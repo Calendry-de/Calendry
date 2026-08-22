@@ -29,6 +29,24 @@
             role="alert"
         >{{ error }}</p>
 
+        <!--
+            Advisory, and visually distinct from `picker_error` on purpose. An
+            error means the write did NOT land; these mean it did, and here is
+            what it implies. Rendered alongside rather than instead of the error,
+            because they are answers to different questions — though in practice
+            a failed write produces no warnings, since the hook runs after a
+            successful replacement.
+
+            `role="status"` rather than `alert`: assistive tech should announce
+            it politely, not interrupt. Nothing is wrong.
+        -->
+        <p
+            v-for="note in warnings ?? []"
+            :key="note"
+            class="picker_warning"
+            role="status"
+        >{{ note }}</p>
+
         <ul
             v-if="rows.length"
             class="picker_rows"
@@ -162,6 +180,8 @@ const props = defineProps<{
     busy?: boolean;
     saved?: boolean;
     error?: string;
+    /** Advisory notes about what the SAVED set implies. Never a failure. */
+    warnings?: string[];
     readonly?: boolean;
 }>();
 
@@ -266,6 +286,21 @@ function onAdd(event: Event) {
         color: $error700;
 
         background: vartorgba('error500', 0.14);
+    }
+
+    /* Deliberately the warning palette, not the error one: same weight of
+       attention, different meaning. A user who has just saved successfully must
+       not be shown red. */
+    &_warning {
+        margin: 0;
+        padding: var(--space-3) var(--space-5);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-sm);
+        line-height: 1.5;
+        color: $warning700;
+
+        background: vartorgba('warning500', 0.14);
     }
 
     &_rows {

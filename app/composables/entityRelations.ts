@@ -94,6 +94,13 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
     const busy = ref<Record<string, boolean>>({});
     const errors = ref<Record<string, string>>({});
     const saved = ref<Record<string, boolean>>({});
+    /**
+     * Advisory notes about what a SAVED set implies — distinct from `errors`,
+     * which mean the write did not land. Keyed per relation, cleared on the next
+     * write to that relation so a stale note cannot outlive the state it
+     * described.
+     */
+    const warnings = ref<Record<string, string[]>>({});
 
     function seed() {
         const next: Record<string, RelationRow[]> = {};
@@ -133,18 +140,29 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
         drafts.value = { ...drafts.value, [def.key]: rows };
         busy.value = { ...busy.value, [def.key]: true };
         errors.value = { ...errors.value, [def.key]: '' };
+        warnings.value = { ...warnings.value, [def.key]: [] };
         saved.value = { ...saved.value, [def.key]: false };
 
         try {
-            const result = await request<RelationRow[]>(`/api/${entity.key}/${id}/${def.key}`, {
-                method: 'PUT',
-                body: rows,
-            });
+            /**
+             * Two shapes, both accepted. A relation declaring `warnAfterWrite`
+             * returns `{ rows, warnings }`; every other one returns the bare
+             * array it always did. Normalised here rather than branching per
+             * relation, so the panel never has to know which kind it is holding.
+             */
+            const result = await request<RelationRow[] | { rows: RelationRow[]; warnings: string[] }>(
+                `/api/${entity.key}/${id}/${def.key}`,
+                { method: 'PUT', body: rows },
+            );
+
+            const returned = Array.isArray(result) ? result : result.rows;
+            const notes = Array.isArray(result) ? [] : (result.warnings ?? []);
 
             // Adopt what came BACK, not what was sent: the server is the
             // authority on the resulting set, and a silent divergence between
             // the two is exactly what an optimistic update hides.
-            drafts.value = { ...drafts.value, [def.key]: result };
+            drafts.value = { ...drafts.value, [def.key]: returned };
+            warnings.value = { ...warnings.value, [def.key]: notes };
             saved.value = { ...saved.value, [def.key]: true };
         } catch (error) {
             // Roll back rather than leave the UI showing a membership the
@@ -189,6 +207,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
         drafts,
         busy,
         errors,
+        warnings,
         saved,
         optionsFor,
         extraOptionsFor,

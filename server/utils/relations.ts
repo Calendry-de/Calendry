@@ -48,6 +48,116 @@ export interface RelationConfig {
      * a federation-owned Room has no owning tenant.
      */
     tenantColumnNullable?: boolean;
+    /**
+     * Advisory notes about what the just-written set IMPLIES, surfaced next to
+     * the control without refusing the write.
+     *
+     * Warn-and-allow, matching TAXONOMY.md §3's rule for manual edits: the
+     * consequence is stated, the user's decision stands. Run INSIDE the write
+     * transaction and AFTER the replacement, so the notes describe the new set
+     * rather than the one being replaced.
+     *
+     * THE SHAPE OF THE PUT RESPONSE DEPENDS ON THIS FIELD. A relation that
+     * declares it returns `{ rows, warnings }`; every other relation returns the
+     * bare array it always did. That is the same conditional-shape pattern the
+     * list route uses for `limit`, and it is what keeps this from being a
+     * breaking change for the five relations that do not want warnings.
+     */
+    warnAfterWrite?: (ctx: {
+        tx: Tx;
+        tenantId: string;
+        /** The parent row's id — for `groups/terms`, the Group. */
+        id: string;
+        /** The set as just written. */
+        rows: Record<string, unknown>[];
+    }) => Promise<string[]>;
+}
+
+/** One Term that still uses a Group it is no longer scoped to. */
+interface OrphanedScope {
+    name: string;
+    offerings: number;
+    sessions: number;
+}
+
+/**
+ * Terms this Group is no longer scoped to, but whose Offerings or Sessions
+ * still reference it.
+ *
+ * WHY THIS WARNS RATHER THAN REFUSES
+ *
+ * Nothing breaks. `group_term` is a VISIBILITY scope — which Groups a picker
+ * offers — and the solver never reads it: `assembleSolverInput` derives the
+ * Groups it needs from what Offerings and Sessions actually reference
+ * (solverGroups.ts), precisely so tenant configuration cannot make an input
+ * internally inconsistent. So the existing links keep working and the next
+ * solve is unaffected either way.
+ *
+ * What DOES change is that the Group stops appearing in that Term's pickers, so
+ * a link removed by accident cannot be re-added without first restoring the
+ * scope. That is worth saying out loud and not worth blocking over.
+ *
+ * The query is the backfill's shape (`groupTermBackfill.ts`) inverted: instead
+ * of "which Terms does usage imply", it asks "which Terms does usage imply that
+ * the new scope now excludes". Both sources, because a Session can carry a
+ * Group its Offering does not.
+ */
+async function groupTermScopeWarnings(ctx: {
+    tx: Tx;
+    tenantId: string;
+    id: string;
+    rows: Record<string, unknown>[];
+}): Promise<string[]> {
+    /**
+     * No rows means "available in every Term" (see the migration), so nothing is
+     * scoped out and nothing can be orphaned. Returning early also keeps the
+     * `<> ALL('{}')` edge case out of the query, where an empty array would make
+     * every Term match.
+     */
+    if (ctx.rows.length === 0) {
+        return [];
+    }
+
+    const scopedTermIds = ctx.rows.map((row) => String(row.termId));
+
+    const orphaned = await ctx.tx.$queryRaw<OrphanedScope[]>`
+        SELECT t.name,
+               count(DISTINCT og.offering_id)::int AS offerings,
+               count(DISTINCT sg.session_id)::int  AS sessions
+          FROM term t
+          LEFT JOIN offering o
+                 ON o.term_id = t.id
+          LEFT JOIN offering_group og
+                 ON og.offering_id = o.id AND og.group_id = ${ctx.id}
+          LEFT JOIN session s
+                 ON s.term_id = t.id
+          LEFT JOIN session_group sg
+                 ON sg.session_id = s.id AND sg.group_id = ${ctx.id}
+         WHERE t.tenant_id = ${ctx.tenantId}
+           AND NOT (t.id = ANY(${scopedTermIds}::text[]))
+         GROUP BY t.id, t.name
+        HAVING count(og.offering_id) + count(sg.session_id) > 0
+         ORDER BY t.name
+    `;
+
+    return orphaned.map((row) => {
+        const parts: string[] = [];
+
+        if (row.offerings > 0) {
+            parts.push(`${row.offerings} Offering${row.offerings === 1 ? '' : 's'}`);
+        }
+
+        if (row.sessions > 0) {
+            parts.push(`${row.sessions} Session${row.sessions === 1 ? '' : 's'}`);
+        }
+
+        // The "solver is unaffected" clause is not reassurance padding: it is
+        // true by construction, and without it the warning reads as though a
+        // timetable is about to break.
+        return `Scoped out of ${row.name}, but ${parts.join(' and ')} in that term still use this group. `
+            + 'They keep working and the solver is unaffected — this group just will not appear in '
+            + `group pickers for ${row.name}.`;
+    });
 }
 
 const id = z.string().min(1);
@@ -100,6 +210,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
         parentKey: 'groupId',
         item: z.object({ termId: id }),
         select: { termId: true },
+        warnAfterWrite: groupTermScopeWarnings,
     },
 
     'offerings/groups': {

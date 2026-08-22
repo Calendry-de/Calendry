@@ -32,6 +32,7 @@
             :readonly="!canUpdate"
             :rows="relations.drafts.value[def.key] ?? []"
             :saved="!!relations.saved.value[def.key]"
+            :warnings="relations.warnings.value[def.key]"
             @add="relations.add(def, $event)"
             @remove="relations.remove(def, $event)"
             @set-extra="relations.setExtra(def, $event.value, $event.key, $event.extra)"

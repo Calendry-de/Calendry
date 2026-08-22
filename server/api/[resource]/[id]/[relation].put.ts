@@ -79,13 +79,41 @@ export default defineEventHandler(async (event) => {
                 });
             }
 
-            return relationDelegate(tx, config.model).findMany({
+            const written = await relationDelegate(tx, config.model).findMany({
                 where: {
                     [config.parentKey]: id,
                     ...(config.tenantColumnNullable ? {} : { tenantId: identity.tenantId }),
                 },
                 select: config.select,
+            }) as Record<string, unknown>[];
+
+            /**
+             * RESPONSE SHAPE IS CONDITIONAL, deliberately:
+             *
+             *   no `warnAfterWrite`  ->  a bare array, exactly as before
+             *   `warnAfterWrite`     ->  { rows, warnings }
+             *
+             * Same pattern as the list route's `limit`. A relation that has
+             * nothing advisory to say keeps the shape every existing caller
+             * already reads, so adding warnings to ONE relation is not a
+             * breaking change for the other five.
+             *
+             * Computed AFTER the replacement and inside the same transaction:
+             * running it before would describe the set being replaced, which is
+             * the opposite of what the user just chose.
+             */
+            if (!config.warnAfterWrite) {
+                return written;
+            }
+
+            const warnings = await config.warnAfterWrite({
+                tx,
+                tenantId: identity.tenantId,
+                id: id as string,
+                rows: written,
             });
+
+            return { rows: written, warnings };
         });
     });
 });
