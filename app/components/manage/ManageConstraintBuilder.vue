@@ -448,33 +448,6 @@ onMounted(() => {
         }
     }
 
-    &_deferred {
-        display: flex;
-        gap: var(--space-4);
-        align-items: flex-start;
-
-        margin: 0;
-        padding: var(--space-5);
-        border-radius: var(--radius-lg);
-
-        font-size: var(--font-size-sm);
-        line-height: 1.55;
-        color: $content5;
-
-        background: $surface3;
-
-        svg {
-            flex: none;
-            width: 17px;
-            height: 17px;
-            margin-top: 1px;
-        }
-
-        strong {
-            display: block;
-            color: $content2;
-        }
-    }
 
     &_params {
         display: flex;
@@ -506,9 +479,9 @@ onMounted(() => {
        ManageField renders help and error as `v-else-if`, so help vanishes
        exactly when someone is most likely to be reading it.
 
-       Deliberately the same visual language as `_deferred` (surface, radius,
-       block `strong` lead) so the form has one voice for "read this" rather
-       than a second style competing with it. */
+       Carries the surface/radius/block-`strong` language the removed
+       `_deferred` banner used, so the form keeps one voice for "read this"
+       rather than growing a second style for the same job. */
     &_note {
         margin: 0;
         padding: var(--space-5);
