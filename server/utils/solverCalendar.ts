@@ -1,6 +1,9 @@
 import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@mindcollaps/calendry-proto';
 import type { BlockGrid } from '../../shared/timeGrid';
 import { blockAtMinute } from '../../shared/timeGrid';
+import {
+    WEEK_KIND, addDays, classifyWeeks, isoDate, isoWeekday, mondayOf, overlaps,
+} from '../../shared/academicCalendar';
 
 /**
  * Stage 3a — the grid and the academic calendar, and the one genuinely hard
@@ -20,35 +23,13 @@ import { blockAtMinute } from '../../shared/timeGrid';
 
 const MS_PER_DAY = 86_400_000;
 
-/** ISO weekday, 1 = Monday … 7 = Sunday, from a UTC-anchored date. */
-export function isoWeekday(date: Date): number {
-    return ((date.getUTCDay() + 6) % 7) + 1;
-}
-
-/** UTC midnight of the Monday on or before `date`. */
-export function mondayOf(date: Date): Date {
-    const utcMidnight = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-
-    return new Date(utcMidnight - (isoWeekday(new Date(utcMidnight)) - 1) * MS_PER_DAY);
-}
-
-/** ISO-8601 date (YYYY-MM-DD) of a UTC-anchored date. */
-export function isoDate(date: Date): string {
-    return date.toISOString().slice(0, 10);
-}
-
-function addDays(date: Date, days: number): Date {
-    return new Date(date.getTime() + days * MS_PER_DAY);
-}
-
-/** Inclusive-range overlap on date-only values. */
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-    return aStart.getTime() <= bEnd.getTime() && bStart.getTime() <= aEnd.getTime();
-}
-
-function covers(outerStart: Date, outerEnd: Date, innerStart: Date, innerEnd: Date): boolean {
-    return outerStart.getTime() <= innerStart.getTime() && outerEnd.getTime() >= innerEnd.getTime();
-}
+/**
+ * Date helpers and week classification now live in `shared/academicCalendar.ts`,
+ * so the calendar-period editor's PREVIEW and the wire cannot disagree about
+ * which weeks a period reclassifies. Re-exported here because several server
+ * modules already import them from this file.
+ */
+export { isoDate, isoWeekday, mondayOf } from '../../shared/academicCalendar';
 
 // ---------------------------------------------------------------------------
 // TimeGrid
@@ -111,8 +92,6 @@ export interface AppCalendarPeriod {
     endDate: Date;
 }
 
-/** Wire WeekKind values; the generated enum is numeric. */
-const WEEK_KIND = { UNSPECIFIED: 0, TEACHING: 1, EXAM: 2, BREAK: 3, HOLIDAY: 4 } as const;
 
 /**
  * Weeks are MONDAY-ANCHORED, per the proto's `start_date` = "that week's
@@ -139,43 +118,38 @@ export function buildAcademicCalendar(
     termEnd: Date,
     periods: AppCalendarPeriod[],
 ): AcademicCalendar {
-    const firstMonday = mondayOf(termStart);
-    const lastMonday = mondayOf(termEnd);
-    const weekCount = Math.floor((lastMonday.getTime() - firstMonday.getTime()) / (7 * MS_PER_DAY)) + 1;
+    /**
+     * Week kinds come from `shared/academicCalendar.ts`, which the editor's
+     * preview also calls. That is the whole point of the extraction: a preview
+     * that disagreed with this would state the opposite of the truth while
+     * looking authoritative.
+     */
+    const weeks = classifyWeeks(termStart, termEnd, periods);
 
-    const exams = periods.filter((p) => p.kind === 'EXAM');
-    const breaks = periods.filter((p) => p.kind === 'BREAK');
+    /**
+     * Holidays that do NOT swallow a whole week are emitted as individual dates,
+     * matching the proto's "single days that are holidays inside
+     * otherwise-teaching weeks". A week already classified HOLIDAY does not also
+     * list its days — that would be the same fact twice.
+     */
     const holidays = periods.filter((p) => p.kind === 'HOLIDAY');
-
-    const weeks = [];
     const holidayDates: { date: string; label: string }[] = [];
+    const firstMonday = mondayOf(termStart);
 
-    for (let index = 0; index < weekCount; index++) {
-        const weekStart = addDays(firstMonday, index * 7);
-        const weekEnd = addDays(weekStart, 6);
-
-        let kind: number = WEEK_KIND.TEACHING;
-
-        if (exams.some((p) => overlaps(p.startDate, p.endDate, weekStart, weekEnd))) {
-            kind = WEEK_KIND.EXAM;
-        } else if (breaks.some((p) => covers(p.startDate, p.endDate, weekStart, weekEnd))) {
-            kind = WEEK_KIND.BREAK;
-        } else if (holidays.some((p) => covers(p.startDate, p.endDate, weekStart, weekEnd))) {
-            kind = WEEK_KIND.HOLIDAY;
-        }
-
-        weeks.push({ index, startDate: isoDate(weekStart), kind });
-
-        if (kind === WEEK_KIND.HOLIDAY) {
+    for (const week of weeks) {
+        if (week.kind === WEEK_KIND.HOLIDAY) {
             continue;
         }
+
+        const weekStart = addDays(firstMonday, week.index * 7);
+        const weekEnd = addDays(weekStart, 6);
 
         for (const period of holidays) {
             if (!overlaps(period.startDate, period.endDate, weekStart, weekEnd)) {
                 continue;
             }
 
-            for (let day = 0; day < 7; day++) {
+            for (let day = 0; day < 7; day += 1) {
                 const date = addDays(weekStart, day);
 
                 if (date >= period.startDate && date <= period.endDate) {

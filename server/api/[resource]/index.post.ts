@@ -23,6 +23,10 @@ export default defineEventHandler(async (event) => {
         const { columns, children } = splitChildren(config, body as Record<string, unknown>);
         const data = { ...columns, tenantId: identity.tenantId };
 
+        // Entity-specific refusal, in this transaction, before anything is
+        // written. Throwing here leaves nothing behind.
+        await config.beforeCreate?.({ tx, tenantId: identity.tenantId, data });
+
         const created = await mapDbErrors(async () => {
             // Creating a row that claims an exclusive flag demotes the incumbent,
             // in this transaction. Without it, "create this as the default" is a

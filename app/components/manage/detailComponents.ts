@@ -1,4 +1,5 @@
 import type { Component } from 'vue';
+import ManageCalendarPeriodForm from '~/components/manage/ManageCalendarPeriodForm.vue';
 import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder.vue';
 import ManageGroupForm from '~/components/manage/ManageGroupForm.vue';
 import ManageGroupTree from '~/components/manage/ManageGroupTree.vue';
@@ -35,6 +36,7 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
     GroupForm: ManageGroupForm,
     TimeGridEditor: ManageTimeGridEditor,
     ConstraintBuilder: ManageConstraintBuilder,
+    CalendarPeriodForm: ManageCalendarPeriodForm,
 };
 
 export const LIST_COMPONENTS: Record<string, Component> = {

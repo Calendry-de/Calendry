@@ -88,6 +88,18 @@ export interface ResourceConfig {
         id: string;
         children: Record<string, unknown[]>;
     }) => Promise<void>;
+    /**
+     * Entity-specific refusal on CREATE, inside the transaction, before the
+     * insert. The counterpart to `beforeUpdate`, for rules a zod schema cannot
+     * express because they need to READ another row — a calendar period has to
+     * be checked against its Term's date range, and the Term is a different
+     * table.
+     */
+    beforeCreate?: (ctx: {
+        tx: Tx;
+        tenantId: string;
+        data: Record<string, unknown>;
+    }) => Promise<void>;
     beforeUpdate?: (ctx: {
         tx: Tx;
         tenantId: string;
@@ -200,6 +212,115 @@ async function constraintBeforeUpdate(ctx: {
             },
         });
     }
+}
+
+/**
+ * A calendar period must fall inside its Term.
+ *
+ * WHY THIS IS A REFUSAL AND NOT A WARNING
+ *
+ * A period entirely outside `[term.startDate, term.endDate]` classifies NO
+ * week: every overlap test in `classifyWeeks` fails, so the row exists, reads
+ * back correctly, appears in the list, and means nothing. That is precisely the
+ * failure mode CLAUDE.md's "guards must fail loudly or match exactly" rule
+ * exists for — and it is the same shape as the bug that made this whole feature
+ * necessary, where an empty `calendar_period` table left
+ * `minimize_exam_week_sessions` reporting zero violations while looking healthy.
+ *
+ * A PARTIAL overlap is ALLOWED, deliberately. A period running past the end of
+ * term is ordinary (an exam week that spills into the following month), only
+ * its in-range part classifies anything, and clipping is the natural reading.
+ * Refusing it would reject a legitimate configuration to prevent nothing.
+ *
+ * OVERLAPS BETWEEN PERIODS ARE NOT CHECKED AT ALL, also deliberately. They are
+ * meaningful and the precedence rule already resolves them — a holiday inside
+ * an exam period is normal, and "EXAM if any exam period touches the week, else
+ * whole-week BREAK, else whole-week HOLIDAY" only HAS meaning because periods
+ * can overlap. Rejecting them would contradict the resolver already shipped.
+ */
+async function assertPeriodWithinTerm(
+    tx: Tx,
+    tenantId: string,
+    termId: string,
+    startDate: Date,
+    endDate: Date,
+): Promise<void> {
+    const term = await tx.term.findFirst({
+        where: { id: termId, tenantId },
+        select: { name: true, startDate: true, endDate: true },
+    });
+
+    // Absent or another tenant's: say nothing, and let the insert's foreign key
+    // report it. This guard must not become a way to probe which ids exist.
+    if (!term) {
+        return;
+    }
+
+    if (endDate < term.startDate || startDate > term.endDate) {
+        const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+        throw createError({
+            statusCode: 400,
+            statusMessage: `This period (${iso(startDate)} to ${iso(endDate)}) falls entirely outside `
+                + `'${term.name}' (${iso(term.startDate)} to ${iso(term.endDate)}), so it would `
+                + 'classify no week and have no effect. Move it inside the term.',
+            data: {
+                issues: [{ code: 'custom', path: ['startDate'], message: 'Outside the term\u2019s date range.' }],
+            },
+        });
+    }
+}
+
+async function calendarPeriodBeforeCreate(ctx: {
+    tx: Tx;
+    tenantId: string;
+    data: Record<string, unknown>;
+}): Promise<void> {
+    await assertPeriodWithinTerm(
+        ctx.tx,
+        ctx.tenantId,
+        ctx.data.termId as string,
+        ctx.data.startDate as Date,
+        ctx.data.endDate as Date,
+    );
+}
+
+/**
+ * On update the MERGED range is checked, not just the patched field — unlike
+ * the constraint guard, which validates only what the patch touches.
+ *
+ * The difference is that these two columns describe ONE fact between them.
+ * Moving only `endDate` changes the range as a whole, so validating it in
+ * isolation would accept a patch that makes the row inert. There is also no
+ * trap to avoid here: an existing out-of-range row can always be repaired,
+ * because any patch that brings the range back inside the term passes.
+ */
+async function calendarPeriodBeforeUpdate(ctx: {
+    tx: Tx;
+    tenantId: string;
+    id: string;
+    patch: Record<string, unknown>;
+}): Promise<void> {
+    if (!('startDate' in ctx.patch) && !('endDate' in ctx.patch)) {
+        return;
+    }
+
+    const existing = await ctx.tx.calendarPeriod.findFirst({
+        where: { id: ctx.id, tenantId: ctx.tenantId },
+        select: { termId: true, startDate: true, endDate: true },
+    });
+
+    if (!existing) {
+        return;
+    }
+
+    await assertPeriodWithinTerm(
+        ctx.tx,
+        ctx.tenantId,
+        existing.termId,
+        (ctx.patch.startDate as Date | undefined) ?? existing.startDate,
+        (ctx.patch.endDate as Date | undefined) ?? existing.endDate,
+    );
 }
 
 const id = z.string().min(1);
@@ -561,6 +682,54 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         filters: z.object({}),
         orderBy: { startDate: 'desc' },
         searchFields: ['name'],
+    },
+
+    /**
+     * Holidays, break weeks and exam periods.
+     *
+     * ON THE GENERIC SCAFFOLD, DELIBERATELY. The row is four scalars — an enum
+     * `kind`, a name, and two dates — with none of what earned the three
+     * bespoke editors their slots: no hierarchy (GroupTree), no arithmetic a
+     * form field cannot express (TimeGridEditor), no fields that constrain each
+     * other (ConstraintBuilder). Offering is the precedent: the hub of the model
+     * renders on the generic scaffold because its complexity is registry data,
+     * not different code. Only the week PREVIEW is bespoke, and it is one
+     * `custom: true` field rather than a page.
+     *
+     * WHY THIS DID NOT EXIST UNTIL NOW, which is worth recording. The table,
+     * the Prisma model, the RLS policy, `buildAcademicCalendar` and the wire
+     * have all been in place since the initial schema — but nothing could WRITE
+     * a row. So `calendar_period` was empty in every tenant, no week was ever
+     * classified EXAM, and `minimize_exam_week_sessions` reported zero
+     * violations while looking like it worked. Raising its weight from 5 to
+     * 1000 multiplied zero by two hundred.
+     */
+    'calendar-periods': {
+        model: 'calendarPeriod',
+        create: z.object({
+            termId: id,
+            kind: z.enum(['HOLIDAY', 'BREAK', 'EXAM']),
+            name: z.string().min(1),
+            startDate: z.coerce.date(),
+            endDate: z.coerce.date(),
+        }),
+        update: z.object({
+            // `termId` is deliberately absent: moving a period to another Term
+            // is creating a different period, and allowing it would let a row
+            // land outside the range `beforeCreate` checked it against.
+            kind: z.enum(['HOLIDAY', 'BREAK', 'EXAM']).optional(),
+            name: z.string().min(1).optional(),
+            startDate: z.coerce.date().optional(),
+            endDate: z.coerce.date().optional(),
+        }),
+        filters: z.object({
+            termId: z.string().optional(),
+            kind: z.enum(['HOLIDAY', 'BREAK', 'EXAM']).optional(),
+        }),
+        orderBy: { startDate: 'asc' },
+        searchFields: ['name'],
+        beforeCreate: calendarPeriodBeforeCreate,
+        beforeUpdate: calendarPeriodBeforeUpdate,
     },
 
     constraints: {

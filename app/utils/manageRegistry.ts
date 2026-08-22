@@ -692,6 +692,71 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             },
         ],
     },
+
+    {
+        key: 'calendar-periods',
+        // A child of Term, so `term.update` governs it — changing when a term's
+        // exam period falls IS editing the term. Same reasoning as
+        // `time_grid_break` living under `time_grid.update`.
+        permissionPrefix: 'term',
+        label: 'Calendar period',
+        plural: 'Calendar periods',
+        icon: 'material-symbols:event-busy-outline',
+        description: 'Holidays, break weeks and exam periods within a term.',
+        keywords: ['calendar', 'period', 'holiday', 'break', 'exam', 'vacation', 'reading week', 'recess'],
+        title: (row) => String(row.name ?? 'Calendar period'),
+        detailComponent: 'CalendarPeriodForm',
+        columns: [
+            { key: 'name', label: 'Name' },
+            { key: 'kind', label: 'Kind' },
+            { key: 'startDate', label: 'Starts', format: 'date' },
+            { key: 'endDate', label: 'Ends', format: 'date' },
+        ],
+        fields: [
+            {
+                key: 'termId',
+                label: 'Term',
+                type: 'reference',
+                required: true,
+                createOnly: true,
+                help: 'Which term this period falls in. Cannot be changed afterwards — '
+                    + 'moving a period to another term is creating a different period.',
+                reference: {
+                    resource: 'terms',
+                    label: (row) => String(row.name ?? row.id),
+                    emptyHint: 'No terms configured yet.',
+                },
+            },
+            {
+                key: 'kind',
+                label: 'Kind',
+                type: 'select',
+                required: true,
+                // Structural, not tenant vocabulary: TAXONOMY.md §2 names these
+                // three explicitly, and each has different week-classification
+                // semantics that only exist because the set is fixed.
+                options: [
+                    { value: 'EXAM', label: 'Exam period' },
+                    { value: 'BREAK', label: 'Break' },
+                    { value: 'HOLIDAY', label: 'Holiday' },
+                ],
+                help: 'An EXAM period claims any week it touches. A BREAK or HOLIDAY '
+                    + 'claims a week only if it covers the whole of it.',
+            },
+            { key: 'name', label: 'Name', type: 'text', required: true },
+            { key: 'startDate', label: 'Start date', type: 'date', required: true },
+            { key: 'endDate', label: 'End date', type: 'date', required: true },
+            {
+                key: 'weekPreview',
+                label: 'Weeks this reclassifies',
+                type: 'text',
+                // Rendered by ManageCalendarPeriodPreview. `custom` keeps the key
+                // out of the payload while leaving the field in the form's
+                // layout — there is no `weekPreview` column.
+                custom: true,
+            },
+        ],
+    },
 ];
 
 

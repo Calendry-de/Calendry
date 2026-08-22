@@ -249,6 +249,15 @@ otherwise" is not one.
   Bulk-fixing pre-existing lint debt is a deliberate standalone task, never a
   side effect of another step.
 
+- **`export { x } from './y'` re-exports WITHOUT binding `x` locally.** The
+  module can hand `x` to its importers and still throw `ReferenceError: x is not
+  defined` when its own code calls it — and `nuxt build` typechecks it clean,
+  because the export is genuinely valid. Moving `isoWeekday` into
+  `shared/academicCalendar.ts` and re-exporting it from `solverCalendar.ts` broke
+  `computeReferenceSlot()` exactly this way; three tests caught it, the build did
+  not. When extracting a helper that the same file still uses, `import` it as
+  well as re-exporting it.
+
 - **Vue does not flush watchers during SSR, so nothing that must be true at
   first render may depend on one.** A `watch(data, seed, { immediate: true })`
   runs exactly once on the server — at setup, before the fetch resolves — and

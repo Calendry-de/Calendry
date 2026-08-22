@@ -37,6 +37,19 @@ export const CRUD_RESOURCES = {
     // placed Sessions. Being able to rename the vocabulary is not the same
     // authority as being able to move the timetable.
     'session-kinds': 'session_kind',
+    /**
+     * Holidays, break weeks and exam periods — the academic calendar
+     * (TAXONOMY.md §2, "FIXED, core from day one").
+     *
+     * Mapped to `term`, NOT a permission of its own. A calendar period is a
+     * child of Term with a mandatory `term_id`, exactly as `time_grid_break` is
+     * a child of TimeGrid, and the same reasoning applies: changing when a
+     * term's exam period falls IS editing the term. A separate
+     * `calendar_period.manage` would be authority over a TABLE rather than over
+     * a capability, and would need a backfill on every existing tenant or the
+     * feature 403s on a screen that visibly exists.
+     */
+    'calendar-periods': 'term',
 } as const;
 
 export type CrudAction = 'read' | 'create' | 'update' | 'delete';
