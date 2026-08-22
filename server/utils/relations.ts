@@ -81,6 +81,27 @@ export const RELATIONS: Record<string, RelationConfig> = {
         select: { id: true, afterBlockIndex: true, durationMinutes: true, label: true, dayOfWeek: true },
     },
 
+    /**
+     * Which Terms a Group is available in.
+     *
+     * A PUT-set like every other collection here. NO ROWS MEANS EVERY TERM, so
+     * saving an empty list is a meaningful action — it WIDENS the Group back to
+     * universal rather than hiding it everywhere. That is the one thing about
+     * this relation that reads backwards at first glance, and it is why the
+     * editor labels the empty state rather than leaving a blank list.
+     *
+     * Permission is the parent's `group.update`, per the rule above: changing
+     * when a Group applies IS editing the Group.
+     */
+    'groups/terms': {
+        parent: 'groups',
+        parentModel: 'group',
+        model: 'groupTerm',
+        parentKey: 'groupId',
+        item: z.object({ termId: id }),
+        select: { termId: true },
+    },
+
     'offerings/groups': {
         parent: 'offerings',
         parentModel: 'offering',

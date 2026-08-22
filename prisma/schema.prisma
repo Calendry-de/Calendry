@@ -252,6 +252,7 @@ model Tenant {
   people               Person[]
   roles                Role[]
   groups               Group[]
+  groupTerms           GroupTerm[]
   memberships          Membership[]
   personRoles          PersonRole[]
   rooms                Room[]
@@ -407,6 +408,7 @@ model Group {
   memberships    Membership[]
   offeringGroups OfferingGroup[]
   sessionGroups  SessionGroup[]
+  terms          GroupTerm[]
 
   ancestorClosures   GroupClosure[] @relation("ClosureAncestor")
   descendantClosures GroupClosure[] @relation("ClosureDescendant")
@@ -652,10 +654,42 @@ model Term {
   offerings       Offering[]
   sessions        Session[]
   solverRuns      SolverRun[]
+  groups          GroupTerm[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("term")
+}
+
+/// Group ↔ Term: which Terms a Group is available in (TAXONOMY.md §2).
+///
+/// NO ROW MEANS "AVAILABLE IN EVERY TERM", not "available in none". Fail-open,
+/// deliberately and against this codebase's usual instinct: scoping is opt-in,
+/// so existing Groups keep working and a newly created one is usable
+/// immediately rather than invisible until someone remembers a second step.
+///
+/// Many-to-many rather than a `term_id` on Group, because the hierarchy mixes
+/// two lifetimes. A cohort like "dIT22 S1 4.Semester" belongs to one Term; its
+/// parent "IT Security" is a degree programme that persists across all of them
+/// and is never directly scheduled. Owning a Group by a Term would force either
+/// a cross-Term parent — abandoning the model — or a duplicated programme node
+/// per Term, which destroys the identity of the thing it names and orphans
+/// every `membership` row pointing at last Term's copy.
+model GroupTerm {
+  groupId  String @map("group_id")
+  termId   String @map("term_id")
+  tenantId String @map("tenant_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  term   Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, termId])
+  @@index([termId])
+  @@index([tenantId])
+  @@map("group_term")
 }
 
 /// Holidays, break weeks and exam periods as structured data.

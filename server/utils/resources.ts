@@ -94,6 +94,22 @@ export interface ResourceConfig {
         id: string;
         patch: Record<string, unknown>;
     }) => Promise<void>;
+    /**
+     * Declared filters that are NOT plain column equality.
+     *
+     * The list route spreads `filters` straight into `where`, which is right for
+     * the common case and wrong for two: a range (`minCapacity` means
+     * `capacity >= n`) and a relation (`groups?termId=` means "scoped to that
+     * Term OR scoped to none"). Each entry removes its key from the equality
+     * spread and contributes a clause to the AND list instead.
+     *
+     * Keyed PER RESOURCE rather than by filter name, which is the point: the
+     * route previously special-cased `minCapacity` by name, and `termId` cannot
+     * work that way — `offerings` declares a `termId` filter that IS a plain
+     * column, so a name-keyed rule would silently rewrite it into a relation
+     * query against a relation offerings does not have.
+     */
+    relationalFilters?: Record<string, (value: never) => Record<string, unknown>>;
 }
 
 /**
@@ -234,6 +250,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
 
     groups: {
         model: 'group',
+        // Scope travels with the row so a caller can tell "available everywhere"
+        // from "available here" without a second request — the distinction the
+        // whole fail-open rule turns on.
+        include: { terms: true },
         create: z.object({
             parentGroupId: optionalId,
             name: z.string().min(1),
@@ -248,7 +268,32 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             description: z.string().nullish(),
             expectedSize: z.number().int().nonnegative().nullish(),
         }),
-        filters: z.object({ parentGroupId: z.string().optional() }),
+        filters: z.object({
+            parentGroupId: z.string().optional(),
+            /** See `relationalFilters.termId` — scoped-or-universal, not equality. */
+            termId: z.string().optional(),
+        }),
+        /**
+         * SCOPED-OR-UNIVERSAL, and the second half is the whole design.
+         *
+         * `group_term` says which Terms a Group is available in, and NO ROW
+         * MEANS EVERY TERM (fail-open). So filtering by Term must return the
+         * Groups explicitly scoped to it AND the unscoped ones — a bare
+         * `terms: { some: { termId } }` would hide every Group nobody has
+         * scoped yet, which today is eight of ten and would make the picker
+         * emptier the moment this shipped.
+         *
+         * `none: {}` rather than a count: it is the direct expression of
+         * "carries no scope rows at all", and reads as the rule it implements.
+         */
+        relationalFilters: {
+            termId: (value: string) => ({
+                OR: [
+                    { terms: { some: { termId: value } } },
+                    { terms: { none: {} } },
+                ],
+            }),
+        },
         orderBy: { name: 'asc' },
         searchFields: ['name', 'description'],
     },
@@ -279,6 +324,11 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             isActive: z.coerce.boolean().optional(),
             minCapacity: z.coerce.number().int().optional(),
         }),
+        // A range, not an equality. Was special-cased by name in the list route;
+        // declared here now so the route stays generic.
+        relationalFilters: {
+            minCapacity: (value: number) => ({ capacity: { gte: value } }),
+        },
         orderBy: { code: 'asc' },
         searchFields: ['code', 'name', 'location'],
     },

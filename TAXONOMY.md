@@ -28,6 +28,10 @@ Everything below is tagged **[FIXED]** or **[OPEN]** accordingly.
 ### Grouping
 - **`Group`** [FIXED] — a class, cohort, seminar group, etc. **Supports nesting** (parent/child hierarchy — e.g. Cohort → Class → Seminar Group).
 - **`Membership`** [FIXED relation] — Person ↔ Group.
+- **`GroupTerm`** [FIXED relation] — Group ↔ Term, many-to-many. Which Terms a Group is available in.
+  - **No row means available in EVERY Term**, not none. Fail-open, deliberately: scoping is opt-in, so a Group nobody has scoped stays usable and a newly created one is usable immediately.
+  - **Many-to-many, not a `term_id` on Group.** The hierarchy carries two different lifetimes. A cohort ("dIT22 S1, 4. Semester") belongs to one Term; its parent ("IT Security", the degree programme) persists across all of them and is never directly scheduled. Owning a Group by a Term would force either a cross-Term parent — abandoning the model — or a duplicated programme node per Term, which destroys the identity of the thing it names and orphans every `Membership` row pointing at last Term's copy. `Membership` has no Term of its own, so Group identity must be stable across Terms for "which cohort is this student in" to have an answer.
+  - It is a **visibility scope, not a scheduling rule.** Nothing about it reaches the solver: which Groups a solve involves is derived from what its Offerings and Sessions actually reference, never from this table. Deriving it from tenant configuration instead would let a mis-scoped Group produce an input whose Offerings name a Group the solver was never sent.
 - Conflict rule: **a scheduling conflict on a parent Group propagates to block its child Groups** (and vice versa should be checked at implementation time — needs an ancestor/descendant closure structure, see §6).
 
 ### Space

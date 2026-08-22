@@ -47,12 +47,32 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requirePermission(event, tx, crudPermission(resource as string, 'read'));
 
-        const where: Record<string, unknown> = { ...(query as Record<string, unknown>) };
 
-        // minCapacity is a range filter, not an equality one.
-        if (where.minCapacity !== undefined) {
-            where.capacity = { gte: where.minCapacity };
-            delete where.minCapacity;
+        /**
+         * Filters that are not plain column equality — a range, or a relation —
+         * are declared per resource and become AND clauses instead.
+         *
+         * Per resource, not per filter name: `minCapacity` used to be
+         * special-cased by name here, which happens to be safe only because one
+         * resource declares it. `termId` is not safe that way — `offerings`
+         * declares a `termId` filter that IS a column, so a name-keyed rule
+         * would rewrite it into a relation query against a relation Offering
+         * does not have.
+         */
+        const builders = config.relationalFilters ?? {};
+        const relational: Record<string, unknown>[] = [];
+        const where: Record<string, unknown> = {};
+
+        // Partitioned rather than spread-then-delete: `no-dynamic-delete` bans
+        // the latter, and one pass is clearer than building a copy to unbuild.
+        for (const [key, value] of Object.entries(query as Record<string, unknown>)) {
+            const build = builders[key];
+
+            if (build && value !== undefined) {
+                relational.push((build as (v: unknown) => Record<string, unknown>)(value));
+            } else {
+                where[key] = value;
+            }
         }
 
         // Explicit tenant filter in addition to RLS. RLS makes a mistake here
@@ -73,7 +93,7 @@ export default defineEventHandler(async (event) => {
             }
             : { tenantId: identity.tenantId };
 
-        const conditions: Record<string, unknown>[] = [ownership];
+        const conditions: Record<string, unknown>[] = [ownership, ...relational];
 
         if (paging.q) {
             const fields = config.searchFields ?? [];

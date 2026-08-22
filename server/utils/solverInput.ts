@@ -4,6 +4,7 @@ import type {
     ConstraintConfig, ExternalOccupancy, Offering, Person, Room, SlotRef,
 } from '@mindcollaps/calendry-proto';
 import type { Tx } from './tenantDb';
+import { assertClosedUnderParent, conflictClosure, referencedGroupIds } from './solverGroups';
 import {
     TermEndedError,
     buildAcademicCalendar,
@@ -55,6 +56,14 @@ export interface AssemblyReport {
      * field, the type determines it — with any weight on a HARD type ignored.
      */
     severityMismatches: { id: string; type: string; stored: string; expected: string }[];
+    /**
+     * Groups the tenant has that this Term's problem does not involve, and which
+     * were therefore not sent. Reported rather than narrowed quietly, like every
+     * other omission in this report — it is the difference between "the tenant
+     * has three cohorts" and "this Term uses three cohorts", and a run that
+     * looks wrong is easier to explain with the number in hand.
+     */
+    groupsOmitted: number;
     counts: {
         rooms: number;
         persons: number;
@@ -319,16 +328,47 @@ export async function assembleSolverInput(
         location: room.location ?? '',
     } as Room));
 
+    /**
+     * Only the Groups this Term's problem can involve.
+     *
+     * Derived from what the Offerings and Sessions actually REFERENCE, expanded
+     * to the conflict closure the solver will rebuild from `parent_id`. NOT
+     * filtered by `group_term`: that table is tenant configuration a human sets,
+     * so trusting it here would let a mis-scoped Group produce an input whose
+     * Offerings name a `group_id` the solver was never sent. See solverGroups.ts
+     * for why the closure is exactly sufficient and why it cannot leave a
+     * dangling parent.
+     */
+    const sentGroupIds = conflictClosure(groupRows, referencedGroupIds(offeringRows, sessionRows));
+    const sentGroupRows = groupRows.filter((group) => sentGroupIds.has(group.id));
+
+    // The proof says this holds; asserted because a silently weakened conflict
+    // propagation is invisible until a timetable double-books a cohort.
+    assertClosedUnderParent(sentGroupRows);
+
     const persons: Person[] = personRows.map((person) => ({
         id: person.id,
         roleTags: person.personRoles.map((link) => link.role.key),
-        groupIds: person.memberships.map((link) => link.groupId),
+        /**
+         * Narrowed to the Groups actually being sent, for the same reason the
+         * Groups themselves are: a `group_id` the solver was never given is a
+         * dangling reference it cannot resolve.
+         *
+         * Dropping the rest loses nothing. A membership only matters if the
+         * Group it names carries a placement in this Term, and a Group with a
+         * placement is by definition referenced — so it is in the sent set,
+         * along with its whole conflict closure. Membership of a Group with no
+         * placements cannot produce a clash for anyone to detect.
+         */
+        groupIds: person.memberships
+            .map((link) => link.groupId)
+            .filter((groupId) => sentGroupIds.has(groupId)),
         // The app models no unavailability at all, so this is empty and
         // LecturerVeto is unsendable. Tracked; see the Stage 3d follow-up.
         blackouts: [],
     }));
 
-    const groups = groupRows.map((group) => ({
+    const groups = sentGroupRows.map((group) => ({
         id: group.id,
         parentId: group.parentGroupId ?? '',
         name: group.name,
@@ -507,6 +547,7 @@ export async function assembleSolverInput(
             droppedEquipmentQuantities,
             skippedConstraints,
             severityMismatches,
+            groupsOmitted: groupRows.length - sentGroupRows.length,
             counts: {
                 rooms: rooms.length,
                 persons: persons.length,

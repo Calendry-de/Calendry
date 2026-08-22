@@ -32,19 +32,60 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
             return { sets: {} as Record<string, RelationRow[]>, options: {} as Record<string, EntityRow[]> };
         }
 
-        const optionResources = [...new Set([
-            ...defs.map((def) => def.resource),
-            ...defs.flatMap((def) => (def.extraReference ? [def.extraReference.resource] : [])),
-        ])];
+        /**
+         * A relation whose options are scoped by a field on the PARENT row needs
+         * that field before it can build the option URL, so the parent is
+         * fetched here rather than read from `useEntityForm`.
+         *
+         * Duplicating that one small request is deliberate. The page awaits both
+         * composables in parallel, and reaching into the form's data would make
+         * this one depend on the other's resolution order — reintroducing
+         * exactly the SSR sequencing that `ready` was restructured to avoid.
+         * Only fetched when some relation actually declares `scopeBy`.
+         */
+        const scoped = defs.some((def) => def.scopeBy);
 
-        const [sets, options] = await Promise.all([
+        const [sets, parent] = await Promise.all([
             Promise.all(defs.map((def) => request<RelationRow[]>(`/api/${entity.key}/${id}/${def.key}`))),
-            Promise.all(optionResources.map((resource) => request<EntityRow[]>(`/api/${resource}`))),
+            scoped ? request<EntityRow>(`/api/${entity.key}/${id}`) : Promise.resolve(null),
         ]);
+
+        /**
+         * Keyed by the full URL, not by resource name. Two relations can draw on
+         * the same resource with different scoping — and deduplicating by
+         * resource alone would serve one of them the other's narrowed list,
+         * silently.
+         */
+        const optionUrls = new Map<string, string>();
+
+        const urlFor = (resource: string, scopeBy?: RelationDef['scopeBy']) => {
+            const value = scopeBy && parent ? parent[scopeBy.from] : undefined;
+
+            // An absent scope value falls back to the UNFILTERED list rather
+            // than sending `?termId=undefined`, which the resource schema would
+            // reject as a 400 and turn a missing field into a blank picker.
+            return value === undefined || value === null || value === ''
+                ? `/api/${resource}`
+                : `/api/${resource}?${scopeBy!.filter}=${encodeURIComponent(String(value))}`;
+        };
+
+        for (const def of defs) {
+            optionUrls.set(`${def.key}:main`, urlFor(def.resource, def.scopeBy));
+
+            if (def.extraReference) {
+                optionUrls.set(`${def.key}:extra`, urlFor(def.extraReference.resource));
+            }
+        }
+
+        const uniqueUrls = [...new Set(optionUrls.values())];
+        const fetched = await Promise.all(uniqueUrls.map((url) => request<EntityRow[]>(url)));
+        const byUrl = new Map(uniqueUrls.map((url, index) => [url, fetched[index] ?? []]));
 
         return {
             sets: Object.fromEntries(defs.map((def, index) => [def.key, sets[index] ?? []])),
-            options: Object.fromEntries(optionResources.map((resource, index) => [resource, options[index] ?? []])),
+            options: Object.fromEntries(
+                [...optionUrls].map(([slot, url]) => [slot, byUrl.get(url) ?? []]),
+            ),
         };
     });
 
@@ -74,11 +115,11 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
     const options = computed(() => asyncData.data.value?.options ?? {});
 
     function optionsFor(def: RelationDef): EntityRow[] {
-        return options.value[def.resource] ?? [];
+        return options.value[`${def.key}:main`] ?? [];
     }
 
     function extraOptionsFor(def: RelationDef): EntityRow[] {
-        return def.extraReference ? (options.value[def.extraReference.resource] ?? []) : [];
+        return def.extraReference ? (options.value[`${def.key}:extra`] ?? []) : [];
     }
 
     /** Writes the whole set. The server replaces it in one transaction. */

@@ -29,6 +29,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from '../scripts/lib/ownerDatabaseUrl';
 import { seedPermissions } from './seeds/reference/permissions';
+import { backfillGroupTerms } from './seeds/reference/groupTermBackfill';
 
 const args = process.argv.slice(2);
 const prune = args.includes('--prune');
@@ -71,6 +72,19 @@ async function main() {
                 );
             }
         }
+
+        /**
+         * Derives Group↔Term scope from existing usage. Reference tier, not
+         * fixture: it is a correction to real tenant data wherever it runs, and
+         * it is a no-op on a database that has none.
+         */
+        const scopes = await backfillGroupTerms(prisma);
+
+        console.log(
+            `  group scopes: ${scopes.created} derived; `
+            + `${scopes.scopedGroups} group(s) scoped, `
+            + `${scopes.universalGroups} left available in every term`,
+        );
 
         if (withFixtures) {
             // Intentionally empty. The tier and its guard exist; the data does

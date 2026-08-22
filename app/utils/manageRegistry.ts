@@ -115,6 +115,20 @@ export interface RelationDef {
         placeholder: string;
     };
     emptyHint?: string;
+    /**
+     * Narrow the option list by a field on the row being edited.
+     *
+     * `{ filter: 'termId', from: 'termId' }` fetches
+     * `/api/groups?termId=<the Offering's termId>` instead of `/api/groups`, so
+     * an Offering's Group picker offers the cohorts that belong to its Term
+     * plus the ones scoped to no Term at all.
+     *
+     * Fetched with the filter rather than filtered client-side, because
+     * "scoped to this Term OR scoped to none" is a relation query the client
+     * cannot answer from a flat row list — it would need each Group's scope
+     * rows, which is the request it is trying to avoid.
+     */
+    scopeBy?: { filter: string; from: string };
 }
 
 export interface ManageEntity {
@@ -253,12 +267,17 @@ export const OFFERING_ENTITY: ManageEntity = {
         {
             key: 'groups',
             label: 'Groups this is for',
-            help: 'Nesting propagates: assigning a cohort also blocks its seminars.',
+            help: 'Nesting propagates: assigning a cohort also blocks its seminars. '
+                + 'Only groups available in this offering\u2019s term are listed.',
             resource: 'groups',
             valueKey: 'groupId',
             indentTree: true,
             optionLabel: (row) => String(row.name),
-            emptyHint: 'No groups defined yet.',
+            // The Offering's own term. Without this the picker offered every
+            // cohort the tenant has ever had, so nothing stopped attaching a
+            // 2024 cohort to a 2027 Offering.
+            scopeBy: { filter: 'termId', from: 'termId' },
+            emptyHint: 'No groups available in this term.',
         },
         {
             key: 'lecturers',
@@ -528,6 +547,23 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                     nullable: true,
                     emptyHint: 'No other groups to nest under yet.',
                 },
+            },
+        ],
+        relations: [
+            {
+                key: 'terms',
+                label: 'Available in terms',
+                // The empty case is stated explicitly because it reads backwards:
+                // an empty set WIDENS the group rather than hiding it. Leaving
+                // the user to infer that from a blank list is how someone
+                // "clears" a scope expecting the opposite.
+                help: 'Leave empty to make this group available in every term. '
+                    + 'Adding terms restricts it to those, which is what narrows the '
+                    + 'group pickers on offerings in other terms.',
+                resource: 'terms',
+                valueKey: 'termId',
+                optionLabel: (row) => String(row.name),
+                emptyHint: 'Available in every term.',
             },
         ],
     },
