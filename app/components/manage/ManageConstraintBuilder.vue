@@ -235,10 +235,15 @@ const solverTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'solver
 const selectedType = computed(() => findConstraintType(draft.value.type as string | undefined));
 
 /**
- * `min: 1` is the input's own floor, not the API's — see the comment on
- * `RESOURCES.constraints.weight` in server/utils/resources.ts. No maximum is
- * set, deliberately: there is no value at which a weight becomes wrong, so a
- * ceiling could only ever be an arbitrary one.
+ * `min: 0`, matching the API and the solver rather than being stricter than
+ * both. It was 1, which quietly rejected a weight the solver accepts: zero
+ * means "evaluate this rule and report its breach count, but do not steer the
+ * search" (calendry-solver, convert.rs::soft_instance). A control that refuses
+ * a legal value is the same builder-versus-API divergence that let a negative
+ * weight through in the other direction.
+ *
+ * No maximum, deliberately: there is no value at which a weight becomes wrong,
+ * so a ceiling could only ever be arbitrary. See `RESOURCES.constraints.weight`.
  *
  * The `help` line is kept to a sentence because ManageField renders help and
  * error as `v-else-if` — it is replaced by the validation message the moment
@@ -249,7 +254,7 @@ const weightField: FieldDef = {
     key: 'weight',
     label: 'Penalty weight',
     type: 'number',
-    min: 1,
+    min: 0,
     help: 'Relative to your other enabled soft rules, not an absolute score — see below.',
 };
 

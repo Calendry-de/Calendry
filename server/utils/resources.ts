@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Tx } from './tenantDb';
 import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
+import { validateConstraintShape } from '../../shared/constraintTypes';
+import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
 
 /**
  * Registry driving generic CRUD for the nine tenant-scoped core entities.
@@ -92,6 +94,96 @@ export interface ResourceConfig {
         id: string;
         patch: Record<string, unknown>;
     }) => Promise<void>;
+}
+
+/**
+ * Shared by the constraint resource's create refinement and its `beforeUpdate`.
+ *
+ * The two rules live in `shared/constraintTypes.ts` because the rule builder
+ * enforces them too; this only adapts the result to zod's issue shape, keeping
+ * the error on the offending FIELD so the form highlights the right control
+ * rather than showing a form-level message.
+ */
+function constraintShapeRefinement(
+    // `type` is required by the create schema (`z.string().min(1)`), so it is
+    // always present here — unlike on the update path, which has no `type` at
+    // all and reads the stored one instead.
+    value: { type: string; severity?: string | null; weight?: number | null },
+    ctx: z.RefinementCtx,
+): void {
+    for (const problem of validateConstraintShape(value)) {
+        ctx.addIssue({ code: 'custom', path: [problem.field], message: problem.message });
+    }
+}
+
+/**
+ * The same two rules on the update path, which cannot be a zod refinement.
+ *
+ * `type` is absent from the update schema entirely — verified: a PATCH carrying
+ * one returns 200 and leaves the stored type unchanged, because zod strips
+ * unknown keys. So the STORED type is authoritative here and has to be read,
+ * which a synchronous refinement cannot do.
+ *
+ * Only the fields present in the patch are passed on, which is what keeps a
+ * legacy bad row editable — see the note on `validateConstraintShape`.
+ */
+async function constraintBeforeUpdate(ctx: {
+    tx: Tx;
+    tenantId: string;
+    id: string;
+    patch: Record<string, unknown>;
+}): Promise<void> {
+    const touchesSeverity = 'severity' in ctx.patch;
+    const touchesWeight = 'weight' in ctx.patch;
+
+    // Nothing this guard is about is being changed, so there is nothing to say.
+    // Renaming or disabling a row must never be blocked by the shape of a value
+    // the caller is not touching.
+    if (!touchesSeverity && !touchesWeight) {
+        return;
+    }
+
+    const existing = await ctx.tx.constraint.findFirst({
+        where: { id: ctx.id, tenantId: ctx.tenantId },
+        select: { type: true },
+    });
+
+    // Missing or another tenant's row: say nothing and let the update itself
+    // report it, so this guard cannot become a way to probe which ids exist.
+    if (!existing) {
+        return;
+    }
+
+    const problems: ConstraintShapeProblem[] = validateConstraintShape({
+        type: existing.type,
+        ...(touchesSeverity ? { severity: ctx.patch.severity as string | null } : {}),
+        ...(touchesWeight ? { weight: ctx.patch.weight as number | null } : {}),
+    });
+
+    if (problems.length) {
+        /**
+         * Thrown in the ZOD ISSUE shape, not as a plain message, so the client
+         * attaches it to the offending FIELD.
+         *
+         * `entityForm.applyError` maps `issue.path[0]` onto `fieldErrors`, and
+         * falls back to a form-level banner for anything it cannot place. A
+         * bespoke `{ fieldErrors }` payload would take that fallback — so the
+         * identical mistake would highlight the weight input on create and
+         * produce an unattached sentence on update. `extractIssues` reads
+         * `data.issues`, which is what this fills.
+         */
+        throw createError({
+            statusCode: 400,
+            statusMessage: problems.map((p) => p.message).join(' '),
+            data: {
+                issues: problems.map((p) => ({
+                    code: 'custom',
+                    path: [p.field],
+                    message: p.message,
+                })),
+            },
+        });
+    }
 }
 
 const id = z.string().min(1);
@@ -475,7 +567,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
-        }),
+        }).superRefine(constraintShapeRefinement),
         update: z.object({
             name: z.string().min(1).optional(),
             severity: z.enum(['HARD', 'SOFT']).optional(),
@@ -484,6 +576,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
         }),
+        beforeUpdate: constraintBeforeUpdate,
         filters: z.object({
             type: z.string().optional(),
             severity: z.enum(['HARD', 'SOFT']).optional(),

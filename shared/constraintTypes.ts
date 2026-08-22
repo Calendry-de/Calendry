@@ -457,3 +457,103 @@ export function severityMismatch(
 
     return { expected: type.severity, stored: storedSeverity };
 }
+
+/** One thing wrong with a proposed constraint row, named by the field it is about. */
+export interface ConstraintShapeProblem {
+    field: 'type' | 'severity' | 'weight';
+    message: string;
+}
+
+/**
+ * Write-boundary validation for a constraint row: the two rules the catalogue
+ * knows and the generic CRUD schema cannot express by itself.
+ *
+ * WHY ONE FUNCTION FOR TWO RULES
+ * ------------------------------
+ * Severity-contradicts-the-catalogue and weight-is-negative are the same
+ * category of gap — the rule builder honours a constraint the API does not — and
+ * they are checked from two different places (a zod refinement on create, the
+ * `beforeUpdate` hook on update, which have different information available).
+ * Two rules times two call sites is four chances to drift; one function called
+ * twice is none.
+ *
+ * ABSENT MEANS UNCHECKED, AND THAT IS THE POINT
+ * ---------------------------------------------
+ * `severity` and `weight` are only examined when they are `undefined`-free, so a
+ * caller passes exactly the fields it is actually setting. On create that is
+ * everything; on update it is whatever the PATCH contains.
+ *
+ * That asymmetry is deliberate and load-bearing. Validating the MERGED row on
+ * update would make an existing bad row **uneditable** — someone trying to
+ * disable the very row the guard is protecting them from would be refused by
+ * the guard. That is not hypothetical: CLAUDE.md records a mislabelled
+ * constraint that "could never be corrected by editing — only deleted and
+ * recreated", because `type` is create-only. Checking only what is being
+ * changed means a legacy row can always be renamed, disabled, or repaired,
+ * while no new bad value gets in.
+ *
+ * `null` weight is NOT absent: it is the explicit "this is HARD, it has no
+ * weight" value, and passes because the HARD ⇄ NULL pairing is the database
+ * CHECK's job, not this function's.
+ */
+export function validateConstraintShape(input: {
+    /** The row's type. On update this is the STORED value — `type` is create-only. */
+    type: string | undefined;
+    severity?: string | null;
+    weight?: number | null;
+}): ConstraintShapeProblem[] {
+    const problems: ConstraintShapeProblem[] = [];
+    const type = findConstraintType(input.type);
+
+    if (input.type !== undefined && !type) {
+        problems.push({
+            field: 'type',
+            message: `Unknown constraint type '${input.type}'. Expected one of: ${CONSTRAINT_TYPE_KEYS.join(', ')}.`,
+        });
+    }
+
+    /**
+     * The catalogue pins severity per type because the severity IS the meaning
+     * (TAXONOMY.md §7) — a double-booked room is not a preference. `null` means
+     * the tenant genuinely chooses, and then anything is fine.
+     *
+     * Shares `severityMismatch()` with `assembleSolverInput`'s reporting, so the
+     * guard at the write boundary and the safety net at solve time cannot
+     * disagree about what a mismatch is.
+     */
+    if (type && input.severity !== undefined && input.severity !== null) {
+        const mismatch = severityMismatch(type, input.severity);
+
+        if (mismatch) {
+            problems.push({
+                field: 'severity',
+                message: `'${type.key}' is always ${mismatch.expected}; it cannot be stored as ${mismatch.stored}. `
+                    + `${type.label} — ${type.description}`,
+            });
+        }
+    }
+
+    /**
+     * `>= 0`, matching calendry-solver's own check (convert.rs::soft_instance)
+     * rather than the builder's input attribute. ZERO IS LEGAL and means
+     * "evaluate this and report the count, but do not steer the search" — a
+     * floor of 1 would reject a configuration the solver accepts, which is the
+     * builder-stricter-than-API divergence that produced this gap.
+     *
+     * Negative is refused for two reasons. Every soft type declares "minimize",
+     * so a negative weight inverts a rule into a maximize it never declared;
+     * and because the solver derives `hard_penalty = sum(weights) * placements
+     * + 1`, a negative weight erodes the margin that keeps hard constraints
+     * dominant for EVERY rule in the tenant, not just this one.
+     */
+    if (input.weight !== undefined && input.weight !== null && input.weight < 0) {
+        problems.push({
+            field: 'weight',
+            message: 'Penalty weight cannot be negative. Weights are relative to your other enabled '
+                + 'soft rules, and a negative one would invert this rule into a preference FOR what it '
+                + 'is meant to avoid. Use 0 to evaluate and report the rule without steering the schedule.',
+        });
+    }
+
+    return problems;
+}
