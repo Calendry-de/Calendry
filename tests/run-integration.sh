@@ -25,6 +25,11 @@ export NODE_ENV=development
 # The background solver poller must not run during the suites: it would sweep
 # the fixture tenants concurrently with their own teardown/seed cycles.
 export CALENDRY_SOLVER_POLL=off
+# Same reasoning for the session sweeper. It could not actually damage a fixture
+# — it only deletes rows expired for 30+ days, and test sessions are minutes old
+# — but a suite racing a background job is a suite that fails once a week for no
+# reason anyone can reproduce.
+export CALENDRY_SESSION_SWEEP=off
 
 echo "Starting Nuxt on ${APP_PORT}..."
 ./node_modules/.bin/nuxt dev --port "$APP_PORT" >/tmp/calendry-test-server.log 2>&1 &

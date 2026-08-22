@@ -103,3 +103,48 @@ export async function touchAccountLogin(accountId: string) {
         data: { lastLoginAt: new Date() },
     });
 }
+
+/**
+ * How long a dead session's row is kept before it is swept.
+ *
+ * Sessions live 12 hours (`SESSION_TTL_MS`), so this retains each row roughly
+ * 60x its useful life. The window is not about the session — an expired row can
+ * never authenticate anyone again — it is about `user_agent` and `ip_address`,
+ * which exist to answer "where was this account used from" and are worth
+ * nothing if they are deleted the moment they become interesting.
+ */
+export const SESSION_RETENTION_MS = 1000 * 60 * 60 * 24 * 30;
+
+/**
+ * Delete sessions that expired more than `SESSION_RETENTION_MS` ago.
+ *
+ * WHY `expires_at` ALONE IS THE WHOLE PREDICATE
+ * ---------------------------------------------
+ * A row whose `expires_at` has passed can never authenticate again:
+ * `resolveSessionToken()` rejects it before returning, and nothing in this
+ * codebase un-expires a session. Revoked-but-unexpired rows need no second
+ * clause, because the 12-hour TTL means every revoked row expires within half a
+ * day and is then caught by the same test. One condition instead of a
+ * `LEAST(expires_at, COALESCE(revoked_at, ...))` expression that would need its
+ * own correctness argument.
+ *
+ * WHY THIS NEEDS NO TENANT CONTEXT AND NO NEW EXCEPTION
+ * -----------------------------------------------------
+ * `auth_session` carries no RLS at all — that is the second of the deliberate
+ * exceptions in CLAUDE.md, because a session must be read before the tenant is
+ * known. Verified rather than assumed: `relrowsecurity = f`, and `calendry_app`
+ * already holds DELETE on the table. So this is an ordinary statement on the
+ * runtime connection, and adds no fourth SECURITY DEFINER path.
+ *
+ * Returns the count and the cutoff so the caller can report BOTH — a sweep that
+ * deleted nothing and a sweep that never ran must not look the same.
+ */
+export async function deleteExpiredSessions(now = new Date()): Promise<{ deleted: number; before: Date }> {
+    const before = new Date(now.getTime() - SESSION_RETENTION_MS);
+
+    const { count } = await getPrisma().authSession.deleteMany({
+        where: { expiresAt: { lt: before } },
+    });
+
+    return { deleted: count, before };
+}
