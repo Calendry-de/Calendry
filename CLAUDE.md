@@ -913,25 +913,59 @@ reason. Their passwords are in `.env` as `VIC_ACCOUNT_PASSWORD` and
 `VIEWER_ACCOUNT_PASSWORD`. Recreate the whole set on a rebuilt database with
 `create:role` followed by two `create:account` calls.
 
-### Tracked gap: severity is validated too late
+### RESOLVED: constraint shape is now validated at the write boundary
 
-`shared/constraintTypes.ts` pins a fixed severity per constraint type — a
-double-booked room is not a preference, and "avoid Saturdays" is not a defect.
-The rule builder honours that (it renders severity as static text when pinned),
-but the **generic CRUD API accepts whatever it is given**, so a row saying
-`no_double_booking_room` is SOFT with a weight can be created directly through
-`POST /api/constraints`.
+Two gaps, one category — the rule builder honoured a rule the **generic CRUD
+API did not**, so anything not going through the form wrote whatever it liked:
 
-The wire has no severity field at all — the TYPE determines hard/soft — so
-Stage 3d's mapper sends the CATALOGUE's severity and reports the contradiction
-in `report.severityMismatches`. That is the right behaviour at solve time, but
-it is the wrong PLACE to catch it: the row should not have been storable.
+- **Severity contradicting the catalogue.** `no_double_booking_room` stored as
+  SOFT with a weight was creatable through `POST /api/constraints`.
+- **Negative weight.** Found later, and worse. `weight: -5` returned **201**.
+  Every soft type declares "minimize", so a negative weight inverts a rule into
+  a maximize it never declared — and because the solver derives
+  `hard_penalty = sum(all soft weights) * placements + 1`, it also SUBTRACTS
+  from the margin that keeps hard constraints outranking every soft
+  configuration, for every rule in the tenant rather than just the mis-typed
+  one. With enough negative weight the penalty goes negative and the search is
+  rewarded for breaking hard rules.
 
-The more correct fix is for the resource's zod schema to reject a severity that
-contradicts the catalogue at write time, which needs `RESOURCES.constraints` to
-consult `CONSTRAINT_TYPES` in a refinement. Not done — flagged so the eventual
-fix lands at the write boundary rather than accumulating more downstream
-compensation.
+Both now go through `validateConstraintShape()` in `shared/constraintTypes.ts`,
+reusing the existing `severityMismatch()` so the write-boundary guard and
+`assembleSolverInput`'s solve-time reporting cannot disagree. Four things worth
+keeping:
+
+- **It could not be one refinement, and the split is create-vs-update, not
+  severity-vs-weight.** CREATE has `type` in the payload, so a zod
+  `superRefine` sees everything. UPDATE has **no `type` at all** — verified: a
+  PATCH carrying one returns 200 and leaves the stored type unchanged, because
+  zod strips unknown keys. So the stored type is authoritative and must be
+  READ, which a synchronous refinement cannot do. Hence `beforeUpdate`. Both
+  rules live in one function called from both paths.
+- **`beforeUpdate` validates ONLY the fields the patch touches**, and that is
+  the whole design. Validating the merged row would make an existing bad row
+  permanently uneditable — someone trying to DISABLE the row the guard objects
+  to would be refused by the guard, exactly the trap the mislabelled constraint
+  below already demonstrated once. Proven by falsification: switching to
+  merged-row validation makes four tests fail (a legacy row can then no longer
+  be disabled, renamed, or given a valid weight).
+- **The floor is `>= 0`, not `>= 1`.** calendry-solver's own check is
+  `weight < 0.0`, with "Zero is fine and means report the count, do not steer".
+  The builder's `min: 1` was **stricter than the solver** and was relaxed to 0 —
+  a control refusing a legal value is the same builder-versus-API divergence,
+  pointing the other way. Still no ceiling: weight is relative and
+  `hard_penalty` scales with the sum, so no magnitude lets a soft rule outrank a
+  hard one.
+- **A database CHECK backs it up.** `constraint_weight_non_negative`
+  (`weight IS NULL OR weight >= 0`) covers what the resource schema cannot:
+  `provision-tenant.ts` writes baseline constraints with
+  `tx.constraint.createMany` and never passes through `RESOURCES`. Refused even
+  for the owner role over raw SQL. The severity rule cannot have a CHECK — the
+  catalogue is code, not data — so it is refinement-only.
+
+`report.severityMismatches` stays as a safety net for rows written before this.
+
+**Still open, same family:** `params` accepts arbitrary JSON through the same
+generic API. Same fix shape when it is worth doing.
 
 ### The duplicate constraint: RESOLVED, and what it revealed
 
@@ -1040,8 +1074,21 @@ constraint rule builder than to the generic scaffold.
 - **Federation-level permissions** are out of scope per TAXONOMY.md §9.4.
   Permissions are per-tenant only; administering federation-owned resources has
   no model yet.
-- **Session cleanup**: expired `auth_session` rows are never swept. Harmless but
-  unbounded; a periodic delete should exist before production.
+- ~~**Session cleanup**~~ **DONE.** `server/plugins/sessionSweeper.ts` deletes
+  `auth_session` rows whose `expires_at` passed more than 30 days ago — first
+  sweep 60s after boot, then every 6h, opt out with `CALENDRY_SESSION_SWEEP=off`.
+  `expires_at` alone is the whole predicate: such a row can never authenticate
+  again, and the 12-hour TTL means a revoked row expires within half a day and is
+  caught by the same test, so no `LEAST(expires_at, COALESCE(revoked_at, …))` is
+  needed. The 30 days are not about the session — an expired one is already dead
+  — but about `user_agent` and `ip_address`, which answer "where was this account
+  used from" and are worth nothing if deleted the moment they matter.
+
+  It deliberately has **none of the solver poller's claim machinery**: the work
+  is one idempotent DELETE, so two instances racing means the loser deletes zero
+  rows and both are correct. And it needs **no new RLS exception** — `auth_session`
+  carries no RLS (exception 2 above) and `calendry_app` already holds DELETE, so
+  it is an ordinary statement on the runtime connection from `authDb.ts`.
 
 ## The management area (Step 13)
 
