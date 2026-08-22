@@ -127,6 +127,34 @@
                     :readonly="readonly"
                 />
 
+                <!--
+                    The inline `help` on the field is one line, because that slot
+                    is a hint and is REPLACED by the validation error when one is
+                    present (ManageField renders them `v-else-if`). The part
+                    people actually get wrong needs more room than that and must
+                    not disappear the moment the field is invalid — so it lives
+                    here, beside the control rather than inside it.
+
+                    What it has to correct is the intuition that weight is a
+                    score out of ten. It is not; it is a ratio against whatever
+                    else is enabled, which is why "is 5 a good weight?" has no
+                    answer without knowing the rest of the tenant's rules.
+                -->
+                <p
+                    v-if="draft.severity === 'SOFT'"
+                    class="builder_note"
+                >
+                    <strong>Weights are relative, not absolute.</strong>
+                    A weight only means something next to the other enabled soft
+                    rules: at 5 against rules weighted 100, this one will barely
+                    influence the result, while at 5 against rules weighted 1 it
+                    will dominate them. Multiplying every weight by the same
+                    number changes nothing at all. There is no ceiling and no
+                    "correct" value — pick a number that reflects this rule's
+                    importance <em>relative to your other active rules</em>, and
+                    raise it if the schedule is not respecting it enough.
+                </p>
+
                 <fieldset
                     v-if="selectedType?.params.length"
                     class="builder_params"
@@ -206,12 +234,23 @@ const solverTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'solver
 
 const selectedType = computed(() => findConstraintType(draft.value.type as string | undefined));
 
+/**
+ * `min: 1` is the input's own floor, not the API's — see the comment on
+ * `RESOURCES.constraints.weight` in server/utils/resources.ts. No maximum is
+ * set, deliberately: there is no value at which a weight becomes wrong, so a
+ * ceiling could only ever be an arbitrary one.
+ *
+ * The `help` line is kept to a sentence because ManageField renders help and
+ * error as `v-else-if` — it is replaced by the validation message the moment
+ * the field is invalid. The guidance that must NOT disappear at that point is
+ * the `builder_note` block in the template.
+ */
 const weightField: FieldDef = {
     key: 'weight',
     label: 'Penalty weight',
     type: 'number',
     min: 1,
-    help: 'How heavily the solver weighs a breach against competing preferences. Higher matters more.',
+    help: 'Relative to your other enabled soft rules, not an absolute score — see below.',
 };
 
 /**
@@ -460,6 +499,39 @@ onMounted(() => {
         font-size: var(--font-size-sm);
         line-height: 1.5;
         color: $content7;
+    }
+
+    /* Guidance, not a hint: it stands beside the weight control rather than
+       inside it, and unlike `_hint` it must survive a validation error —
+       ManageField renders help and error as `v-else-if`, so help vanishes
+       exactly when someone is most likely to be reading it.
+
+       Deliberately the same visual language as `_deferred` (surface, radius,
+       block `strong` lead) so the form has one voice for "read this" rather
+       than a second style competing with it. */
+    &_note {
+        margin: 0;
+        padding: var(--space-5);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-sm);
+        line-height: 1.55;
+        color: $content5;
+
+        background: $surface3;
+
+        strong {
+            display: block;
+            color: $content2;
+        }
+
+        /* Emphasis without italics: the phrase being stressed is the operative
+           one, and italic at this size is harder to read than it is worth. */
+        em {
+            font-weight: 650;
+            font-style: normal;
+            color: $content2;
+        }
     }
 
     &_error {

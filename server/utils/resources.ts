@@ -427,8 +427,51 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             type: z.string().min(1),
             name: z.string().min(1),
             severity: z.enum(['HARD', 'SOFT']),
-            // The DB CHECK enforces the HARD/SOFT ↔ weight pairing; this only
-            // shapes the input.
+            /**
+             * The DB CHECK enforces the HARD/SOFT ⇄ weight pairing; this only
+             * shapes the input.
+             *
+             * NO CEILING, BY DESIGN — NOT AN OVERSIGHT.
+             *
+             * A weight has no absolute meaning. The solver derives its
+             * hard-violation penalty from the weights themselves:
+             *
+             *     hard_penalty = sum(all soft weights) * placements + 1
+             *                              (calendry-solver, problem.rs)
+             *
+             * Two consequences follow, and both are why capping the value would
+             * be meaningless rather than merely unnecessary:
+             *
+             *  - Only RATIOS matter. Multiplying every enabled weight by the
+             *    same factor leaves every comparison — soft against soft, and
+             *    hard against soft — exactly where it was.
+             *  - A large weight cannot let a soft rule overrule a hard one.
+             *    Raising one weight raises `total_weight`, which raises
+             *    `hard_penalty` in the same step, so the lexicographic ordering
+             *    (hard first, then soft) survives any magnitude.
+             *
+             * So "10" is not safer than "10000", and neither is more correct;
+             * the only question a tenant can meaningfully answer is how this
+             * rule ranks against their OTHER enabled soft rules. That is what
+             * the `builder_note` block in ManageConstraintBuilder.vue explains,
+             * and the two should not drift.
+             *
+             * WHAT IS NOT ENFORCED HERE, AND SHOULD BE. There is no lower bound
+             * either: `weight: -5` is accepted by this schema and by the
+             * database, verified against the live API (HTTP 201). The builder's
+             * `min: 1` is an HTML input attribute and stops nothing that does
+             * not go through the form. A negative weight is not a harmless
+             * oddity — it SUBTRACTS from `total_weight`, lowering the very
+             * penalty that keeps hard constraints dominant, and it inverts the
+             * rule so the solver prefers what the tenant asked it to avoid.
+             *
+             * Deliberately left unfixed here: this is the same shape as the
+             * tracked "severity is validated too late" gap in CLAUDE.md — the
+             * builder honours a rule the generic CRUD API does not — and both
+             * belong in one write-boundary fix that has `RESOURCES.constraints`
+             * consult `CONSTRAINT_TYPES` in a refinement, rather than another
+             * piecemeal patch.
+             */
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
@@ -436,6 +479,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         update: z.object({
             name: z.string().min(1).optional(),
             severity: z.enum(['HARD', 'SOFT']).optional(),
+            /** Unbounded above and, currently, below — see `create` above. */
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),

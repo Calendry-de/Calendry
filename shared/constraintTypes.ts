@@ -129,6 +129,13 @@ export interface ConstraintTypeDef {
      * double-booked is not a preference, and "minimize Saturday" is not a
      * defect. The database CHECK enforces the HARD⇄no-weight, SOFT⇄weight
      * pairing regardless of what the UI offers.
+     *
+     * On the SOFT side, note that the weight a tenant attaches is RELATIVE and
+     * has no absolute scale — the solver derives its hard-violation penalty as
+     * `sum(all soft weights) * placements + 1`, so only ratios between enabled
+     * soft rules carry meaning, and no magnitude lets a soft rule outrank a
+     * hard one. Deliberately unbounded above; see the long note on
+     * `RESOURCES.constraints.weight` in server/utils/resources.ts.
      */
     severity: 'HARD' | 'SOFT' | null;
     params: ConstraintParamDef[];
