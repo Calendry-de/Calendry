@@ -24,7 +24,11 @@ export interface AppSessionRow {
      */
     tenantId: string | null;
     federationId?: string | null;
-    offeringId: string;
+    /**
+     * NULL for an EVENT — a Session with no recurring demand behind it
+     * (TAXONOMY.md §2). See `toWireSession` for what that means on the wire.
+     */
+    offeringId: string | null;
     kindId: string;
     termWeek: number;
     dayOfWeek: number;
@@ -65,7 +69,18 @@ export function toWireSession(row: AppSessionRow): WireSession {
         // The oneof owner is now a real choice: tenant-owned or shared.
         tenantId: row.tenantId ?? '',
         federationId: row.federationId ?? '',
-        offeringId: row.offeringId,
+        /**
+         * An EVENT has no Offering. The wire field is a plain string, so the
+         * empty string is what "no offering" looks like to the solver — the
+         * same convention `tenantId`/`federationId`/`roomId` already use above.
+         *
+         * The solver never places an Event: it has no Offering, so no demand
+         * references it and nothing asks for it to be scheduled. It arrives
+         * purely as OCCUPANCY — a room and a slot that are already taken — which
+         * is exactly the role `existingSessions` documents for federation-owned
+         * Sessions.
+         */
+        offeringId: row.offeringId ?? '',
         kind: row.kindKey,
         startSlot: {
             week: toWireWeek(row.termWeek),
@@ -92,7 +107,21 @@ export function toWireSession(row: AppSessionRow): WireSession {
          * The proto anticipates exactly this: existingSessions is documented as
          * carrying "Federation-owned Sessions that act purely as occupancy".
          */
-        isLocked: row.isLocked || row.tenantId === null,
+        /**
+         * Immovable in two cases, for the same underlying reason: the app could
+         * not apply a move the solver proposed.
+         *
+         *  - a federation-shared Session (`tenantId === null`) — RLS refuses
+         *    the write;
+         *  - an EVENT (`offeringId === null`) — it is in no solve's scope, so
+         *    `planMaterialization()` would never write the placement back, and
+         *    a solver that moved it would be reasoning about a timetable the
+         *    apply then silently declines to produce.
+         *
+         * Sending both locked makes the constraint the solver reasons with match
+         * the constraint the app actually enforces.
+         */
+        isLocked: row.isLocked || row.tenantId === null || row.offeringId === null,
     } as WireSession;
 }
 

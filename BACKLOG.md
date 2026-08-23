@@ -273,13 +273,26 @@ support for both.
 
 # Features not built
 
-## Manual Session creation ("Events")
+## ~~Manual Session creation ("Events")~~ — API DONE 2026-08-23, UI still open
 
-There is still no route to create a Session directly — every Session has
-always come from the solver. Needed for staff placing a fixed-date gathering,
-or any "just put this on the calendar" case that shouldn't go through a solve.
-Long-tracked gap (originally surfaced during Stage 9 UI planning), and now a
-concrete prerequisite for the exam-placement item above.
+`POST /api/sessions` exists, gated on the new `session.create` permission.
+`session.offering_id` is nullable and a NULL means the Session is an **Event**
+(TAXONOMY.md §2). Verified end to end against a live solver: an Event survives a
+real run + apply un-deleted and un-moved, **including when unlocked** — the
+exemption is that it belongs to no Offering and therefore to no solve's scope,
+not the lock.
+
+**What remains is the UI.** There is no "create event" flow in the schedule; the
+API is the only way in. That was a deliberate scope split — the safety property
+was worth proving before any UI depended on it.
+
+Two things for whoever builds the UI:
+
+- The kind picker is tenant vocabulary. Do not special-case "holiday" / "exam" /
+  "gathering" anywhere; `kind` is data (TAXONOMY.md §2).
+- Read the `CalendarPeriod` overlap below before designing the flow. Placing a
+  campus-wide holiday as a 1-block Session in one room is valid input and the
+  wrong model.
 
 ## Cancel-to-spare-bank
 
@@ -381,6 +394,78 @@ as a side effect of `minimize_day_usage`'s weight relative to others. Not a
 bug — flagged and explicitly kept as-is. Leaving this here as a note in case a
 future session finds the same shape and wonders whether it was intended.
 
+
+---
+
+# Event log
+
+## A tenant or Generation carrying any `session_event` cannot be deleted
+
+Found 2026-08-23, while making `executePlan` emit DELETE events — the
+materialize test's teardown started failing with
+`session_event is append-only; DELETE is not permitted`.
+
+Both FKs are `ON DELETE CASCADE`:
+
+```
+session_event_tenant_id_fkey       -> tenant      CASCADE
+session_event_generation_id_fkey   -> generation  CASCADE
+```
+
+and `session_event_append_only` refuses `DELETE` unconditionally. So the schema
+says "when the tenant goes, its events go" and the trigger says "no", and the
+`DELETE FROM tenant` fails outright.
+
+**This is pre-existing, not caused by the DELETE events** — `apply.post.ts` has
+always written an `APPLY_GENERATION` event, so any tenant that ever applied a
+Generation was already undeletable. Emitting DELETE events only made a *test*
+tenant reach the same state, which is how it surfaced.
+
+Impact is currently low: nothing in the app deletes a tenant or a Generation, so
+this bites fixtures and manual cleanup rather than users. Test suites work around
+it with `ALTER TABLE ... DISABLE TRIGGER`, which requires ownership — a
+production purge or a GDPR-style erasure request could not.
+
+The shape of a fix already exists: migration `20260816180000` solved the exact
+analogue for `session_event.session_id` by narrowing the trigger to permit ONE
+specific shape (the FK's own `SET NULL` detach) while still refusing everything
+else. The equivalent here is harder because a cascade DELETE is not
+distinguishable from a hand-written one inside a row-level trigger. Options not
+yet evaluated: a session-local GUC the purge sets, or moving the guard to a
+`BEFORE DELETE` on the parent instead.
+
+**Do not "fix" it by dropping the trigger** — append-only enforcement is what
+TAXONOMY.md §3 rollback depends on.
+
+## `CREATE` and `DELETE` were unreachable enum values until 2026-08-23
+
+Recorded because it explains why neither had a shape to copy. `SessionEventType`
+declared all seven values, but nothing emitted `CREATE` (until `POST
+/api/sessions`) or `DELETE` (until `executePlan`). `materializeGeneration()`
+still writes no per-session CREATE or MOVE events — the Generation snapshot is
+the record for solver-originated placements, and only removals now get their own
+event, because a removal is the one change the snapshot cannot describe.
+
+If per-placement solver events are ever wanted, that is a deliberate decision
+about log volume (a 27,000-session apply would write 27,000 rows), not an
+oversight.
+
+---
+
+# Overlaps to resolve
+
+## `CalendarPeriod` vs. an Event, for holidays
+
+Both can express "the 14th is a holiday" and they mean different things.
+`CalendarPeriod` (HOLIDAY/BREAK/EXAM) colours a **range of dates** and is what
+`minimize_exam_week_sessions` and the academic calendar read. An Event occupies
+a **room and a block**. TAXONOMY.md §2 now states the rule — *range of dates →
+CalendarPeriod; room and block → Event* — but nothing enforces it, and the
+manage UI offers both without explaining the difference.
+
+Worth revisiting when the Event UI is built: a "create event" flow that lets
+someone place a campus-wide holiday as a 1-block Session in one room would be
+technically valid and semantically wrong.
 
 ---
 

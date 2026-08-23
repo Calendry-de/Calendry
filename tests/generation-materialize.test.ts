@@ -40,12 +40,31 @@ const ids = {
     moveSession: `${T}-session-move`,
     dropSession: `${T}-session-drop`,
     lockedSession: `${T}-session-locked`,
+    eventSession: `${T}-session-event`,
+    eventUnlocked: `${T}-session-event-unlocked`,
 };
 
 async function reset() {
+    /**
+     * Both append-only guards are stood down for the teardown DELETE, because
+     * `tenant` cascades into `generation` AND `session_event` and each has a
+     * trigger that refuses DELETE outright.
+     *
+     * `session_event` joined this list when `executePlan` began emitting DELETE
+     * events: before that, materialize wrote no events at all and the cascade
+     * had nothing to refuse. The same pattern already exists in
+     * `scripts/seed-demo-schedule.ts`.
+     *
+     * Note what this reveals and does not fix — see BACKLOG.md: a tenant or a
+     * generation carrying ANY session_event cannot be deleted through ordinary
+     * SQL, because the FKs say CASCADE and the trigger says no. Test fixtures
+     * can reach for DISABLE TRIGGER; a production purge cannot.
+     */
     await db.$executeRawUnsafe('ALTER TABLE generation DISABLE TRIGGER generation_no_delete');
     await db.$executeRawUnsafe('ALTER TABLE generation DISABLE TRIGGER generation_content_immutable');
+    await db.$executeRawUnsafe('ALTER TABLE session_event DISABLE TRIGGER session_event_append_only');
     await db.$executeRawUnsafe(`DELETE FROM tenant WHERE id = '${ids.tenant}'`);
+    await db.$executeRawUnsafe('ALTER TABLE session_event ENABLE TRIGGER session_event_append_only');
     await db.$executeRawUnsafe('ALTER TABLE generation ENABLE TRIGGER generation_no_delete');
     await db.$executeRawUnsafe('ALTER TABLE generation ENABLE TRIGGER generation_content_immutable');
 }
@@ -113,6 +132,25 @@ async function seed() {
             termWeek: 1, dayOfWeek: 2, blockIndex: 0, isLocked: true,
         },
     });
+
+    /**
+     * EVENTS — offeringId NULL. Two of them, differing only in `isLocked`,
+     * because the whole claim being tested is that the LOCK is not what
+     * protects them: an Event is exempt because it belongs to no Offering and
+     * therefore to no solve's scope.
+     */
+    await db.session.create({
+        data: {
+            ...base, id: ids.eventSession, offeringId: null,
+            termWeek: 1, dayOfWeek: 3, blockIndex: 0, isLocked: true,
+        },
+    });
+    await db.session.create({
+        data: {
+            ...base, id: ids.eventUnlocked, offeringId: null,
+            termWeek: 1, dayOfWeek: 3, blockIndex: 1, isLocked: false,
+        },
+    });
 }
 
 const output = (over: Partial<Parameters<typeof SolverOutput.fromJSON>[0]> = {}) => SolverOutput.fromJSON({
@@ -156,6 +194,7 @@ describe('materializeGeneration', () => {
             generationId: ids.generation,
             output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         expect(counts.created).toBe(1);
@@ -165,7 +204,12 @@ describe('materializeGeneration', () => {
         expect(counts.unchanged).toBe(1);
         // The in-scope session the solver did not return.
         expect(counts.deleted).toBe(1);
-        expect(counts.skippedLocked).toBe(1);
+        // TWO: the locked in-scope Session, plus the locked EVENT. An Event is
+        // exempt from the partition on scope grounds, but a LOCKED one is still
+        // literally a locked Session and is counted as such — the count is not
+        // special-cased, because a second exemption rule would be one more thing
+        // to keep in step with the first.
+        expect(counts.skippedLocked).toBe(2);
 
         expect(await db.session.findUnique({ where: { id: ids.dropSession } })).toBeNull();
 
@@ -207,12 +251,14 @@ describe('materializeGeneration', () => {
             // Offering A is NOT in scope this time.
             output: SolverOutput.fromJSON({ sessions: [], hardViolations: [] }),
             scopeOfferingIds: [ids.offeringB],
+            actorPersonId: null,
         }));
 
         // Nothing deleted: the solver was never asked about offering A, so its
         // silence says nothing about those sessions.
         expect(counts.deleted).toBe(0);
-        expect(await db.session.count({ where: { termId: ids.term } })).toBe(4);
+        // 4 offering-linked + 2 Events.
+        expect(await db.session.count({ where: { termId: ids.term } })).toBe(6);
     });
 });
 
@@ -234,6 +280,7 @@ describe('violation materialization', () => {
                 }],
             }),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const rows = await db.constraintViolation.findMany({ where: { tenantId: ids.tenant } });
@@ -262,6 +309,7 @@ describe('violation materialization', () => {
                 }],
             }),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const rows = await db.constraintViolation.findMany({ where: { tenantId: ids.tenant } });
@@ -289,6 +337,7 @@ describe('violation materialization', () => {
                 }],
             }),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         expect(await db.constraintViolation.count({ where: { tenantId: ids.tenant } })).toBe(1);
@@ -311,6 +360,7 @@ describe('violation materialization', () => {
                 }],
             }),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         expect(counts.violationsUnmapped).toBe(1);
@@ -342,11 +392,13 @@ describe('planMaterialization', () => {
             termId: ids.term,
             output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         expect(plan.counts).toEqual({
             created: 1, moved: 1, unchanged: 1, deleted: 1,
-            skippedLocked: 1, placementsUnmapped: 0,
+            // 2 = the locked in-scope Session + the locked Event; see above.
+            skippedLocked: 2, placementsUnmapped: 0,
         });
 
         // The point of a plan: the database is untouched.
@@ -358,6 +410,7 @@ describe('planMaterialization', () => {
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const move = plan.placements.find((p) => p.action === 'move');
@@ -378,6 +431,7 @@ describe('planMaterialization', () => {
         const args = {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         };
 
         const first = await db.$transaction((tx) => planMaterialization(tx as never, args));
@@ -401,6 +455,7 @@ describe('planMaterialization', () => {
                 }],
             }),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         expect(plan.counts.placementsUnmapped).toBe(1);
@@ -413,6 +468,7 @@ describe('planMaterialization', () => {
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const counts = await db.$transaction((tx) => executePlan(tx as never, plan, {
@@ -420,6 +476,7 @@ describe('planMaterialization', () => {
             termId: ids.term,
             generationId: ids.generation,
             violations: [],
+            actorPersonId: null,
         }));
 
         // Field for field. This is the invariant the preview route depends on.
@@ -432,6 +489,7 @@ describe('planMaterialization', () => {
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         await seed();
@@ -452,6 +510,7 @@ describe('summarizePlanByWeek', () => {
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const weeks = summarizePlanByWeek(plan);
@@ -478,6 +537,7 @@ describe('summarizePlanByWeek', () => {
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
             tenantId: ids.tenant, termId: ids.term, output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
         }));
 
         const weeks = summarizePlanByWeek(plan);
@@ -538,4 +598,137 @@ describe('summarizeProposedViolations', () => {
 afterAll(async () => {
     await reset();
     await db.$disconnect();
+});
+
+
+/**
+ * Events (offering-less Sessions) versus the delete partition.
+ *
+ * The property under test is the one the whole feature rests on: applying a
+ * solver Generation must never remove a Session a human placed. The interesting
+ * case is the UNLOCKED Event — if the exemption were really the lock, that one
+ * would be deleted.
+ */
+describe('Events survive an apply', () => {
+    it('keeps both Events, locked and unlocked, while still deleting the in-scope orphan', async () => {
+        await seed();
+
+        const counts = await db.$transaction((tx) => materializeGeneration(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            generationId: ids.generation,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
+        }));
+
+        const survivors = await db.session.findMany({
+            where: { tenantId: ids.tenant },
+            select: { id: true, offeringId: true, isLocked: true, termWeek: true, dayOfWeek: true, blockIndex: true },
+            orderBy: { id: 'asc' },
+        });
+        const byId = new Map(survivors.map((s) => [s.id, s]));
+
+        // The orphan still goes — this test must not pass by disabling deletes.
+        expect(counts.deleted).toBe(1);
+        expect(byId.has(ids.dropSession)).toBe(false);
+
+        // Both Events survive.
+        expect(byId.has(ids.eventSession)).toBe(true);
+        expect(byId.has(ids.eventUnlocked)).toBe(true);
+
+        // And UNMOVED — surviving at a different slot would be its own bug.
+        expect(byId.get(ids.eventSession)).toMatchObject({ dayOfWeek: 3, blockIndex: 0 });
+        expect(byId.get(ids.eventUnlocked)).toMatchObject({ dayOfWeek: 3, blockIndex: 1 });
+    });
+
+    it('does not count Events as skippedLocked — the exemption is scope, not the lock', async () => {
+        await seed();
+
+        const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
+            tenantId: ids.tenant, termId: ids.term, output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+        }));
+
+        // The locked EVENT does appear in skippedLocked (it is locked), but the
+        // unlocked one appears nowhere at all — not in deletes, not in
+        // placements, not in skippedLocked. It is simply not this solve's
+        // business, which is the point.
+        expect(plan.deletes.map((d) => d.sessionId)).toEqual([ids.dropSession]);
+        expect(plan.skippedLocked).not.toContain(ids.eventUnlocked);
+        expect(plan.placements.map((p) => p.sessionId)).not.toContain(ids.eventUnlocked);
+    });
+
+    it('is exempt even when a (hypothetical) scope contains a null-ish entry', async () => {
+        await seed();
+
+        // Guards the explicit `offeringId === null` clause rather than the
+        // incidental `Set.has(null) === false`. If someone widens inScope, this
+        // is the test that fails.
+        const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
+            tenantId: ids.tenant, termId: ids.term, output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB, null as unknown as string],
+        }));
+
+        expect(plan.deletes.map((d) => d.sessionId)).toEqual([ids.dropSession]);
+    });
+});
+
+describe('DELETE events', () => {
+    it('writes one per removed Session, before the row goes, with the placement preserved', async () => {
+        await seed();
+
+        await db.$transaction((tx) => materializeGeneration(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            generationId: ids.generation,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: null,
+        }));
+
+        const events = await db.sessionEvent.findMany({
+            where: { tenantId: ids.tenant, type: 'DELETE' },
+        });
+
+        expect(events).toHaveLength(1);
+
+        const [ev] = events;
+
+        /**
+         * `session_id` is NULL because the FK is ON DELETE SET NULL and the row
+         * it pointed at is gone — that is the designed behaviour (migration
+         * 20260816180000), and it is precisely why the payload has to carry the
+         * placement rather than reference it.
+         */
+        expect(ev.sessionId).toBeNull();
+
+        const payload = ev.payload as Record<string, unknown>;
+
+        expect(payload.offeringId).toBe(ids.offeringA);
+        expect(payload.reason).toBe('not_returned_by_solver');
+        expect(payload.from).toMatchObject({
+            termId: ids.term, termWeek: 1, dayOfWeek: 1, blockIndex: 2,
+        });
+    });
+
+    it('writes none when the plan deletes nothing', async () => {
+        await seed();
+
+        await db.$transaction((tx) => materializeGeneration(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            generationId: ids.generation,
+            output: output(),
+            // Nothing in scope means nothing can be orphaned.
+            scopeOfferingIds: [],
+            actorPersonId: null,
+        }));
+
+        const events = await db.sessionEvent.count({
+            where: { tenantId: ids.tenant, type: 'DELETE' },
+        });
+
+        expect(events).toBe(0);
+    });
 });

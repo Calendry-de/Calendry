@@ -111,11 +111,34 @@ export default defineEventHandler(async (event) => {
                     generationId: generation.id,
                     output: SolverOutput.fromJSON(run.result),
                     scopeOfferingIds: scope.offeringIds ?? [],
+                    actorPersonId: identity.actorPersonId,
                 }));
             }
 
+            /**
+             * Rebase the applied TERM only, and never an Event.
+             *
+             * This used to be `{ tenantId, isLocked: false }` — every unlocked
+             * Session in the tenant, regardless of term. Applying a Generation
+             * for one term therefore rewrote `generation_id` on every other
+             * term's Sessions too, attributing them to a Generation that never
+             * placed them. Provenance damage rather than data loss, which is
+             * why nothing caught it: the schedule renders identically either
+             * way, and `generation_id` is only read when someone asks where a
+             * placement came from.
+             *
+             * `offeringId: { not: null }` excludes Events for the same reason:
+             * a human placed it, so "which solver run produced this" has the
+             * answer NONE, and overwriting that with a Generation id would make
+             * the row indistinguishable from solver output.
+             */
             const rebased = await tx.session.updateMany({
-                where: { tenantId: identity.tenantId, isLocked: false },
+                where: {
+                    tenantId: identity.tenantId,
+                    isLocked: false,
+                    ...(run?.termId ? { termId: run.termId } : {}),
+                    offeringId: { not: null },
+                },
                 data: { generationId: generation.id },
             });
 

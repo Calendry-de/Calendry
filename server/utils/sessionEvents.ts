@@ -17,7 +17,14 @@ export type EventType = 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'LOCK' | 'UNLOCK
  */
 export async function appendEvent(
     tx: Tx,
-    identity: RequestIdentity,
+    /**
+     * Structurally `{ tenantId, actorPersonId }` rather than a full
+     * `RequestIdentity`, because those are the only two fields used and the
+     * materialize layer has no request identity to offer — it runs from a plan.
+     * A `RequestIdentity` still satisfies this, so every existing caller is
+     * unchanged.
+     */
+    identity: Pick<RequestIdentity, 'tenantId' | 'actorPersonId'>,
     input: {
         type: EventType;
         generationId: string;

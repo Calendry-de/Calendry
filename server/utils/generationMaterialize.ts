@@ -1,5 +1,6 @@
 import type { ConstraintViolation, PlacedSession, SolverOutput } from '@mindcollaps/calendry-proto';
 import type { Tx } from './tenantDb';
+import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';
 
 /**
@@ -59,7 +60,13 @@ export interface Placement {
 
 export interface PlannedDelete {
     sessionId: string;
-    offeringId: string;
+    /**
+     * Never NULL in practice — the delete filter requires `inScope.has(...)`,
+     * which an Event's NULL offering can never satisfy — but typed nullable
+     * because the column is. Narrowing it here would be a lie the compiler
+     * could not check.
+     */
+    offeringId: string | null;
     placement: Placement;
 }
 
@@ -253,7 +260,24 @@ export async function planMaterialization(tx: Tx, options: {
      * asked about those and its silence says nothing.
      */
     const deletes: PlannedDelete[] = existing
-        .filter((s) => !keptIds.has(s.id) && !s.isLocked && inScope.has(s.offeringId))
+        .filter((s) => {
+            /**
+             * An EVENT is never deleted by an apply. Stated as its own clause
+             * rather than left to `inScope.has(null)` returning false — that
+             * would be an exemption that WORKS but is invisible, and the next
+             * person to change `inScope` into something that tolerates null
+             * (a list, a predicate, a widened Set) would silently start
+             * deleting Events with no test naming what broke.
+             *
+             * TAXONOMY.md §2: an Event is placed by a human and belongs to no
+             * demand, so a solver's silence about it says nothing at all.
+             */
+            if (s.offeringId === null) {
+                return false;
+            }
+
+            return !keptIds.has(s.id) && !s.isLocked && inScope.has(s.offeringId);
+        })
         .map((s) => ({
             sessionId: s.id,
             offeringId: s.offeringId,
@@ -341,8 +365,10 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
     termId: string;
     generationId: string;
     violations: ConstraintViolation[];
+    /** Who to attribute the DELETE events to. Null for a background apply. */
+    actorPersonId: string | null;
 }): Promise<MaterializeCounts> {
-    const { tenantId, termId, generationId, violations } = options;
+    const { tenantId, termId, generationId, violations, actorPersonId } = options;
 
     const offerings = await tx.offering.findMany({
         where: { tenantId, termId },
@@ -399,6 +425,43 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
     }
 
     if (plan.deletes.length) {
+        /**
+         * A DELETE event PER Session, written BEFORE the rows go.
+         *
+         * Until now materialize deleted Sessions silently: the only record was
+         * the `deleted` count riding on the single APPLY_GENERATION event, so
+         * "what was removed, and from where" had no answer at all. That
+         * contradicts TAXONOMY.md §3 — a Session may not be mutated without the
+         * corresponding event — and it is the half of the log that rollback
+         * would need, since a delete is the one change the Generation snapshot
+         * cannot describe on its own.
+         *
+         * Order matters. `session_event.session_id` is ON DELETE SET NULL, and
+         * the append-only trigger permits exactly that detach (migration
+         * 20260816180000). So the event is written pointing at a live Session,
+         * and the delete then NULLs the pointer while leaving the payload — the
+         * placement, the offering, the reason — intact. Writing the event
+         * afterwards would mean writing a row that points at nothing, which is
+         * indistinguishable from the detached case and loses which Session it
+         * was.
+         */
+        for (const deleted of plan.deletes) {
+            await appendEvent(tx, { tenantId, actorPersonId }, {
+                type: 'DELETE',
+                generationId,
+                sessionId: deleted.sessionId,
+                payload: {
+                    from: {
+                        termId,
+                        ...deleted.placement,
+                    },
+                    offeringId: deleted.offeringId,
+                    reason: 'not_returned_by_solver',
+                },
+                reason: 'Removed by applying a solver Generation: the run did not place it.',
+            });
+        }
+
         await tx.session.deleteMany({
             where: { id: { in: plan.deletes.map((d) => d.sessionId) } },
         });
@@ -418,8 +481,10 @@ export async function materializeGeneration(tx: Tx, options: {
     output: SolverOutput;
     scopeOfferingIds: string[];
     federationId?: string | null;
+    /** Attribution for the DELETE events this may emit. */
+    actorPersonId: string | null;
 }): Promise<MaterializeCounts> {
-    const { tenantId, federationId = null, termId, generationId, output, scopeOfferingIds } = options;
+    const { tenantId, federationId = null, termId, generationId, output, scopeOfferingIds, actorPersonId } = options;
 
     const plan = await planMaterialization(tx, {
         tenantId, federationId, termId, output, scopeOfferingIds,
@@ -430,6 +495,7 @@ export async function materializeGeneration(tx: Tx, options: {
         termId,
         generationId,
         violations: output.hardViolations,
+        actorPersonId,
     });
 }
 

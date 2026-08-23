@@ -75,6 +75,7 @@ export const PERMISSIONS: PermissionDef[] = [
 
     // Session editing — explicit verbs, mirroring the routes (TAXONOMY.md §3).
     { key: 'session.read', category: 'session', description: 'View the schedule' },
+    { key: 'session.create', category: 'session', description: 'Create a Session or Event directly' },
     { key: 'session.move', category: 'session', description: 'Re-place a Session' },
     { key: 'session.swap', category: 'session', description: 'Swap two Sessions' },
     { key: 'session.lock', category: 'session', description: 'Lock or unlock a Session' },

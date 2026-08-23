@@ -183,8 +183,41 @@ otherwise" is not one.
   Generation snapshot (solver output or manual baseline). Never mutate a
   Session in place without emitting the corresponding event — rollback and
   audit depend on the log being complete.
+
+  **What the solver path does and does not log, deliberately.** Applying a
+  Generation writes ONE `APPLY_GENERATION` event, not one per placement — the
+  snapshot is the record, and a 27,000-Session apply would otherwise write
+  27,000 rows. The exception is **deletion**: `executePlan` emits a `DELETE`
+  event per removed Session, because a removal is the one change a snapshot of
+  what-now-exists cannot describe. Until 2026-08-23 it emitted none, so "what
+  was removed, and from where" had no answer at all.
+
+  Order matters there and is easy to get wrong: the event is written **before**
+  the row is deleted. `session_event.session_id` is `ON DELETE SET NULL` and the
+  append-only trigger permits exactly that detach (migration `20260816180000`),
+  so the pointer is nulled while the payload keeps the placement. Writing the
+  event afterwards would produce a row pointing at nothing, indistinguishable
+  from the detached case.
 - **Locked Sessions are solver-exempt.** A solver re-run must skip locked
   Sessions entirely, not just deprioritize them.
+- **An offering-less Session is an EVENT, and its exemption is structural, not
+  the lock.** `session.offering_id` is nullable (TAXONOMY.md §2); NULL means a
+  human placed this and no recurring demand stands behind it.
+  `planMaterialization()`'s delete partition requires `inScope.has(offeringId)`,
+  and an Event belongs to no Offering, so no solve's scope can reach it —
+  including a solve that has never heard of it. `POST /api/sessions` also
+  defaults `is_locked` to true, but **the lock is defence in depth**: it is one
+  UPDATE from being cleared, whereas the missing Offering is a property of what
+  the row IS. Verified against a live solver both ways, locked and unlocked.
+
+  Two consequences that must not be "tidied":
+
+  - the delete partition names `offeringId === null` as its own clause rather
+    than relying on `Set.has(null)` being false — an exemption that works but is
+    invisible would break silently the moment `inScope` changes shape;
+  - `toWireSession` forces `isLocked` for an Event exactly as it already does
+    for a federation-shared Session, so the solver receives it as **occupancy**
+    and never proposes moving something the apply would refuse to write.
 - **Hard-constraint violations from manual edits: warn, don't block.** The
   UI/API must surface current violations as a queryable state, not just a
   one-time toast at edit time.
@@ -1521,6 +1554,25 @@ is the opposite: problems that ARE fixed, kept here because each one's fix
 encodes a decision that would otherwise look arbitrary — and that someone could
 reasonably "fix" back to something worse. Deleting these would delete the
 argument, not the bug.
+
+- **~~Applying a Generation rebased `generation_id` on every unlocked Session in
+  the TENANT.~~ FIXED 2026-08-23.** `apply.post.ts` ran
+  `updateMany({ where: { tenantId, isLocked: false } })` with no term filter, so
+  applying a run for one term re-attributed every *other* term's Sessions to a
+  Generation that never placed them.
+
+  It survived because the damage is invisible: the schedule renders identically
+  either way, no constraint is affected, and `generation_id` is only read when
+  someone asks where a placement came from — which nothing in the UI does yet.
+  A provenance bug in a system whose whole audit story is provenance.
+
+  Now scoped to the applied term, and additionally excludes Events
+  (`offeringId: { not: null }`): a human placed an Event, so "which run produced
+  this" has the answer NONE, and overwriting that would make it
+  indistinguishable from solver output. Do not widen either filter back —
+  `updateMany` with fewer conditions looks like a simplification and is a
+  correctness regression that no test outside `generation_id` assertions would
+  catch.
 
 - ~~**Three hand-written indexes are MISSING from the database.**~~ **RESOLVED
   BY MEASUREMENT — no migration, and deliberately so.** The accidental migration

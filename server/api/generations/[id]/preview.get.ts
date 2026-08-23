@@ -193,6 +193,14 @@ async function deletedByOffering(tx: Tx, tenantId: string, plan: Materialization
     const counts = new Map<string, number>();
 
     for (const del of plan.deletes) {
+        // Unreachable by construction — the delete partition excludes Events
+        // explicitly — but skipped rather than coerced, so that if it ever DID
+        // happen this would under-report by one rather than invent an Offering
+        // named "null" in the reviewer's summary.
+        if (del.offeringId === null) {
+            continue;
+        }
+
         counts.set(del.offeringId, (counts.get(del.offeringId) ?? 0) + 1);
     }
 

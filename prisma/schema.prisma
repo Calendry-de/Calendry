@@ -879,7 +879,12 @@ model Session {
   tenantId     String? @map("tenant_id")
   federationId String? @map("federation_id")
 
-  offeringId String  @map("offering_id")
+  /// NULL means this Session is an EVENT — a placement with no recurring
+  /// demand behind it (TAXONOMY.md §2). An Event carries no Offering, so it is
+  /// in no solve's scope and `planMaterialization()`'s delete partition
+  /// (`inScope.has(offeringId)`) cannot reach it. Sent to the solver as
+  /// immovable occupancy, never as something to place.
+  offeringId String? @map("offering_id")
   termId     String  @map("term_id")
   kindId     String  @map("kind_id")
   timeGridId String? @map("time_grid_id")
@@ -915,7 +920,7 @@ model Session {
 
   tenant     Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   federation Federation? @relation(fields: [federationId], references: [id], onDelete: Cascade)
-  offering   Offering    @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  offering   Offering?   @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   term       Term        @relation(fields: [termId], references: [id], onDelete: Cascade)
   kind       SessionKind @relation(fields: [kindId], references: [id], onDelete: Restrict)
   timeGrid   TimeGrid?   @relation(fields: [timeGridId], references: [id], onDelete: SetNull)

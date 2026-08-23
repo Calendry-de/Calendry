@@ -95,6 +95,39 @@ permissions remain out of scope (§9.4). Stage 7c makes the schema and RLS
 - **`kind`** [OPEN, tenant-defined, on Offering/Session] — replaces a fixed Lecture/Exam/Event split. Constraints must declare which kinds they apply to, since a tenant-defined kind (e.g. "staff_meeting") may not have a Group at all.
 - **`Assignment`** [FIXED relation] — Session ↔ Group, Session ↔ Person (direct/individual), Session ↔ Room, Session ↔ Lecturer.
 
+### Offering-less Sessions ("Events") — amendment (decided 2026-08-23)
+
+`Session.offering_id` is **nullable**. A Session with no Offering is an
+**Event**: a placement that exists in its own right rather than as one
+occurrence of a recurring demand — an exam sitting, a staff gathering, a
+one-off lecture, anything a human places deliberately.
+
+Reasoning, and why this is not a weakening of the two-level model:
+
+- The two-level split exists because *demand* and *placement* are genuinely
+  different things, and most placements are occurrences of a demand. An Event
+  is the case where there is no demand to speak of: nothing says "this must
+  happen N times". Forcing a synthetic frequency-1 Offering behind every Event
+  would put rows in the demand model that are not demand, and every solve would
+  then have to be told to ignore them.
+- It follows the shape §2's Federation amendment already set: the column
+  becomes nullable, and the meaning of NULL is stated rather than inferred.
+- **An Event is invisible to the solver as a movable thing.** It carries no
+  Offering, so it is in no solve's scope, and it is sent as immovable occupancy
+  exactly as a federation-shared Session already is (`toWireSession` forces
+  `isLocked` when there is no owning tenant; the same applies with no Offering).
+  The solver must respect the room and slot it occupies and may never re-place
+  it.
+- `kind` still carries what the Event *is* — "exam", "holiday", "gathering" are
+  tenant vocabulary, never schema. Nothing in application logic may branch on a
+  particular kind.
+
+**A fixed-date holiday is usually NOT an Event.** `CalendarPeriod`
+(HOLIDAY/BREAK/EXAM) already models date ranges in the academic calendar and is
+what constraints like "minimize exam-week sessions" read. Reach for an Event
+when something occupies a *room and a block*; reach for a CalendarPeriod when it
+colours a *range of dates*.
+
 ### Time
 - **`TimeGrid`** [FIXED entity, per-tenant configured] — block length, blocks/day, active days, start hour. Not a global fixed grid (prototype's `timeslot % 3` arithmetic must NOT be hardcoded — it must resolve against each tenant's grid).
 - **Academic calendar** [FIXED, core from day one] — Terms/Semesters, Holidays, Break weeks, Exam periods. Constraints like "minimize lectures in exam weeks" need this as structured data, not a magic slice of `weeks[-exam_weeks:]`.
