@@ -357,6 +357,14 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
         { key: 'severity', label: 'Severity', type: 'select', required: true, custom: true },
         { key: 'weight', label: 'Penalty weight', type: 'number', custom: true },
         { key: 'params', label: 'Parameters', type: 'json', custom: true },
+        /*
+         * Kind scopes. `custom` because the builder renders the picker, and
+         * because the value is an ARRAY — the shape that produced
+         * "[object Object]" when a structured field reached ManageField. It is
+         * declared here so it takes part in the draft, dirty tracking and the
+         * payload, exactly as `time_grid.breaks` does.
+         */
+        { key: 'scopes', label: 'Applies to kinds', type: 'text', custom: true },
         { key: 'isEnabled', label: 'Enabled', type: 'boolean' },
     ],
 };

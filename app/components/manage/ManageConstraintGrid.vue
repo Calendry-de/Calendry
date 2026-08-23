@@ -115,32 +115,96 @@
                         </template>
                     </div>
 
-                    <ul
-                        v-if="entry.variants.length"
-                        class="cgrid_variants"
-                    >
-                        <li
-                            v-for="variant in entry.variants"
-                            :key="variant.id"
-                            class="cgrid_variant"
-                        >
-                            <label class="cgrid_toggle">
-                                <input
-                                    :checked="variant.isEnabled"
-                                    :disabled="!canUpdate || busy.has(variant.id)"
-                                    type="checkbox"
-                                    @change="setEnabled(variant, ($event.target as HTMLInputElement).checked)"
-                                >
-                                <span>{{ variant.name }}</span>
-                            </label>
-
-                            <span class="cgrid_scoped">scoped variant</span>
-
-                            <NuxtLink :to="`/manage/constraints/${variant.id}`">Edit</NuxtLink>
-                        </li>
-                    </ul>
                 </li>
             </ul>
+        </section>
+
+        <!--
+            ADDITIONAL RULES — every non-default instance, in one place.
+            
+            These are NOT listed again under their base rule's row. A variant is
+            only meaningful relative to the rule it qualifies, so showing it in
+            both places would put the same exception on screen twice and leave
+            no single answer to "what extra rules does this tenant have?".
+        -->
+        <section class="cgrid_group">
+            <header class="cgrid_head">
+                <h2>Additional rules</h2>
+                <p>
+                    Extra instances of a rule, each narrowed to particular session kinds — a
+                    different weight for seminars than for lectures, say. The tenant-wide
+                    version above still applies everywhere these do not.
+                </p>
+            </header>
+
+            <ul
+                v-if="variants.length"
+                class="cgrid_rows"
+            >
+                <li
+                    v-for="variant in variants"
+                    :key="variant.id"
+                    class="cgrid_row"
+                    :class="{ 'cgrid_row--off': !variant.isEnabled }"
+                >
+                    <div class="cgrid_main">
+                        <label class="cgrid_toggle">
+                            <input
+                                :checked="variant.isEnabled"
+                                :disabled="!canUpdate || busy.has(variant.id)"
+                                type="checkbox"
+                                @change="setEnabled(variant, ($event.target as HTMLInputElement).checked)"
+                            >
+                            <span class="cgrid_name">{{ variant.name }}</span>
+                        </label>
+
+                        <p class="cgrid_desc">
+                            <span
+                                class="cgrid_sev"
+                                :class="`cgrid_sev--${variant.severity.toLowerCase()}`"
+                            >{{ variant.severity }}</span>
+                            {{ typeLabel(variant.type) }}
+                            <span class="cgrid_scoped">· {{ scopeSummary(variant) }}</span>
+                        </p>
+
+                        <div class="cgrid_controls">
+                            <label
+                                v-if="variant.severity === 'SOFT'"
+                                class="cgrid_weight"
+                            >
+                                <span>Weight</span>
+                                <input
+                                    :disabled="!canUpdate || busy.has(variant.id)"
+                                    min="0"
+                                    type="number"
+                                    :value="variant.weight ?? 0"
+                                    @change="setWeight(variant, ($event.target as HTMLInputElement).value)"
+                                >
+                            </label>
+
+                            <common-button
+                                icon="material-symbols:edit-outline"
+                                :to="`/manage/constraints/${variant.id}`"
+                                type="transparent"
+                            >Edit</common-button>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+
+            <p
+                v-else
+                class="cgrid_empty"
+            >
+                None yet. Every rule above applies to all session kinds.
+            </p>
+
+            <common-button
+                v-if="canCreate"
+                icon="material-symbols:add"
+                to="/manage/constraints/new"
+                type="secondary"
+            >Add a rule</common-button>
         </section>
 
         <p
@@ -203,6 +267,8 @@ interface ConstraintRow {
     params: Record<string, unknown> | null;
     isEnabled: boolean;
     isDefault: boolean;
+    /** Present because the resource `include`s them; kind-only in this UI. */
+    scopes?: { kindId: string | null; offeringId: string | null }[];
 }
 
 const request = useRequestFetch();
@@ -218,15 +284,54 @@ const defaultByType = computed(() => new Map(
     rows.value.filter((row) => row.isDefault).map((row) => [row.type, row]),
 ));
 
-const variantsByType = computed(() => {
-    const map = new Map<string, ConstraintRow[]>();
+/** Every non-default instance, newest rule types first for a stable order. */
+const variants = computed(() => rows.value
+    .filter((row) => !row.isDefault)
+    .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name)));
 
-    for (const row of rows.value.filter((r) => !r.isDefault)) {
-        map.set(row.type, [...(map.get(row.type) ?? []), row]);
+/*
+ * Kind names for the scope summary.
+ *
+ * `useAsyncData` + `useRequestFetch`, NOT an `onMounted` fetch. A client-only
+ * hook does not run on the server, so the first render showed raw uuids where
+ * kind names belong — the same shape as every other SSR trap recorded in
+ * CLAUDE.md, and caught here only because the check read the rendered TEXT
+ * rather than counting elements.
+ *
+ * `useRequestFetch` because a bare `$fetch` carries no cookie server-side and
+ * would 401 into an empty list, which renders identically to a tenant with no
+ * kinds.
+ */
+const kindRequest = useRequestFetch();
+
+const kindsData = useAsyncData(
+    'constraint-grid:kinds',
+    () => kindRequest<{ rows: { id: string; name: string }[] }>('/api/session-kinds', {
+        query: { limit: 200 },
+    }),
+    // A failed fetch degrades to ids rather than blanking the row — the 6c rule.
+    { default: () => ({ rows: [] as { id: string; name: string }[] }) },
+);
+
+const kinds = computed(() => kindsData.data.value?.rows ?? []);
+
+const kindName = (id: string) => kinds.value.find((k) => k.id === id)?.name ?? id;
+
+const typeLabel = (key: string) => defaultConstraintTypes().find((t) => t.key === key)?.label ?? key;
+
+function scopeSummary(row: ConstraintRow): string {
+    const names = (row.scopes ?? [])
+        .map((scope) => (scope.kindId ? kindName(scope.kindId) : null))
+        .filter((name): name is string => Boolean(name));
+
+    if (!names.length) {
+        // Should be unreachable for a non-default row; stated rather than
+        // rendered as an empty string, which would read as "no scope needed".
+        return 'not scoped — this duplicates the tenant-wide rule';
     }
 
-    return map;
-});
+    return names.join(', ');
+}
 
 /**
  * Catalogue types with no row for this tenant. Surfaced, never hidden: the
@@ -236,7 +341,7 @@ const variantsByType = computed(() => {
 const missingTypes = computed(() => defaultConstraintTypes()
     .filter((type) => !defaultByType.value.has(type.key)));
 
-interface Entry { type: ConstraintTypeDef; row: ConstraintRow; variants: ConstraintRow[] }
+interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
 
 function entriesFor(severity: 'HARD' | 'SOFT'): Entry[] {
     return defaultConstraintTypes()
@@ -244,7 +349,7 @@ function entriesFor(severity: 'HARD' | 'SOFT'): Entry[] {
         .map((type) => {
             const row = defaultByType.value.get(type.key);
 
-            return row ? { type, row, variants: variantsByType.value.get(type.key) ?? [] } : null;
+            return row ? { type, row } : null;
         })
         .filter((entry): entry is Entry => entry !== null);
 }
@@ -501,6 +606,16 @@ const setParam = (row: ConstraintRow, key: string, value: unknown) =>
         padding: $space2 0;
 
         font-size: $fontSizeSm;
+    }
+
+    &_empty {
+        margin: 0;
+        padding: $space6;
+        border: 1px dashed var(--border-color, rgb(128 128 128 / 30%));
+        border-radius: $radiusMd;
+
+        font-size: $fontSizeSm;
+        color: var(--text-secondary-color);
     }
 
     &_scoped {

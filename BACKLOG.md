@@ -407,7 +407,31 @@ future session finds the same shape and wonders whether it was intended.
 
 # Constraint management
 
-## Kind/offering-scoped variants are modelled and unused
+## Offering-scoped constraints are accepted but never reach the solver
+
+`constraint_scope.offering_id` exists and `PUT /api/constraints/:id/scopes`
+accepts it, but `assembleSolverInput` **skips the whole constraint** when any
+scope names an offering ([solverInput.ts:125](server/utils/solverInput.ts#L125)) —
+`ConstraintConfig` carries `applies_to_kinds` only, and widening the rule to
+every offering would be the opposite of what was configured.
+
+The constraint form therefore offers **kind scoping only**, deliberately. Closing
+this means a `calendry-proto` change (an offering dimension on
+`ConstraintConfig`) and is cross-repo. Until then, an offering scope set through
+the API is a rule that silently does not run in solves — which is why the UI
+does not offer one.
+
+## `refreshViolations()` ignores constraint scopes entirely
+
+No scope query anywhere in `server/utils/violations.ts`. A kind-scoped
+STRUCTURAL rule (the four double-booking types) still evaluates tenant-wide for
+manual edits, so scoping narrows the solver's view and not the live warnings.
+
+Not urgent — the four structural types are the ones a tenant is least likely to
+want scoped — but the two halves disagreeing is exactly the kind of divergence
+this project tracks rather than discovers later.
+
+## ~~Kind/offering-scoped variants are modelled and unused~~ — RESOLVED for kinds
 
 `constraint_scope` holds **zero rows** across all tenants (measured
 2026-08-23), so scoped variants are a modelled capability nobody has exercised.

@@ -156,6 +156,49 @@
                     raise it if the schedule is not respecting it enough.
                 </p>
 
+                <!--
+                    SCOPES. Kind only, deliberately: `assembleSolverInput` SKIPS a
+                    constraint scoped to offerings entirely, because the wire's
+                    ConstraintConfig carries `applies_to_kinds` and nothing else —
+                    so an offering picker here would be a control whose main
+                    effect is to switch the rule off in the next solve.
+                -->
+                <fieldset class="builder_scopes">
+                    <legend>Applies to</legend>
+
+                    <p
+                        v-if="scopeRequired"
+                        class="builder_hint builder_hint--warn"
+                    >
+                        This rule already has a tenant-wide version. Pick at least one kind,
+                        or this one would silently duplicate it.
+                    </p>
+
+                    <p
+                        v-else-if="!scopeKinds.length"
+                        class="builder_hint"
+                    >Every session kind — this is the tenant-wide rule.</p>
+
+                    <label
+                        v-for="kind in kinds"
+                        :key="kind.id"
+                        class="builder_scope"
+                    >
+                        <input
+                            :checked="scopeKinds.includes(kind.id)"
+                            :disabled="readonly"
+                            type="checkbox"
+                            @change="toggleScope(kind.id)"
+                        >
+                        <span>{{ kind.name }}</span>
+                    </label>
+
+                    <p
+                        v-if="!kinds.length"
+                        class="builder_hint builder_hint--warn"
+                    >No session kinds exist yet, so there is nothing to scope to.</p>
+                </fieldset>
+
                 <fieldset
                     v-if="selectedType?.params.length"
                     class="builder_params"
@@ -234,6 +277,59 @@ const appTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'app');
 const solverTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'solver');
 
 const selectedType = computed(() => findConstraintType(draft.value.type as string | undefined));
+
+/**
+ * Kinds and the tenant's existing rules, for the scope picker and for knowing
+ * whether a scope is REQUIRED.
+ *
+ * `useRequestFetch()` rather than bare `$fetch`: this renders during SSR, and
+ * `$fetch` does not carry the browser's cookie there — the call would 401 on
+ * the server and the picker would render empty, which is indistinguishable from
+ * a tenant with no kinds.
+ */
+const request = useRequestFetch();
+
+const kindsData = useAsyncData(
+    'constraint-builder:kinds',
+    () => request<{ rows: { id: string; name: string }[] }>('/api/session-kinds', { query: { limit: 200 } }),
+);
+
+const existingData = useAsyncData(
+    'constraint-builder:existing',
+    () => request<{ rows: { type: string; isDefault: boolean }[] }>('/api/constraints', { query: { limit: 200 } }),
+);
+
+const kinds = computed(() => kindsData.data.value?.rows ?? []);
+
+const scopeKinds = computed<string[]>(() => {
+    const value = draft.value.scopes;
+
+    return Array.isArray(value)
+        ? value.map((scope) => (scope as { kindId?: string }).kindId).filter((id): id is string => Boolean(id))
+        : [];
+});
+
+/**
+ * Whether the server will REFUSE this row without a scope.
+ *
+ * Mirrors `RESOURCES.constraints.beforeCreate`, which is the authority — this
+ * only stops the user reaching a 422 they could have been warned about. A
+ * default row of the same type means an unscoped sibling would apply
+ * tenant-wide alongside it, which is the duplicate-constraint defect.
+ */
+const scopeRequired = computed(() => props.mode === 'create'
+    && scopeKinds.value.length === 0
+    && (existingData.data.value?.rows ?? []).some(
+        (row) => row.type === draft.value.type && row.isDefault,
+    ));
+
+function toggleScope(kindId: string) {
+    const next = scopeKinds.value.includes(kindId)
+        ? scopeKinds.value.filter((id) => id !== kindId)
+        : [...scopeKinds.value, kindId];
+
+    draft.value.scopes = next.map((id) => ({ kindId: id }));
+}
 
 /**
  * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry from

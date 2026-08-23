@@ -99,6 +99,14 @@ export interface ResourceConfig {
         tx: Tx;
         tenantId: string;
         data: Record<string, unknown>;
+        /**
+         * The CHILD collections, already split out of `data` by
+         * `splitChildren`. Passed because a rule can depend on them: a
+         * constraint variant is only legal if it names a scope, and `scopes` is
+         * a child key — so a guard reading `data` alone sees `undefined` and
+         * refuses everything, valid payloads included.
+         */
+        children: Record<string, unknown>;
     }) => Promise<void>;
     beforeUpdate?: (ctx: {
         tx: Tx;
@@ -161,6 +169,40 @@ async function constraintBeforeUpdate(ctx: {
     id: string;
     patch: Record<string, unknown>;
 }): Promise<void> {
+    /**
+     * Emptying a variant's scopes would leave it an unscoped duplicate of a type
+     * that already has a tenant-wide rule — the exact state `beforeCreate`
+     * refuses. Guarding only the create path would mean the rule could be
+     * reached in two requests instead of one.
+     *
+     * Only when the patch actually CLEARS them: a patch that does not mention
+     * `scopes` leaves them alone, and one that sets a non-empty list is the
+     * ordinary edit.
+     */
+    if (Array.isArray(ctx.patch.scopes) && ctx.patch.scopes.length === 0) {
+        const row = await ctx.tx.constraint.findFirst({
+            where: { id: ctx.id, tenantId: ctx.tenantId },
+            select: { type: true, isDefault: true },
+        });
+
+        if (row && !row.isDefault) {
+            const existingDefault = await ctx.tx.constraint.findFirst({
+                where: { tenantId: ctx.tenantId, type: row.type, isDefault: true },
+                select: { name: true },
+            });
+
+            if (existingDefault) {
+                throw createError({
+                    statusCode: 422,
+                    statusMessage: `Removing every kind would make this a second tenant-wide `
+                        + `'${row.type}' rule alongside "${existingDefault.name}". `
+                        + 'Keep at least one kind, or delete this rule instead.',
+                    data: { field: 'scopes', type: row.type },
+                });
+            }
+        }
+    }
+
     const touchesSeverity = 'severity' in ctx.patch;
     const touchesWeight = 'weight' in ctx.patch;
 
@@ -734,6 +776,83 @@ export const RESOURCES: Record<string, ResourceConfig> = {
 
     constraints: {
         model: 'constraint',
+        include: { scopes: true },
+        /**
+         * Scopes travel WITH the constraint rather than as a relation.
+         *
+         * `ManageRelationsPanel` says it plainly: "Relations need an id to hang
+         * off, so on the create page there is nothing to edit yet." A scope
+         * added after the row exists is a scope the row spent a moment without —
+         * and for a non-default constraint that moment is an UNSCOPED DUPLICATE
+         * of a type that already has a default, applying tenant-wide until the
+         * second request lands. `beforeCreate` below refuses exactly that state,
+         * so the scope has to arrive in the same payload.
+         *
+         * Same mechanism `time-grids` already uses for `breaks`, and written in
+         * one transaction for the same reason.
+         */
+        childKeys: ['scopes'],
+        async writeChildren({ tx, tenantId, id, children }) {
+            const rows = (children.scopes ?? []) as { kindId: string }[];
+
+            // Replaced wholesale, like every other set here: the submitted list
+            // is the authority.
+            await tx.constraintScope.deleteMany({ where: { constraintId: id, tenantId } });
+
+            if (rows.length) {
+                await tx.constraintScope.createMany({
+                    data: rows.map((scope) => ({
+                        constraintId: id,
+                        tenantId,
+                        kindId: scope.kindId,
+                        // Offering scoping is deliberately not exposed here —
+                        // see the schema note below.
+                        offeringId: null,
+                    })),
+                });
+            }
+        },
+        /**
+         * A NON-DEFAULT constraint of a type that already has a default row must
+         * name at least one scope.
+         *
+         * Without this, "Add scoped variant" produces a second tenant-wide rule
+         * of the same type — both enabled, both weighted, both sent to the
+         * solver. That is the duplicate-constraint defect this project already
+         * fixed once, reintroduced through a button that promises the opposite.
+         *
+         * NOT a database constraint, and it cannot be one: "has at least one row
+         * in another table" is not expressible as a CHECK, and the partial
+         * unique index only governs how many DEFAULTS exist. Saying so is better
+         * than implying the index covers it.
+         *
+         * The other candidate rule — have the type picker exclude types that
+         * already have a default — is unworkable by construction: every live
+         * catalogue type has a default row, so the picker would be empty.
+         */
+        async beforeCreate({ tx, tenantId, data, children }) {
+            const type = data.type as string | undefined;
+            const scopes = (children.scopes ?? []) as unknown[];
+
+            if (!type || scopes.length > 0) {
+                return;
+            }
+
+            const existingDefault = await tx.constraint.findFirst({
+                where: { tenantId, type, isDefault: true },
+                select: { id: true, name: true },
+            });
+
+            if (existingDefault) {
+                throw createError({
+                    statusCode: 422,
+                    statusMessage: `'${type}' already has a tenant-wide rule ("${existingDefault.name}"). `
+                        + 'An additional rule of the same type must name at least one session kind, '
+                        + 'or it would silently duplicate that one.',
+                    data: { field: 'scopes', type, defaultConstraintId: existingDefault.id },
+                });
+            }
+        },
         create: z.object({
             type: z.string().min(1),
             name: z.string().min(1),
@@ -786,6 +905,22 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
+            /**
+             * KIND SCOPES ONLY, and that is a UI-honesty decision rather than a
+             * schema limit.
+             *
+             * `constraint_scope` can name an Offering, and the relation endpoint
+             * still accepts one. But `assembleSolverInput` SKIPS a constraint
+             * scoped to offerings entirely — `ConstraintConfig` carries
+             * `applies_to_kinds` only, and sending it unscoped would widen the
+             * rule rather than narrow it. Offering-scoping through this form
+             * would therefore be a control whose main effect is to switch the
+             * rule off in the solve, which is the silent-no-op class this
+             * project keeps designing against.
+             *
+             * Kind scopes DO reach the solver, as `appliesToKinds`.
+             */
+            scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
         }).superRefine(constraintShapeRefinement),
         update: z.object({
             name: z.string().min(1).optional(),
@@ -794,6 +929,8 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
+            /** Editable after creation too; same kind-only reasoning as create. */
+            scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
         }),
         beforeUpdate: constraintBeforeUpdate,
         filters: z.object({

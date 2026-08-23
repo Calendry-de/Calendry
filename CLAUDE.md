@@ -442,6 +442,40 @@ otherwise" is not one.
     row is reported loudly in the UI rather than omitted — omission is exactly
     what hid the gap above, in a list that looked complete.
 
+- **A non-default Constraint must name a scope, and scoping is KIND-ONLY in the
+  UI.** Every live catalogue type has a default (tenant-wide) row, so a second
+  UNSCOPED row of the same type is not an "additional rule" — it is a second
+  tenant-wide rule with its own weight, and both reach the solver. That is the
+  duplicate-constraint defect this project already fixed once, and the "Add
+  scoped variant" button reintroduced it by creating rows it had no way to
+  scope: `GET /api/constraints/:id/scopes` returned `[]` and nothing in the UI
+  could change that.
+
+  Three things hold it together, and each was chosen against an alternative:
+
+  - **Scopes travel in the constraint's own payload** (`childKeys: ['scopes']`),
+    not as a relation. `ManageRelationsPanel` cannot edit relations before the
+    row exists, so "create then scope" would leave a window in which the variant
+    IS the duplicate. Same mechanism `time-grids` uses for `breaks`.
+  - **`beforeCreate` refuses an unscoped variant when a default exists, and
+    `beforeUpdate` refuses an edit that would empty the scopes.** Guarding only
+    create would let the same state be reached in two requests. This cannot be a
+    database constraint — "has at least one row in another table" is not a CHECK,
+    and the partial unique index governs only how many DEFAULTS exist.
+  - **The "exclude types that already have a default" alternative is unworkable
+    by construction**: all thirteen live types have one, so the picker would be
+    empty.
+
+  **Kind scopes only in the form.** `constraint_scope` can name an Offering and
+  the relation endpoint still accepts one, but `assembleSolverInput` SKIPS a
+  constraint scoped to offerings outright — `ConstraintConfig` carries
+  `applies_to_kinds` and nothing else, and sending it unscoped would widen the
+  rule rather than narrow it. An offering picker would be a control whose main
+  effect is switching the rule off in the next solve.
+
+  Note also that **`refreshViolations()` ignores scopes entirely**, so scoping a
+  structural rule narrows the SOLVER's view and not the live violation checks.
+
 - **Permissions are fixed, roles are not.** The `permission` catalogue is code
   (`server/utils/permissions.ts`, mirrored into the table by migration).
   Tenants bundle permissions into AccessRoles; they cannot invent permissions,

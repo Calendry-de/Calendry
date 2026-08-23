@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
 
         // Entity-specific refusal, in this transaction, before anything is
         // written. Throwing here leaves nothing behind.
-        await config.beforeCreate?.({ tx, tenantId: identity.tenantId, data });
+        await config.beforeCreate?.({ tx, tenantId: identity.tenantId, data, children });
 
         const created = await mapDbErrors(async () => {
             // Creating a row that claims an exclusive flag demotes the incumbent,
