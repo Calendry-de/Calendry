@@ -116,7 +116,7 @@
             :id="controlId"
             class="field_control"
             :type="inputType"
-            :value="(model as string | number) ?? ''"
+            :value="inputValue"
             :placeholder="field.placeholder"
             :min="field.min"
             :max="field.max"
@@ -195,6 +195,30 @@ const options = computed(() => {
 });
 
 /** What the read-only view prints — resolved labels, not raw foreign keys. */
+/**
+ * A value this control can meaningfully render as text.
+ *
+ * ARRAYS AND OBJECTS ARE NOT, and saying so here is what closes a whole
+ * category. `String([{…}])` is `"[object Object]"` — a string that renders
+ * happily, passes every type check, and tells the reader nothing. It shipped
+ * for real: `time_grid.breaks` is an array declared `type: 'text'`, and a
+ * viewer's read-only page displayed exactly that under the label "Named
+ * breaks".
+ *
+ * The field-specific cause is fixed where it belongs (the TimeGrid editor no
+ * longer hands `breaks` to this component). This guard is the mechanism: no
+ * future registry entry can produce `[object Object]` here, whatever it
+ * declares, because a structured value now renders as "no value" instead of as
+ * a lie about one.
+ */
+function isRenderablePrimitive(value: unknown): boolean {
+    return value === null
+        || value === undefined
+        || typeof value === 'string'
+        || typeof value === 'number'
+        || typeof value === 'boolean';
+}
+
 const staticText = computed(() => {
     if (props.field.type === 'boolean') {
         return model.value ? 'Yes' : 'No';
@@ -208,8 +232,23 @@ const staticText = computed(() => {
 
     const value = model.value;
 
+    if (!isRenderablePrimitive(value)) {
+        return '—';
+    }
+
     return value === null || value === undefined || value === '' ? '—' : String(value);
 });
+
+/**
+ * The editable twin of the guard above.
+ *
+ * An array bound to `<input type="text">` is worse than the read-only case: it
+ * renders as an EMPTY box that looks editable, and one keystroke replaces the
+ * whole structure with a string on the next save. Binding empty makes the
+ * control inert-looking rather than destructive — and the field should not be
+ * reaching this component at all, which is the other half of the fix.
+ */
+const inputValue = computed(() => (isRenderablePrimitive(model.value) ? (model.value ?? '') : ''));
 
 function emitValue(value: unknown) {
     model.value = value;

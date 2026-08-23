@@ -258,8 +258,27 @@ const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 
 // Everything except the day toggles and the default flag, which get their own
 // controls below.
+/**
+ * Fields this editor delegates to the generic `ManageField`.
+ *
+ * The registry marks EVERY time-grid field `custom: true` — meaning "the
+ * bespoke component decides" — and this component decides to render most of
+ * them generically and three of them itself. So the filter cannot be
+ * `!field.custom`: that would leave the editor empty.
+ *
+ * It was a denylist of two keys and `breaks` was never added to it, so an
+ * ARRAY reached ManageField as a `type: 'text'` field. A viewer saw
+ * "[object Object]" under the label "Named breaks"; an admin saw an empty text
+ * input that would have replaced the whole array with a string on first
+ * keystroke.
+ *
+ * Named after the reason instead of the exception, so the next bespoke control
+ * added below has an obvious place to declare itself.
+ */
+const SELF_RENDERED_FIELDS = ['activeDays', 'isDefault', 'breaks'];
+
 const scalarFields = computed(() => props.form.fields.filter(
-    (field) => !['activeDays', 'isDefault'].includes(field.key),
+    (field) => !SELF_RENDERED_FIELDS.includes(field.key),
 ));
 
 const activeDays = computed<number[]>(() => {
