@@ -33,7 +33,8 @@
     "reset:password": "bun run scripts/reset-password.ts",
     "grant:permissions": "bun run scripts/grant-permissions.ts",
     "create:account": "bun run scripts/create-account.ts",
-    "create:role": "bun run scripts/create-role.ts"
+    "create:role": "bun run scripts/create-role.ts",
+    "backfill:constraints": "bun run scripts/backfill-constraints.ts"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.4",

@@ -397,6 +397,31 @@ future session finds the same shape and wonders whether it was intended.
 
 ---
 
+# Constraint management
+
+## Kind/offering-scoped variants are modelled and unused
+
+`constraint_scope` holds **zero rows** across all tenants (measured
+2026-08-23), so scoped variants are a modelled capability nobody has exercised.
+The grid renders them as a sub-list under their type's row and the builder can
+create one via `/manage/constraints/new?type=<key>`, but the scope PICKER
+itself is still the generic relations panel rather than a purpose-built
+control.
+
+Worth a design pass when someone actually needs one: "cap online share at 30%,
+except seminars at 50%" is the motivating case, and it wants a control that
+shows the default and the exception together rather than two independent rows.
+
+## `params` still accepts arbitrary JSON through the generic API
+
+Unchanged by the grid work and still open — see the entry under **Undecided**.
+The grid writes params through the same `PATCH /api/constraints/:id` as before,
+so a malformed param set is refused by nothing. The catalogue knows each type's
+parameter shape (`ConstraintParamDef`), so the fix is the same shape as
+`validateConstraintShape()`: consult the catalogue in a refinement.
+
+---
+
 # Event log
 
 ## A tenant or Generation carrying any `session_event` cannot be deleted

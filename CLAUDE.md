@@ -411,6 +411,37 @@ otherwise" is not one.
   bundle of fixed Permissions. Keeping them separate is what stops the schema
   accepting an Offering that requires a lecturer holding the role "Billing
   Admin". Never merge them, and never grant permissions via `Role`.
+- **A constraint TYPE with no row is a silently disabled rule, not a neutral
+  absence.** `refreshViolations()` evaluates only the types the tenant has a
+  `constraint_def` row for, and `constraint_violation.constraint_id` is NOT
+  NULL, so a type nobody created is a rule that never runs and never says so.
+
+  This bit for real and for a long time: `no_double_booking_person` was added to
+  the catalogue in Stage 7a and never added to `provision-tenant.ts`'s
+  hand-written three-item list, so the person-clash check had **never run in any
+  real tenant** — while `tests/violations-person-clash.test.ts` passed the whole
+  time, because it creates its own constraint row.
+
+  Closed structurally (TAXONOMY.md §2 amendment): every tenant now holds exactly
+  one **default row per live catalogue type**, enforced by the partial unique
+  index `constraint_one_default_per_type` on `(tenant_id, type) WHERE is_default`.
+  Provisioning derives the set from `CONSTRAINT_TYPES` rather than listing it,
+  so a new type is provisioned by construction; existing tenants are repaired
+  with `bun run backfill:constraints -- --all-missing`.
+
+  Three things to keep:
+
+  - **A tenant opts out by DISABLING a default row, never by deleting it.**
+    Deleting makes the rule unreachable again; disabling makes it off.
+  - **Deprecated types get no default row** (`defaultConstraintTypes()` filters
+    on `deprecatedBy`). They stay in the catalogue so existing rows remain
+    renderable, but seeding a fresh one would resurrect a superseded rule as a
+    first-class option. Two are deprecated today, so the catalogue has 15
+    entries and **13 live types**.
+  - **The grid renders from the CATALOGUE, not from the fetch.** A type with no
+    row is reported loudly in the UI rather than omitted — omission is exactly
+    what hid the gap above, in a list that looked complete.
+
 - **Permissions are fixed, roles are not.** The `permission` catalogue is code
   (`server/utils/permissions.ts`, mirrored into the table by migration).
   Tenants bundle permissions into AccessRoles; they cannot invent permissions,
@@ -1389,6 +1420,19 @@ The order matters, and each step depends on the one before it.
   production and must not be removed.
 - **Rebuilding a dev database:** `bun run db-reset` (`prisma migrate reset`)
   replays the migrations *and* runs the seed automatically.
+- **Adding a CONSTRAINT TYPE needs a backfill too, for the same reason.**
+  `provision:tenant` creates one default row per live catalogue type at creation
+  time only, so a type added later leaves every EXISTING tenant without a row —
+  and a missing row is a rule that never runs (see Conventions). Repair with
+  `bun run backfill:constraints -- --all-missing` (`--dry-run` first; owner
+  connection, audited to stdout).
+
+  It only ever CREATES absent rows and never edits an existing one, so a
+  tenant's toggles, weights and params survive a re-run untouched. Deliberately
+  not part of `db seed`: the seed runs on every deploy and carries reference
+  data that is code, whereas constraint rows are tenant data — a seed writing
+  them per deploy is the same mistake as one silently widening AccessRoles.
+
 - **Adding a permission needs a fourth step.** `db seed` mirrors the catalogue
   into the `permission` table, but it deliberately does not touch
   `access_role_permission` — which permissions a tenant's roles *hold* is tenant

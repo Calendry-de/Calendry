@@ -1,6 +1,7 @@
 import type { Component } from 'vue';
 import ManageCalendarPeriodForm from '~/components/manage/ManageCalendarPeriodForm.vue';
 import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder.vue';
+import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
 import ManageGroupForm from '~/components/manage/ManageGroupForm.vue';
 import ManageGroupTree from '~/components/manage/ManageGroupTree.vue';
 import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
@@ -41,6 +42,13 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
 
 export const LIST_COMPONENTS: Record<string, Component> = {
     GroupTree: ManageGroupTree,
+    /**
+     * Constraints are a fixed catalogue of switches, not a collection you
+     * populate. The generic table framed them as the latter, which is how a
+     * tenant ended up with types that had no row and were therefore never
+     * evaluated. See the component for the full reasoning.
+     */
+    ConstraintGrid: ManageConstraintGrid,
 };
 
 export function resolveDetailComponent(name: string | undefined): Component | undefined {

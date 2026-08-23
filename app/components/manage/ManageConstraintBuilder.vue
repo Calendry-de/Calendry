@@ -26,12 +26,13 @@
                     >Rule<span class="builder_req">*</span></label>
 
                     <p
-                        v-if="readonly || mode === 'edit'"
+                        v-if="readonly || mode === 'edit' || typeIsPreset"
                         :id="typeId"
                         class="builder_static"
                     >
                         {{ selectedType?.label ?? draft.type ?? '—' }}
                         <em v-if="mode === 'edit' && !readonly">Cannot be changed — create a new constraint instead.</em>
+                        <em v-else-if="typeIsPreset">A scoped variant of this rule. Scope it below, then save.</em>
                     </p>
 
                     <select
@@ -54,7 +55,7 @@
                                 :value="type.key"
                             >{{ type.label }}</option>
                         </optgroup>
-                        <optgroup label="Solver — not yet enforced">
+                        <optgroup label="Solver">
                             <option
                                 v-for="type in solverTypes"
                                 :key="type.key"
@@ -233,6 +234,30 @@ const appTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'app');
 const solverTypes = CONSTRAINT_TYPES.filter((type) => type.evaluator === 'solver');
 
 const selectedType = computed(() => findConstraintType(draft.value.type as string | undefined));
+
+/**
+ * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry from
+ * the constraint grid.
+ *
+ * Applied SYNCHRONOUSLY at setup, never from a watcher. A watcher does not
+ * flush during SSR, so the server would render the type picker unset and the
+ * client would correct it on hydration — the exact mismatch this codebase has
+ * hit three times (edit forms, `<select>`, the solver control).
+ *
+ * When preset, the picker renders as static text. That is what makes the
+ * mislabelled-name defect unreachable from this path: the bug needed
+ * `selectType()` to run a SECOND time, after the name had auto-filled from the
+ * first choice. Here it runs exactly once, before the user can type anything.
+ */
+const presetType = props.mode === 'create'
+    ? findConstraintType(useRoute().query.type as string | undefined)
+    : undefined;
+
+const typeIsPreset = computed(() => Boolean(presetType) && props.mode === 'create');
+
+if (presetType) {
+    selectType(presetType.key);
+}
 
 /**
  * `min: 0`, matching the API and the solver rather than being stricter than

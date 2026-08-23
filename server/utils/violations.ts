@@ -104,19 +104,42 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         return 0;
     }
 
-    const enabled = await tx.constraint.findMany({
+    /**
+     * EVERY structural constraint the tenant has, enabled or not — then the
+     * enabled subset.
+     *
+     * The distinction is what makes DISABLING a rule take effect. `clearViolations`
+     * removes rows for the constraint ids it is given, so passing only the
+     * ENABLED ones left a disabled rule's existing violations in the table with
+     * nothing that would ever delete them: the warning stayed on screen forever
+     * and the toggle looked broken.
+     *
+     * It went unnoticed because disabling used to mean editing a rule through
+     * the builder, which is rare. The constraint grid makes it a one-click
+     * action on thirteen rows, so the stale state is now the common case rather
+     * than the odd one.
+     *
+     * Note the pre-existing asymmetry this removes: the `length === 0` branch
+     * below passed an EMPTY id list, and `clearViolations` treats that as "no
+     * constraint filter" and deletes everything session-scoped. So "no rules at
+     * all" cleared correctly while "one rule of several disabled" did not.
+     */
+    const configured = await tx.constraint.findMany({
         where: {
             tenantId,
-            isEnabled: true,
             type: { in: [...STRUCTURAL_CONSTRAINT_TYPES] },
         },
-        select: { id: true, type: true, severity: true, weight: true },
+        select: { id: true, type: true, severity: true, weight: true, isEnabled: true },
     });
 
-    // Nothing configured means nothing to record. Collisions still happen; the
-    // tenant simply has not asked to be warned about them.
+    const clearableIds = configured.map((c) => c.id);
+    const enabled = configured.filter((c) => c.isEnabled);
+
+    // Nothing ENABLED means nothing to record. Collisions still happen; the
+    // tenant simply has not asked to be warned about them — and anything a
+    // previously-enabled rule recorded is cleared rather than stranded.
     if (enabled.length === 0) {
-        await clearViolations(tx, tenantId, sessionIds, []);
+        await clearViolations(tx, tenantId, sessionIds, clearableIds);
 
         return 0;
     }
@@ -285,7 +308,10 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         }
     }
 
-    await clearViolations(tx, tenantId, involvedIds, enabled.map((c) => c.id));
+    // `clearableIds`, not `enabled` — see the note above. A rule that was
+    // switched off must have its old rows removed, not merely stop adding new
+    // ones.
+    await clearViolations(tx, tenantId, involvedIds, clearableIds);
 
     for (const d of detected) {
         /**

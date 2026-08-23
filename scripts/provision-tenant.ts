@@ -30,6 +30,7 @@ import { PrismaClient } from '@prisma/client';
 // second copy of the KDF drifts silently the moment the original changes.
 import { hashPassword } from '../server/utils/auth';
 import { PERMISSIONS } from '../server/utils/permissions';
+import { defaultConstraintRow, defaultConstraintTypes } from '../shared/constraintTypes';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
 function arg(name: string): string | undefined {
@@ -50,16 +51,24 @@ function required(name: string): string {
 }
 
 /**
- * The three structural hard constraints. Created because the violation
- * evaluator can only record against a Constraint that exists
- * (constraint_violation.constraint_id is NOT NULL) — a tenant without these
- * silently gets no collision warnings at all.
+ * ONE DEFAULT ROW PER LIVE CATALOGUE TYPE (TAXONOMY.md §2).
+ *
+ * This used to be three hand-listed structural types. That list was written
+ * before `no_double_booking_person` existed and was never updated, and because
+ * `refreshViolations()` evaluates only the types a tenant has a row for, the
+ * person-clash check has never run in any real tenant — while its unit test
+ * passed, because the test creates its own row.
+ *
+ * Deriving the set from the catalogue instead of listing it is what stops that
+ * recurring: a type added to `CONSTRAINT_TYPES` is now provisioned by
+ * construction, and existing tenants are repaired by
+ * `bun run backfill:constraints`.
+ *
+ * The evaluator still requires the row to exist at all — `constraint_violation
+ * .constraint_id` is NOT NULL — which is why a tenant opts out by DISABLING a
+ * default row rather than deleting it.
  */
-const BASELINE_CONSTRAINTS = [
-    { type: 'no_double_booking_room', name: 'No room double-booking' },
-    { type: 'no_double_booking_lecturer', name: 'No lecturer double-booking' },
-    { type: 'no_double_booking_group', name: 'No group double-booking' },
-];
+const DEFAULT_CONSTRAINTS = defaultConstraintTypes().map(defaultConstraintRow);
 
 async function main() {
     const slug = required('slug');
@@ -165,14 +174,7 @@ async function main() {
             await tx.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 
             await tx.constraint.createMany({
-                data: BASELINE_CONSTRAINTS.map((c) => ({
-                    tenantId: tenant.id,
-                    type: c.type,
-                    name: c.name,
-                    severity: 'HARD' as const,
-                    weight: null,
-                    isEnabled: true,
-                })),
+                data: DEFAULT_CONSTRAINTS.map((c) => ({ ...c, tenantId: tenant.id })),
             });
 
             return { tenant, person, account, reusedAccount: Boolean(existing), lecturerRole };
@@ -182,7 +184,11 @@ async function main() {
         console.log(`  Admin Person : ${result.person.id} <${adminEmail}>`);
         console.log(`  Access role  : tenant-admin (all ${PERMISSIONS.length} permissions)`);
         console.log(`  Domain role  : lecturer (is_system)`);
-        console.log(`  Constraints  : ${BASELINE_CONSTRAINTS.length} baseline hard constraints`);
+        console.log(
+            `  Constraints  : ${DEFAULT_CONSTRAINTS.length} default rows`
+            + ` (${DEFAULT_CONSTRAINTS.filter((c) => c.isEnabled).length} enabled,`
+            + ` ${DEFAULT_CONSTRAINTS.filter((c) => !c.isEnabled).length} available but off)`,
+        );
 
         if (result.reusedAccount) {
             console.log('\n  Existing account reused — the current password is unchanged.');

@@ -4,7 +4,7 @@
         :description="entity.description"
     >
         <template
-            v-if="canCreate"
+            v-if="canCreate && !entity.hideCreateAction"
             #actions
         >
             <common-button

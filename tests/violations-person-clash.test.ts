@@ -164,3 +164,45 @@ describe('person double-booking across unrelated groups', () => {
         expect(counts.group).toBe(0);
     });
 });
+
+/**
+ * Disabling a rule must REMOVE what it already recorded, not merely stop it
+ * recording more.
+ *
+ * `clearViolations` was passed only the ENABLED constraint ids, so a rule
+ * switched off left its violations in the table with nothing that would ever
+ * delete them. The warning stayed on screen forever and the toggle looked
+ * broken. Unnoticed because disabling used to mean editing a rule through the
+ * builder; the constraint grid makes it one click on thirteen rows.
+ */
+describe('disabling a rule clears its existing violations', () => {
+    it('removes the person violation when the rule is switched off, and restores it when back on', async () => {
+        await seed(true);
+
+        expect((await countsByConstraint()).person).toBeGreaterThan(0);
+
+        await db.constraint.update({ where: { id: ids.cPerson }, data: { isEnabled: false } });
+
+        expect((await countsByConstraint()).person).toBe(0);
+
+        await db.constraint.update({ where: { id: ids.cPerson }, data: { isEnabled: true } });
+
+        expect((await countsByConstraint()).person).toBeGreaterThan(0);
+    });
+
+    it('leaves an OTHER rule\'s violations alone while one is disabled', async () => {
+        // Guards the fix against over-reach: clearing must be scoped to this
+        // evaluator's own constraint rows, not "everything for these sessions".
+        await seed(true);
+        await db.constraint.update({ where: { id: ids.cPerson }, data: { isEnabled: false } });
+
+        const counts = await countsByConstraint();
+
+        expect(counts.person).toBe(0);
+        // The group rule is still enabled and still correctly silent for
+        // unrelated groups — disabling its neighbour changed nothing about it.
+        expect(counts.group).toBe(0);
+
+        await db.constraint.update({ where: { id: ids.cPerson }, data: { isEnabled: true } });
+    });
+});

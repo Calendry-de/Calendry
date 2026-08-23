@@ -1032,6 +1032,18 @@ model Constraint {
   params Json @default("{}")
 
   isEnabled Boolean  @default(true) @map("is_enabled")
+
+  /// The tenant's single always-present row for this catalogue type
+  /// (TAXONOMY.md §2). Exactly one per (tenant, type), enforced by the partial
+  /// unique index `constraint_one_default_per_type` — which Prisma cannot
+  /// express, so it lives in SQL only. `prisma migrate dev` will offer to drop
+  /// it as drift; do not let it (see CLAUDE.md).
+  ///
+  /// False marks a kind/offering-scoped VARIANT of the same type. A default row
+  /// is never deleted through the UI: disabling it is how a tenant opts out,
+  /// because deleting it would make the rule unreachable rather than off.
+  isDefault Boolean  @default(false) @map("is_default")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

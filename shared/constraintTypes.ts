@@ -138,6 +138,18 @@ export interface ConstraintTypeDef {
      * `RESOURCES.constraints.weight` in server/utils/resources.ts.
      */
     severity: 'HARD' | 'SOFT' | null;
+    /**
+     * Weight a tenant's DEFAULT row is seeded with. Required for every SOFT
+     * type and meaningless for HARD ones, because `constraint_weight_matches_severity`
+     * demands SOFT rows carry a weight even while disabled — so "seed it
+     * disabled with no weight" is not a representable state.
+     *
+     * These are a coherent RELATIVE scale, not calibrated magnitudes: only
+     * ratios between enabled soft rules mean anything to the solver. A tenant
+     * is expected to retune them; the point is that toggling a rule on does not
+     * present an empty required input.
+     */
+    defaultWeight?: number;
     params: ConstraintParamDef[];
     /**
      * Set when a newer type supersedes this one.
@@ -263,6 +275,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         description: 'Prefer not to schedule in the earliest block of the day.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 5,
         params: [],
         // Superseded by `minimize_block_usage`. Kept so tenants who already
         // configured it keep working — a catalogue entry that disappears turns
@@ -277,6 +290,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         description: 'Prefer not to schedule in the latest block of the day.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 5,
         params: [],
         deprecatedBy: 'minimize_block_usage',
     },
@@ -290,6 +304,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             + 'axis what "avoid particular days" did for the day axis.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 5,
         params: [
             {
                 key: 'blocks',
@@ -330,6 +345,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             + 'is not structurally special.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 5,
         params: [{
             key: 'days',
             label: 'Days to avoid',
@@ -349,6 +365,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         description: 'Prefer lower-ranked rooms, keeping premium ones free.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 3,
         params: [{
             key: 'rankThreshold',
             label: 'Penalize rooms ranked at or above',
@@ -367,6 +384,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             + 'calendar rather than assuming the last few weeks.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 8,
         params: [],
     },
     {
@@ -376,6 +394,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         description: 'Prefer on-site delivery where either would satisfy the offering.',
         evaluator: 'solver',
         severity: 'SOFT',
+        defaultWeight: 3,
         params: [],
     },
 ];
@@ -556,4 +575,72 @@ export function validateConstraintShape(input: {
     }
 
     return problems;
+}
+
+/**
+ * The catalogue types a tenant should hold a DEFAULT row for.
+ *
+ * DEPRECATED TYPES ARE EXCLUDED, and that is the whole reason this is a
+ * function rather than `CONSTRAINT_TYPES` itself. A deprecated entry stays in
+ * the catalogue so existing rows of that type remain renderable (see
+ * `deprecatedBy`), but seeding a fresh default row for one would resurrect it
+ * as a first-class option in a UI whose entire premise is "every row here is a
+ * rule you can use". `minimize_first_block` and `minimize_last_block` are both
+ * superseded by `minimize_block_usage`.
+ */
+export function defaultConstraintTypes(): ConstraintTypeDef[] {
+    return CONSTRAINT_TYPES.filter((type) => !type.deprecatedBy);
+}
+
+/**
+ * The row a tenant's default for `type` should be created with.
+ *
+ * ENABLED-BY-DEFAULT IS LIMITED TO THE STRUCTURAL RULES, deliberately:
+ *
+ *  - the four structural types are evaluated by THIS app
+ *    (`refreshViolations`), and they are what produces the double-booking
+ *    warnings a user expects to see without configuring anything. Three of them
+ *    were already enabled by `provision-tenant.ts`, so this is parity plus
+ *    `no_double_booking_person`, which had been unreachable.
+ *  - the other nine steer the SOLVER. Enabling them on upgrade would silently
+ *    change the timetable every existing tenant gets from their next run, which
+ *    is not a change a backfill script is entitled to make on their behalf.
+ *
+ * A disabled row is not a dormant rule — it is a rule the tenant can see and
+ * switch on. That distinction is the point of the whole default-row model.
+ */
+export function defaultConstraintRow(type: ConstraintTypeDef): {
+    type: string;
+    name: string;
+    severity: 'HARD' | 'SOFT';
+    weight: number | null;
+    isEnabled: boolean;
+    isDefault: true;
+    params: Record<string, unknown>;
+} {
+    // `severity: null` means the tenant chooses; HARD is the safe reading,
+    // since a rule that turns out to be a preference is a weaker claim than one
+    // that turns out to be a defect.
+    const severity = type.severity ?? 'HARD';
+
+    if (severity === 'SOFT' && type.defaultWeight === undefined) {
+        // Loud rather than a silent 0: a SOFT type with no default weight would
+        // otherwise be seeded at "evaluate but do not steer", which reads as a
+        // deliberate choice and is actually a missing catalogue entry.
+        throw new Error(`Constraint type '${type.key}' is SOFT but declares no defaultWeight.`);
+    }
+
+    return {
+        type: type.key,
+        name: type.label,
+        severity,
+        weight: severity === 'SOFT' ? type.defaultWeight! : null,
+        isEnabled: STRUCTURAL_CONSTRAINT_TYPES.includes(type.key as never),
+        isDefault: true,
+        params: Object.fromEntries(
+            type.params
+                .filter((param) => param.default !== undefined)
+                .map((param) => [param.key, param.default]),
+        ),
+    };
 }

@@ -172,6 +172,17 @@ export interface ManageEntity {
      * reports honestly when it did not receive everything.
      */
     listPageSize?: number;
+    /**
+     * Suppresses the list header's "New <entity>" button.
+     *
+     * For an entity whose rows are PROVISIONED rather than collected — the
+     * constraint catalogue — a prominent "New" action frames a fixed set of
+     * switches as a collection you populate, which is how tenants ended up with
+     * types that had no row and were therefore never evaluated. Creation is
+     * still reachable (a scoped variant, from within its type's row); it is
+     * just not the primary verb.
+     */
+    hideCreateAction?: boolean;
     /** Join tables edited as sets on the detail page. */
     relations?: RelationDef[];
 }
@@ -317,6 +328,15 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
     keywords: ['constraint', 'rule', 'hard', 'soft', 'penalty', 'conflict', 'policy'],
     title: (row) => String(row.name ?? 'Constraint'),
     detailComponent: 'ConstraintBuilder',
+    /**
+     * The catalogue is thirteen live types and every tenant holds one default
+     * row for each, plus any scoped variants — bounded and small. The grid
+     * needs the WHOLE set to group it correctly, and reports loudly rather than
+     * silently truncating if it ever stops being complete.
+     */
+    listComponent: 'ConstraintGrid',
+    listPageSize: 200,
+    hideCreateAction: true,
     columns: [
         { key: 'name', label: 'Name' },
         { key: 'type', label: 'Type', format: 'code', secondary: true },

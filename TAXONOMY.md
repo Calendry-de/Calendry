@@ -135,6 +135,7 @@ colours a *range of dates*.
 
 ### Constraints
 - **`Constraint`** [FIXED mechanism] — defined via a **structured rule builder**: predefined constraint types + parameters (extends the prototype's one-function-per-constraint pattern), not a free-form expression DSL.
+  - **Every tenant holds exactly one DEFAULT row per catalogue type** (`is_default`, amendment 2026-08-23). The catalogue is code and fixed; the tenant's configuration of it is data. Making the row's *existence* automatic rather than user-created is what stops a rule being unreachable because nobody added it — the evaluator only considers types the tenant has a row for, so a missing row is a silently disabled rule, not a neutral absence. Enforced by the partial unique index `constraint_one_default_per_type`. Additional rows of the same type are permitted and are the kind/offering-scoped variants (`constraint_scope`); they carry `is_default = false`.
 - Each constraint type declares: hard vs. soft, which `kind`(s) it applies to, its parameters, and a penalty weight (if soft).
 - Initial constraint library to port from the prototype (see §7).
 
