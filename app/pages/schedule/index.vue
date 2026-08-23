@@ -162,6 +162,7 @@
                 :placing="editing.placing.value"
                 :swapping="editing.swapping.value"
                 :can-swap="canSwap"
+                :can-delete="canDeleteSession"
                 :rooms="data.rooms.value"
                 :busy="editing.busy.value"
                 :lookup="data.lookup"
@@ -170,6 +171,7 @@
                 @toggle-swap="editing.toggleSwapping"
                 @set-rooms="editing.setRooms"
                 @toggle-lock="editing.toggleLock"
+                @delete="deleteSelectedEvent"
             />
         </div>
     </div>
@@ -204,6 +206,7 @@ useHead({ title: 'Schedule' });
 // Every solver route requires this one, so it gates the whole control.
 const canTriggerSolver = useHasPermission('solver.trigger');
 const canCreateSession = useHasPermission('session.create');
+const canDeleteSession = useHasPermission('session.delete');
 /**
  * A placement carries the week currently on screen.
  *
@@ -233,6 +236,33 @@ const pendingSlot = ref<{ dayOfWeek: number; blockIndex: number } | null>(null);
 function cancelCreate() {
     pendingSlot.value = null;
     editing.endCreating();
+}
+
+/**
+ * Deletes the selected EVENT.
+ *
+ * Routed through the page rather than `useScheduleEditing` because deletion is
+ * not a grid MODE — it changes nothing about what a click on the grid means,
+ * which is the composable's own stated test for what belongs there.
+ */
+async function deleteSelectedEvent() {
+    const target = editing.selected.value;
+
+    if (!target || target.offeringId !== null) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/sessions/${target.id}`, { method: 'DELETE' });
+        editing.clearSelection();
+        await data.refreshAll();
+    } catch (caught: unknown) {
+        const detail = (caught as { data?: { statusMessage?: string } }).data;
+
+        // Surfaced in the same place every other editing failure is, rather
+        // than as a toast that outlives the screen it refers to.
+        editing.error.value = detail?.statusMessage ?? 'Could not delete that event.';
+    }
 }
 
 async function onEventCreated() {

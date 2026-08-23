@@ -34,7 +34,16 @@ export interface Term {
 
 export interface ScheduleSession {
     id: string;
-    offeringId: string;
+    /**
+     * NULL for an EVENT — a Session placed by a human with no recurring demand
+     * behind it (TAXONOMY.md §2).
+     *
+     * Typed `string` until now, which had not been updated when the column
+     * became nullable. That matters here rather than being cosmetic: the UI
+     * BRANCHES on this field to decide whether a Session can be deleted, and to
+     * the compiler `offeringId === null` read as always-false.
+     */
+    offeringId: string | null;
     termId: string;
     kindId: string;
     termWeek: number;

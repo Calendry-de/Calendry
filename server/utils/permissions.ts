@@ -79,6 +79,20 @@ export const PERMISSIONS: PermissionDef[] = [
     { key: 'session.move', category: 'session', description: 'Re-place a Session' },
     { key: 'session.swap', category: 'session', description: 'Swap two Sessions' },
     { key: 'session.lock', category: 'session', description: 'Lock or unlock a Session' },
+    /**
+     * Its own permission rather than a reuse of `session.create`.
+     *
+     * Deletion is irreversible in a way creation is not: an Event carries no
+     * Offering, so nothing re-creates it and the only record left is the DELETE
+     * event. Separating it lets a tenant grant "put things on the calendar"
+     * without also granting "take them off".
+     *
+     * NOTE the cost, which CLAUDE.md documents: a permission added after a
+     * tenant was provisioned is not held by anyone until
+     * `grant:permissions --all-missing` runs, and the symptom is a 403 on a
+     * feature that visibly exists.
+     */
+    { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
 
     // Operations
     { key: 'generation.apply', category: 'generation', description: 'Promote a Generation to the current baseline' },

@@ -293,10 +293,13 @@ What is still thin, for whoever picks it up next:
   multi-room case runs into the tracked wire-format gap above.
 - **No people/lecturer assignment**, for the same reason — it wants a search
   control, not a `<select>` of every person in the tenant.
-- **No edit or delete for an Event.** The inspector offers Move/Swap/Lock like
-  any Session, but there is no `DELETE /api/sessions/:id` at all, so an Event
-  created by mistake can only be removed through the database. That is the most
-  likely first complaint.
+- ~~**No delete for an Event.**~~ **DONE.** `DELETE /api/sessions/:id` exists,
+  gated on its own `session.delete` permission, with a confirm action in the
+  schedule inspector. Scoped to Events: an Offering-linked Session returns 409,
+  because deleting one would leave its Offering's frequency unmet and the next
+  solve would place it again — removing a real Session is cancel-to-spare-bank
+  below, not this. **No EDIT for an Event still**: its kind, room, groups and
+  people cannot be changed after creation, only its placement (Move/Swap/Lock).
 - The kind picker is tenant vocabulary. Do not special-case "holiday" / "exam" /
   "gathering" anywhere; `kind` is data (TAXONOMY.md §2). The form states the
   CalendarPeriod distinction in prose and links to it, which is the only

@@ -210,6 +210,15 @@ otherwise" is not one.
   UPDATE from being cleared, whereas the missing Offering is a property of what
   the row IS. Verified against a live solver both ways, locked and unlocked.
 
+  **Deleting one is Events-only, and that boundary is load-bearing.**
+  `DELETE /api/sessions/:id` refuses an Offering-linked Session with 409: its
+  Offering declares a frequency, so deleting the Session leaves that unmet and
+  the next solve re-creates it — the delete would appear to work and silently
+  undo itself. Removing a real Session means deciding whether it is re-placed or
+  held as unplaced-but-tracked, which is the deferred cancel-to-spare-bank
+  feature. 409 rather than 404 so "belongs to an Offering" stays distinguishable
+  from "no such Session".
+
   Two consequences that must not be "tidied":
 
   - the delete partition names `offeringId === null` as its own clause rather

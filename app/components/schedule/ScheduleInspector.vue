@@ -166,8 +166,45 @@
                     @click="$emit('toggle-lock')"
                 >{{ session.isLocked ? 'Unlock' : 'Lock in place' }}</common-button>
 
+                <!--
+                    EVENTS ONLY. An Offering-linked Session cannot be deleted —
+                    its Offering's frequency would go unmet and the next solve
+                    would place it again — so the action is absent rather than
+                    disabled: there is no state in which pressing it would work.
+                -->
+                <template v-if="canDelete && session.offeringId === null">
+                    <common-button
+                        v-if="!confirmingDelete"
+                        type="destructive"
+                        width="100%"
+                        :disabled="busy"
+                        @click="confirmingDelete = true"
+                    >Delete event</common-button>
+
+                    <template v-else>
+                        <p class="inspector_hint">
+                            Delete this event? It is not backed by an offering, so nothing
+                            will re-create it.
+                        </p>
+
+                        <common-button
+                            type="destructive"
+                            width="100%"
+                            :disabled="busy"
+                            @click="$emit('delete')"
+                        >{{ busy ? 'Deleting…' : 'Yes, delete it' }}</common-button>
+
+                        <common-button
+                            type="secondary"
+                            width="100%"
+                            :disabled="busy"
+                            @click="confirmingDelete = false"
+                        >Keep it</common-button>
+                    </template>
+                </template>
+
                 <p
-                    v-if="!canMove && !canLock"
+                    v-if="!canMove && !canLock && !canDelete"
                     class="inspector_hint"
                 >You have view-only access to this schedule.</p>
             </div>
@@ -186,6 +223,7 @@ const props = defineProps<{
     canMove: boolean;
     canLock: boolean;
     canSwap: boolean;
+    canDelete: boolean;
     placing: boolean;
     swapping: boolean;
     busy: boolean;
@@ -200,11 +238,23 @@ const props = defineProps<{
     };
 }>();
 
+/**
+ * Reset whenever the SUBJECT changes, so a confirm armed on one Event cannot
+ * be fired at the next one selected. Watching the id rather than the object
+ * because the row is refetched after every edit and would otherwise re-arm.
+ */
+const confirmingDelete = ref(false);
+
+watch(() => props.session?.id, () => {
+    confirmingDelete.value = false;
+});
+
 const emit = defineEmits<{
     close: [];
     'toggle-place': [];
     'toggle-swap': [];
     'toggle-lock': [];
+    delete: [];
     'set-rooms': [roomIds: string[]];
 }>();
 
