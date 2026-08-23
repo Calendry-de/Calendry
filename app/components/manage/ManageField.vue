@@ -143,6 +143,14 @@
             v-else-if="field.help"
             class="field_hint"
         >{{ field.help }}</p>
+
+        <!-- A server-computed explanation of what leaving this blank means.
+             Rendered BESIDE the help rather than replacing it: the help says
+             the rule, this says what the rule currently evaluates to. -->
+        <p
+            v-if="note"
+            class="field_derived"
+        >{{ note }}</p>
     </div>
 </template>
 
@@ -162,6 +170,8 @@ const props = defineProps<{
     referenceRows?: EntityRow[];
     error?: string;
     readonly?: boolean;
+    /** Server-computed line shown under the control; see FieldDef.derived. */
+    note?: string;
 }>();
 
 const model = defineModel<unknown>();
@@ -339,6 +349,12 @@ function emitValue(value: unknown) {
         padding: 10px 0;
         font-size: var(--font-size-md);
         color: $content3;
+    }
+
+    &_derived {
+        margin: 0;
+        font-size: var(--font-size-xs);
+        color: var(--primary400, #8f70c6);
     }
 
     &_hint {

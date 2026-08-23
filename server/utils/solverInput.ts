@@ -14,6 +14,7 @@ import {
     toWireTimeGrid,
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
+import { deriveCapacity } from '../../shared/groupCapacity';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -48,6 +49,18 @@ export interface AssemblyReport {
     multiRoomSessions: string[];
     /** Equipment requirements whose quantity the wire cannot carry. */
     droppedEquipmentQuantities: number;
+    /**
+     * Offerings whose room-capacity requirement could not be established at
+     * all: `requiredCapacity` unset AND no attached Group with either real
+     * membership or an estimate anywhere in its closure.
+     *
+     * These are sent with `minCapacity: 0`, which the solver reads as "any room
+     * qualifies" — the same silent state this whole derivation exists to fix,
+     * so it is REPORTED rather than merely happening. There is no other value
+     * to send: the wire field is a plain uint32 with no absent case, and
+     * inventing a number would be worse than admitting the gap.
+     */
+    offeringsWithNoDerivableCapacity: { id: string; title: string }[];
     /** Constraints not sent, with the reason. Never sent with invented defaults. */
     skippedConstraints: { id: string; type: string; reason: string }[];
     /**
@@ -379,9 +392,53 @@ export async function assembleSolverInput(
     }));
 
     let droppedEquipmentQuantities = 0;
+    const offeringsWithNoDerivableCapacity: { id: string; title: string }[] = [];
+
+    /**
+     * Capacity inputs, fetched ONCE for the whole assembly rather than per
+     * Offering: every Offering's closure is walked against the same tenant tree
+     * and the same roll, and twelve Offerings would otherwise mean twelve
+     * identical queries.
+     *
+     * `groupRows` is every Group in the tenant — deliberately NOT the filtered
+     * `sentGroupRows`. That set is narrowed to what the SOLVER needs to reason
+     * about; a Group's real size depends on descendants that may carry no
+     * placement of their own, and dropping them would under-count.
+     */
+    const capacityGroups = groupRows.map((group) => ({
+        id: group.id,
+        parentGroupId: group.parentGroupId,
+        expectedSize: group.expectedSize,
+    }));
+
+    const capacityMemberships = (await tx.membership.findMany({
+        where: { tenantId: options.tenantId },
+        select: { groupId: true, personId: true },
+    }));
 
     const offerings: Offering[] = offeringRows.map((offering) => {
         droppedEquipmentQuantities += offering.equipment.filter((link) => link.quantity !== null).length;
+
+        /**
+         * THE DOCUMENTED BEHAVIOUR, NOW REAL.
+         *
+         * `requiredCapacity` stays authoritative when a human set it — an
+         * explicit number is a decision, and a derived one must never overrule
+         * it. Only the NULL case derives, which is precisely what the schema
+         * comment and the form's help text have promised all along while
+         * `?? 0` quietly satisfied every room in the tenant.
+         */
+        const derived = offering.requiredCapacity === null
+            ? deriveCapacity(
+                offering.groups.map((link) => link.groupId),
+                capacityGroups,
+                capacityMemberships,
+            )
+            : null;
+
+        if (derived && derived.capacity === null) {
+            offeringsWithNoDerivableCapacity.push({ id: offering.id, title: offering.title });
+        }
 
         return {
             id: offering.id,
@@ -399,7 +456,9 @@ export async function assembleSolverInput(
             // The app models no direct per-Offering participants beyond groups.
             participantPersonIds: [],
             requiredRoomFeatures: offering.equipment.map((link) => link.equipment.key),
-            minCapacity: offering.requiredCapacity ?? 0,
+            // 0 only when genuinely underivable — and that case is reported
+            // above rather than passing as "no requirement".
+            minCapacity: offering.requiredCapacity ?? derived?.capacity ?? 0,
             // Empty = any eligible Room. The app has no allow-list.
             allowedRoomIds: [],
             allowOnline: offering.allowOnline,
@@ -545,6 +604,7 @@ export async function assembleSolverInput(
             excludedFederationOfferings: federationOfferings,
             multiRoomSessions: multiRoomSessionIds(sessionInputs),
             droppedEquipmentQuantities,
+            offeringsWithNoDerivableCapacity,
             skippedConstraints,
             severityMismatches,
             groupsOmitted: groupRows.length - sentGroupRows.length,

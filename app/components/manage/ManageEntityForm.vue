@@ -39,6 +39,7 @@
                 :field="field"
                 :readonly="readonly"
                 :reference-rows="field.reference ? form.references.value[field.reference.resource] : undefined"
+                :note="derivedNotes[field.key]"
             />
         </div>
 
@@ -108,6 +109,54 @@ defineSlots<{ fields?: (props: { readonly: boolean }) => unknown }>();
  * bespoke detail component through the `fields` slot.
  */
 const genericFields = computed(() => props.form.fields.filter((field) => !field.custom));
+
+/**
+ * Server-computed notes for fields declaring `derived`.
+ *
+ * Fetched here rather than in `ManageField` because the ROW ID lives at this
+ * level, and a field component that had to be told its own row's id would be a
+ * worse seam than one extra prop.
+ *
+ * Edit only: on the create page there is no id to compute against, the same
+ * reason relations are unavailable there.
+ */
+const derivedNotes = ref<Record<string, string>>({});
+
+const request = useRequestFetch();
+
+async function loadDerived() {
+    const id = (props.form.row.value as { id?: string } | null)?.id;
+
+    if (!id || props.mode !== 'edit') {
+        return;
+    }
+
+    for (const field of props.form.fields) {
+        if (!field.derived) {
+            continue;
+        }
+
+        try {
+            const data = await request<Record<string, unknown>>(field.derived.path.replace(':id', id));
+
+            derivedNotes.value = { ...derivedNotes.value, [field.key]: field.derived.describe(data) };
+        } catch {
+            /*
+             * Degraded silently ON PURPOSE, and this is the one place that is
+             * right: the note is explanatory, and a failed fetch showing an
+             * error beside an unrelated input would suggest the FIELD is wrong.
+             * The stored value and the save path are untouched by its absence.
+             */
+        }
+    }
+}
+
+/*
+ * Re-run whenever the row changes, so editing another Offering does not show
+ * the previous one's number. `immediate` is safe here because this is not
+ * first-render state — the note is additive, and SSR simply omits it.
+ */
+watch(() => (props.form.row.value as { id?: string } | null)?.id, loadDerived, { immediate: true });
 
 /**
  * The draft is the one thing this component writes, so it travels as a model.

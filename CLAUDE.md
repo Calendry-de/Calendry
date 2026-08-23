@@ -485,6 +485,46 @@ otherwise" is not one.
   Note also that **`refreshViolations()` ignores scopes entirely**, so scoping a
   structural rule narrows the SOLVER's view and not the live violation checks.
 
+- **A per-entity API route must NOT live under `server/api/<resource>/` for a
+  resource served by the generic scaffold.** `server/api/[resource]/` is the
+  CRUD catch-all; creating a literal sibling directory makes Nitro match that
+  segment statically and stop considering the dynamic branch, so **every** route
+  for that resource 404s. Measured while adding the derived-capacity endpoint:
+  `GET /api/offerings` returned "Page not found" while `/api/rooms`,
+  `/api/groups` and `/api/persons` stayed 200 — the whole Offerings section
+  dead, from adding one unrelated file. The endpoint lives at
+  `/api/offering-capacity/:id` for exactly this reason.
+
+- **`Offering.requiredCapacity` derives when NULL — really, now.** Both the
+  schema comment and the form's help text promised derivation from the attached
+  Groups; nothing derived, `assembleSolverInput` mapped `?? 0`, and the solver's
+  filter is `room.capacity < min_capacity`, so 0 admitted every Room. Measured
+  on the demo tenant: twelve Offerings of 96 attendees each, all with NULL, all
+  placed into 24-seat rooms.
+
+  The rule lives once, in `shared/groupCapacity.ts`, because two consumers need
+  the identical number: the solver input and the Offering form's read-only note.
+
+  **Counting is a UNION, not a sum**, and that is the whole design. Two
+  independent double-counts exist — a person enrolled at both a leaf and an
+  ancestor (legal data), and an Offering carrying both a Group and one of its
+  own descendants. Both are fixed by taking the union of every attached Group's
+  own-plus-descendants closure and counting DISTINCT people. The `expectedSize`
+  fallback needs the same dedup, so it sums only the MAXIMAL attached Groups:
+  "IT Security" (48) plus its child "dIT22 S1" (24) is 48, not 72 — verified
+  live in both the membership and estimate forms.
+
+  **Real membership always beats `expectedSize`**, including when it is smaller.
+  The consequence to know: a PARTIAL roll shrinks the requirement. Enrol 3 of 96
+  students and the derived capacity is 3 — measured, not hypothetical. That is
+  the specified behaviour, not a bug, but partial enrolment data is now more
+  dangerous than none.
+
+  **Underivable is reported, not silently zero.** The wire field is a plain
+  uint32 with no absent case, so 0 is still sent — but the Offering lands in
+  `report.offeringsWithNoDerivableCapacity` beside the other narrowings. The bug
+  being fixed was the silence, not the zero.
+
 - **Permissions are fixed, roles are not.** The `permission` catalogue is code
   (`server/utils/permissions.ts`, mirrored into the table by migration).
   Tenants bundle permissions into AccessRoles; they cannot invent permissions,

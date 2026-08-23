@@ -39,6 +39,26 @@ export interface FieldDef {
     type: FieldType;
     /** Shown under the control. Use it for domain meaning, not restating the label. */
     help?: string;
+    /**
+     * A read-only value COMPUTED server-side for this row, shown beneath the
+     * control while editing.
+     *
+     * Exists because `Offering.requiredCapacity` promised — in its schema
+     * comment AND in this registry's own help text — to derive from the
+     * attached Groups when left blank, and nothing derived. The gap survived
+     * because the real number was never on screen: a field whose BLANK state
+     * means something should be able to show what it means.
+     *
+     * Generic on purpose. Making Offering a bespoke detail component for one
+     * read-only line would contradict the standing decision that it renders on
+     * the generic scaffold because its complexity is registry data.
+     */
+    derived?: {
+        /** Path with `:id` substituted for the row being edited. */
+        path: string;
+        /** Turns the response into one line of prose. */
+        describe: (data: Record<string, unknown>) => string;
+    };
     required?: boolean;
     /**
      * Settable at create time only, because the server's `update` schema omits
@@ -263,7 +283,29 @@ export const OFFERING_ENTITY: ManageEntity = {
             label: 'Required room capacity',
             type: 'number',
             min: 0,
-            help: 'Leave unset to derive it from the assigned groups\' expected sizes.',
+            help: 'Leave unset to derive it from the attached groups.',
+            derived: {
+                path: '/api/offering-capacity/:id',
+                describe: (data) => {
+                    const capacity = data.capacity as number | null;
+                    const basis = data.basis as string;
+                    const groups = data.attachedGroups as number;
+
+                    if (capacity === null) {
+                        return groups === 0
+                            ? 'No groups attached, so nothing can be derived \u2014 every room would qualify.'
+                            : 'The attached groups have neither members nor an expected size, so nothing '
+                                + 'can be derived \u2014 every room would qualify.';
+                    }
+
+                    const source = basis === 'membership'
+                        ? `${capacity} enrolled ${capacity === 1 ? 'person' : 'people'}`
+                        : 'expected sizes';
+
+                    return `If left blank: ${capacity}, from ${groups} attached `
+                        + `${groups === 1 ? 'group' : 'groups'} (${source}).`;
+                },
+            },
         },
         {
             key: 'allowOnline',

@@ -772,7 +772,17 @@ model Offering {
   /// don't constrain who leads them.
   requiredRoleId String? @map("required_role_id")
 
-  /// Minimum room capacity. Nullable — derived from Group size when absent.
+  /// Minimum room capacity, gating which Rooms are eligible at all.
+  ///
+  /// NULL means DERIVED from the attached Groups by `shared/groupCapacity.ts`:
+  /// distinct people across the union of every attached Group's own-plus-
+  /// descendants closure, falling back to summed `expectedSize` over the
+  /// MAXIMAL attached Groups when that closure holds no real membership.
+  ///
+  /// This comment described the derivation for months before anything did it —
+  /// `assembleSolverInput` mapped `?? 0`, and the solver's filter is
+  /// `room.capacity < min_capacity`, so 0 meant every Room qualified. An
+  /// explicit value still wins; only NULL derives.
   requiredCapacity Int? @map("required_capacity")
 
   /// May the solver place this Offering in a VIRTUAL Room? Not "is this
