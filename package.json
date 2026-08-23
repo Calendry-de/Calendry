@@ -27,12 +27,11 @@
     "db-push": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app bun run prisma db push",
     "db-deploy": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app bun run prisma migrate deploy",
     "db-drop": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app bun run prisma db push --force-reset",
-    "db-reset-db": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app sh -c \"bun run prisma migrate reset --force && bun run prisma migrate dev --name init && bun run prisma generate\"",
+    "db-reset-db": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app sh -c \"bun run prisma migrate reset --force && bun run prisma generate\"",
     "db-reset": "bun run db-reset-db",
     "seed:demo": "bun run scripts/seed-demo-schedule.ts",
     "reset:password": "bun run scripts/reset-password.ts",
     "grant:permissions": "bun run scripts/grant-permissions.ts",
-    "solver:smoke": "bun run scripts/solver-smoke.ts",
     "create:account": "bun run scripts/create-account.ts",
     "create:role": "bun run scripts/create-role.ts"
   },

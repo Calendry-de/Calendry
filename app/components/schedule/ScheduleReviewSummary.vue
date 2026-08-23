@@ -5,8 +5,10 @@
 
             The counts are not commensurable and must not be rendered as a
             delta: `current` comes from constraint_violation, which this app's
-            evaluator fills using only the three structural double-booking
-            rules, while `proposed` is the solver reporting on all 14 constraint
+            evaluator fills using only the structural double-booking rules
+            (STRUCTURAL_CONSTRAINT_TYPES — the count is derived, never written
+            out, because it went stale once when Stage 7a made it four), while
+            `proposed` is the solver reporting on all 14 constraint
             types. Measured on the same timetable they disagree — the solver
             reported 23 where the app's evaluator then found 41 rows. "0 → 23"
             would be the most misleading thing this screen could say.
@@ -18,7 +20,7 @@
                 <p class="rev_panel-note">
                     issue{{ violations.current.hard === 1 ? '' : 's' }} on the current schedule
                 </p>
-                <p class="rev_panel-source">checked by Calendry — 3 structural rules</p>
+                <p class="rev_panel-source">checked by Calendry — {{ structuralRuleCount }} structural rules</p>
                 <ul
                     v-if="currentTypes.length"
                     class="rev_types"
@@ -135,6 +137,7 @@
 </template>
 
 <script setup lang="ts">
+import { STRUCTURAL_CONSTRAINT_TYPES } from '#shared/constraintTypes';
 import { terminationSentence } from '~/composables/generationReview';
 import type { ReviewPreview } from '~/composables/generationReview';
 
@@ -144,6 +147,14 @@ const props = defineProps<{
     deletedByOffering: ReviewPreview['deletedByOffering'];
     run: ReviewPreview['run'];
 }>();
+
+/**
+ * Derived, not written out. This label read "3 structural rules" for the whole
+ * of Stage 7 after `no_double_booking_person` made it four — a user-facing
+ * count stating the wrong number, which nothing checks. Binding it to the
+ * catalogue is what stops that recurring.
+ */
+const structuralRuleCount = STRUCTURAL_CONSTRAINT_TYPES.length;
 
 const toRows = (byType: Record<string, number>) => Object.entries(byType)
     .map(([type, count]) => ({ type, count }))

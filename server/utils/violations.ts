@@ -9,11 +9,12 @@ import { conflictGroupIds, descendantGroupIds } from './groupClosure';
  * TAXONOMY.md §3.
  *
  * SCOPE: this evaluates only the *structural* hard constraints that a manual
- * edit can break — the three double-booking rules, which are decidable from
- * placement data alone. It is not a solver and never will be. Everything
- * parameterised (online ratios, lecturer vetoes) or preference-shaped (all the
- * soft penalties in §7) belongs to the Rust solver service and is registered
- * below as an explicit TODO rather than silently omitted.
+ * edit can break — the double-booking rules in STRUCTURAL_CONSTRAINT_TYPES,
+ * which are decidable from placement data alone. It is not a solver and never
+ * will be. Everything parameterised (online ratios, lecturer vetoes) or
+ * preference-shaped (all the soft penalties in §7) belongs to the Rust solver
+ * service and is registered below as an explicit TODO rather than silently
+ * omitted.
  *
  * A violation row can only be written against a Constraint the tenant has
  * actually configured, because constraint_violation.constraint_id is a NOT NULL
@@ -175,9 +176,11 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
      * `is_virtual` FLAG rather than on a well-known "online" room, because
      * nothing restricts a tenant to a single virtual room.
      *
-     * NOTE the solver does NOT yet make this exemption — see the tracked
-     * cross-repo item in CLAUDE.md. Until it does, the two disagree, and the
-     * solver's is the more damaging half.
+     * The solver made the opposite assumption until `calendry-solver@99b41e3`,
+     * which treated a virtual room as capacity-1 and so constrained the SEARCH
+     * to one online Session per slot. Both sides now key on the flag — the
+     * solver via `Room::is_exclusive()`. See CLAUDE.md § "RESOLVED (cross-repo):
+     * the solver treated a VIRTUAL room as capacity-1".
      */
     const byRoom = groupBy(
         rooms.filter((row) => !virtualRoomIds.has(row.roomId)),

@@ -28,8 +28,18 @@ present one (this repo's job)?
   Do not add, rename, or restructure core entities without flagging it and
   getting explicit confirmation first — this is intentionally "carved in
   stone" and changes here are migrations, not config edits.
-- This file (`CLAUDE.md`) — conventions, architecture rules, current phase.
-  Update it when a real convention changes; don't let it drift from reality.
+- This file (`CLAUDE.md`) — the **durable** half: architecture rules, RLS
+  boundaries, standing conventions, and the reasoning behind decisions someone
+  could otherwise undo. Update it when a real convention changes; don't let it
+  drift from reality.
+- `BACKLOG.md` — the **transient** half: open bugs, deferred work, undecided
+  questions, the phase checklist. Split out on 2026-08-23 so this file stops
+  absorbing both categories.
+
+  The dividing question is *does this tell someone what not to undo, or what
+  they might still do?* A resolved bug whose fix encodes a real decision stays
+  HERE, under "Resolved, with the reasoning kept" — deleting it would delete the
+  argument, not the bug. Anything actionable goes to BACKLOG.md.
 
 ## Fixed vs. open taxonomy (quick reference)
 
@@ -70,7 +80,33 @@ Role called "Student" exists, never assume a `kind` called "lecture" exists)
   "equivalent" migration containing none of it, producing a database where every
   table exists and tenant isolation is silently absent, with every test still
   passing. Rebuild with `prisma migrate reset`, which *replays* the committed
-  files. (`db-reset` used to `rm -rf prisma/migrations`; it no longer does.)
+  files.
+
+  **`db-reset` ran `migrate dev` until 2026-08-23, and that — not the old
+  `rm -rf prisma/migrations` — is what actually caused the damage this rule
+  exists to prevent.** The script was
+  `migrate reset --force && migrate dev --name init && generate`. `reset`
+  replays correctly; `migrate dev` then diffs `schema.prisma` against the
+  rebuilt database, sees hand-written objects the schema language cannot
+  declare, and emits a migration to DROP them. That is the exact provenance of
+  `20260813190131_init`, which contains nothing but three `DROP INDEX`
+  statements and is applied. This entry previously said "`db-reset` used to
+  `rm -rf prisma/migrations`; it no longer does" — true, and misleading, because
+  the removed half was never the dangerous one.
+
+  `migrate dev` is now gone from the script (`migrate reset --force && generate`).
+  The consequence worth holding onto: **any hand-written index, policy, trigger
+  or function is invisible to `schema.prisma` and was therefore a standing
+  candidate for deletion on every developer's next rebuild.** If those three
+  indexes had been recreated rather than measured and declined, the next
+  `db-reset` would have dropped them again.
+
+  `db-drop` (`prisma db push --force-reset`) is the same hazard in sharper form
+  and is deliberately left in place as an explicit escape hatch: `db push`
+  applies `schema.prisma` DIRECTLY, so it produces a database with every table
+  and **no RLS, no triggers, no `SECURITY DEFINER` functions** — tenant
+  isolation silently absent, every test passing. Never use it to rebuild a
+  working database; `db-reset` is the rebuild path.
 - **Never query outside `withTenant()`.** Route handlers go through
   `withRequestTenant`, which opens a transaction and sets
   `calendry.tenant_id`. A query issued outside it sees zero rows rather than
@@ -82,11 +118,14 @@ Role called "Student" exists, never assume a `kind` called "lecture" exists)
 Both are conscious boundaries, not oversights. Anything that looks like a
 third exception is a bug.
 
-1. **Federation-owned resources.** `room`, `equipment` and `offering` may be
-   owned by a Federation instead of a Tenant (a consortium's shared lecture
-   hall, a cross-enrolled elective). A CHECK constraint enforces exactly one
-   owner, and the RLS read policy widens to the caller's federation while the
-   write policy stays tenant-only.
+1. **Federation-owned resources.** `room`, `equipment`, `offering` and
+   `session` may be owned by a Federation instead of a Tenant (a consortium's
+   shared lecture hall, a cross-enrolled elective, a genuinely shared event
+   both member tenants see). A CHECK constraint enforces exactly one owner,
+   and the RLS read policy widens to the caller's federation while the write
+   policy stays tenant-only. See "Group↔Term scoping" and the Federation
+   sections below for the reasoning behind extending this to `session`
+   specifically, and why it deliberately did NOT extend to `group`/`person`.
 
 2. **The pre-tenant auth plane.** `account`, `account_person` and
    `auth_session` carry **no RLS at all**. This is structural, not a
@@ -131,6 +170,11 @@ otherwise" is not one.
   TAXONOMY.md §6 before touching any conflict-check or notification
   fan-out code — there's a known perf trap here (don't walk the tree live
   in hot paths; use a precomputed closure structure).
+- **`group_term` is a visibility scope, never a scheduling input.** A Group
+  can be many-to-many linked to the Terms it's relevant to; an unlinked Group
+  is visible in every Term (fail-open). The solver's own Group filter never
+  reads this table — see "Group↔Term scoping" below for why that's load-bearing,
+  not incidental.
 - **TimeGrid is per-tenant, not global.** Never hardcode block/timeslot
   arithmetic (e.g. `timeslot % 3`, `timeslot > 14` for "Saturday"). Always
   resolve against the tenant's TimeGrid and Term/academic-calendar config.
@@ -186,9 +230,42 @@ otherwise" is not one.
     "affordance absent" must also assert the surrounding page RENDERED, or it
     passes for the wrong reason. The fixed check reports
     `schedule rendered=True solver control=False`.
+  - **A constraint tracked against a query shape that never existed (indexes,
+    below).** Two of three "missing" indexes were tracked as backing a
+    `refreshViolations()` collision lookup that has never driven off room/person
+    columns. The description was accurate to an intention, not to the code.
 
   The counter-example to copy: provisioning against an unseeded database fails
   on a foreign key and writes nothing. Loud, specific, unmistakable.
+
+- **A tracked-gap entry written from design INTENT can drift from the code
+  silently — re-verify before acting on one.** Everything else in this repo is
+  checked by something: types, tests, the database, the build. Prose is checked
+  by nobody. So an entry describing what a thing is *for* stays confidently
+  worded long after the implementation went somewhere else, and the next session
+  reads it as fact because it is written like fact.
+
+  The instance that proved it: the three missing indexes below were tracked as
+  backing "the room/person collision lookups in `refreshViolations()`", copied
+  from the migration comment that created them. `refreshViolations()` has
+  never looked up by room or person — it drives off `session_id` throughout, and
+  the primary keys already served it. The description was accurate to an
+  intention the code never took, and reading it as a to-do would have added two
+  indexes with `idx_scan = 0` at 27,000 sessions.
+
+  Practical form: when a tracked entry is the reason you are about to change
+  something, **confirm its claim against the code first, and measure if the claim
+  is about performance.** Then correct the entry with what you found, whichever
+  way it went — that is how the entry stops being wrong, and the correction is
+  worth more than the change you were going to make. A periodic pass over the
+  older entries is tracked in `BACKLOG.md`; until then, verification is
+  per-entry and happens when the entry is used.
+
+  **This applies with more force to `BACKLOG.md` than to this file.** Nothing in
+  the repo references a backlog entry, so nothing ever contradicts one when it
+  goes stale — no test fails, no build breaks, no reader trips over it in the
+  course of other work. CLAUDE.md at least gets read every session. Treat an
+  entry there as a lead, never as a finding.
 
 - **Split a component when it mixes more than ~3 distinct responsibilities, or
   exceeds ~250 lines.** Line count is the trigger to *look*, not the rule: a
@@ -309,31 +386,10 @@ otherwise" is not one.
 
 ## Current phase
 
-- [x] Repo rebranded from template (`xxx-changeme` → `calendry`)
-- [x] TAXONOMY.md alignment confirmed
-- [x] Database schema (migrations) for core entities + join tables
-- [x] CRUD + editing API routes
-- [x] Solver interface boundary (stub, not implementation)
-- [x] Tenant provisioning CLI (`bun run provision:tenant`)
-- [x] Authentication (global Account, post-login tenant selection)
-- [x] Per-tenant permissions (AccessRole + fixed permission catalogue)
-- [x] Login/profile UI wired to the auth API
-- [x] Schedule view + editor UI
-- [x] Management UI for the core entities + Ctrl+K command palette
-- [ ] AccessRole / permission management UI (Step 14) — the operator CLI
-      `create:role` exists; the tenant-facing UI and its API do not
-- [x] **Solver integration Stages 1–7 — COMPLETE.** Start a solve, never lose
-      the result, review it, apply or discard it; person-level clash detection,
-      Federation-shared Rooms with real cross-tenant occupancy, and
-      federation-shareable Sessions. Both remaining cross-repo items are now
-      closed too: the solver's virtual-room capacity-1 bug is fixed in
-      `calendry-solver`, and the AccessRole gap that blocked viewer-account
-      regression checks is closed — see `create:role`.
-- [ ] Import (CSV/Excel)
-- [ ] Export (iCal/Google/Outlook)
-- [ ] Notifications (delivery; audience resolution already exists)
+Tracked in **[BACKLOG.md](BACKLOG.md) § Current phase**, together with the
+staged solver plan. Kept out of this file because a checklist is a task list,
+not a decision someone could undo.
 
-Update the checklist above as phases complete — don't let this file go stale.
 
 ## Solver integration (calendry-solver)
 
@@ -416,20 +472,21 @@ is a normal outcome, not an error case.
 
 ### Decision: single-tenant, non-federated scope for Stages 1–6
 
-Two Federation mechanisms are decided in principle and **NOT implemented in this
-app's schema or RLS**:
+**Superseded by Stage 7 for two of the two mechanisms below — both are now
+implemented.** Kept here for the reasoning; see "Federation-shared room
+occupancy" and "Federation-shareable Sessions" further down for what actually
+shipped.
+
+Two Federation mechanisms were decided in principle and deliberately NOT
+implemented before Stage 7:
 
 - **`ExternalOccupancy`** — occupancy of Federation-shared Rooms by other
-  tenants. The proto message exists and is deliberately shaped to commit to
-  neither of the two candidate mechanisms (cross-tenant occupancy ledger vs. a
-  narrow database function).
-- **`Session` becoming federation-shareable** — extending the Federation
-  exception beyond `room`/`equipment`/`offering`, per the TAXONOMY.md amendment.
-
-Do not attempt either before Stage 7. Sending an empty `external_occupancy` and
-tenant-owned Sessions only is correct for a single-tenant run and wrong the
-moment a shared Room is involved — so the limit is a scope boundary, not an
-oversight, and the deferral is what keeps it visible.
+  tenants. Resolved in Stage 7b (below): a parameterless `SECURITY DEFINER`
+  function, not a cross-tenant ledger.
+- **`Session` becoming federation-shareable** — resolved in Stage 7c (below):
+  the Session row is shared, but participant links (`session_group`,
+  `session_person`) stay tenant-private — a deliberate narrowing of the
+  TAXONOMY.md amendment's literal wording.
 
 ### Determinism: only the move budget is reproducible
 
@@ -487,15 +544,11 @@ proto:
 
 ### Staged plan
 
-| Stage | Scope |
-|---|---|
-| ~~1~~ | **DONE.** Package wiring (`bunfig.toml` auth), `@mindcollaps/calendry-proto@0.2.0` + `@grpc/grpc-js` installed, real StartRun→GetStatus round trip proven against a live solver. `scripts/solver-smoke.ts` is the throwaway probe — delete it when Stage 2 lands a real client. |
-| ~~2~~ | **DONE.** `solver_run` table + `solver_run_one_active_per_term` partial unique index; `/api/solver/runs` (POST/GET/`:id`/`:id/cancel`) replacing the deleted `/api/solver/generations` stub. Input is still the placeholder. |
-| **3** | Real `SolverInput` assembly from Prisma. **3a/3c and 3b/3e DONE** — calendar, slot arithmetic, entities, wire-up, placeholder deleted, `RUNNING → CANCELLED` verified. **3d remains**: constraint mapping, the three missing parameter sets, and the `ManageWeekdayPicker` extraction. |
-| ~~4~~ | **DONE.** Background poller (`server/plugins/solverPoller.ts`) owns advancing runs and capturing results; on-demand `GET /runs/:id` is latency only. Adaptive cadence, `FOR UPDATE SKIP LOCKED` claim, NOT_FOUND→FAILED. |
-| ~~5~~ | **DONE.** `generationFromRun.ts` (poller creates a READY Generation on SUCCEEDED) + `generationMaterialize.ts` (create/move/unchanged/delete partition, violations onto `constraint_violation`). Verified both ways: a clean run applied end to end, and an over-constrained SUCCEEDED-with-23-violations run applied successfully. Fixed two pre-existing bugs it uncovered — see below. |
-| ~~6~~ | **DONE.** 6a: plan/execute split + `GET /api/generations`, `/:id`, `/:id/preview`, `POST /:id/discard`, `termination_reason` capture. 6b: six-state solver control in the schedule toolbar, honest progress, cancel, run adoption. 6c: `/schedule/review/[id]` — two non-commensurable violation panels, change partition, diff grid, apply/discard. |
-| ~~7~~ | **DONE.** 7a: `no_double_booking_person` in the manual-edit evaluator — both sides expanded to people, intersected by identity. 7b: `federation_room_occupancy()`, a parameterless SECURITY DEFINER function, feeding `externalOccupancy` and unlocking federation-owned Rooms in `SolverInput`. 7c: `session` federation-shareable — shared row, tenant-private participant links, `session_room` widened. |
+All seven stages are complete; the table has moved to
+**[BACKLOG.md](BACKLOG.md) § Staged plan** as a changelog. What each stage
+*established* — the behaviours and decisions that outlive it — stays in the
+sections below.
+
 
 ### What Stage 2 established, and the one path it could not test
 
@@ -588,45 +641,15 @@ deliberately writes nothing at all. A run therefore takes up to ~30s after the
 solver returns to resolve. That is backoff, not a bug, but it surprised me while
 testing and will surprise the next person.
 
-### Tracked gap: equipment QUANTITY cannot cross the wire
+### Tracked gaps in the wire format
 
-`RoomEquipment.quantity` and `OfferingEquipment.quantity` both exist — "this lab
-has 24 workstations", "this offering needs 24". The proto carries
-`Room.feature_tags` and `Offering.required_room_features` as plain string lists,
-so both become presence-only: "has `workstation`", "needs `workstation`".
+Three open expressiveness limits between this app and `calendry-proto`, all in
+**[BACKLOG.md](BACKLOG.md) § Solver**: equipment QUANTITY cannot cross the wire,
+a Session with more than one Room cannot be represented, and the solver's run
+registry grows without bound. Each reports rather than narrows silently
+(`assembleSolverInput`'s report, `multiRoomSessionIds()`), which is the property
+to preserve — **do not "fix" any of them by quietly picking a value.**
 
-The solver therefore cannot reason about counts, and a 12-seat lab satisfies a
-24-workstation requirement. `assembleSolverInput` counts the dropped quantities
-and returns them in its report rather than narrowing quietly. Same shape of fix
-as the multi-room gap below: either the proto grows a quantity, or the app
-accepts presence-only semantics deliberately.
-
-### Tracked gap: a Session with more than one Room cannot cross the wire
-
-`session_room` is a join table, so the app models a Session in several Rooms at
-once. The proto's `Session` and `PlacedSession` both carry a single `room_id`.
-A multi-room Session therefore cannot be fully represented in either direction:
-the input mapper sends the first room and reports the rest, and Stage 5 will
-face the same narrowing coming back.
-
-Not urgent — the demo tenant has none, and `multiRoomSessionIds()` in
-`solverSessions.ts` reports any that appear rather than silently dropping them.
-But it is a real expressiveness limit, not an implementation shortcut: closing
-it means either a proto change (repeated `room_id`) or a decision that Calendry
-Sessions occupy exactly one Room. Do not "fix" it by quietly picking a room.
-
-### Cross-repo note: calendry-solver's run registry grows without bound
-
-The solver keeps runs in an in-memory `HashMap` with **no TTL and no eviction**,
-so every run ever started stays resident until the process restarts. Not urgent
-at current volumes, and not this repo's code to fix — but it is an unbounded
-growth path, and the same absence of persistence is why this app captures
-results eagerly (above) and treats NOT_FOUND as terminal.
-
-~~**This should also get a line in calendry-solver's own CLAUDE.md.**~~ **DONE**
-— recorded there (§2, "the run registry grows without bound") alongside the two
-consequences this app depends on, so the repo that can fix it now knows what
-changing it would break here.
 
 ### RESOLVED (cross-repo): the solver treated a VIRTUAL room as capacity-1
 
@@ -652,7 +675,8 @@ valve nearly shut. Removing it more than doubled share violations at
 large-university (180 → 455) with structural violations unchanged at exactly 80
 and `unplaced` still 0 — so the model is now correct and the search is visibly
 worse at respecting a cap it was never actually respecting on its own. That is
-solver-side work; nothing in this app changes because of it.
+solver-side work; nothing in this app changes because of it. See
+BACKLOG.md § "Needs a decision, not a design pass" for the candidate fixes.
 
 What this app should expect in the meantime: a SUCCEEDED run may carry more
 `MaxOnlineShare` violations than it used to. That is warn-and-allow behaving as
@@ -660,24 +684,28 @@ designed — they arrive in `SolverOutput.hard_violations` like any other residu
 — but a run against a tenant with heavy online delivery will look noisier than
 the Stage 5 measurements recorded above.
 
-### Tracked gap: the manual-edit evaluator misses person clashes across groups
+### Why `violations.ts` expands membership DOWN but conflicts BOTH ways
 
-Found while building the solver. `server/utils/violations.ts` evaluates
-`no_double_booking_lecturer` by intersecting `session_person` rows, which catches
-a person assigned to two overlapping Sessions directly. It does **not** catch a
-person who is clashed into two overlapping Sessions via membership of two
-unrelated Groups — no ancestor/descendant relationship, so `conflictGroupIds()`
-does not connect them, and nothing flags it.
+Two opposite failure directions were found in the same function, and the fix for
+each is why the two directions are now deliberately different. Both are closed —
+this is the reasoning, not a gap.
 
-A manual edit can therefore create a real person-level clash that the UI reports
-as clean. Correctness gap, not performance. Scheduled for Stage 7; do not treat
-the existing lecturer check as covering it.
+**Under-reporting (closed by Stage 7a).** `no_double_booking_lecturer` intersects
+`session_person` rows, so it catches a person assigned to two overlapping
+Sessions directly — and misses one clashed in via membership of two *unrelated*
+Groups, where `conflictGroupIds()` connects nothing. `no_double_booking_person`
+closes it by expanding both sides to their attendee sets (direct participants
+plus every DESCENDANT group's members) and intersecting by identity.
 
-Note this is the *under*-reporting half of a pair. The over-reporting half — the
-group check flagging unrelated Groups — was found and FIXED in Stage 5, below.
-They are the same function and opposite failure directions, but only this one is
-still open, and it stays open because it needs new capability (resolving Group
-membership down to people) rather than a correction to existing logic.
+**Over-reporting (closed in Stage 5).** The group check expanded the conflict
+closure of BOTH sides, so any two Groups sharing an ancestor always intersected
+at that ancestor — see the Stage 5 section below for the measured scale.
+
+The rule that falls out, and the thing not to "simplify" back: **membership flows
+DOWN, conflict flows BOTH WAYS.** Being in Seminar A1 makes you part of Class A's
+cohort; being in Class A does not put you in Seminar A1. So `attendeeSets` uses
+`descendantGroupIds` while `conflictSets` uses `conflictGroupIds`, and swapping
+either for the other reintroduces one of the two bugs above.
 
 ### Stage 5: two pre-existing bugs it uncovered, both fixed
 
@@ -822,9 +850,10 @@ The obvious design — "0 issues → 23 issues" — is wrong, and the screen
 deliberately refuses to draw it.
 
 `violations.current` comes from `constraint_violation`, which this app's
-evaluator fills using **only the three structural double-booking rules**
-(`violations.ts` says so). `violations.proposed` is the solver reporting on **all
-14 constraint types**. They are different measurements of different things.
+evaluator fills using **only the structural double-booking rules** —
+`STRUCTURAL_CONSTRAINT_TYPES`, currently four. `violations.proposed` is the
+solver reporting on **all 14 constraint types**. They are different measurements
+of different things.
 
 Measured, not assumed: on the same over-constrained timetable the solver reported
 **23** hard violations, and after applying, `refreshViolations()` recorded **36
@@ -833,8 +862,14 @@ rule sets. An arrow between those numbers would invent a comparison that does no
 exist.
 
 So the screen renders two labelled panels, each naming its own source ("checked
-by Calendry — 3 structural rules" / "reported by the solver — 14 constraint
+by Calendry — N structural rules" / "reported by the solver — 14 constraint
 types") and an explicit line saying they are not a like-for-like difference.
+
+**That N is derived from `STRUCTURAL_CONSTRAINT_TYPES.length`, not written out**,
+and the reason is a bug this file's own drift rule predicted: the label said
+"3 structural rules" for the whole of Stage 7 after `no_double_booking_person`
+made it four. A user-facing count stating the wrong number, that nothing checks.
+Do not replace it with a literal to save an import.
 
 **A true delta needs a dry-run evaluator** — running the app's own evaluator over
 the proposed placements without writing them, so both sides are measured the same
@@ -842,8 +877,9 @@ way. That is real future scope, deliberately not built: it is a genuine feature,
 not a tweak, and faking it with the numbers available would be worse than saying
 so.
 
-### Tracked gap: a page must not depend on permissions its own gate does not imply
+### Rule: a page must not depend on permissions its own gate does not imply
 
+**Not a tracked gap — the bug is fixed and this is the standing rule it left.**
 Found in 6c verification. `/schedule/review/[id]` is gated on `session.read` (the
 preview endpoint's permission), but its reference fetch called `/api/offerings`,
 which requires `offering.read`. The `viewer` role has the former and not the
@@ -857,36 +893,20 @@ degrading to showing ids rather than blanking the page.
 The general rule, worth applying to any new page: **enumerate every endpoint a
 page calls and confirm each is covered by the permission the page is gated on.**
 A `Promise.all` of reference fetches turns one missing permission into a blank
-screen, which is the least diagnosable failure a UI has.
+screen, which is the least diagnosable failure a UI has. This bit again in the
+schedule inspector's lecturer/group display (routes fetching `/api/roles` would
+have blanked the schedule for the `viewer` role, which lacks `role.read`) —
+caught before shipping by checking the live grant first.
 
 ### Tracked gap: solver violations naming Sessions the solver invented
 
-`SolverOutput.hard_violations` identifies Sessions by id, but for a Session the
-solver INVENTED the two id spaces in the same response do not agree:
-
-- `PlacedSession.session_id` is **empty** (953 of 993 placements in the Stage 5
-  over-constrained run).
-- the violation names it with a synthetic `"<offeringId>#<index>"` key
-  (`…-offering-6#19`), which appears **nowhere** in the placements.
-
-So there is no join key. The app cannot attach such a violation to the Session
-row it just created, because nothing links the synthetic id to the placement that
-produced it. Measured: of 36 session references across 18 `GroupDoubleBooking`
-violations, **7 resolved and 29 did not** — exactly the 29 that named invented
-Sessions.
-
-`materializeGeneration()` counts these in `violationsUnmapped` rather than
-dropping them silently, which is the right behaviour but not a fix. Closing it is
-a cross-repo change and belongs with the solver, which needs to give a
-newly-created `PlacedSession` a **stable, joinable reference** in violation
-reports — most likely its INDEX in the output `sessions` list, rather than an
-empty `session_id` paired with a synthetic key that appears nowhere else.
+A violation can name a Session the solver INVENTED, using a synthetic key that
+appears in no placement, so there is no join key and the violation cannot be
+attached to the row just created. `materializeGeneration()` counts these in
+`violationsUnmapped` rather than dropping them silently. Full measurement and
+the cross-repo fix shape are in **[BACKLOG.md](BACKLOG.md) § Solver**.
 **Do not "fix" it here by guessing a mapping from offering + slot.**
 
-In practice the loss is currently masked — `refreshViolations()` runs after
-materialize and re-derives the structural violations from the applied rows, so
-the group clashes end up recorded anyway. It would NOT be masked for any
-violation type the app's own evaluator cannot compute.
 
 ### `bun run create:account` — adding an account to an EXISTING tenant
 
@@ -963,7 +983,10 @@ keeping:
   a control refusing a legal value is the same builder-versus-API divergence,
   pointing the other way. Still no ceiling: weight is relative and
   `hard_penalty` scales with the sum, so no magnitude lets a soft rule outrank a
-  hard one.
+  hard one. A per-field help note now says so explicitly, since a low weight
+  being dominated by other configured rules looks identical to "the constraint
+  is being ignored" — it isn't, it's just small relative to whatever else is
+  enabled.
 - **A database CHECK backs it up.** `constraint_weight_non_negative`
   (`weight IS NULL OR weight >= 0`) covers what the resource schema cannot:
   `provision-tenant.ts` writes baseline constraints with
@@ -974,7 +997,7 @@ keeping:
 `report.severityMismatches` stays as a safety net for rows written before this.
 
 **Still open, same family:** `params` accepts arbitrary JSON through the same
-generic API. Same fix shape when it is worth doing.
+generic API — see BACKLOG.md § Undecided.
 
 ### The duplicate constraint: RESOLVED, and what it revealed
 
@@ -1036,7 +1059,7 @@ stops being everything the next time a permission is added — the same drift
 steps instead.
 
 Duplicates fail loudly and are never upserted (a second row that looks like the
-first is worse than an error — see the mislabelled constraint below), and a role
+first is worse than an error — see § "The duplicate constraint"), and a role
 whose *display name* collides with an existing one warns without blocking, since
 `name` is not unique but silence is how "Cap online share per group" came to
 label a `minimize_exam_week_sessions` row.
@@ -1046,24 +1069,13 @@ who already exists is still Step 14.
 
 ### Step 14: AccessRole management has no UI and no API
 
-Tenant roles are editable **only by operator CLIs**: `provision:tenant` (grants
-the whole catalogue to `tenant-admin` at creation), `create:role` (composes a new
-role from an explicit permission list) and `grant:permissions` (backfills onto an
-existing role). A tenant admin still cannot compose a role, and no route is
-behind any of it:
+Scope and current state in **[BACKLOG.md](BACKLOG.md) § Features not built**.
+The durable part: `access_role`, `access_role_permission` and
+`person_access_role` are deliberately absent from `RESOURCES`/`RELATIONS`, and
+the editor this needs is a **picker over the fixed permission catalogue**, not a
+generic form — AccessRole is tenant data, but the permissions it bundles are
+code. Closer to the constraint rule builder than to the generic scaffold.
 
-- `access_role.manage` and `person_access_role.assign` are in the permission
-  catalogue and granted to `tenant-admin`, but **no endpoint checks either** —
-  they are currently unreachable code paths.
-- `access_role`, `access_role_permission` and `person_access_role` are not in
-  `RESOURCES` or `RELATIONS`, so the generic CRUD and relation routes do not
-  serve them.
-
-That is deliberate for Step 13 (the brief scoped it to the nine core entities)
-and is the whole of Step 14. Note the shape it needs is unusual: AccessRole is
-tenant data, but the permissions it bundles are *code*, so its editor is a
-picker over the fixed catalogue rather than a free-form form — closer to the
-constraint rule builder than to the generic scaffold.
 
 ### Open items on auth (tracked, deliberately not built)
 
@@ -1071,15 +1083,17 @@ constraint rule builder than to the generic scaffold.
   can force a reset with `bun run reset:password -- --email …`, which revokes
   every session across every tenant, sets the flag, and prints an audit line;
   login then returns `requiresPasswordChange` and issues no session until
-  `POST /api/auth/change-password` clears it. What is still open: the initial
-  password from `provision:tenant` is *not* flagged for rotation (it is a
-  one-time stdout print that stays valid), there is no password expiry, no
-  complexity rule beyond a 12-character floor, no rate limiting on the change
-  endpoint, and no email delivery of reset links.
-- **`WebUser` / `isAdmin` in `types/user.ts` is still the template stub** and is
-  unrelated to the real auth model. It is only referenced by the navigation
-  composable. Replace it with the session payload from `GET /api/auth/session`
-  when the login UI is wired up.
+  `POST /api/auth/change-password` clears it. The remaining gaps — no rotation
+  flag on the provisioned password, no expiry, no complexity rule beyond the
+  12-character floor, no rate limiting, no email delivery — are listed in
+  **[BACKLOG.md](BACKLOG.md) § Password policy gaps**.
+- ~~**`WebUser` / `isAdmin` in `types/user.ts` is the template stub.**~~ **DONE.**
+  `types/user.ts` and the store's `me` field are deleted rather than left as a
+  second, wrong idea of who the user is; navigation gates on the real permission
+  catalogue. Verified: `types/` holds only `index.ts` and `toast.ts`. The
+  surviving mentions in `ViewMenu.vue`, `ViewLogin.vue`, `navigation.ts` and
+  `store/index.ts` are comments recording the removal — do not read them as the
+  stub still existing.
 - **Federation-level permissions** are out of scope per TAXONOMY.md §9.4.
   Permissions are per-tenant only; administering federation-owned resources has
   no model yet.
@@ -1116,13 +1130,15 @@ from each other or from the entity list.
   is a 404, which keeps a typo distinguishable from a permission problem.
 - **Bespoke means one slot, never a page.** `detailComponent` / `listComponent`
   replace the fields area or the rows; the shell, header, permission handling,
-  save/error plumbing and delete confirmation stay shared. Only three qualify:
+  save/error plumbing and delete confirmation stay shared. Qualifying cases:
   `GroupTree` + `GroupForm` (a hierarchy, and a parent picker whose options
   depend on the row being edited), `TimeGridEditor` (an ISO-weekday array plus a
-  live preview built from the schedule's own `blockTime()`), and
-  `ConstraintBuilder` (type, severity, weight and params constrain each other).
-  **Offering is deliberately not one** — the hub of the model renders on the
-  generic scaffold because its complexity is registry data (`fields`,
+  live preview built from the schedule's own `blockTime()`, and its own break
+  editor — see "TimeGrid breaks" below), `ConstraintBuilder` (type, severity,
+  weight and params constrain each other), and `CalendarPeriodEditor` (a
+  bespoke week-reclassification preview — see "Academic calendar periods"
+  below). **Offering is deliberately not one** — the hub of the model renders
+  on the generic scaffold because its complexity is registry data (`fields`,
   `relations`), not different code.
 - **`custom: true` on a field** keeps it in the draft, dirty tracking, payload
   and error mapping while a bespoke component supplies only its control. Leaving
@@ -1132,7 +1148,11 @@ from each other or from the entity list.
   as a whole collection and saved immediately, one request per change. They are
   not part of the form's Save button: the entity and each relation are separate
   endpoints with no shared transaction, so one button spanning them could
-  half-succeed with a single error message covering both.
+  half-succeed with a single error message covering both. A relation can
+  optionally declare `warnAfterWrite` to return `{ rows, warnings }` instead of
+  the bare array every other relation returns — see "Group↔Term scoping" below
+  for the one relation that uses it, and why the response shape is conditional
+  rather than changed for all of them.
 - **The Ctrl+K palette holds no permission logic at all.** Its entire input is
   the already-filtered `useNavEntries()`, so there is no check to forget.
 - **Overlays claim the keyboard through `useOverlay()`.** Page-level global
@@ -1140,6 +1160,179 @@ from each other or from the entity list.
   which is what stops closing the palette from also cancelling a placement. The
   claim follows the open *state*, not the function that changed it — hanging it
   off `openPalette()` left the header's search button unclaimed.
+
+## Academic calendar periods, and the exam-week dead end they closed
+
+`calendar_period` had a table, a Prisma model, an RLS policy, a mapper and a
+wire field since the initial schema — and **no way to write a row**, in any
+tenant. It was absent from both `RESOURCES` and `manageRegistry`. Consequence:
+no week was ever classified `EXAM` anywhere, so `minimize_exam_week_sessions`
+reported zero violations while looking enabled and healthy, indistinguishable
+from "working and satisfied." Raising its weight from 5 to 1000 (a workaround
+tried before the real cause was found) multiplied zero by two hundred and
+changed nothing — proven directly: a probe exam period inserted, then a solve
+at weight 5 and at weight 1000, produced **byte-identical placements**. The
+weight was never the problem.
+
+**`calendar_period` is now a managed resource on the generic scaffold**, with
+one bespoke field: a live week-reclassification preview. `kind` (a fixed
+3-value enum), `name` and two dates are the whole row — none of what earned the
+three bespoke editors their slot (a hierarchy, arithmetic no form field
+expresses, fields that constrain each other) applies here. `Offering` is the
+precedent for "complex entity, generic scaffold anyway."
+
+**Permission: `term.update`, not a new one.** A calendar period is a child of
+Term with a mandatory `term_id`, exactly like `time_grid_break` is a child of
+TimeGrid — "changing when a term's exam period falls IS editing the term."
+Adding `calendar_period.manage` would mean editing the catalogue and seed, a
+backfill on every existing tenant, and authority over a table rather than a
+capability (the shape CLAUDE.md already warns against for `offering_equipment.
+update`).
+
+**Validation: two rules enforced, one deliberately not.**
+
+- A period fully outside the Term's date range → rejected (400). Such a row
+  would classify no week at all — silently inert, exactly the failure this
+  feature exists to end.
+- A period partially overlapping the Term's end → allowed. Only the in-range
+  part matters; clipping is the natural reading.
+- **Overlapping periods within a Term → allowed, and not checked at all.** A
+  holiday inside an exam period is completely ordinary, and the week-kind
+  precedence rule (EXAM wins if any exam period touches the week, else
+  whole-week BREAK, else whole-week HOLIDAY, else TEACHING) only has meaning
+  *because* periods can overlap. Rejecting overlaps would contradict the
+  resolver already shipped.
+
+**Why the preview earns its place, not just its cost.** The mapping from two
+dates to week kinds is genuinely unpredictable, and this is not hypothetical —
+a real probe period (2027-09-27 → 2027-10-18) marked **four** weeks `EXAM`, not
+three, because `EXAM` uses a "touches" rule (the week beginning 2027-10-18
+counts on its Monday alone) while `BREAK`/`HOLIDAY` use "covers the entire
+week" instead — so the *same dates* give a *different* answer depending on the
+`kind` chosen. Nobody reading two dates predicts that. The preview renders each
+week's new classification next to its old one.
+
+**Week classification lives in `shared/academicCalendar.ts` as `classifyWeeks`,
+and both the preview and the solver's own input call it** — the same
+one-definition discipline as `shared/timeGrid.ts`'s block-boundary walk. A
+locally-computed preview would eventually disagree with the wire and then state
+the opposite of the truth while looking authoritative, which is the exact
+failure class the `<select>`/`:selected` bug produced elsewhere.
+
+**Verified end to end, closing the loop.** An exam period created *through the
+API* for the first time returned the week kinds on the wire as
+`…10:TEACHING 11:EXAM 12:EXAM`, and a solve at the ORIGINAL weight of 5 placed
+**zero** sessions in weeks 11 and 12, redistributing all 65 into the earlier
+weeks. Before this, the same term spread evenly across all 13 weeks including
+those two. The constraint is reachable and effective, at the weight it always
+had.
+
+## Group↔Term scoping, and why the solver filter is reference-derived
+
+Until this, `group` had **no relation to `term` at any level** — not on the
+table, not through `membership` (which carries only `created_at`, no validity
+window), not through `constraint_scope` (offering and kind only), and not on
+the wire. The only link was transitive: `group → offering_group →
+offering.term_id`. Two consequences, both measured:
+
+- `assembleSolverInput` sent **every** tenant Group on every run, while
+  Offerings and Sessions were already narrowed to the Term (10 sent, 2
+  referenced on the demo tenant).
+- The Offering editor's Group picker offered every Group regardless of the
+  Offering's Term — nothing stopped attaching a 2024 cohort to a 2027
+  Offering, and `RESOURCES.groups.filters` had no `termId` to narrow with even
+  if it had wanted to.
+
+The tenant was already encoding the Term into the Group's name
+("dIT22 S1 4.Semester") for lack of anywhere else to put it — the requirement
+asserting itself through a text field.
+
+**Many-to-many (`group_term`), not `group.term_id` ownership.** The Group tree
+carries two lifetimes: a leaf cohort belongs to one Term, but its parent
+programme (e.g. "IT Security") persists across all of them and is never
+directly scheduled. Ownership is unsolvable for the parent — either permit a
+cross-Term parent (abandoning the model) or duplicate the programme node every
+Term (destroying its identity and orphaning `membership` rows, which have no
+Term of their own and need Group identity to stay stable for "which cohort is
+this student in" to have an answer). M2M is also a strict superset of
+ownership, and the reversibility argument settles it decisively: choosing M2M
+and later finding everyone uses one Term is harmless; choosing ownership and
+later finding cohorts persist is a migration that must merge duplicated
+Groups.
+
+**No link means visible in every Term — fail-open, deliberately**, which is
+the opposite of this codebase's usual instinct and chosen anyway: scoping is
+opt-in, so all existing Groups keep working the moment this ships and a new
+Group is usable immediately rather than invisible until someone remembers a
+second step. Fail-closed would make every existing Group unusable on landing
+and make correctness depend on a perfect backfill.
+
+Backfill is **derived from actual usage** — `offering_group ∪ session_group`
+joined to their Term — not from a rule that guesses. Ancestors are deliberately
+**not** auto-scoped: a programme node being an ancestor of something scheduled
+in one Term doesn't make the programme itself Term-bound.
+
+**The solver's Group filter is reference-derived, not scope-derived, and this
+is the load-bearing decision, not a style choice.** Filtering the solver's
+Groups by `group_term` would be the obvious move and is the wrong one: that
+table is tenant *configuration* a human sets, and nothing forces it to agree
+with what Offerings actually reference. Trust it and a mis-scoped Group
+produces a `SolverInput` whose Offering names a `group_id` the solver was
+never given — internally inconsistent, and the solver has no way to detect it.
+Deriving from references cannot fail that way, because the references ARE the
+source. The sent set is the **conflict closure** of the referenced ids (`{g} ∪
+ancestors ∪ descendants`, since the solver rebuilds this itself from
+`parent_id`), and it is closed under parent by construction — pinned three
+ways: an assembly-time assertion, 600 randomised hierarchies checked against an
+independently-written oracle, and a falsification test proving the guard isn't
+a no-op. A sibling branch is deliberately not pulled in unless something
+independently references it.
+
+**The scope table is never allowed near solver input.** `group_term` exists
+purely to answer "what should a human be offered in a picker," and that
+boundary is the whole point of the design — see BACKLOG.md's "Constraint
+params validation" entry and this file's drift-rule entries for the general
+shape of what happens when a config table and the thing it configures are
+allowed to silently disagree.
+
+**Verified**: backfill scoped the two real cohorts and left the other eight
+universal; the API narrows by `termId` correctly, including the two scoped
+cohorts excluded from another Term; the picker narrows the same way, checked
+against a server-rendered page (not just presence); the solver received
+exactly the referenced Groups plus closure (3, not 2 — the closure correctly
+pulls in the parent) with an independent SQL computation over `group_closure`
+agreeing exactly; and an invariant assertion on real assembled input shows zero
+dangling group references and zero orphaned `parentId`s in both directions,
+for both a populated and an empty Term.
+
+### Warning when a Group is scoped out of a Term that still uses it
+
+Real, harmless, and until this addition, silent: scoping a Group out of a Term
+whose Offerings or Sessions still reference it doesn't break anything (the
+solver's filter is reference-derived, see above — existing links keep
+working), but the Group then stops appearing in that Term's pickers, so a
+removed link can't be re-added without first re-scoping.
+
+**There is no "save" to warn before.** `ManageRelationsPanel` has no Save
+button — `add()`/`remove()` each call `persist()` directly, so removing a Term
+from the list IS the save. The warning therefore lands **after the write**,
+computed server-side inside the same transaction, and reported alongside the
+control — the same shape as hard-constraint violations from manual edits
+(warn, don't block, state the consequence next to where it happened).
+
+The response shape is **conditional**: a relation declaring `warnAfterWrite`
+returns `{ rows, warnings }`; every other relation still returns the bare array
+it always did, verified by a test that fails if the shape becomes unconditional
+for all of them (an object where an array is expected makes `Array.isArray`
+false client-side, so the regression would be a picker silently rendering an
+empty set — not an error).
+
+Rendered as `picker_warning`, in the warning palette with `role="status"`,
+deliberately not the error tone (`alert`) — a user who just saved successfully
+must not be shown red. Clearing every Term (widening a Group back to universal)
+produces no warning, since nothing can be orphaned by becoming universal;
+that's asserted explicitly rather than left to fall out of the query by
+accident.
 
 ## Bootstrap & deploy sequence
 
@@ -1280,6 +1473,10 @@ changes to `calendry-proto` or `calendry-solver`.
 a field participates in the INDEX SPACE, which is exactly `blocksPerDay ×
 activeDays`. A break names an `afterBlockIndex` — it references that space
 without defining it — so adding a lunch creates, destroys and renumbers nothing.
+This same `fitsGrid()` guard also refuses narrowing `blocksPerDay`/`activeDays`
+out from under an existing Session (the actual TimeGrid-shrink incident) and the
+same predicate gates the move route, so a Session cannot be moved off-grid
+either.
 
 **Orphaned breaks are deleted and reported; orphaned Sessions refuse the edit.**
 The asymmetry is the design. A Session outside the grid is DATA that resolves to
@@ -1290,27 +1487,46 @@ deletes nothing, which is pinned by a test.
 
 ### OPEN QUESTION — a Session whose duration spans a break
 
-**Not decided, deliberately.** A `durationBlocks: 2` Session placed across lunch
-currently renders as one contiguous span, and with a 45-minute gap inside it that
-is visibly wrong. Resolving it means deciding whether such a placement is legal
-at all:
+**Undecided, deliberately** — see **[BACKLOG.md](BACKLOG.md) § Undecided**. It
+matters here because one of the two branches would overturn the decision this
+whole feature rests on: if such a placement is illegal, the SOLVER would need to
+know about breaks, and breaks currently never cross the wire.
 
-- if it is legal, the Session genuinely runs longer in wall-clock terms than
-  `durationBlocks × blockLengthMinutes`, and every duration display is wrong;
-- if it is not, that is a new hard constraint — and the SOLVER would need to know
-  about breaks to avoid producing one, which would overturn the "breaks never
-  cross the wire" decision this whole feature rests on.
+## `MinimizeBlockUsage` — generalizing first/last block into a block list
 
-That second branch is why this is not a rendering tweak. It is a scheduling-
-semantics question with a cross-repo consequence, and it should be answered
-explicitly rather than settled by whichever behaviour someone implements first.
+`MinimizeFirstBlock`/`MinimizeLastBlock` were the same hardcoding as
+"minimize Saturday" one axis over — `is_first_block`/`is_last_block` are
+booleans baked into `SlotFlags` at fixed positions, and extending a TimeGrid's
+day silently moves what "last block" means underneath a tenant who never
+touched the rule. Replaced with `MinimizeBlockUsage { blocks: number[], first:
+bool, last: bool }` — absolute indices for "avoid block 5 specifically," plus
+the two relative booleans so "avoid the last block, however long the day gets"
+stays expressible without re-editing every time the grid changes. A strict
+superset; nothing is lost.
 
-## Known issues / tech debt
+Published as `calendry-proto@0.3.0`. Fields 20/21 (the old types) are kept and
+marked `deprecated`, not removed — `buf breaking` rejects removal outright, and
+a peer on the old schema may still send them. The app's catalogue keeps both
+old types too, marked `deprecatedBy`, since `type` is `createOnly` and removing
+them would make existing tenant rows unrenderable and uneditable.
 
-- **Three hand-written indexes are MISSING from the database.** The accidental
-  migration `20260813190131_init` — generated by the `db-reset` script before it
-  was fixed — contains nothing but three `DROP INDEX` statements, and it **is
-  applied**. Confirmed absent from the live database:
+Verified with a real live solve after publish: `minimize_block_usage` correctly
+avoided the configured blocks; the change was proven against a real encode of
+the new proto message, not just a passing unit test against a plain object cast.
+
+## Resolved, with the reasoning kept
+
+**Open bugs and deferred work live in [BACKLOG.md](BACKLOG.md).** What follows
+is the opposite: problems that ARE fixed, kept here because each one's fix
+encodes a decision that would otherwise look arbitrary — and that someone could
+reasonably "fix" back to something worse. Deleting these would delete the
+argument, not the bug.
+
+- ~~**Three hand-written indexes are MISSING from the database.**~~ **RESOLVED
+  BY MEASUREMENT — no migration, and deliberately so.** The accidental migration
+  `20260813190131_init` (generated by `db-reset` before it was fixed) dropped
+  three indexes and is applied. They were measured before being recreated, and
+  the evidence said not to:
 
   ```
   session_room_conflict_idx     ON session_room   (room_id, session_id)
@@ -1318,28 +1534,61 @@ explicitly rather than settled by whichever behaviour someone implements first.
   session_event_replay_idx      ON session_event  (tenant_id, generation_id, created_at, seq)
   ```
 
-  The first two back the room/person collision lookups in `refreshViolations()`,
-  which runs synchronously inside every editing route; the third backs event
-  replay (TAXONOMY.md §3 rollback). This is a performance regression, not a
-  correctness one — every query still returns the right answer, which is exactly
-  why it went unnoticed. `migrate reset` will replay the drop, so it does not
-  heal itself.
+  **The first two were tracked against a query shape that does not exist.** The
+  original comment — and this file until now — said they back "the room/person
+  collision lookups in `refreshViolations()`". They do not. Every site that
+  touches these tables drives off `session_id`, never `room_id`/`person_id`:
+  `violations.ts` (`sessionId: { in: involvedIds }`), `solverInput.ts`
+  (`include: { rooms, people }`), `move.post.ts`, `generationMaterialize.ts`,
+  `affected-persons.get.ts`. Stage 7a's `no_double_booking_person` is no
+  exception — it builds attendee sets from session-keyed reads plus
+  `membership`. All of them are already served as **index-only scans** by
+  `session_room_pkey (session_id, room_id)` and
+  `session_person_pkey (session_id, person_id)`, and any future point lookup by
+  room or person is covered by the existing single-column
+  `session_room_room_id_idx` / `session_person_person_id_idx`. So these are not
+  premature — they are the wrong shape, and adding them costs write
+  amplification on tables every editing route writes.
 
-  Fix forward with a small migration recreating the three (definitions are in
-  `20260812000100_rls_triggers_and_indexes` §7), rather than deleting the bad
-  migration file — that history is already applied in at least one database.
-  Not done as part of Step 13; flagged and left as an explicit decision.
+  Measured on a probe schema at solver scale (27k sessions, 27k `session_room`,
+  54k `session_person`), not on the 65-row dev tenant:
+
+  ```
+  A  session_room   WHERE session_id IN (40)  before 0.336ms → after 0.225ms  same plan
+  B  session_person WHERE session_id IN (40)  before 0.307ms → after 0.176ms  same plan
+                    idx_scan = 0 on BOTH new indexes — never chosen
+  C  federation_room_occupancy() join         before 5.802ms →       5.720ms  identical
+     forced onto session_room_conflict_idx           5.713ms / 8252 buffers vs 514
+  ```
+
+  C is the only room-driven query in the system, and it is a bulk join over ~10%
+  of the table with no `room_id` equality predicate — the seq scan is correct
+  and the index cannot beat it, only cost 16× the I/O.
+
+  **`session_event_replay_idx` has the right shape for a query nobody runs.**
+  `session_event` is write-only today: `sessionEvents.ts` creates rows, the demo
+  seeder deletes them raw, and there is **no read path anywhere** in `server/`,
+  `app/` or `scripts/` — no rollback or audit-history route is built. At 205k
+  events the natural plan uses the existing `session_event_generation_id_idx`
+  (0.653ms); with the tracked index it is 0.660ms, because a bitmap scan
+  discards ordering and it still sorts. Forcing an ordered `Index Scan` on a
+  5,000-event generation does remove the sort (1.643ms → 0.862ms), so the shape
+  is right — but that is 0.8ms on a query that does not exist, for an 11 MB
+  index.
+
+  **Add it in the same change as the replay reader**, where the ordered scan can
+  be verified against the real query instead of guessed at. Note that until
+  2026-08-23 adding it would not have stuck: `db-reset` ran `migrate dev`, which
+  is what dropped these three in the first place — see the "Never regenerate
+  `prisma/migrations/`" rule. That half is now fixed, so a future hand-written
+  index survives a rebuild. Same reasoning the
+  session sweeper applied at 28 rows, with the addition that the other two would
+  still be unused at 27,000. Do not recreate any of the three "to close the
+  tracked item" — the item is closed.
 
 
 Deliberately deferred, with the reasoning, so these are not rediscovered as
 surprises. None of these block current work.
-
-- **Design-token retrofit (deferred by decision, not oversight).** Step 10
-  established the token scale and wired its emission, but did not convert
-  existing components. Remaining hardcoded literals, counted at the time:
-  **~40 font-size**, **~26 border-radius**, **~70 spacing** values across
-  `app/components/`. New work uses tokens (see Conventions); this is a
-  standalone design-system pass whenever it is worth doing.
 
 - ~~**Raw-SQL account artifacts in the `test` tenant.**~~ **BOTH RESOLVED.** Each
   was originally written directly to the database, bypassing the paths that would
@@ -1371,17 +1620,6 @@ surprises. None of these block current work.
     `violation.read` was intended and absent. Recreated as six deliberately,
     because six is what the 6b/6c evidence was actually gathered against.
 
-- **Impeccable's state directory collides with its own install path.** The
-  skill expects `.impeccable/` at the repo root to hold *per-project* state
-  (`settings.json`, `mocks/`, `live/`), but that path is the vendored skill
-  submodule itself (`github.com/pbakaus/impeccable`). Consequence:
-  `concept-seed.mjs` exits 0 with no output at either scope, so the
-  direction/structure dice never deal, and `serve-question.mjs` has nowhere to
-  write. Design work through the skill has to substitute a manual choice round
-  and say so. Fix by relocating the submodule (e.g. `vendor/impeccable`) and
-  repointing `.claude/skills/impeccable`, or by pointing the skill's state
-  elsewhere if it supports that.
-
 - **~~`CommonButton` renders a `<div>`~~ — FIXED.** It rendered a `<div>` with a
   click handler, so every action built on it — the whole schedule inspector, the
   solver control, the palette — was mouse-only: no Tab, no Enter/Space, not
@@ -1405,15 +1643,6 @@ surprises. None of these block current work.
   `font: inherit` was added to `.button`; computed font now matches `body` on
   every page.
 
-- **`CommonButton` accepts two variants it does not style.** Callers pass
-  `transparent` (`CommonChevron.vue`) and `secondary-875`
-  (`ViewMenu.vue`), but SCSS exists only for `primary`, `secondary`,
-  `secondary-black`, `destructive`, `link`. The prop union was widened to make
-  `nuxt build` typecheck pass, so these render with an unstyled
-  `button--type-*` class. Fix by writing the missing SCSS *or* migrating those
-  callers to an implemented variant — the type error was a real signal that has
-  been silenced, not solved.
-
 - ~~**Pre-launch sweep for leftover template-author branding/strings.**~~ **DONE.**
   The Step 1 rebrand searched only for the `xxx-changeme` placeholder pattern, so
   anything the template author hardcoded under a different name survived it;
@@ -1436,17 +1665,6 @@ surprises. None of these block current work.
   borrowed code (`// From https://vatsim-radar.com/ … modified to fit our
   needs`), not branding; removing them would strip credit from third-party-derived
   work. Do not "finish the sweep" by deleting them.
-
-- **`docker-compose-next.yml` cannot start.** It declares
-  `depends_on: redis: condition: service_healthy` but defines no `redis`
-  service. Both compose files also declare an unused `redis_data` volume.
-
-- **Repo hygiene.** The `Init` commit tracked `.agents/`, `.claude/` and
-  `skills-lock.json`, and added `.impeccable` as a git submodule
-  (`github.com/pbakaus/impeccable`). `.gitignore` now lists these, but ignore
-  rules do not apply to already-tracked files — they need `git rm --cached`,
-  and the submodule needs deliberate removal, before they stop travelling with
-  the repo.
 
 ## Things to never do without asking first
 

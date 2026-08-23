@@ -21,8 +21,10 @@ import { fromWireWeek, toWireSession, toWireWeek } from '../server/utils/solverS
  * than eyeballed.
  *
  * The concrete dates mirror the demo tenant's real term (2026-10-05 →
- * 2027-02-12, exams 2027-02-01 → 2027-02-12) so the expectations here and the
- * output of scripts/solver-calendar-check.ts can be compared directly.
+ * 2027-02-12, exams 2027-02-01 → 2027-02-12), so a failure here can be checked
+ * by eye against the tenant's actual Term and TimeGrid rows. (They were
+ * originally cross-checked against `scripts/solver-calendar-check.ts`, the
+ * Stage 3a/3c probe, which was deleted once this suite covered it.)
  */
 const d = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
