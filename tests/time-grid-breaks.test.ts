@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockAtMinute, blockBoundaries, blockSpan, gapAfter } from '../shared/timeGrid';
+import { blockAtMinute, blockBoundaries, blockSpan, breakAfter, gapAfter, gapsOfDay } from '../shared/timeGrid';
 import type { BlockGrid, TimeGridBreak } from '../shared/timeGrid';
 import { blockOfMinute } from '../server/utils/solverCalendar';
 
@@ -228,5 +228,102 @@ describe('blockSpan and the public helpers', () => {
         // 8 x 150 - 30 = 1170 minutes of teaching from 08:00 → ends 03:30 next
         // day. Reported as 1650, above 1440, rather than as a plausible 03:30.
         expect(bounds[bounds.length - 1]).toBeGreaterThan(24 * 60);
+    });
+});
+
+
+/**
+ * `breakAfter` and `gapsOfDay` — what a RENDERER asks the timeline.
+ *
+ * These exist because two components needed to name the break in a gap, and
+ * the first one to need it grew its own lookup:
+ *
+ *     breaks.find((b) => b.afterBlockIndex === i && (b.dayOfWeek === day || b.dayOfWeek === null))
+ *
+ * which returns whichever row is FIRST in the array. `gapAfter` prefers the
+ * day-specific one. So a label and a duration could describe different breaks —
+ * the divergence this module exists to prevent, and the reason resolution now
+ * lives here once.
+ */
+describe('breakAfter resolves the same break gapAfter measures', () => {
+    const grid: BlockGrid = {
+        blocksPerDay: 6,
+        blockLengthMinutes: 45,
+        startHour: 9,
+        startMinute: 0,
+        breakMinutes: 5,
+        breaks: [
+            // Universal FIRST in the array, day-specific second — the order
+            // that made the naive `.find()` return the wrong one on Friday.
+            { afterBlockIndex: 2, durationMinutes: 45, label: 'Lunch', dayOfWeek: null },
+            { afterBlockIndex: 2, durationMinutes: 90, label: 'Friday lunch', dayOfWeek: 5 },
+        ] satisfies TimeGridBreak[],
+    };
+
+    it('prefers the day-specific break, matching gapAfter', () => {
+        expect(breakAfter(grid, 2, 5)?.label).toBe('Friday lunch');
+        expect(gapAfter(grid, 2, 5)).toBe(90);
+    });
+
+    it('falls back to the universal break on other days', () => {
+        expect(breakAfter(grid, 2, 3)?.label).toBe('Lunch');
+        expect(gapAfter(grid, 2, 3)).toBe(45);
+    });
+
+    it('never disagrees with gapAfter about which break applies', () => {
+        // The property the two helpers must satisfy jointly: whenever a NAMED
+        // break is returned, its duration is the duration gapAfter reports.
+        for (const day of [null, 1, 2, 3, 4, 5]) {
+            for (let i = 0; i < grid.blocksPerDay; i += 1) {
+                const named = breakAfter(grid, i, day);
+
+                if (named) {
+                    expect(named.durationMinutes, `day ${day} block ${i}`).toBe(gapAfter(grid, i, day));
+                }
+            }
+        }
+    });
+
+    it('returns null after the final block, where gapBoundaries walks nothing', () => {
+        expect(breakAfter(grid, grid.blocksPerDay - 1, null)).toBeNull();
+    });
+});
+
+describe('gapsOfDay is what a renderer draws', () => {
+    const grid: BlockGrid = {
+        blocksPerDay: 4,
+        blockLengthMinutes: 60,
+        startHour: 9,
+        startMinute: 0,
+        breakMinutes: 0,
+        breaks: [{ afterBlockIndex: 0, durationMinutes: 45, label: 'Morning break', dayOfWeek: null }],
+    };
+
+    it('includes the named gap, with its label, and nothing else when the default is 0', () => {
+        expect(gapsOfDay(grid, null)).toEqual([
+            { afterBlockIndex: 0, minutes: 45, label: 'Morning break' },
+        ]);
+    });
+
+    it('includes an UNNAMED default gap, because it occupies real time', () => {
+        // Omitting it would draw a timeline that does not add up: the blocks
+        // would not reach the end that blockBoundaries reports.
+        const withDefault = { ...grid, breakMinutes: 10 };
+        const gaps = gapsOfDay(withDefault, null);
+
+        expect(gaps).toHaveLength(3);
+        expect(gaps[1]).toEqual({ afterBlockIndex: 1, minutes: 10, label: null });
+    });
+
+    it('sums with the blocks to exactly the day length blockBoundaries reports', () => {
+        const withDefault = { ...grid, breakMinutes: 10 };
+        const bounds = blockBoundaries(withDefault, null);
+        const span = (bounds[bounds.length - 1] ?? 0) - (bounds[0] ?? 0);
+        const drawn = withDefault.blocksPerDay * withDefault.blockLengthMinutes
+            + gapsOfDay(withDefault, null).reduce((sum, g) => sum + g.minutes, 0);
+
+        // The property the grid's geometry depends on: what it draws fills the
+        // day exactly, with no rounding slack to absorb.
+        expect(drawn).toBe(span);
     });
 });

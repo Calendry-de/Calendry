@@ -93,6 +93,71 @@ export function gapAfter(
 }
 
 /**
+ * The named break that fills the gap after `afterBlockIndex`, or null when the
+ * gap is the grid's unnamed default (or zero).
+ *
+ * SAME PRECEDENCE AS `gapAfter`, AND THAT IS THE ENTIRE POINT OF IT EXISTING.
+ * Both the TimeGrid editor's preview and the schedule grid need to say WHICH
+ * break sits in a gap, not just how long it is. The editor grew its own lookup
+ * first:
+ *
+ *     breaks.find((b) => b.afterBlockIndex === i && (b.dayOfWeek === day || b.dayOfWeek === null))
+ *
+ * which returns whichever row happens to come first in the array — so with a
+ * universal break AND a Friday break at the same position, previewing Friday
+ * could show the universal one, while `gapAfter` correctly returned the
+ * Friday duration. A label and a height describing different breaks is exactly
+ * the divergence this module exists to prevent, so the resolution lives here
+ * once and both callers read it.
+ */
+export function breakAfter(
+    grid: BlockGrid,
+    afterBlockIndex: number,
+    dayOfWeek: number | null = null,
+): TimeGridBreak | null {
+    // Never after the final block: nothing follows it, so a gap there has no
+    // meaning — the same boundary `blockBoundaries` refuses to walk.
+    if (afterBlockIndex >= grid.blocksPerDay - 1) {
+        return null;
+    }
+
+    const at = (grid.breaks ?? []).filter((b) => b.afterBlockIndex === afterBlockIndex);
+
+    const specific = dayOfWeek === null
+        ? undefined
+        : at.find((b) => b.dayOfWeek === dayOfWeek);
+
+    return specific ?? at.find((b) => b.dayOfWeek === null) ?? null;
+}
+
+/**
+ * Every gap on `dayOfWeek` that occupies real time, as
+ * `{ afterBlockIndex, minutes, label }`.
+ *
+ * What a RENDERER needs, in one call: which gaps to draw, how tall, and what to
+ * call them. Derived from `gapAfter`/`breakAfter` rather than from the break
+ * rows directly, so an unnamed default gap (`breakMinutes` with no override)
+ * is included — it occupies time on screen exactly as a named one does, and
+ * omitting it would draw a timeline that does not add up.
+ */
+export function gapsOfDay(
+    grid: BlockGrid,
+    dayOfWeek: number | null = null,
+): { afterBlockIndex: number; minutes: number; label: string | null }[] {
+    const out = [];
+
+    for (let i = 0; i < grid.blocksPerDay - 1; i += 1) {
+        const minutes = gapAfter(grid, i, dayOfWeek);
+
+        if (minutes > 0) {
+            out.push({ afterBlockIndex: i, minutes, label: breakAfter(grid, i, dayOfWeek)?.label ?? null });
+        }
+    }
+
+    return out;
+}
+
+/**
  * Start minute of every block on `dayOfWeek`, plus one final entry: the minute
  * teaching ends.
  *

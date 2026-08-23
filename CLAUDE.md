@@ -1525,7 +1525,29 @@ label, dayOfWeek}` — where `dayOfWeek NULL` means every active day and a
 day-specific row beats it **at that position only**, so "same lunch every day,
 but Friday's afternoon break differs" is one extra row, not a duplicated day.
 
-**`shared/timeGrid.ts` is the single definition of when a block starts.** Both
+**`shared/timeGrid.ts` is the single definition of when a block starts — and
+that now includes RENDERING.** `ScheduleGrid.vue` was built before breaks
+existed and kept a uniform stride (`grid-auto-rows` + one CSS row per block)
+long after the feature landed, so a tenant with a 45-minute morning break saw
+their blocks butted together while the time column correctly read 12:15 then
+13:00. Times right, picture contradicting them.
+
+It is now laid out in MINUTES from `blockBoundaries()`, per day. **One CSS grid
+could not be fixed by adding break rows**: row heights are shared across
+columns, and a day-specific break means two days genuinely have different block
+start times. So each day is its own positioned stack sized from
+`blockBoundaries(grid, day)`, the time gutter shows the universal timeline as a
+reference, and a day that differs drifts from it visibly and is labelled "own
+breaks". Verified on the demo tenant: Mon–Thu and Sat at 193.85px with a 45-min
+break, Friday at 216.92px with a 120-min one.
+
+`breakAfter()` and `gapsOfDay()` were added for the same reason the walk was:
+the editor's preview had grown its OWN break lookup
+(`breaks.find(b => b.afterBlockIndex === i && (b.dayOfWeek === day || b.dayOfWeek === null))`),
+which returns whichever row is first in the array — so with a universal and a
+day-specific break at one position it could NAME one break while `blockTime()`
+had already applied the other's DURATION. A fourth divergent stride in embryo,
+in the one component whose purpose is showing the two agree. Both
 `blockTime()` (what a block is called) and `blockOfMinute()` (which block it is
 now) walk cumulative boundaries through it. They answer inverse questions about
 one timeline, and if they disagreed the schedule would render one time while

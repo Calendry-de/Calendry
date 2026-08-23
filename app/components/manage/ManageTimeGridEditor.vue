@@ -230,7 +230,7 @@ import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import type { TimeGridBreak } from '#shared/timeGrid';
-import { blockBoundaries } from '#shared/timeGrid';
+import { blockBoundaries, breakAfter } from '#shared/timeGrid';
 import { blockTime, weekdayName } from '~/composables/schedule';
 
 /**
@@ -306,13 +306,19 @@ const previewBlocks = computed(() => {
     return Array.from({ length: count }, (_, index) => ({
         index,
         ...blockTime(grid, index, day),
-        // The gap that FOLLOWS this block, if a named one applies on the day
-        // being previewed. Never after the last block — nothing follows it.
-        breakAfter: index === grid.blocksPerDay - 1
-            ? null
-            : breaks.value.find((b) => b.afterBlockIndex === index
-                && (b.dayOfWeek === day || b.dayOfWeek === null))
-                ?? null,
+        /*
+         * The gap that FOLLOWS this block on the day being previewed.
+         *
+         * Resolved by the shared helper rather than locally. The local version
+         * was `breaks.find(b => b.afterBlockIndex === index && (b.dayOfWeek === day
+         * || b.dayOfWeek === null))`, which returns whichever row comes FIRST in
+         * the array — so with a universal break and a day-specific one at the
+         * same position, this preview could name the universal break while
+         * `blockTime()` above had already applied the day-specific DURATION.
+         * The label and the times would disagree, in the one component whose
+         * whole purpose is showing them agree.
+         */
+        breakAfter: breakAfter(grid, index, day),
     }));
 });
 
