@@ -37,7 +37,10 @@
             :violation-count="data.violations.value.length"
             :can-read-violations="data.canReadViolations.value"
             :can-trigger-solver="canTriggerSolver"
+            :can-create-session="canCreateSession"
+            :creating="editing.creating.value"
             :solver-term-id="data.resolvedTermId.value"
+            @toggle-create="editing.toggleCreating"
         />
 
         <p
@@ -50,6 +53,18 @@
                 aria-hidden="true"
             />
             Pick a slot for <strong>{{ editing.selected.value?.offering?.title }}</strong>. Press Escape to cancel.
+        </p>
+
+        <p
+            v-if="editing.creating.value && !pendingSlot"
+            class="schedule_placing"
+            role="status"
+        >
+            <Icon
+                name="material-symbols:add-circle-outline"
+                aria-hidden="true"
+            />
+            Pick a slot for the new event. Press Escape to cancel.
         </p>
 
         <p
@@ -91,11 +106,24 @@
                     :sessions="data.onGridSessions.value"
                     :violations="data.violationsBySessionId.value"
                     :selected-id="editing.selectedId.value"
-                    :placing="editing.placing.value"
+                    :placing="editing.placing.value || editing.creating.value"
                     :swapping="editing.swapping.value"
                     :row-height="rowHeight"
+                    :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @select="editing.select"
                     @place="placeAt"
+                />
+
+                <ScheduleEventForm
+                    v-if="pendingSlot && data.resolvedTermId.value"
+                    :grid="data.grid.value"
+                    :term-id="data.resolvedTermId.value"
+                    :week="filters.week.value"
+                    :target="pendingSlot"
+                    :rooms="data.rooms.value"
+                    :groups="data.groups.value"
+                    @cancel="cancelCreate"
+                    @created="onEventCreated"
                 />
 
                 <ScheduleAgenda
@@ -150,6 +178,7 @@
 <script setup lang="ts">
 import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
+import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
 import ScheduleInspector from '~/components/schedule/ScheduleInspector.vue';
 import ScheduleOffGridTray from '~/components/schedule/ScheduleOffGridTray.vue';
@@ -174,6 +203,7 @@ useHead({ title: 'Schedule' });
 // them reaches an endpoint that returns 403.
 // Every solver route requires this one, so it gates the whole control.
 const canTriggerSolver = useHasPermission('solver.trigger');
+const canCreateSession = useHasPermission('session.create');
 /**
  * A placement carries the week currently on screen.
  *
@@ -181,8 +211,34 @@ const canTriggerSolver = useHasPermission('solver.trigger');
  * `filters.week` — supplies it. That is what makes a cross-week move possible:
  * enter placement mode, step to another week, click a slot.
  */
+/**
+ * ONE grid click, routed by the mode that made the cells targets.
+ *
+ * `create` opens the form seeded with the slot rather than issuing a request:
+ * a new Session needs a kind, which no click can supply. `place` still moves
+ * the selection immediately, because everything a move needs is already known.
+ */
 function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
+    if (editing.creating.value) {
+        pendingSlot.value = target;
+
+        return;
+    }
+
     return editing.move({ ...target, termWeek: filters.week.value });
+}
+
+const pendingSlot = ref<{ dayOfWeek: number; blockIndex: number } | null>(null);
+
+function cancelCreate() {
+    pendingSlot.value = null;
+    editing.endCreating();
+}
+
+async function onEventCreated() {
+    pendingSlot.value = null;
+    editing.endCreating();
+    await data.refreshAll();
 }
 
 const canMove = useHasPermission('session.move');

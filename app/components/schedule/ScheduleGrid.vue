@@ -69,7 +69,9 @@
                 :class="{ 'grid_cell--target': placing }"
                 :style="{ top: `${block.top}px`, height: `${block.height}px` }"
                 :disabled="!placing"
-                :aria-label="placing ? `Move to ${weekdayName(day)} ${block.start}` : undefined"
+                :aria-label="placing
+                    ? `${targetVerb ?? 'Move to'} ${weekdayName(day)} ${block.start}`
+                    : undefined"
                 @click="placing && $emit('place', { dayOfWeek: day, blockIndex: block.index })"
             />
 
@@ -150,6 +152,13 @@ const props = defineProps<{
     /** Chips are pick targets rather than the grid's empty cells. */
     swapping: boolean;
     rowHeight: number;
+    /**
+     * What choosing a cell will DO, for the slot's accessible name. `place` and
+     * `create` both make cells the targets, and a blind user pressing one
+     * deserves to know which — "Move to Friday 09:00" and "Add event at Friday
+     * 09:00" are different promises.
+     */
+    targetVerb?: string;
 }>();
 
 defineEmits<{

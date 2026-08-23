@@ -20,7 +20,7 @@ import { useOverlayActive } from '~/composables/overlay';
  * `place` — a slot is a destination for the selected session
  * `swap`  — a session is the partner to exchange placements with
  */
-export type EditMode = 'idle' | 'place' | 'swap';
+export type EditMode = 'idle' | 'place' | 'swap' | 'create';
 
 export function useScheduleEditing(options: {
     sessions: ComputedRef<ScheduleSession[]>;
@@ -47,6 +47,17 @@ export function useScheduleEditing(options: {
     /** Kept so existing callers (`ScheduleGrid`, the page) read unchanged. */
     const placing = computed(() => mode.value === 'place');
     const swapping = computed(() => mode.value === 'swap');
+
+    /**
+     * `create` earns a mode by the same test the comment above states: it
+     * changes what a click on the GRID means. A slot becomes the placement for
+     * a Session that does not exist yet.
+     *
+     * Unlike `place` and `swap` it needs NO selection — there is nothing
+     * selected yet — which is why it does not go through `setMode`, whose
+     * whole job is guarding that a mode without a subject cannot be entered.
+     */
+    const creating = computed(() => mode.value === 'create');
 
     /**
      * The session most recently selected, kept even if it leaves the view.
@@ -105,6 +116,31 @@ export function useScheduleEditing(options: {
 
     function toggleSwapping() {
         setMode('swap');
+    }
+
+    /**
+     * Entering create CLEARS the selection. Leaving a session selected while
+     * the grid means "put a new event here" would leave the inspector offering
+     * Move and Swap against a subject the next click is not going to act on —
+     * two live interpretations of one click, which is exactly what the single
+     * `mode` enum exists to prevent.
+     */
+    function toggleCreating() {
+        if (mode.value === 'create') {
+            mode.value = 'idle';
+
+            return;
+        }
+
+        selectedId.value = null;
+        mode.value = 'create';
+    }
+
+    /** Leaves create mode without touching a selection made since. */
+    function endCreating() {
+        if (mode.value === 'create') {
+            mode.value = 'idle';
+        }
     }
 
     async function move(target: { dayOfWeek: number; blockIndex: number; termWeek?: number }) {
@@ -247,7 +283,8 @@ export function useScheduleEditing(options: {
     onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
     return {
-        selectedId, selected, mode, placing, swapping, busy, error,
+        selectedId, selected, mode, placing, swapping, creating, busy, error,
+        toggleCreating, endCreating,
         select, clearSelection, setMode, togglePlacing, toggleSwapping,
         move, swapWith, setRooms, toggleLock,
     };

@@ -105,6 +105,17 @@
         </div>
 
         <div class="bar_group bar_group--end">
+            <!-- Same rule as the solver control below: hidden entirely without
+                 `session.create`, not disabled. There is no read-only version
+                 of "add an event" to show, and a disabled control reads as
+                 "unavailable right now" rather than "not yours". -->
+            <common-button
+                v-if="canCreateSession && solverTermId"
+                :icon="creating ? 'material-symbols:close' : 'material-symbols:add'"
+                :type="creating ? 'secondary' : 'transparent'"
+                @click="$emit('toggle-create')"
+            >{{ creating ? 'Cancel event' : 'Add event' }}</common-button>
+
             <!-- Hidden entirely without solver.trigger, not disabled: every
                  solver route requires that permission, so there is no read-only
                  version of this control to show. -->
@@ -158,10 +169,14 @@ defineProps<{
     violationCount: number;
     canReadViolations: boolean;
     canTriggerSolver: boolean;
+    canCreateSession: boolean;
+    creating: boolean;
     /** Correct at first render, unlike the term-id model, which a
         watchEffect seeds and SSR never flushes. */
     solverTermId: string;
 }>();
+
+defineEmits<{ 'toggle-create': [] }>();
 
 // Filter values are owned by useScheduleFilters() and reach this component as
 // models — the toolbar renders and edits them, it does not own them.

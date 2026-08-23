@@ -282,17 +282,25 @@ real run + apply un-deleted and un-moved, **including when unlocked** — the
 exemption is that it belongs to no Offering and therefore to no solve's scope,
 not the lock.
 
-**What remains is the UI.** There is no "create event" flow in the schedule; the
-API is the only way in. That was a deliberate scope split — the safety property
-was worth proving before any UI depended on it.
+**The UI landed 2026-08-23** as a `create` mode on the schedule grid: "Add
+event" arms the grid, a slot click opens a form seeded with that day/block/week.
+Gated on `session.create` and hidden entirely without it.
 
-Two things for whoever builds the UI:
+What is still thin, for whoever picks it up next:
 
+- **One group and one room only.** The form offers a single select for each,
+  while the API accepts arrays. Multi-select needs a real picker, and the
+  multi-room case runs into the tracked wire-format gap above.
+- **No people/lecturer assignment**, for the same reason — it wants a search
+  control, not a `<select>` of every person in the tenant.
+- **No edit or delete for an Event.** The inspector offers Move/Swap/Lock like
+  any Session, but there is no `DELETE /api/sessions/:id` at all, so an Event
+  created by mistake can only be removed through the database. That is the most
+  likely first complaint.
 - The kind picker is tenant vocabulary. Do not special-case "holiday" / "exam" /
-  "gathering" anywhere; `kind` is data (TAXONOMY.md §2).
-- Read the `CalendarPeriod` overlap below before designing the flow. Placing a
-  campus-wide holiday as a 1-block Session in one room is valid input and the
-  wrong model.
+  "gathering" anywhere; `kind` is data (TAXONOMY.md §2). The form states the
+  CalendarPeriod distinction in prose and links to it, which is the only
+  treatment that does not hardcode a kind.
 
 ## Cancel-to-spare-bank
 
