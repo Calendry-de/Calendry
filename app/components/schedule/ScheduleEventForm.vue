@@ -83,20 +83,33 @@
                 </select>
             </label>
 
+            <!--
+                MULTIPLE, like the inspector's room control and for the same
+                reason it gives: `session_group` is many-to-many, so a
+                single-select cannot express a Session shared by two cohorts and
+                would silently drop every group but one. An Event for four
+                cohorts is the ordinary case here, not the exotic one.
+            -->
             <label class="evform_field">
-                <span>Group</span>
+                <span>Groups</span>
                 <select
-                    v-model="groupId"
+                    multiple
                     :disabled="busy"
+                    :size="Math.min(6, Math.max(3, groups.length))"
+                    @change="onGroupsChange"
                 >
-                    <option value="">— none —</option>
                     <option
                         v-for="group in groups"
                         :key="group.id"
-                        :selected="group.id === groupId"
+                        :selected="groupIds.includes(group.id)"
                         :value="group.id"
                     >{{ group.name }}</option>
                 </select>
+                <em class="evform_multi-hint">
+                    {{ groupIds.length
+                        ? `${groupIds.length} selected`
+                        : 'None — the event has no cohort attached.' }}
+                </em>
             </label>
         </div>
 
@@ -184,7 +197,18 @@ onBeforeUnmount(() => {
 const kinds = ref<{ id: string; name: string }[]>([]);
 const kindId = ref('');
 const roomId = ref('');
-const groupId = ref('');
+const groupIds = ref<string[]>([]);
+
+/**
+ * Reads the whole selection, never a single value.
+ *
+ * The same shape `ScheduleInspector.onRoomsChange` uses: `selectedOptions` is
+ * the authority, so deselecting is expressed by absence rather than needing its
+ * own path.
+ */
+function onGroupsChange(event: Event) {
+    groupIds.value = [...(event.target as HTMLSelectElement).selectedOptions].map((option) => option.value);
+}
 const durationBlocks = ref(1);
 const isLocked = ref(true);
 const busy = ref(false);
@@ -232,7 +256,7 @@ async function submit() {
                 durationBlocks: durationBlocks.value,
                 isLocked: isLocked.value,
                 ...(roomId.value ? { roomIds: [roomId.value] } : {}),
-                ...(groupId.value ? { groupIds: [groupId.value] } : {}),
+                ...(groupIds.value.length ? { groupIds: groupIds.value } : {}),
             },
         });
 
@@ -319,6 +343,12 @@ async function submit() {
 
             background: $surface0;
         }
+    }
+
+    &_multi-hint {
+        font-size: var(--font-size-xs);
+        font-style: normal;
+        color: $content6;
     }
 
     &_lock {
