@@ -138,31 +138,31 @@
                     <dd v-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
                     <dd v-else>
                         <!--
-                            A plain multi-select over every person in the tenant.
-                            It does not scale — a real institution has thousands
-                            — and the proper control is a search field, tracked
-                            as its own follow-up. Shipped this way because an
-                            Event nobody can be added to is a worse gap than a
-                            long list.
+                            The SAME picker as groups, one field down — add from
+                            a list, remove from chips, current selection always
+                            visible.
+
+                            It replaced a `<select multiple>`, which was the
+                            wrong control for the job in ways that had nothing
+                            to do with scale: the selection was only legible by
+                            scanning for highlighted rows, removing one meant
+                            ctrl-clicking, and a stray plain click silently
+                            cleared every other person on the Event.
+
+                            The list is still every person in the tenant. That
+                            limit is real and tracked as its own follow-up (a
+                            search field), but it is a different problem from
+                            this one having been the wrong shape of control.
                         -->
-                        <select
-                            class="inspector_rooms"
-                            multiple
-                            :size="Math.min(5, Math.max(3, people.length))"
-                            :disabled="busy"
-                            @change="onPeopleChange"
-                        >
-                            <option
-                                v-for="person in people"
-                                :key="person.id"
-                                :selected="session.people.some(link => link.personId === person.id)"
-                                :value="person.id"
-                            >{{ person.name }}</option>
-                        </select>
-                        <p
-                            v-if="people.length > 40"
-                            class="inspector_hint"
-                        >{{ people.length }} people — a searchable picker is coming.</p>
+                        <ManageRelationPicker
+                            :def="personRelation"
+                            :rows="session.people"
+                            :options="people"
+                            :extra-options="[]"
+                            :readonly="busy"
+                            @add="onPersonAdd"
+                            @remove="onPersonRemove"
+                        />
                     </dd>
                 </div>
                 <div v-if="editable">
@@ -363,6 +363,17 @@ const locale = useViewerLocale();
  */
 const editable = computed(() => props.canUpdate && props.session?.offeringId === null);
 
+const personRelation: RelationDef = {
+    key: 'people',
+    label: 'People',
+    help: 'Individuals attending in their own right, beyond whole groups.',
+    resource: 'persons',
+    valueKey: 'personId',
+    // People are a flat list, not a hierarchy — the one difference from groups.
+    optionLabel: (row) => String(row.name),
+    emptyHint: 'No people in this institution yet.',
+};
+
 const groupRelation: RelationDef = {
     key: 'groups',
     label: 'Groups',
@@ -387,10 +398,17 @@ function onGroupRemove(value: string) {
     emit('set-details', { groupIds: next });
 }
 
-function onPeopleChange(event: Event) {
-    const select = event.target as HTMLSelectElement;
+/** Same shape as groups: the whole set is sent, so removal needs no own path. */
+function onPersonAdd(value: string) {
+    const next = [...(props.session?.people ?? []).map((p) => p.personId), value];
 
-    emit('set-details', { personIds: [...select.selectedOptions].map((option) => option.value) });
+    emit('set-details', { personIds: [...new Set(next)] });
+}
+
+function onPersonRemove(value: string) {
+    const next = (props.session?.people ?? []).map((p) => p.personId).filter((id) => id !== value);
+
+    emit('set-details', { personIds: next });
 }
 
 const confirmingDelete = ref(false);

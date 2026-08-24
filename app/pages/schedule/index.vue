@@ -215,6 +215,13 @@ useHead({ title: 'Schedule' });
 // UX only. Every one of these is re-checked server-side; a client that forges
 // them reaches an endpoint that returns 403.
 // Every solver route requires this one, so it gates the whole control.
+/**
+ * Gated on every permission the reference wave needs, not just `session.read`.
+ * See `app/utils/schedulePermissions.ts` — the page renders nothing useful
+ * without all six, and used to render nothing AT ALL.
+ */
+definePageMeta({ middleware: 'schedule' });
+
 const canTriggerSolver = useHasPermission('solver.trigger');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');

@@ -1128,10 +1128,20 @@ the cause is not.
 **Adding a page means adding a row to that table**, with a marker that only
 exists once the data resolved.
 
-That suite found a third instance on its first run, now recorded there as a
-known defect: `/schedule` has no page gate at all and its wave needs FIVE read
-permissions, so a role holding only `session.read` gets a blank page. It is
-invisible against the demo tenant because `viewer6b` happens to hold all six.
+That suite found a third instance on its first run — `/schedule` had no page
+gate at all while its wave needed five reads beyond `session.read` — and it is
+now **fixed**: the page is gated on all six via `app/utils/schedulePermissions.ts`,
+read by the route middleware AND by the nav entry, so the link is not offered to
+someone the route will refuse.
+
+**Gated rather than made tolerant, deliberately.** Degrading each fetch to an
+empty list keeps the page up but renders "No time grid configured" — a LIE to
+someone whose tenant has one and who merely may not read it, sending them to fix
+the wrong thing. The denial instead NAMES the missing permissions, because the
+whole reason this broke is that the page's real requirements were invisible.
+
+`session_kind.read` is deliberately not among the six: kinds feed the Event
+editor's picker, not the grid, so that one fetch stays individually tolerant.
 A `Promise.all` of reference fetches turns one missing permission into a blank
 screen, which is the least diagnosable failure a UI has. This bit again in the
 schedule inspector's lecturer/group display (routes fetching `/api/roles` would

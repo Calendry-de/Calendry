@@ -53,10 +53,25 @@ const ROLES = [
 const PAGES = [
     {
         path: '/schedule',
-        // Viewer is covered separately below — see the known defect.
         roles: ['admin'],
         marker: 'grid_col',
         why: 'the week grid itself — present only once the reference wave resolved',
+    },
+    {
+        /*
+         * The viewer holds ONLY `session.read`, and the schedule needs six
+         * reads to draw anything. It used to render blank; it now says which
+         * permissions are missing.
+         *
+         * This row is the fix's real proof. It sat in `it.fails` while the page
+         * was broken, so moving it back here — passing on its own terms rather
+         * than by being expected to fail — is the signal the gap is closed.
+         */
+        path: '/schedule',
+        roles: ['viewer'],
+        status: 403,
+        marker: 'do not have permission to view the schedule',
+        why: 'a stated denial, not an empty grid and not a blank shell',
     },
     {
         path: '/manage',
@@ -89,7 +104,13 @@ describe('every page renders for every role that can reach it', () => {
             it(`${page.path} renders for ${role}`, async () => {
                 const res = await fetch(`${BASE}${page.path}`, { headers: { cookie: cookies[role]! } });
 
-                expect(res.status).toBe(200);
+                /*
+                 * The status is asserted per row, because a DENIAL is a correct
+                 * outcome for some role/page pairs and 200 is not the only right
+                 * answer. It is asserted at all because a page that 500s and one
+                 * that legitimately refuses must not both count as "not blank".
+                 */
+                expect(res.status).toBe((page as { status?: number }).status ?? 200);
 
                 const html = await res.text();
 
@@ -104,35 +125,21 @@ describe('every page renders for every role that can reach it', () => {
         }
     }
 
-    /**
-     * KNOWN DEFECT, found by this suite on its first run — the third instance
-     * of the class it was written for.
-     *
-     * `/schedule` has no `definePageMeta` gate at all, so any authenticated user
-     * reaches it. Its reference wave then fetches terms, time-grids, groups,
-     * rooms and persons in one bare `Promise.all` — five endpoints, five
-     * separate read permissions — so a role holding only `session.read` gets a
-     * 403, the wave rejects, and the page renders NOTHING.
-     *
-     * It is invisible against the demo tenant because `viewer6b` happens to
-     * hold all six of those permissions. This fixture's viewer holds one, which
-     * is why it surfaces here and nowhere else.
-     *
-     * `it.fails` rather than a weakened assertion: the defect stays recorded in
-     * code, the suite stays green, and FIXING it makes this line fail with
-     * "expected test to fail" — which is the prompt to move the case back into
-     * the table above. A skipped test would just rot.
-     *
-     * The fix is a real decision, not a mechanism: either gate the page on the
-     * permissions it actually needs, or make each fetch individually tolerant —
-     * and if tolerant, the empty state must say "you cannot see all of this"
-     * rather than "no time grid configured", or a permission problem becomes
-     * indistinguishable from an unconfigured tenant.
-     */
-    it.fails('/schedule renders for a viewer holding only session.read', async () => {
+    it('names WHICH permissions are missing, not just that access is denied', async () => {
+        /*
+         * "You do not have access" sends someone to ask for the wrong thing.
+         * The whole reason this page broke is that its real requirements were
+         * invisible, so the denial states them.
+         */
         const res = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.viewer! } });
+        const html = await res.text();
 
-        expect(await res.text()).toContain('grid_col');
+        for (const permission of ['term.read', 'time_grid.read', 'group.read', 'room.read', 'person.read']) {
+            expect(html, `denial should name ${permission}`).toContain(permission);
+        }
+
+        // ...and not the one they DO hold.
+        expect(html).not.toContain('session.read,');
     });
 
     it('fails when a page depends on a permission its role lacks', async () => {

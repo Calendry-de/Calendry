@@ -1,5 +1,6 @@
 import type { ComputedRef } from 'vue';
 import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
+import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { useThemeToggle } from '~/composables/layout';
 import { logout, useSession } from '~/composables/session';
 
@@ -33,11 +34,16 @@ export interface NavEntry {
     /** Extra terms the fuzzy match should hit. Never shown. */
     keywords: string[];
     /**
-     * Catalogue permission required to see this entry at all. Absent means
+     * Catalogue permission(s) required to see this entry at all. Absent means
      * "always visible" — used only for account actions, which are about the
      * session rather than tenant data.
+     *
+     * A LIST means ALL of them, not any: an entry needing several is hidden
+     * unless the caller holds every one. `/schedule` is the case that forced
+     * this — it draws nothing without six separate reads, and offering the link
+     * on the strength of one of them led straight to a blank page.
      */
-    permission?: string;
+    permission?: string | readonly string[];
     /** Exactly one of `to` / `run` is set. */
     to?: string;
     run?: () => void | Promise<void>;
@@ -96,7 +102,13 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             icon: 'material-symbols:calendar-view-week-outline',
             section: 'schedule',
             keywords: ['schedule', 'timetable', 'grid', 'week', 'calendar', 'sessions'],
-            permission: 'session.read',
+            /*
+             * The page needs six permissions, not this one — see
+             * `schedulePermissions.ts`. Gating the LINK on the same set stops
+             * offering a destination that answers 403; the nav and the route
+             * agree because they read one list.
+             */
+            permission: SCHEDULE_PERMISSIONS,
             to: '/schedule',
             inHeader: true,
         },
@@ -163,7 +175,16 @@ export function useNavEntries(): ComputedRef<ResolvedNavEntry[]> {
 
     return computed(() => {
         const held = new Set(session.value?.permissions ?? []);
-        const visible = registry.value.filter((entry) => !entry.permission || held.has(entry.permission));
+        const visible = registry.value.filter((entry) => {
+            if (!entry.permission) {
+                return true;
+            }
+
+            // ALL of them when it is a list — see the note on `permission`.
+            return typeof entry.permission === 'string'
+                ? held.has(entry.permission)
+                : entry.permission.every((key) => held.has(key));
+        });
 
         // The Manage index earns its place only if it leads somewhere. Showing a
         // hub whose every section is hidden is the "empty state that means
