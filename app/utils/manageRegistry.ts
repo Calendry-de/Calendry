@@ -302,8 +302,22 @@ export const OFFERING_ENTITY: ManageEntity = {
                         ? `${capacity} enrolled ${capacity === 1 ? 'person' : 'people'}`
                         : 'expected sizes';
 
-                    return `If left blank: ${capacity}, from ${groups} attached `
+                    const line = `If left blank: ${capacity}, from ${groups} attached `
                         + `${groups === 1 ? 'group' : 'groups'} (${source}).`;
+
+                    /*
+                     * The warning belongs HERE, next to the decision it affects.
+                     * A capacity of 4 where 96 are expected is still the honest
+                     * count, but someone leaving this field blank on that basis
+                     * should see why the number looks small before a room turns
+                     * out to be far too small.
+                     */
+                    if (data.partialEnrolment) {
+                        return `${line} Warning: only ${capacity} of an expected `
+                            + `${data.estimate as number} are enrolled, so this may be incomplete.`;
+                    }
+
+                    return line;
                 },
             },
         },

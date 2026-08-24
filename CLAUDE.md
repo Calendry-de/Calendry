@@ -514,11 +514,26 @@ otherwise" is not one.
   "IT Security" (48) plus its child "dIT22 S1" (24) is 48, not 72 — verified
   live in both the membership and estimate forms.
 
-  **Real membership always beats `expectedSize`**, including when it is smaller.
-  The consequence to know: a PARTIAL roll shrinks the requirement. Enrol 3 of 96
-  students and the derived capacity is 3 — measured, not hypothetical. That is
-  the specified behaviour, not a bug, but partial enrolment data is now more
-  dangerous than none.
+  **Real membership always beats `expectedSize`**, including when it is smaller —
+  an enrolment list is a fact and an estimate is a number someone typed once.
+  The consequence: a PARTIAL roll shrinks the requirement. Enrol 4 of 96 and the
+  derived capacity is 4, measured rather than hypothesised.
+
+  That is not blocked, because the roll is still the honest count. It is
+  REPORTED: `report.offeringsWithPartialEnrolment` carries `{ members, expected }`
+  whenever the roll is below `ENROLMENT_COMPLETE_RATIO` (0.9) of the estimate,
+  and the Offering form says so next to the field. Three things about that
+  threshold are deliberate:
+
+  - **It is not zero-tolerance.** A roll is always slightly short — late
+    enrolment, drops — so flagging any shortfall would fire on nearly every
+    Offering and train people to skip the report.
+  - **It decides only WHETHER to mention it, never severity.** Both numbers
+    travel, so 4-of-96 and 86-of-96 both surface and are obviously different
+    problems. A slightly-wrong threshold degrades into noise, not silence.
+  - **No estimate means no flag.** Absence of an `expectedSize` anywhere in the
+    closure is not evidence of completeness, and inventing a comparison would be
+    the silent-narrowing failure one level up.
 
   **Underivable is reported, not silently zero.** The wire field is a plain
   uint32 with no absent case, so 0 is still sent — but the Offering lands in

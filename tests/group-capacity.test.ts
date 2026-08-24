@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { type CapacityGroup, type CapacityMembership, deriveCapacity } from '../shared/groupCapacity';
+import {
+    ENROLMENT_COMPLETE_RATIO, type CapacityGroup, type CapacityMembership, deriveCapacity,
+} from '../shared/groupCapacity';
 
 /**
  * The counting rule behind `Offering.requiredCapacity`'s documented-but-absent
@@ -117,5 +119,87 @@ describe('when nothing can be derived', () => {
 
     it('ignores a dangling group id rather than counting it as zero', () => {
         expect(deriveCapacity(['ghost'], TREE, [])).toMatchObject({ capacity: null, basis: 'none' });
+    });
+});
+
+
+/**
+ * Partial enrolment — the risk created by "real membership always wins".
+ *
+ * A roll of 4 against an expected 96 is still a fact, and still the answer. But
+ * trusting it silently produces a capacity that is catastrophically low, and
+ * the tenant discovers it when a room turns out to hold a twentieth of the
+ * cohort. So it is REPORTED, never blocked — the same "surface rather than
+ * narrow silently" pattern as `offeringsWithNoDerivableCapacity`.
+ *
+ * The threshold decides only WHETHER to mention it. Both numbers travel with
+ * the result so severity is a human judgement rather than this constant's.
+ */
+describe('partial enrolment is flagged, not blocked', () => {
+    const one = (expected: number | null): CapacityGroup[] =>
+        [{ id: 'cohort', parentGroupId: null, expectedSize: expected }];
+
+    const roll = (n: number): CapacityMembership[] =>
+        Array.from({ length: n }, (_, i) => ({ groupId: 'cohort', personId: `p${i}` }));
+
+    it('flags a roll far below the estimate, and still uses the real count', async () => {
+        const out = deriveCapacity(['cohort'], one(96), roll(4));
+
+        // The count WINS — this is advisory, not a veto.
+        expect(out).toMatchObject({
+            capacity: 4, basis: 'membership', estimate: 96, partialEnrolment: true,
+        });
+    });
+
+    it('does NOT flag a roll at the threshold', async () => {
+        // 90 of 100 is exactly the ratio; ordinary churn, not a data gap.
+        expect(deriveCapacity(['cohort'], one(100), roll(90))).toMatchObject({
+            capacity: 90, partialEnrolment: false,
+        });
+    });
+
+    it('flags one just below the threshold', async () => {
+        expect(deriveCapacity(['cohort'], one(100), roll(89))).toMatchObject({
+            capacity: 89, partialEnrolment: true,
+        });
+    });
+
+    it('does not flag a roll LARGER than the estimate', async () => {
+        // A stale low estimate is the estimate's problem, not the roll's.
+        expect(deriveCapacity(['cohort'], one(10), roll(40))).toMatchObject({
+            capacity: 40, partialEnrolment: false,
+        });
+    });
+
+    it('cannot flag anything when no estimate exists to compare against', async () => {
+        // Absence of an estimate is not evidence of completeness. Inventing a
+        // comparison here would be the silent-narrowing failure one level up.
+        expect(deriveCapacity(['cohort'], one(null), roll(3))).toMatchObject({
+            capacity: 3, basis: 'membership', estimate: null, partialEnrolment: false,
+        });
+    });
+
+    it('never flags when the basis is the estimate itself', async () => {
+        // No roll at all means nothing to be partial about.
+        expect(deriveCapacity(['cohort'], one(96), [])).toMatchObject({
+            capacity: 96, basis: 'expected_size', partialEnrolment: false,
+        });
+    });
+
+    it('compares against the DEDUPED estimate, not the naive sum', async () => {
+        const tree: CapacityGroup[] = [
+            { id: 'parent', parentGroupId: null, expectedSize: 100 },
+            { id: 'child', parentGroupId: 'parent', expectedSize: 60 },
+        ];
+        // Naive sum 160 -> 95 would look partial. Deduped estimate is 100, so
+        // 95 is complete. The dedup has to hold here too or the flag misfires.
+        const out = deriveCapacity(['parent', 'child'], tree, Array.from({ length: 95 },
+            (_, i) => ({ groupId: 'child', personId: `p${i}` })));
+
+        expect(out).toMatchObject({ capacity: 95, estimate: 100, partialEnrolment: false });
+    });
+
+    it('exports the threshold rather than hiding it in the predicate', async () => {
+        expect(ENROLMENT_COMPLETE_RATIO).toBe(0.9);
     });
 });

@@ -65,7 +65,41 @@ export interface DerivedCapacity {
     basis: CapacityBasis;
     /** Groups in the walked closure, so a UI can say what the number covers. */
     closureSize: number;
+    /**
+     * What the `expectedSize` fallback WOULD have produced, computed even when
+     * membership wins. NULL when no attached Group carries an estimate anywhere
+     * in its closure.
+     *
+     * Kept so the two candidate answers can be COMPARED rather than one simply
+     * replacing the other — which is the whole point of `partialEnrolment`.
+     */
+    estimate: number | null;
+    /**
+     * The real roll is materially smaller than the estimate, so enrolment looks
+     * incomplete and this capacity is probably too low.
+     *
+     * Advisory. The real count still wins — an enrolment list is a fact — but a
+     * tenant should learn that "4 against an expected 96" is the basis BEFORE a
+     * room turns out to be catastrophically small, not after.
+     */
+    partialEnrolment: boolean;
 }
+
+/**
+ * How much of the expected cohort must be enrolled before the roll is treated
+ * as complete.
+ *
+ * A roll is ALWAYS slightly short — late enrolment, drops, someone
+ * unregistered — so reporting any shortfall at all would flag nearly every
+ * Offering and train people to skip the report. Ten percent absorbs ordinary
+ * churn without absorbing a data-entry gap.
+ *
+ * The threshold decides only WHETHER to mention it. Both numbers travel with
+ * the report so a human judges severity: 4-of-96 and 86-of-96 both surface, and
+ * nobody has to trust this constant to tell them apart. That is also what makes
+ * a slightly-wrong threshold degrade into noise rather than into silence.
+ */
+export const ENROLMENT_COMPLETE_RATIO = 0.9;
 
 /** Every id in `roots` plus everything beneath them, deduplicated. */
 function closureOf(roots: string[], childrenOf: Map<string, string[]>): Set<string> {
@@ -112,7 +146,7 @@ export function deriveCapacity(
     memberships: CapacityMembership[],
 ): DerivedCapacity {
     if (attachedGroupIds.length === 0) {
-        return { capacity: null, basis: 'none', closureSize: 0 };
+        return { capacity: null, basis: 'none', closureSize: 0, estimate: null, partialEnrolment: false };
     }
 
     const byId = new Map(groups.map((g) => [g.id, g]));
@@ -140,12 +174,15 @@ export function deriveCapacity(
         }
     }
 
-    if (people.size > 0) {
-        return { capacity: people.size, basis: 'membership', closureSize: closure.size };
-    }
-
     /**
-     * Fallback, with the SAME dedup applied.
+     * The estimate is computed even when membership wins.
+     *
+     * It used to be the fallback path only, returned early past. Computing both
+     * is what lets them be COMPARED — the real count is still the answer, but
+     * "4 people where 96 were expected" is a fact about that answer which was
+     * previously invisible until a room turned out to be far too small.
+     *
+     * SAME dedup applied.
      *
      * Summing `expectedSize` across attached Groups repeats the double-count
      * the union avoided — "IT Security" (48) plus its own child "dIT22 S1" (24)
@@ -171,10 +208,38 @@ export function deriveCapacity(
     };
 
     const maximal = attached.filter((id) => !isCoveredByAnotherAttached(id));
-    const estimated = maximal.reduce((sum, id) => sum + estimateOf(id, byId, childrenOf), 0);
+    const summed = maximal.reduce((sum, id) => sum + estimateOf(id, byId, childrenOf), 0);
 
-    if (estimated > 0) {
-        return { capacity: estimated, basis: 'expected_size', closureSize: closure.size };
+    // NULL, not 0: "nobody wrote an estimate" is not "the estimate is nobody".
+    // Only the first can be compared against a roll, and only the second would
+    // make every partial roll look complete.
+    const estimate = summed > 0 ? summed : null;
+
+    if (people.size > 0) {
+        return {
+            capacity: people.size,
+            basis: 'membership',
+            closureSize: closure.size,
+            estimate,
+            /**
+             * Advisory only — the roll still wins. Requires an estimate to
+             * compare against: absence of one is not evidence of completeness,
+             * and inventing a comparison would be the silent-narrowing failure
+             * this whole derivation exists to end, one level up.
+             */
+            partialEnrolment: estimate !== null && people.size < estimate * ENROLMENT_COMPLETE_RATIO,
+        };
+    }
+
+    if (estimate !== null) {
+        // No roll at all, so nothing to be partial about.
+        return {
+            capacity: estimate,
+            basis: 'expected_size',
+            closureSize: closure.size,
+            estimate,
+            partialEnrolment: false,
+        };
     }
 
     /**
@@ -184,5 +249,5 @@ export function deriveCapacity(
      * have to decide what to send AND say so — see
      * `report.offeringsWithNoDerivableCapacity`.
      */
-    return { capacity: null, basis: 'none', closureSize: closure.size };
+    return { capacity: null, basis: 'none', closureSize: closure.size, estimate: null, partialEnrolment: false };
 }

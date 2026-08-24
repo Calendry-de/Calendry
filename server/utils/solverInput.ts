@@ -61,6 +61,20 @@ export interface AssemblyReport {
      * inventing a number would be worse than admitting the gap.
      */
     offeringsWithNoDerivableCapacity: { id: string; title: string }[];
+    /**
+     * Offerings whose derived capacity rests on a roll that looks INCOMPLETE —
+     * materially fewer enrolled people than the attached Groups expect.
+     *
+     * Not an error and not a narrowing: the real count is still used, because
+     * an enrolment list is a fact and a stale estimate is not. What it prevents
+     * is learning that "4 against an expected 96" was the basis only when a
+     * room turns out to hold a twentieth of the cohort.
+     *
+     * Both numbers travel so severity is a human judgement rather than the
+     * threshold's — 4-of-96 and 86-of-96 both appear here and are obviously
+     * different problems.
+     */
+    offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
     /** Constraints not sent, with the reason. Never sent with invented defaults. */
     skippedConstraints: { id: string; type: string; reason: string }[];
     /**
@@ -393,6 +407,9 @@ export async function assembleSolverInput(
 
     let droppedEquipmentQuantities = 0;
     const offeringsWithNoDerivableCapacity: { id: string; title: string }[] = [];
+    const offeringsWithPartialEnrolment: {
+        id: string; title: string; members: number; expected: number;
+    }[] = [];
 
     /**
      * Capacity inputs, fetched ONCE for the whole assembly rather than per
@@ -438,6 +455,15 @@ export async function assembleSolverInput(
 
         if (derived && derived.capacity === null) {
             offeringsWithNoDerivableCapacity.push({ id: offering.id, title: offering.title });
+        }
+
+        if (derived?.partialEnrolment && derived.capacity !== null && derived.estimate !== null) {
+            offeringsWithPartialEnrolment.push({
+                id: offering.id,
+                title: offering.title,
+                members: derived.capacity,
+                expected: derived.estimate,
+            });
         }
 
         return {
@@ -605,6 +631,7 @@ export async function assembleSolverInput(
             multiRoomSessions: multiRoomSessionIds(sessionInputs),
             droppedEquipmentQuantities,
             offeringsWithNoDerivableCapacity,
+            offeringsWithPartialEnrolment,
             skippedConstraints,
             severityMismatches,
             groupsOmitted: groupRows.length - sentGroupRows.length,
