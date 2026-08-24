@@ -1,7 +1,7 @@
 import type { ComputedRef, Ref } from 'vue';
 import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
-import { isOnGrid, sessionLabel, weeksInTerm } from '~/composables/schedule';
-import { slotDate } from '#shared/academicCalendar';
+import { isOnGrid, sessionLabel } from '~/composables/schedule';
+import { slotDate, weekCountOf } from '#shared/academicCalendar';
 import { useHasPermission } from '~/composables/session';
 
 /**
@@ -138,7 +138,26 @@ export function useScheduleData(filters: {
      * broken control.
      */
     const term = computed(() => terms.value.find((t) => t.id === resolvedTermId.value) ?? null);
-    const totalWeeks = computed(() => (term.value ? weeksInTerm(term.value) : 1));
+    /**
+     * `weekCountOf`, the SAME function the week classifier, the solver calendar
+     * and `POST /api/sessions`'s validation already use.
+     *
+     * This used to call a local `weeksInTerm`, which computed the raw span
+     * (`ceil((end - start) / 7)`) instead of counting Monday-anchored weeks.
+     * The two disagree on roughly half of all terms, always by one, and the
+     * toolbar was the only thing reading the local version — so the schedule
+     * capped a term one week short of what the server would accept, and the
+     * final week was unreachable. Measured on a Saturday-start term: the
+     * toolbar said `Week 1 / 12` and disabled the next button there, while the
+     * classifier, the solver and the API all said 13.
+     *
+     * `POST /api/sessions` already carried the warning in a comment — that
+     * computing this locally "would be a fourth definition of which week is
+     * this" — written after the local version already existed.
+     */
+    const totalWeeks = computed(() => (term.value
+        ? weekCountOf(new Date(term.value.startDate), new Date(term.value.endDate))
+        : 1));
 
     /**
      * Grid shape follows the selected Term's TimeGrid, falling back to the

@@ -195,14 +195,6 @@ export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'
     return session.title ?? 'Untitled event';
 }
 
-/** Whole weeks spanned by a term, so the week stepper has real bounds. */
-export function weeksInTerm(term: Term): number {
-    const start = new Date(term.startDate).getTime();
-    const end = new Date(term.endDate).getTime();
-
-    return Math.max(1, Math.ceil((end - start) / (7 * 24 * 60 * 60 * 1000)));
-}
-
 /**
  * A session belongs on the grid only if its day is one the grid schedules AND
  * it fits within the day's blocks. Anything else is real data the grid cannot
