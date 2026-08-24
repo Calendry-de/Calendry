@@ -367,7 +367,7 @@ function toggle(id: string) {
         &--error {
             font-weight: 600;
             color: $error700;
-            background: vartorgba('error500', 0.12);
+            background: varToRgba('error500', 0.12);
         }
     }
 

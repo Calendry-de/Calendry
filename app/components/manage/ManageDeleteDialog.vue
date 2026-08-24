@@ -100,7 +100,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
     padding: var(--space-6);
 
-    background: vartorgba('content0', 0.45);
+    background: varToRgba('content0', 0.45);
 
     &_box {
         display: flex;
@@ -113,7 +113,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         border-radius: var(--radius-xl);
 
         background: $surface1;
-        box-shadow: 0 24px 60px vartorgba('content0', 0.28);
+        box-shadow: 0 24px 60px varToRgba('content0', 0.28);
 
         h2 {
             margin: 0;
@@ -142,7 +142,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         font-size: var(--font-size-sm) !important;
         color: $error700 !important;
 
-        background: vartorgba('error500', 0.14);
+        background: varToRgba('error500', 0.14);
     }
 
     &_actions {

@@ -113,7 +113,7 @@ function toggle(iso: number) {
         &--on {
             border-color: $primary500;
             color: $primary700;
-            background: vartorgba('primary500', 0.12);
+            background: varToRgba('primary500', 0.12);
         }
     }
 

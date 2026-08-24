@@ -384,7 +384,7 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
         text-transform: uppercase;
         letter-spacing: 0.04em;
 
-        background: vartorgba('primary500', 0.16);
+        background: varToRgba('primary500', 0.16);
 
         &--system {
             color: $content7;
@@ -405,7 +405,7 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
         &--error {
             font-weight: 600;
             color: $error700;
-            background: vartorgba('error500', 0.12);
+            background: varToRgba('error500', 0.12);
         }
     }
 

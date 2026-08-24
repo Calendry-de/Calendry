@@ -155,7 +155,7 @@ function trapFocus(event: KeyboardEvent) {
 
     padding: 12vh var(--space-6) var(--space-6);
 
-    background: vartorgba('content0', 0.45);
+    background: varToRgba('content0', 0.45);
 
     &_dialog {
         display: flex;
@@ -168,7 +168,7 @@ function trapFocus(event: KeyboardEvent) {
         border-radius: var(--radius-xl);
 
         background: $surface1;
-        box-shadow: 0 24px 60px vartorgba('content0', 0.28);
+        box-shadow: 0 24px 60px varToRgba('content0', 0.28);
     }
 
     &_search {
@@ -291,7 +291,7 @@ function trapFocus(event: KeyboardEvent) {
 
             .palette_result-label { color: $surface0; }
 
-            .palette_result-hint { color: vartorgba('surface0', 0.75); }
+            .palette_result-hint { color: varToRgba('surface0', 0.75); }
 
             .palette_hit { color: $surface0; }
         }

@@ -285,7 +285,7 @@ function onAdd(event: Event) {
         font-weight: 600;
         color: $error700;
 
-        background: vartorgba('error500', 0.14);
+        background: varToRgba('error500', 0.14);
     }
 
     /* Deliberately the warning palette, not the error one: same weight of
@@ -300,7 +300,7 @@ function onAdd(event: Event) {
         line-height: 1.5;
         color: $warning700;
 
-        background: vartorgba('warning500', 0.14);
+        background: varToRgba('warning500', 0.14);
     }
 
     &_rows {
@@ -386,7 +386,7 @@ function onAdd(event: Event) {
         @include hover() {
             &:hover {
                 color: $error700;
-                background: vartorgba('error500', 0.14);
+                background: varToRgba('error500', 0.14);
             }
         }
     }

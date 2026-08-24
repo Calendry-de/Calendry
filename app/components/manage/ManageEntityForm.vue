@@ -235,7 +235,7 @@ const saveLabel = computed(() => (props.mode === 'create' ? 'Create' : 'Save cha
         font-weight: 600;
         color: $error700;
 
-        background: vartorgba('error500', 0.14);
+        background: varToRgba('error500', 0.14);
     }
 
     &_actions {

@@ -544,12 +544,12 @@ onMounted(() => {
 
         &--hard {
             color: $error700;
-            background: vartorgba('error500', 0.16);
+            background: varToRgba('error500', 0.16);
         }
 
         &--soft {
             color: $warning700;
-            background: vartorgba('warning500', 0.2);
+            background: varToRgba('warning500', 0.2);
         }
     }
 

@@ -339,7 +339,7 @@ function removeBreak(index: number) {
         @include hover() {
             &:hover {
                 color: $error700;
-                background: vartorgba('error500', 0.14);
+                background: varToRgba('error500', 0.14);
             }
         }
     }

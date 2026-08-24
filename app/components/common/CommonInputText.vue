@@ -170,7 +170,7 @@ defineExpose({
             }
 
             &::placeholder {
-                color: vartorgba('content4', 0.5);
+                color: varToRgba('content4', 0.5);
                 opacity: 1
             }
         }
