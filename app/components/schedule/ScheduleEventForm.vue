@@ -36,6 +36,17 @@
         </p>
 
         <div class="evform_grid">
+            <label class="evform_field evform_field--wide">
+                <span>Name<i>*</i></span>
+                <input
+                    v-model="title"
+                    :disabled="busy"
+                    maxlength="200"
+                    placeholder="Open day, exam sitting, staff meeting…"
+                    type="text"
+                >
+            </label>
+
             <label class="evform_field">
                 <span>Kind<i>*</i></span>
                 <select
@@ -84,33 +95,29 @@
             </label>
 
             <!--
-                MULTIPLE, like the inspector's room control and for the same
-                reason it gives: `session_group` is many-to-many, so a
-                single-select cannot express a Session shared by two cohorts and
-                would silently drop every group but one. An Event for four
-                cohorts is the ordinary case here, not the exotic one.
+                THE SAME control the Offering page uses, not a second one.
+
+                `ManageRelationPicker` is already standalone and already
+                decoupled from persistence — it renders `rows`/`options` and
+                emits add/remove, while its usual parent does the saving. So it
+                works unchanged against draft state here, and the Events form
+                gains the indented group tree: a flat <select multiple> gave no
+                hint that picking a cohort implies its seminars.
+
+                A second group picker is exactly the drift ManageWeekdayPicker's
+                extraction existed to prevent.
             -->
-            <label class="evform_field">
-                <span>Groups</span>
-                <select
-                    multiple
-                    :disabled="busy"
-                    :size="Math.min(6, Math.max(3, groups.length))"
-                    @change="onGroupsChange"
-                >
-                    <option
-                        v-for="group in groups"
-                        :key="group.id"
-                        :selected="groupIds.includes(group.id)"
-                        :value="group.id"
-                    >{{ group.name }}</option>
-                </select>
-                <em class="evform_multi-hint">
-                    {{ groupIds.length
-                        ? `${groupIds.length} selected`
-                        : 'None — the event has no cohort attached.' }}
-                </em>
-            </label>
+            <div class="evform_field evform_field--wide">
+                <ManageRelationPicker
+                    :def="groupRelation"
+                    :rows="groupRows"
+                    :options="groups"
+                    :extra-options="[]"
+                    :readonly="busy"
+                    @add="addGroup"
+                    @remove="removeGroup"
+                />
+            </div>
         </div>
 
         <label class="evform_lock">
@@ -136,7 +143,7 @@
 
         <footer class="evform_foot">
             <common-button
-                :disabled="!kindId || busy"
+                :disabled="!kindId || !title.trim() || busy"
                 type="primary"
                 @click="submit"
             >{{ busy ? 'Creating…' : 'Create event' }}</common-button>
@@ -147,6 +154,8 @@
 <script setup lang="ts">
 import { type TimeGrid, blockTime, weekdayName } from '~/composables/schedule';
 import { useOverlay } from '~/composables/overlay';
+import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
+import type { RelationDef } from '~/utils/manageRegistry';
 
 /**
  * The create-an-Event form, opened by clicking a slot while the grid is in
@@ -197,18 +206,42 @@ onBeforeUnmount(() => {
 const kinds = ref<{ id: string; name: string }[]>([]);
 const kindId = ref('');
 const roomId = ref('');
+const title = ref('');
 const groupIds = ref<string[]>([]);
 
 /**
- * Reads the whole selection, never a single value.
+ * The picker's contract: a relation DEFINITION plus the current rows.
  *
- * The same shape `ScheduleInspector.onRoomsChange` uses: `selectedOptions` is
- * the authority, so deselecting is expressed by absence rather than needing its
- * own path.
+ * Built inline rather than imported from the manage registry, because that
+ * entry describes the Offering's relation — its `scopeBy` narrows options by
+ * the Offering's own `termId`, which this form does not have and does not need
+ * (the page already hands it groups for the term in view). Sharing the
+ * COMPONENT is the point; sharing a config written for a different parent would
+ * couple two screens that have no reason to move together.
  */
-function onGroupsChange(event: Event) {
-    groupIds.value = [...(event.target as HTMLSelectElement).selectedOptions].map((option) => option.value);
-}
+const groupRelation: RelationDef = {
+    key: 'groups',
+    label: 'Groups',
+    help: 'Nesting propagates: choosing a cohort also covers its seminars.',
+    resource: 'groups',
+    valueKey: 'groupId',
+    indentTree: true,
+    optionLabel: (row) => String(row.name),
+    emptyHint: 'No groups available in this term.',
+};
+
+/** The picker reads join-shaped rows; the draft holds plain ids. */
+const groupRows = computed(() => groupIds.value.map((groupId) => ({ groupId })));
+
+const addGroup = (value: string) => {
+    if (!groupIds.value.includes(value)) {
+        groupIds.value = [...groupIds.value, value];
+    }
+};
+
+const removeGroup = (value: string) => {
+    groupIds.value = groupIds.value.filter((id) => id !== value);
+};
 const durationBlocks = ref(1);
 const isLocked = ref(true);
 const busy = ref(false);
@@ -237,7 +270,9 @@ onMounted(async () => {
 });
 
 async function submit() {
-    if (!kindId.value || busy.value) {
+    // Name is required — an Event has no Offering to borrow one from, and the
+    // server refuses it too.
+    if (!kindId.value || !title.value.trim() || busy.value) {
         return;
     }
 
@@ -250,6 +285,7 @@ async function submit() {
             body: {
                 termId: props.termId,
                 kindId: kindId.value,
+                title: title.value.trim(),
                 termWeek: props.week,
                 dayOfWeek: props.target.dayOfWeek,
                 blockIndex: props.target.blockIndex,
@@ -343,6 +379,10 @@ async function submit() {
 
             background: $surface0;
         }
+    }
+
+    &_field--wide {
+        grid-column: 1 / -1;
     }
 
     &_multi-hint {

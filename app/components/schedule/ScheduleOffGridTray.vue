@@ -16,7 +16,7 @@
                 <button
                     type="button"
                     @click="$emit('select', session.id)"
-                >{{ session.offering?.title ?? 'Untitled session' }}</button>
+                >{{ sessionLabel(session) }}</button>
                 <span>{{ offGridReason(grid, session) }}</span>
             </li>
         </ul>
@@ -25,7 +25,7 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid } from '~/composables/schedule';
-import { offGridReason } from '~/composables/schedule';
+import { offGridReason, sessionLabel } from '~/composables/schedule';
 
 /**
  * Sessions the grid cannot position — a day the TimeGrid does not schedule, or

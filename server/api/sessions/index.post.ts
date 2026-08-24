@@ -10,6 +10,12 @@ import { weekCountOf } from '../../../shared/academicCalendar';
 const bodySchema = z.object({
     termId: z.string().min(1),
     kindId: z.string().min(1),
+
+    /**
+     * The EVENT's name. Required when there is no Offering to borrow one from,
+     * and REFUSED when there is — see the guard below.
+     */
+    title: z.string().min(1).nullish(),
     termWeek: z.number().int().min(1),
     dayOfWeek: z.number().int().min(1).max(7),
     blockIndex: z.number().int().min(0),
@@ -109,6 +115,37 @@ export default defineEventHandler(async (event) => {
          * placed. `planMaterialization()` already counts this shape as
          * `placementsUnmapped` coming the other way.
          */
+        /**
+         * A title belongs to an EVENT and to nothing else.
+         *
+         * Refused rather than stored-and-ignored: `sessionLabel()` reads this
+         * column only when `offeringId` is NULL, so a title on an
+         * Offering-linked Session would be a value no screen ever renders —
+         * dead data that reads as a bug the first time someone finds it.
+         */
+        if (body.offeringId && body.title) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: 'A Session belonging to an Offering takes its name from that '
+                    + 'Offering, so it cannot carry its own title. Omit `title`, or omit '
+                    + '`offeringId` to create an Event.',
+                data: { field: 'title' },
+            });
+        }
+
+        /**
+         * ...and an Event has nothing else to be called. The kind alone
+         * ("Lecture") does not distinguish two Events in the same week, which
+         * is the confusion this field exists to end.
+         */
+        if (!body.offeringId && !body.title) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: 'An event needs a name — there is no Offering to take one from.',
+                data: { field: 'title' },
+            });
+        }
+
         if (body.offeringId) {
             const offering = await tx.offering.findFirst({
                 where: { id: body.offeringId, tenantId: identity.tenantId, termId: term.id },
@@ -177,6 +214,7 @@ export default defineEventHandler(async (event) => {
                     termId: term.id,
                     kindId: kind.id,
                     offeringId: body.offeringId ?? null,
+                    title: body.title ?? null,
                     timeGridId: term.timeGridId,
                     termWeek: body.termWeek,
                     dayOfWeek: body.dayOfWeek,
@@ -241,6 +279,7 @@ export default defineEventHandler(async (event) => {
                     personIds: [...new Set([...body.lecturerIds, ...body.personIds])],
                 },
                 offeringId: body.offeringId ?? null,
+                title: body.title ?? null,
                 kindId: kind.id,
                 isLocked: body.isLocked,
                 isEvent: !body.offeringId,

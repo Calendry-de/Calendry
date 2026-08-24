@@ -889,6 +889,14 @@ model Session {
   tenantId     String? @map("tenant_id")
   federationId String? @map("federation_id")
 
+  /// Display name, for an EVENT only.
+  ///
+  /// An Offering-linked Session derives its name from `offering.title` as it
+  /// always has; `sessionLabel()` reads this column only when `offeringId` is
+  /// NULL, and the create route REFUSES a title alongside an offeringId rather
+  /// than storing one nothing will ever render.
+  title String?
+
   /// NULL means this Session is an EVENT — a placement with no recurring
   /// demand behind it (TAXONOMY.md §2). An Event carries no Offering, so it is
   /// in no solve's scope and `planMaterialization()`'s delete partition

@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue';
 import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
-import { isOnGrid, weeksInTerm } from '~/composables/schedule';
+import { isOnGrid, sessionLabel, weeksInTerm } from '~/composables/schedule';
 import { useHasPermission } from '~/composables/session';
 
 /**
@@ -192,7 +192,7 @@ export function useScheduleData(filters: {
     };
 
     function sessionTitle(id: string): string {
-        return allSessions.value.find((s) => s.id === id)?.offering?.title ?? 'Session';
+        return sessionLabel(allSessions.value.find((s) => s.id === id));
     }
 
     async function refreshAll() {

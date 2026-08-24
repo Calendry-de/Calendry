@@ -27,7 +27,14 @@ async function makeEvent(over: Record<string, unknown> = {}) {
         method: 'POST',
         cookie,
         body: JSON.stringify({
-            termId: TERM, kindId: KIND, termWeek: 1, dayOfWeek: 1, blockIndex: 0, ...over,
+            termId: TERM,
+            kindId: KIND,
+            termWeek: 1,
+            dayOfWeek: 1,
+            blockIndex: 0,
+            // Required for an Event, refused for an Offering-linked Session.
+            ...(over.offeringId ? {} : { title: 'Test event' }),
+            ...over,
         }),
     });
 

@@ -11,7 +11,7 @@
         :aria-pressed="selected"
         @click="$emit('select')"
     >
-        <span class="chip_title">{{ session.offering?.title ?? 'Untitled session' }}</span>
+        <span class="chip_title">{{ sessionLabel(session) }}</span>
 
         <span class="chip_meta">
             <Icon
@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, Violation } from '~/composables/schedule';
+import { sessionLabel } from '~/composables/schedule';
 import { colorsList } from '~/utils/styles';
 
 const props = defineProps<{

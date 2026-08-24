@@ -34,6 +34,8 @@ export interface Term {
 
 export interface ScheduleSession {
     id: string;
+    /** An EVENT's own name. Null for an Offering-linked Session. */
+    title: string | null;
     /**
      * NULL for an EVENT — a Session placed by a human with no recurring demand
      * behind it (TAXONOMY.md §2).
@@ -108,6 +110,36 @@ export function blockTime(
     const fmt = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
     return { start: fmt(start), end: fmt(end) };
+}
+
+/**
+ * What to call a Session on screen.
+ *
+ * ONE definition, five consumers — the chip, the inspector, the off-grid tray,
+ * the placement banner and the violations panel. It was previously inlined at
+ * each of them as `session.offering?.title ?? …`, with THREE different
+ * fallbacks: two said "Untitled session", one said "Session", and the banner
+ * had none at all, so it rendered "Pick a slot for ." for every Event.
+ *
+ * The rule: an Event is called what someone named it; anything else is called
+ * after its Offering. The two never compete, which is why the create route
+ * refuses a title alongside an offeringId.
+ */
+export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'> | null | undefined): string {
+    if (!session) {
+        return 'Session';
+    }
+
+    // The Offering wins whenever there is one, unconditionally — `title` is
+    // NULL for those rows by construction, and reading it first would quietly
+    // introduce the competition the write guard exists to prevent.
+    if (session.offering) {
+        return session.offering.title;
+    }
+
+    // Required at creation, so the fallback is for rows that predate the
+    // column rather than for ordinary use.
+    return session.title ?? 'Untitled event';
 }
 
 /** Whole weeks spanned by a term, so the week stepper has real bounds. */

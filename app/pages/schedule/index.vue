@@ -52,7 +52,7 @@
                 name="material-symbols:touch-app-outline"
                 aria-hidden="true"
             />
-            Pick a slot for <strong>{{ editing.selected.value?.offering?.title }}</strong>. Press Escape to cancel.
+            Pick a slot for <strong>{{ sessionLabel(editing.selected.value) }}</strong>. Press Escape to cancel.
         </p>
 
         <p
@@ -181,6 +181,7 @@
 import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
 import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
+import { sessionLabel } from '~/composables/schedule';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
 import ScheduleInspector from '~/components/schedule/ScheduleInspector.vue';
 import ScheduleOffGridTray from '~/components/schedule/ScheduleOffGridTray.vue';

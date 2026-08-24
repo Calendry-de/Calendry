@@ -45,11 +45,23 @@ afterAll(async () => {
     await ownerDb.$disconnect();
 });
 
+/**
+ * A title is REQUIRED for an Event and REFUSED for an Offering-linked Session,
+ * so the default depends on which is being made. Adding one unconditionally
+ * would turn the "Offering from another term" case into a title error and stop
+ * it testing what it names.
+ */
 const create = (body: Record<string, unknown>) => api('/api/sessions', {
     method: 'POST',
     cookie,
     body: JSON.stringify({
-        termId: TERM, kindId: KIND, termWeek: 1, dayOfWeek: 1, blockIndex: 0, ...body,
+        termId: TERM,
+        kindId: KIND,
+        termWeek: 1,
+        dayOfWeek: 1,
+        blockIndex: 0,
+        ...(body.offeringId ? {} : { title: 'Test event' }),
+        ...body,
     }),
 });
 
@@ -178,5 +190,44 @@ describe('permission and tenant scoping', () => {
         const res = await create({ kindId: 'test-kind-b' });
 
         expect(res.status).toBe(404);
+    });
+});
+
+
+describe('an Event needs a name', () => {
+    it('refuses one with no title — there is no Offering to borrow from', async () => {
+        const res = await api('/api/sessions', {
+            method: 'POST',
+            cookie,
+            body: JSON.stringify({ termId: TERM, kindId: KIND, termWeek: 1, dayOfWeek: 1, blockIndex: 0 }),
+        });
+
+        expect(res.status).toBe(400);
+        expect(String(res.body.statusMessage)).toContain('needs a name');
+    });
+
+    it('stores the title and returns it', async () => {
+        const res = await create({ title: 'Open Day Briefing' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.session.title).toBe('Open Day Briefing');
+    });
+
+    it('REFUSES a title on an Offering-linked Session', async () => {
+        // Stored-and-ignored was the alternative: `sessionLabel()` reads this
+        // column only for Events, so a title here would be a value no screen
+        // ever renders. Dead data reads as a bug the first time someone finds
+        // it, so the write is refused instead.
+        const res = await create({ offeringId: 'test-offering-a', title: 'nope' });
+
+        expect(res.status).toBe(400);
+        expect(String(res.body.statusMessage)).toContain('takes its name from that Offering');
+    });
+
+    it('still accepts an Offering-linked Session with NO title', async () => {
+        const res = await create({ offeringId: 'test-offering-a' });
+
+        expect(res.status).toBe(201);
+        expect(res.body.session.title).toBeNull();
     });
 });

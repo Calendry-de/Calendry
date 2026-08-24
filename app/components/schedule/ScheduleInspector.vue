@@ -18,7 +18,7 @@
 
         <template v-else>
             <header class="inspector_head">
-                <h2 class="inspector_title">{{ session.offering?.title ?? 'Untitled session' }}</h2>
+                <h2 class="inspector_title">{{ sessionLabel(session) }}</h2>
                 <p class="inspector_sub">
                     {{ session.offering?.code ? `${session.offering.code} · ` : '' }}{{ session.kind?.name }}
                 </p>
@@ -214,7 +214,7 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
-import { blockTime, describeViolation, weekdayName } from '~/composables/schedule';
+import { blockTime, describeViolation, sessionLabel, weekdayName } from '~/composables/schedule';
 
 const props = defineProps<{
     session: ScheduleSession | null;
