@@ -1789,7 +1789,17 @@ the two relative booleans so "avoid the last block, however long the day gets"
 stays expressible without re-editing every time the grid changes. A strict
 superset; nothing is lost.
 
-Published as `calendry-proto@0.3.0`. Fields 20/21 (the old types) are kept and
+Published as `calendry-proto@0.4.0`. **This entry said 0.3.0 until 2026-08-24;
+that was wrong, and the way it was wrong is worth keeping.** `v0.2.0`, `v0.3.0`,
+`v0.3.1` and `v0.3.2` are four tags on ONE commit (`7856748`) with byte-identical
+proto trees — publish retries that shipped no schema change. The commit that
+actually adds `MinimizeBlockUsage` (`506dacd`) is tagged `v0.4.0` alone, which is
+why `package.json` depends on `^0.4.0` while the submodule's newest commit is
+still MinimizeBlockUsage. Nothing was published "between" the two numbers; the
+version in this file was simply never corrected after the retries. Read a tag,
+not a memory: `git -C vendor/calendry-solver/vendor/calendry-proto log -1 <tag>`.
+
+Fields 20/21 (the old types) are kept and
 marked `deprecated`, not removed — `buf breaking` rejects removal outright, and
 a peer on the old schema may still send them. The app's catalogue keeps both
 old types too, marked `deprecatedBy`, since `type` is `createOnly` and removing
