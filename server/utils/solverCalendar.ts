@@ -2,7 +2,7 @@ import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@mindc
 import type { BlockGrid } from '../../shared/timeGrid';
 import { blockAtMinute } from '../../shared/timeGrid';
 import {
-    WEEK_KIND, addDays, classifyWeeks, isoDate, isoWeekday, mondayOf, overlaps,
+    WEEK_KIND, addDays, classifyWeeks, isoDate, isoWeekday, mondayOf, overlaps, weekIndexOf,
 } from '../../shared/academicCalendar';
 
 /**
@@ -21,15 +21,13 @@ import {
  * calendar day — never the requester's (TAXONOMY.md §8).
  */
 
-const MS_PER_DAY = 86_400_000;
-
 /**
  * Date helpers and week classification now live in `shared/academicCalendar.ts`,
  * so the calendar-period editor's PREVIEW and the wire cannot disagree about
  * which weeks a period reclassifies. Re-exported here because several server
  * modules already import them from this file.
  */
-export { isoDate, isoWeekday, mondayOf } from '../../shared/academicCalendar';
+export { isoDate, isoWeekday, mondayOf, weekIndexOf } from '../../shared/academicCalendar';
 
 // ---------------------------------------------------------------------------
 // TimeGrid
@@ -241,8 +239,6 @@ export function computeReferenceSlot(options: {
         throw new TermEndedError(isoDate(termEnd));
     }
 
-    const firstMonday = mondayOf(termStart);
-
     // Before the term: nothing is past. The earliest addressable slot is the
     // grid's first active day, NOT day 1 — a grid that does not teach Monday
     // would otherwise get a reference day it never schedules.
@@ -252,7 +248,7 @@ export function computeReferenceSlot(options: {
         return { week: 0, day: firstActiveDay, block: 0 };
     }
 
-    const week = Math.floor((mondayOf(local.date).getTime() - firstMonday.getTime()) / (7 * MS_PER_DAY));
+    const week = weekIndexOf(termStart, local.date);
 
     const day = isoWeekday(local.date);
 

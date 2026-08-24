@@ -10,8 +10,8 @@ import {
     buildAcademicCalendar,
     computeReferenceSlot,
     isoWeekday,
-    mondayOf,
     toWireTimeGrid,
+    weekIndexOf,
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
 import { deriveCapacity } from '../../shared/groupCapacity';
@@ -721,14 +721,12 @@ export async function assembleSolverInput(
      * the one frame a Federation agrees on, so the conversion happens here,
      * anchored on the same Monday `buildAcademicCalendar` uses.
      */
-    const firstMonday = mondayOf(term.startDate);
-
     const externalOccupancy: ExternalOccupancy[] = occupancyRows
         .map((row) => {
             const date = new Date(row.occupied_on);
-            const week = Math.floor(
-                (mondayOf(date).getTime() - firstMonday.getTime()) / (7 * 24 * 60 * 60 * 1000),
-            );
+            // Shared with computeReferenceSlot, which anchors the same way. A
+            // negative index here means "before the term" and is filtered below.
+            const week = weekIndexOf(term.startDate, date);
 
             return { row, date, week };
         })

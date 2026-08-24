@@ -128,10 +128,33 @@ export function covers(outerStart: Date, outerEnd: Date, innerStart: Date, inner
  * `reference_slot` and a Session's stored week would disagree.
  */
 export function weekCountOf(termStart: Date, termEnd: Date): number {
-    const first = mondayOf(termStart).getTime();
-    const last = mondayOf(termEnd).getTime();
+    return weekIndexOf(termStart, termEnd) + 1;
+}
 
-    return Math.floor((last - first) / (7 * MS_PER_DAY)) + 1;
+/**
+ * Which week of a term a DATE falls in — 0-based, Monday-anchored.
+ *
+ * The inverse of `slotDate`, and the same anchoring `weekCountOf` counts with:
+ * both measure from the Monday on or before the term start, so a date's index
+ * and the term's total agree by construction rather than by coincidence.
+ *
+ * NEGATIVE for a date before that Monday, and deliberately not clamped here.
+ * The two callers want different things from that case — the occupancy mapper
+ * filters it out as outside the term, `computeReferenceSlot` clamps it to 0 —
+ * and a helper that picked one would silently impose it on the other.
+ *
+ * Extracted because this arithmetic existed twice, in `solverInput.ts` and
+ * `solverCalendar.ts`, written identically both times. They agreed, so nothing
+ * was broken — but `weeksInTerm` also agreed with `weekCountOf` on every
+ * Monday-start term right up until it did not, and that one shipped a schedule
+ * that could not reach its own final week. Two copies of one arithmetic is the
+ * precondition, not the symptom.
+ */
+export function weekIndexOf(termStart: Date, date: Date): number {
+    const first = mondayOf(termStart).getTime();
+    const target = mondayOf(date).getTime();
+
+    return Math.floor((target - first) / (7 * MS_PER_DAY));
 }
 
 /**
