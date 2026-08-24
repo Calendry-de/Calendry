@@ -75,6 +75,40 @@
                     </template>
                 </ManageConstraintRow>
             </ul>
+
+            <!--
+                SUPERSEDED RULES — a subsection, never interleaved above.
+
+                Only rendered when the tenant actually HOLDS such a row. These
+                are rules whose type has been replaced: they still apply while
+                enabled and can still be turned off, but `type` is create-only,
+                so one that is deleted cannot be recreated. Kept out of the main
+                list because nothing here should read as a rule to adopt, and
+                kept visible because it is a rule that is currently running.
+            -->
+            <template v-if="group.superseded.length">
+                <h3 class="cgrid_subhead">Superseded rules</h3>
+
+                <ul class="cgrid_rows">
+                    <ManageConstraintRow
+                        v-for="entry in group.superseded"
+                        :key="entry.type.key"
+                        :busy="busy.has(entry.row.id)"
+                        :can-read-kinds="canReadKinds"
+                        :can-update="canUpdate"
+                        :heading="entry.type.label"
+                        :kinds="kinds"
+                        :row="entry.row"
+                        superseded
+                        :superseded-by="supersededBy(entry.type)"
+                        :type="entry.type"
+                        @update:enabled="setEnabled(entry.row, $event)"
+                        @update:param="setParam(entry.row, $event.key, $event.value)"
+                        @update:scopes="setScopes(entry.row, $event)"
+                        @update:weight="setWeight(entry.row, $event)"
+                    />
+                </ul>
+            </template>
         </section>
 
         <!--
@@ -155,7 +189,7 @@ import type { ManageEntity } from '~/utils/manageRegistry';
 import type { useEntityList } from '~/composables/entityList';
 import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
-import { defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
+import { CONSTRAINT_TYPES, defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
 
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
@@ -272,6 +306,12 @@ const canReadKinds = useHasPermission('session_kind.read');
  * Catalogue types with no row for this tenant. Surfaced, never hidden: the
  * evaluator only considers types the tenant has a row for, so this list is
  * exactly the set of rules that are silently not running.
+ *
+ * This one DOES use `defaultConstraintTypes()`, unlike `entriesFor` above, and
+ * the difference is deliberate rather than an oversight: a deprecated type with
+ * no row is not MISSING. `backfill:constraints` will never create one, so
+ * reporting it would send an operator to run a repair command that correctly
+ * does nothing.
  */
 const missingTypes = computed(() => defaultConstraintTypes()
     .filter((type) => !defaultByType.value.has(type.key)));
@@ -289,9 +329,30 @@ const unknownTypeRows = computed(() => rows.value.filter((row) => !findConstrain
 
 interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
 
-function entriesFor(severity: 'HARD' | 'SOFT'): Entry[] {
-    return defaultConstraintTypes()
+/**
+ * Catalogue entries of one severity that this tenant holds a default row for.
+ *
+ * DRIVEN BY `CONSTRAINT_TYPES`, NOT `defaultConstraintTypes()`, AND THAT IS THE
+ * WHOLE FIX. The latter EXCLUDES deprecated types — correctly, because it
+ * answers "which types should a tenant be SEEDED a row for?", and seeding a
+ * superseded rule would resurrect it as a first-class option.
+ *
+ * This function asks a different question: "which rows does this tenant have,
+ * and how do I show them?" Borrowing the seeding predicate to answer it made a
+ * deprecated row invisible to every branch at once — filtered out here, skipped
+ * by `variants` (which takes only `!isDefault`), and not counted by
+ * `missingTypes` (same seeding predicate). Measured before the fix, with one
+ * legacy `minimize_first_block` row present: `/api/constraints` returned 14
+ * rows, the page rendered 13, and the type appeared nowhere in the rendered
+ * body — while the rule was still enabled and still being sent to the solver.
+ *
+ * A deprecated type with NO row stays hidden, which is the other half of the
+ * rule: show what a tenant HAS, never invite them to adopt what is superseded.
+ */
+function entriesFor(severity: 'HARD' | 'SOFT', deprecated: boolean): Entry[] {
+    return CONSTRAINT_TYPES
         .filter((type) => (type.severity ?? 'HARD') === severity)
+        .filter((type) => Boolean(type.deprecatedBy) === deprecated)
         .map((type) => {
             const row = defaultByType.value.get(type.key);
 
@@ -300,20 +361,27 @@ function entriesFor(severity: 'HARD' | 'SOFT'): Entry[] {
         .filter((entry): entry is Entry => entry !== null);
 }
 
+/** What replaced this type, in the tenant's language rather than as a key. */
+function supersededBy(type: ConstraintTypeDef): string {
+    return findConstraintType(type.deprecatedBy)?.label ?? type.deprecatedBy ?? 'a newer rule';
+}
+
 const groups = computed(() => [
     {
         severity: 'HARD' as const,
         title: 'Rules a timetable must not break',
         blurb: 'A breach is a defect. Manual edits are warned rather than blocked, and the solver '
             + 'treats these as inviolable.',
-        entries: entriesFor('HARD'),
+        entries: entriesFor('HARD', false),
+        superseded: entriesFor('HARD', true),
     },
     {
         severity: 'SOFT' as const,
         title: 'Preferences the solver weighs',
         blurb: 'Weights are relative to each other, not a score out of ten — only the ratio between '
             + 'enabled rules means anything. Zero evaluates the rule without steering the schedule.',
-        entries: entriesFor('SOFT'),
+        entries: entriesFor('SOFT', false),
+        superseded: entriesFor('SOFT', true),
     },
 ]);
 
@@ -460,6 +528,16 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
 
 
 
+
+    &_subhead {
+        margin: var(--space-2) 0 0;
+
+        font-size: var(--font-size-xs);
+        font-weight: 650;
+        color: $surface7;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
 
     &_empty {
         margin: 0;
