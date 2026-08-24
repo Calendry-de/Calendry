@@ -49,105 +49,17 @@
                     Named breaks. The default gap above still applies everywhere
                     a row does not name, so a grid with no rows behaves exactly
                     as it did before this existed.
+
+                    Its own component: this editor owns the draft and the
+                    preview, the break editor owns the collection, and the two
+                    meet at `breaksModel` and nowhere else.
                 -->
-                <section class="grid-editor_breaks">
-                    <h3>Named breaks</h3>
-                    <p class="grid-editor_hint">
-                        A longer gap at one position — lunch, an afternoon break. Everywhere
-                        else keeps the default gap above.
-                    </p>
-
-                    <ul
-                        v-if="breaks.length"
-                        class="grid-editor_break-list"
-                    >
-                        <li
-                            v-for="(brk, i) in breaks"
-                            :key="i"
-                        >
-                            <label>
-                                <span>After block</span>
-                                <select
-                                    :disabled="readonly"
-                                    @change="updateBreak(i, { afterBlockIndex: Number(($event.target as HTMLSelectElement).value) })"
-                                >
-                                    <!-- :selected, not :value on the select — a
-                                         select's value is a property, so SSR
-                                         drops it and the browser falls back to
-                                         the first option. -->
-                                    <option
-                                        v-for="n in blockChoices"
-                                        :key="n"
-                                        :selected="brk.afterBlockIndex === n"
-                                        :value="n"
-                                    >{{ n + 1 }}</option>
-                                </select>
-                            </label>
-
-                            <label>
-                                <span>Minutes</span>
-                                <input
-                                    :disabled="readonly"
-                                    min="1"
-                                    type="number"
-                                    :value="brk.durationMinutes"
-                                    @input="updateBreak(i, { durationMinutes: Number(($event.target as HTMLInputElement).value) })"
-                                >
-                            </label>
-
-                            <label class="grid-editor_break-label">
-                                <span>Label</span>
-                                <input
-                                    :disabled="readonly"
-                                    type="text"
-                                    :value="brk.label"
-                                    @input="updateBreak(i, { label: ($event.target as HTMLInputElement).value })"
-                                >
-                            </label>
-
-                            <label>
-                                <span>Days</span>
-                                <!-- Bounded to the grid's own teaching days: a
-                                     break on a day nothing is scheduled is
-                                     configuration that can never take effect. -->
-                                <select
-                                    :disabled="readonly"
-                                    @change="updateBreak(i, { dayOfWeek: ($event.target as HTMLSelectElement).value === ''
-                                        ? null : Number(($event.target as HTMLSelectElement).value) })"
-                                >
-                                    <option
-                                        :selected="brk.dayOfWeek === null"
-                                        value=""
-                                    >All days</option>
-                                    <option
-                                        v-for="iso in activeDays"
-                                        :key="iso"
-                                        :selected="brk.dayOfWeek === iso"
-                                        :value="iso"
-                                    >{{ weekdayName(iso) }} only</option>
-                                </select>
-                            </label>
-
-                            <button
-                                :disabled="readonly"
-                                title="Remove this break"
-                                type="button"
-                                @click="removeBreak(i)"
-                            >✕</button>
-                        </li>
-                    </ul>
-
-                    <p
-                        v-else
-                        class="grid-editor_hint"
-                    >No named breaks — every gap is the default.</p>
-
-                    <CommonButton
-                        v-if="!readonly"
-                        type="secondary"
-                        @click="addBreak"
-                    >Add a break</CommonButton>
-                </section>
+                <ManageTimeGridBreaks
+                    v-model="breaksModel"
+                    :active-days="activeDays"
+                    :block-choices="blockChoices"
+                    :readonly="readonly"
+                />
 
                 <!--
                     The preview is computed with `blockTime()` — the SAME helper
@@ -228,7 +140,7 @@ import type { TimeGrid } from '~/composables/schedule';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
-import CommonButton from '~/components/common/CommonButton.vue';
+import ManageTimeGridBreaks from '~/components/manage/ManageTimeGridBreaks.vue';
 import type { TimeGridBreak } from '#shared/timeGrid';
 import { blockBoundaries, breakAfter } from '#shared/timeGrid';
 import { blockTime, weekdayName } from '~/composables/schedule';
@@ -352,6 +264,16 @@ const breaks = computed<TimeGridBreak[]>(() => {
     return Array.isArray(value) ? (value as TimeGridBreak[]) : [];
 });
 
+/**
+ * The break editor's model. The array itself is the only thing that crosses
+ * between the two components — the editor keeps sole write access to the draft,
+ * so the break list cannot start writing other fields of it by accident.
+ */
+const breaksModel = computed({
+    get: () => breaks.value,
+    set: (next: TimeGridBreak[]) => { draft.value.breaks = next; },
+});
+
 /** Which day the preview renders. Defaults to the grid's first teaching day. */
 const previewDay = ref<number>(0);
 
@@ -367,37 +289,6 @@ const blockChoices = computed(() => {
 
     return Array.from({ length: Math.max(0, Math.min(count, 40) - 1) }, (_, i) => i);
 });
-
-function writeBreaks(next: TimeGridBreak[]) {
-    draft.value.breaks = next;
-}
-
-function addBreak() {
-    // Position defaults to the middle of the day and "all days" — the lunch
-    // case, which is what someone reaching for this button usually wants.
-    const middle = Math.max(0, Math.floor(Number(draft.value.blocksPerDay ?? 2) / 2) - 1);
-
-    writeBreaks([...breaks.value, {
-        afterBlockIndex: blockChoices.value.includes(middle) ? middle : (blockChoices.value[0] ?? 0),
-        durationMinutes: 45,
-        // Deliberately NOT 'Lunch'. A default that is usually right gets left in
-        // place; a default that names one specific break gets left in place too,
-        // and then it is wrong. The demo tenant ended up with two breaks both
-        // labelled "Lunch" — a 10:00 morning break and a 13:00 lunch — because
-        // the second one kept this default. A neutral word is one nobody
-        // mistakes for a considered answer.
-        label: 'Break',
-        dayOfWeek: null,
-    }]);
-}
-
-function updateBreak(index: number, patch: Partial<TimeGridBreak>) {
-    writeBreaks(breaks.value.map((b, i) => (i === index ? { ...b, ...patch } : b)));
-}
-
-function removeBreak(index: number) {
-    writeBreaks(breaks.value.filter((_, i) => i !== index));
-}
 
 /**
  * `blockTime` wraps the clock with `% 24`, so a grid running past midnight
