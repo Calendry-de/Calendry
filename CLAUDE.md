@@ -1111,6 +1111,27 @@ degrading to showing ids rather than blanking the page.
 
 The general rule, worth applying to any new page: **enumerate every endpoint a
 page calls and confirm each is covered by the permission the page is gated on.**
+
+**This rule was written down and then broken anyway, twice.** Prose is checked by
+nobody, so it is now also a test: `tests/page-renders-per-role.test.ts` renders
+each page as each seeded role and asserts the CONTENT came back, not merely a
+200 — a blanked page returns 200 with a shell, which is exactly how both
+incidents passed review. Adding a reference fetch that some role cannot reach
+fails there immediately, whoever adds it.
+
+A lint rule was considered and rejected: it could spot a `.catch`-less fetch
+inside `Promise.all`, but it cannot know which permission an endpoint needs or
+which the page is gated on, so it would fire on every correct reference wave and
+be suppressed into uselessness. The symptom is trivially checkable even though
+the cause is not.
+
+**Adding a page means adding a row to that table**, with a marker that only
+exists once the data resolved.
+
+That suite found a third instance on its first run, now recorded there as a
+known defect: `/schedule` has no page gate at all and its wave needs FIVE read
+permissions, so a role holding only `session.read` gets a blank page. It is
+invisible against the demo tenant because `viewer6b` happens to hold all six.
 A `Promise.all` of reference fetches turns one missing permission into a blank
 screen, which is the least diagnosable failure a UI has. This bit again in the
 schedule inspector's lecturer/group display (routes fetching `/api/roles` would
