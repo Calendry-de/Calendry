@@ -15,43 +15,55 @@
  * toolbar would keep sending the old value explicitly, and the disclosure would
  * describe a budget no plain click ever used.
  *
- * WHY THE MOVE BUDGET IS 5,000,000
- * --------------------------------
- * Measured, not guessed — `bench large-university` (27,136 placements, an
- * instance two orders of magnitude larger than any real tenant here) at three
- * budgets, one seed, release build:
+ * WHY THE MOVE BUDGET IS 30,000,000
+ * ---------------------------------
+ * Measured on the demo tenant's real term (260 placements), seed 42, one run at
+ * a time, restarting the solver between runs so each is genuinely fresh:
  *
- *   budget    wall      iterations   objective      violations   improvements
- *   50,000    263 ms            21   181,624,576           558             19
- *   2,000,000 861 ms           879   113,233,336           378            759
- *   5,000,000 1.88 s         2,181    83,214,288           299          1,656
+ *   maxMoves      termination   moves        elapsed   objective
+ *   5,000,000     move_budget    5,002,752      886 ms      441.9
+ *   10,000,000    move_budget   10,000,384    1,773 ms      431.6
+ *   20,000,000    move_budget   20,000,256    3,603 ms      430.0
+ *   30,000,000    converged     23,791,104    4,293 ms      430.0
+ *   50,000,000    converged     23,791,104    4,283 ms      430.0
  *
- * At 50,000 the search barely runs: 66% of the wall time is CONSTRUCTION and
- * LNS gets 16%, and the objective curve moves from 181,624,864 to 181,624,576 —
- * a 0.0002% improvement over the whole run. With `COOLING = 0.999` applied once
- * per iteration, 21 iterations leaves the temperature at 0.999^21 ≈ 0.98, so
- * the annealing schedule never reaches the exploitation phase it exists for.
+ * The instance CONVERGES at 23.79 million moves, in 4.3 seconds. At the old
+ * default it was being cut off at 21% of that, and the run ended on
+ * `move_budget` every time.
  *
- * 5,000,000 is chosen over 2,000,000 because it is not yet into diminishing
- * returns: the second half of that run still improves the objective from
- * 108,293,148 to 83,214,288, and it ends 26% better with 21% fewer violations
- * for one extra second.
+ * 50,000,000 buys nothing — converged is converged, and the two runs are
+ * identical down to the move count — while costing ~9 s on any instance that
+ * does NOT converge, which is too close to the wall cap (see below).
  *
- * WHY THE WALL BUDGET STAYS 10 SECONDS
- * ------------------------------------
- * It is the safety cap, not the operating limit, and raising the move budget is
- * what keeps it that way. Only a `move_budget` (or `converged`) termination is
- * reproducible — a wall-clock run is not, because how many moves fit in a
- * second is not a property of the input (CLAUDE.md, "Determinism"). So the
- * move budget must be the one that BINDS, and 1.88 s against a 10 s cap leaves
- * 5.3x headroom: the default still terminates on moves on hardware five times
- * slower than this machine.
+ * THE CLAIM THIS REPLACES WAS FALSE, AND THAT IS THE POINT
+ * -------------------------------------------------------
+ * This comment previously ended: "Small instances never reach it at all. The
+ * stagnation limit is 200 + 20 x placements, so a real tenant's ~276-placement
+ * term converges out long before five million moves are spent."
  *
- * Small instances never reach it at all. The stagnation limit is
- * `200 + 20 x placements`, so a real tenant's ~276-placement term converges out
- * long before five million moves are spent.
+ * It does not. The same tenant needs 23.79 million. The stagnation limit counts
+ * ITERATIONS without improvement, not moves, and each LNS iteration evaluates
+ * many thousands of moves — so the two are not comparable quantities and the
+ * inference never held. It read as a measurement and was a guess, which is
+ * exactly the drift CLAUDE.md warns about for prose nothing checks.
+ *
+ * WHY THE WALL BUDGET RISES TO 30 SECONDS
+ * ---------------------------------------
+ * It is still the safety cap rather than the operating limit, and it has to stay
+ * that way: only a `move_budget` or `converged` termination is reproducible,
+ * because how many moves fit in a second is not a property of the input
+ * (CLAUDE.md, "Determinism"). So the MOVE budget must be the one that binds.
+ *
+ * At ~5.5M moves/second on this machine, an instance that does not converge
+ * spends ~5.4 s reaching 30,000,000. Against the old 10 s cap that is only 1.85x
+ * headroom, so hardware twice as slow would terminate on the clock and lose
+ * reproducibility. 30 s restores ~5.5x, matching the margin the previous default
+ * was chosen with.
+ *
+ * A run does not become slower because the cap is higher — the demo tenant still
+ * finishes in 4.3 s by converging. The cap only bounds the pathological case.
  */
-export const DEFAULT_MAX_MOVES = 5_000_000;
+export const DEFAULT_MAX_MOVES = 30_000_000;
 
 /** Backstop only — see above. Whichever budget is hit first ends the run. */
-export const DEFAULT_MAX_WALL_MILLIS = 10_000;
+export const DEFAULT_MAX_WALL_MILLIS = 30_000;
