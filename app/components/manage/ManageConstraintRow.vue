@@ -457,7 +457,7 @@ function toggleKind(kindId: string) {
 
         &--app {
             color: $primary700;
-            background: vartorgba('primary500', 0.14);
+            background: varToRgba('primary500', 0.14);
         }
 
         &--solver {
@@ -467,7 +467,7 @@ function toggleKind(kindId: string) {
 
         &--superseded {
             color: $warning700;
-            background: vartorgba('warning500', 0.18);
+            background: varToRgba('warning500', 0.18);
         }
     }
 
@@ -490,7 +490,7 @@ function toggleKind(kindId: string) {
         line-height: 1.5;
         color: $warning700;
 
-        background: vartorgba('warning500', 0.12);
+        background: varToRgba('warning500', 0.12);
 
         strong { font-weight: 650; }
     }
@@ -641,7 +641,7 @@ function toggleKind(kindId: string) {
         &--on {
             border-color: $primary500;
             color: $primary700;
-            background: vartorgba('primary500', 0.12);
+            background: varToRgba('primary500', 0.12);
         }
 
         &--static {

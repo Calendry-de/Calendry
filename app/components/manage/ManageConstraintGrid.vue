@@ -450,6 +450,37 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
 </script>
 
 <style scoped lang="scss">
+/*
+ * COLOURS COME FROM THE GENERATED TOKEN SET, NOT FROM NAMES THIS FILE INVENTED.
+ *
+ * This block used `--error-color`, `--primary-color`, `--border-color` and
+ * `--text-secondary-color`. None of them exist: `useLayout()` emits one custom
+ * property per generated colour (`--surface0`, `--content7`, `--primary500`…),
+ * and `--primary-color` is only ever set INLINE on a CommonButton's own element,
+ * so it never reached anything here.
+ *
+ * Two consequences, one of them visible. `var(--error-color, #b3261e)` fell
+ * back to a hardcoded literal that does not follow the theme; and
+ * `background: var(--primary-color)` had NO fallback, so the declaration was
+ * invalid at computed-value time and resolved to `transparent` — under
+ * `color: #fff` that made the SOFT badge white text on the page background.
+ * The one label distinguishing preferences from defects was unreadable.
+ *
+ * The severity pair is now the one ManageConstraintBuilder already uses, so the
+ * two screens stop describing the same concept in different colours.
+ *
+ * NOTE THE FUNCTION NAME: `varToRgba`, not `vartorgba`. Sass function lookup is
+ * case-sensitive, so the lowercase spelling does not resolve — it survives as a
+ * literal `vartorgba(...)` in the emitted CSS, which is an unknown CSS function,
+ * which makes the whole declaration invalid and the background transparent.
+ * Proven by compiling both spellings against this repo's own colors.scss:
+ *
+ *   varToRgba('error500', 0.16)  ->  rgba(var(--error500, 187, 88, 102), 0.16)
+ *   vartorgba('error500', 0.16)  ->  vartorgba("error500", 0.16)
+ *
+ * The lowercase spelling is used in nine other components and is inert in every
+ * one of them — see the note handed over with this change.
+ */
 .cgrid {
     display: flex;
     flex-direction: column;
@@ -457,11 +488,19 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
 
     &_alarm {
         padding: $space6;
-        border: 1px solid var(--error-color, #b3261e);
+        border: 1px solid varToRgba('error500', 0.4);
         border-radius: $radiusMd;
 
         font-size: $fontSizeSm;
-        color: var(--error-color, #b3261e);
+        line-height: 1.5;
+        color: $error700;
+
+        background: varToRgba('error500', 0.1);
+
+        code {
+            font-size: $fontSizeXs;
+            overflow-wrap: anywhere;
+        }
     }
 
     &_group {
@@ -473,19 +512,23 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
     &_head {
         h2 {
             display: flex;
+            flex-wrap: wrap;
             gap: $space4;
             align-items: center;
 
             margin: 0;
 
             font-size: $fontSizeLg;
+            color: $content2;
         }
 
         p {
             max-width: 68ch;
             margin: $space2 0 0;
+
             font-size: $fontSizeSm;
-            color: var(--text-secondary-color);
+            line-height: 1.5;
+            color: $content7;
         }
     }
 
@@ -498,13 +541,13 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
         letter-spacing: 0.06em;
 
         &--hard {
-            color: #fff;
-            background: var(--error-color, #b3261e);
+            color: $error700;
+            background: varToRgba('error500', 0.16);
         }
 
         &--soft {
-            color: #fff;
-            background: var(--primary-color);
+            color: $warning700;
+            background: varToRgba('warning500', 0.2);
         }
     }
 
@@ -519,20 +562,10 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
         list-style: none;
     }
 
-
-
-
-
-
-
-
-
-
-
     &_subhead {
-        margin: var(--space-2) 0 0;
+        margin: $space2 0 0;
 
-        font-size: var(--font-size-xs);
+        font-size: $fontSizeXs;
         font-weight: 650;
         color: $surface7;
         text-transform: uppercase;
@@ -542,12 +575,11 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
     &_empty {
         margin: 0;
         padding: $space6;
-        border: 1px dashed var(--border-color, rgb(128 128 128 / 30%));
+        border: 1px dashed $surface4;
         border-radius: $radiusMd;
 
         font-size: $fontSizeSm;
-        color: var(--text-secondary-color);
+        color: $content7;
     }
-
 }
 </style>
