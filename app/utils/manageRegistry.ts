@@ -540,7 +540,16 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 key: 'ranking',
                 label: 'Ranking',
                 type: 'number',
-                help: 'Desirability. Soft constraints minimise use of high-ranking rooms.',
+                /*
+                 * Direction-neutral, because the constraint that reads this is
+                 * now direction-neutral too. It used to say "soft constraints
+                 * minimise use of high-ranking rooms", which stopped being the
+                 * whole truth when "Steer room choice by rank" gained a
+                 * direction: the same ranking can now be used to steer TOWARD
+                 * the premium rooms.
+                 */
+                help: 'Desirability, HIGHER = more premium. The "Steer room choice by rank" '
+                    + 'constraint reads this to bias placement toward one end of the scale.',
             },
             { key: 'isVirtual', label: 'Virtual', type: 'boolean' },
             { key: 'isActive', label: 'Active', type: 'boolean' },

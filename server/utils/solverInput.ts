@@ -220,7 +220,17 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
             return { days: (params.days as number[]).map(Number).sort((a, b) => a - b) };
 
         case 'minimize_high_ranking_rooms':
-            return { rankThreshold: Number(params.rankThreshold) };
+            return {
+                rankThreshold: Number(params.rankThreshold),
+                /*
+                 * `Boolean()`, so a row stored before this parameter existed
+                 * sends false — which is the behaviour it already had. An
+                 * absent key must not become a direction the tenant never
+                 * chose, and 0.5.0's own default for the field is the same
+                 * false, so the two agree.
+                 */
+                invert: Boolean(params.invert),
+            };
 
         case 'minimize_block_usage':
             return {

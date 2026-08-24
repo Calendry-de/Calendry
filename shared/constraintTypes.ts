@@ -361,18 +361,58 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'minimize_high_ranking_rooms',
         wireField: 'minimizeRoomRank',
-        label: 'Spare the best rooms',
-        description: 'Prefer lower-ranked rooms, keeping premium ones free.',
+        /*
+         * Named for the AXIS, not for one direction along it.
+         *
+         * This was "Spare the best rooms", which is only half of what the rule
+         * can now express — `invert` steers placement toward the premium rooms
+         * instead. A label accurate for one setting of a control the same rule
+         * offers is the mislabelled-constraint problem in miniature, and the key
+         * is `createOnly`, so a row saved under a wrong name cannot be renamed
+         * by changing its type.
+         */
+        label: 'Steer room choice by rank',
+        description:
+            'Bias the solver toward one end of your room ranking. The threshold marks '
+            + 'the boundary; the direction decides which side of it is discouraged.',
         evaluator: 'solver',
         severity: 'SOFT',
         defaultWeight: 3,
         params: [{
             key: 'rankThreshold',
-            label: 'Penalize rooms ranked at or above',
+            label: 'Rank boundary',
             type: 'number',
             min: 0,
             required: true,
             help: 'Room.ranking is ordered HIGHER = more premium. No default: "premium" is per-institution.',
+        }, {
+            key: 'invert',
+            label: 'Prefer the best rooms instead of sparing them',
+            type: 'boolean',
+            required: false,
+            /*
+             * DEFAULTS TO TRUE, which is also what a newly provisioned tenant
+             * gets, because `defaultConstraintRow` seeds params from exactly
+             * these defaults.
+             *
+             * The product's opinion is "use the good rooms for teaching rather
+             * than leaving them empty", and it is expressed ONCE here rather
+             * than as a catalogue default of false with a provisioning override
+             * of true. Two defaults for one field is the same two-implementations
+             * shape as `weeksInTerm`: they agree until something distinguishes
+             * them, and then the form prefills one thing while provisioning
+             * writes another.
+             *
+             * EXISTING tenants are untouched. Their stored params carry no
+             * `invert` key, and an absent key reads as false through
+             * `Boolean()` — so every rule already configured keeps sparing the
+             * best rooms until someone deliberately changes it. This default
+             * governs new rows only, which is the same restraint
+             * `defaultConstraintRow` already applies to `isEnabled`.
+             */
+            default: true,
+            help: 'Off — discourage rooms AT OR ABOVE the boundary, keeping premium rooms free. '
+                + 'On — discourage rooms AT OR BELOW it, so lessons fill the better rooms first.',
         }],
     },
     {

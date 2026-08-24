@@ -4,6 +4,7 @@ import {
     SOLVER_OWNED_CONSTRAINT_TYPES,
     STRUCTURAL_CONSTRAINT_TYPES,
     constraintCatalogueDrift,
+    defaultConstraintRow,
     findConstraintType,
     severityMismatch,
 } from '../shared/constraintTypes';
@@ -205,7 +206,49 @@ describe('constraint → wire mapping (Stage 3d)', () => {
             noKinds,
         );
 
-        expect((result as { config: Record<string, unknown> }).config.minimizeRoomRank).toEqual({ rankThreshold: 0 });
+        expect((result as { config: Record<string, unknown> }).config.minimizeRoomRank)
+            .toEqual({ rankThreshold: 0, invert: false });
+    });
+
+    /*
+     * The direction has to REACH the wire, and an absent one has to stay false.
+     *
+     * Both halves matter. Until calendry-proto 0.5.0 the field did not exist in
+     * the generated encoder, so an `invert` key was silently dropped — a control
+     * that would have saved, rendered and passed every test while changing
+     * nothing about the solve. And a row written before the parameter existed
+     * carries no key at all; reading that as anything but false would flip a
+     * direction the tenant never chose.
+     */
+    it('carries the room-rank direction, and reads an absent one as false', () => {
+        const configOf = (params: Record<string, unknown>) => (toWireConstraint(
+            row({ type: 'minimize_high_ranking_rooms', severity: 'SOFT', weight: 2, params }),
+            noKinds,
+        ) as { config: Record<string, unknown> }).config.minimizeRoomRank;
+
+        expect(configOf({ rankThreshold: 3, invert: true }))
+            .toEqual({ rankThreshold: 3, invert: true });
+
+        // A legacy row, stored before `invert` was a parameter.
+        expect(configOf({ rankThreshold: 3 }))
+            .toEqual({ rankThreshold: 3, invert: false });
+    });
+
+    /*
+     * A NEW tenant is provisioned preferring its best rooms; an existing row is
+     * never rewritten. `defaultConstraintRow` seeds params from the catalogue
+     * defaults, so this pins the product's opinion in the one place it lives.
+     */
+    it('provisions a new tenant with the room-rank direction set, but still disabled', () => {
+        const type = findConstraintType('minimize_high_ranking_rooms')!;
+        const seeded = defaultConstraintRow(type);
+
+        expect(seeded.params).toEqual({ invert: true });
+
+        // Unchanged convention: only the structural rules start enabled, because
+        // switching a solver-steering rule on would silently change every
+        // existing tenant's next timetable.
+        expect(seeded.isEnabled).toBe(false);
     });
 
     it('carries weight for SOFT types and zeroes it for HARD ones', () => {
