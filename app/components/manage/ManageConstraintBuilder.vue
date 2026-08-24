@@ -206,26 +206,26 @@
                     <legend>Parameters</legend>
 
                     <template
-                        v-for="param in selectedType.params"
-                        :key="param.key"
+                        v-for="control in paramControls"
+                        :key="control.param.key"
                     >
                         <ManageWeekdayPicker
-                            v-if="param.type === 'weekdays'"
-                            :error="paramError(param)"
-                            :help="param.help"
-                            :label="param.label"
-                            :model-value="(paramValue(param.key) as number[]) ?? []"
+                            v-if="control.kind === 'weekdays'"
+                            :error="paramError(control.param)"
+                            :help="control.param.help"
+                            :label="control.param.label"
+                            :model-value="(paramValue(control.param.key) as number[]) ?? []"
                             :readonly="readonly"
-                            @update:model-value="setParam(param.key, $event)"
+                            @update:model-value="setParam(control.param.key, $event)"
                         />
 
                         <ManageField
                             v-else
-                            :error="paramError(param)"
-                            :field="paramField(param)"
-                            :model-value="paramValue(param.key)"
+                            :error="paramError(control.param)"
+                            :field="control.field"
+                            :model-value="paramValue(control.param.key)"
                             :readonly="readonly"
-                            @update:model-value="setParam(param.key, $event)"
+                            @update:model-value="setParam(control.param.key, $event)"
                         />
                     </template>
                 </fieldset>
@@ -247,6 +247,7 @@ import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { CONSTRAINT_TYPES, findConstraintType, missingConstraintParams } from '#shared/constraintTypes';
+import { constraintParamControls } from '~/utils/constraintFields';
 
 /**
  * The constraint rule builder.
@@ -439,35 +440,13 @@ function setParam(key: string, value: unknown) {
 }
 
 /**
- * A catalogue parameter, expressed as a field the generic renderer understands.
+ * The type's parameters, each already resolved to the control it needs.
  *
- * `weekdays` never reaches here — it has its own control. `percent` renders as a
- * number with a "(%)" label because the tenant thinks in 0–100 while the wire
- * wants 0.0–1.0; the conversion happens server-side at the mapping boundary, so
- * what is STORED is what was typed.
+ * The mapping lives in `~/utils/constraintFields` because the constraint GRID
+ * renders the same parameters and the two copies had already diverged — see the
+ * note there.
  */
-function paramField(param: ConstraintParamDef): FieldDef {
-    const type: FieldDef['type'] = param.type === 'percent'
-        ? 'number'
-        : param.type === 'select'
-            ? 'select'
-            : param.type === 'boolean'
-                ? 'boolean'
-                : param.type === 'number'
-                    ? 'number'
-                    : 'text';
-
-    return {
-        key: param.key,
-        label: param.type === 'percent' ? `${param.label} (%)` : param.label,
-        type,
-        help: param.help,
-        required: param.required,
-        min: param.min,
-        max: param.max,
-        options: param.options,
-    };
-}
+const paramControls = computed(() => (selectedType.value ? constraintParamControls(selectedType.value) : []));
 
 /**
  * Surfaces a missing REQUIRED parameter in the form, because the consequence is

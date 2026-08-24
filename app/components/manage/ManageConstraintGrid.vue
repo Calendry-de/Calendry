@@ -93,24 +93,24 @@
                         class="cgrid_params"
                     >
                         <template
-                            v-for="param in entry.type.params"
-                            :key="param.key"
+                            v-for="control in constraintParamControls(entry.type)"
+                            :key="control.param.key"
                         >
                             <ManageWeekdayPicker
-                                v-if="param.type === 'weekdays'"
-                                :help="param.help"
-                                :label="param.label"
-                                :model-value="(paramValue(entry.row, param.key) as number[]) ?? []"
+                                v-if="control.kind === 'weekdays'"
+                                :help="control.param.help"
+                                :label="control.param.label"
+                                :model-value="(paramValue(entry.row, control.param.key) as number[]) ?? []"
                                 :readonly="!canUpdate"
-                                @update:model-value="setParam(entry.row, param.key, $event)"
+                                @update:model-value="setParam(entry.row, control.param.key, $event)"
                             />
 
                             <ManageField
                                 v-else
-                                :field="paramField(param)"
-                                :model-value="paramValue(entry.row, param.key)"
+                                :field="control.field"
+                                :model-value="paramValue(entry.row, control.param.key)"
                                 :readonly="!canUpdate"
-                                @update:model-value="setParam(entry.row, param.key, $event)"
+                                @update:model-value="setParam(entry.row, control.param.key, $event)"
                             />
                         </template>
                     </div>
@@ -216,12 +216,13 @@
 </template>
 
 <script setup lang="ts">
-import type { ConstraintParamDef, ConstraintTypeDef } from '#shared/constraintTypes';
-import type { FieldDef, ManageEntity } from '~/utils/manageRegistry';
+import type { ConstraintTypeDef } from '#shared/constraintTypes';
+import type { ManageEntity } from '~/utils/manageRegistry';
 import type { useEntityList } from '~/composables/entityList';
 import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { defaultConstraintTypes } from '#shared/constraintTypes';
+import { constraintParamControls } from '~/utils/constraintFields';
 
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
@@ -373,16 +374,6 @@ const groups = computed(() => [
 
 function paramValue(row: ConstraintRow, key: string): unknown {
     return (row.params ?? {})[key] ?? null;
-}
-
-function paramField(param: ConstraintParamDef): FieldDef {
-    return {
-        key: param.key,
-        label: param.label,
-        type: param.type === 'percent' ? 'number' : param.type,
-        help: param.help,
-        options: param.options,
-    } as FieldDef;
 }
 
 function toggleParams(key: string) {
