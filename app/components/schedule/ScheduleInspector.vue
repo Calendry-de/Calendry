@@ -18,7 +18,24 @@
 
         <template v-else>
             <header class="inspector_head">
-                <h2 class="inspector_title">{{ sessionLabel(session) }}</h2>
+                <!--
+                    An EVENT's name is editable in place; an Offering-linked
+                    Session's comes from its Offering and stays a heading. Same
+                    rule the whole panel follows: no control exists where there
+                    is nothing the user may change.
+                -->
+                <input
+                    v-if="editable"
+                    class="inspector_title inspector_title--edit"
+                    :disabled="busy"
+                    maxlength="200"
+                    :value="session.title ?? ''"
+                    @change="$emit('set-details', { title: ($event.target as HTMLInputElement).value })"
+                >
+                <h2
+                    v-else
+                    class="inspector_title"
+                >{{ sessionLabel(session) }}</h2>
                 <p class="inspector_sub">
                     {{ session.offering?.code ? `${session.offering.code} · ` : '' }}{{ session.kind?.name }}
                 </p>
@@ -39,8 +56,20 @@
                 <div>
                     <dt>When</dt>
                     <dd>
-                        {{ weekdayName(session.dayOfWeek) }},
-                        {{ blockTime(grid, session.blockIndex).start }}–{{ blockTime(grid, endBlock).end }}
+                        <!--
+                            The full date, not just the weekday. "Tuesday,
+                            09:00–12:15" leaves the reader to work out WHICH
+                            Tuesday from the week number beside it; the date is
+                            the thing they were looking for.
+                        -->
+                        <template v-if="sessionDate">
+                            {{ formatSlotDate(sessionDate, locale, 'full') }},
+                        </template>
+                        <template v-else>
+                            {{ weekdayName(session.dayOfWeek, locale) }},
+                        </template>
+                        {{ blockTime(grid, session.blockIndex, session.dayOfWeek).start }}–{{
+                            blockTime(grid, endBlock, session.dayOfWeek).end }}
                         <span class="inspector_muted">· week {{ session.termWeek }}</span>
                     </dd>
                 </div>
@@ -79,15 +108,82 @@
                         >The solver places a session in one room — the extras are kept here but not sent to it.</p>
                     </dd>
                 </div>
+                <div v-if="editable || session.kind">
+                    <dt>Kind</dt>
+                    <dd v-if="!editable">{{ session.kind?.name ?? '—' }}</dd>
+                    <dd v-else>
+                        <select
+                            class="inspector_control"
+                            :disabled="busy"
+                            @change="$emit('set-details', { kindId: ($event.target as HTMLSelectElement).value })"
+                        >
+                            <!-- `:selected`, not `:value` on the select: a
+                                 select's value is a property, so SSR drops it. -->
+                            <option
+                                v-for="k in kinds"
+                                :key="k.id"
+                                :selected="k.id === session.kindId"
+                                :value="k.id"
+                            >{{ k.name }}</option>
+                        </select>
+                    </dd>
+                </div>
+
                 <div v-if="lecturers.length">
                     <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
                     <dd>{{ lecturers.map(p => lookup.person(p.personId)).join(', ') }}</dd>
                 </div>
-                <div v-if="attendees.length">
+                <div v-if="editable || attendees.length">
                     <dt>{{ attendees.length === 1 ? 'Person' : 'People' }}</dt>
-                    <dd>{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
+                    <dd v-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
+                    <dd v-else>
+                        <!--
+                            A plain multi-select over every person in the tenant.
+                            It does not scale — a real institution has thousands
+                            — and the proper control is a search field, tracked
+                            as its own follow-up. Shipped this way because an
+                            Event nobody can be added to is a worse gap than a
+                            long list.
+                        -->
+                        <select
+                            class="inspector_rooms"
+                            multiple
+                            :size="Math.min(5, Math.max(3, people.length))"
+                            :disabled="busy"
+                            @change="onPeopleChange"
+                        >
+                            <option
+                                v-for="person in people"
+                                :key="person.id"
+                                :selected="session.people.some(link => link.personId === person.id)"
+                                :value="person.id"
+                            >{{ person.name }}</option>
+                        </select>
+                        <p
+                            v-if="people.length > 40"
+                            class="inspector_hint"
+                        >{{ people.length }} people — a searchable picker is coming.</p>
+                    </dd>
                 </div>
-                <div v-if="session.groups.length">
+                <div v-if="editable">
+                    <dt>{{ session.groups.length === 1 ? 'Group' : 'Groups' }}</dt>
+                    <dd>
+                        <!-- The SAME picker the Offering page and the Event
+                             creation form use. Its third consumer, and the
+                             reason it was reused rather than reimplemented. -->
+                        <ManageRelationPicker
+                            :def="groupRelation"
+                            :rows="session.groups"
+                            :options="groups"
+                            :extra-options="[]"
+                            :readonly="busy"
+                            @add="onGroupAdd"
+                            @remove="onGroupRemove"
+                        />
+                    </dd>
+                </div>
+
+                <div v-else-if="session.groups.length">
                     <dt>{{ session.groups.length === 1 ? 'Group' : 'Groups' }}</dt>
                     <dd>
                         <!-- One level of ancestry, muted: "Seminar A1" alone is
@@ -214,7 +310,10 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
-import { blockTime, describeViolation, sessionLabel, weekdayName } from '~/composables/schedule';
+import { blockTime, describeViolation, formatSlotDate, sessionLabel, weekdayName } from '~/composables/schedule';
+import { useViewerLocale } from '~/composables/locale';
+import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
+import type { RelationDef } from '~/utils/manageRegistry';
 
 const props = defineProps<{
     session: ScheduleSession | null;
@@ -224,6 +323,15 @@ const props = defineProps<{
     canLock: boolean;
     canSwap: boolean;
     canDelete: boolean;
+    canUpdate: boolean;
+    /** Calendar date of this Session's slot; null before a term resolves. */
+    sessionDate: Date | null;
+    /** Tenant vocabulary, for the kind picker. */
+    kinds: { id: string; name: string }[];
+    /** Everyone in the tenant, for the people picker. */
+    people: { id: string; name: string }[];
+    /** Groups available in this term, for the group picker. */
+    groups: { id: string; name: string; parentGroupId: string | null }[];
     placing: boolean;
     swapping: boolean;
     busy: boolean;
@@ -243,6 +351,48 @@ const props = defineProps<{
  * be fired at the next one selected. Watching the id rather than the object
  * because the row is refetched after every edit and would otherwise re-arm.
  */
+const locale = useViewerLocale();
+
+/**
+ * Whether THIS Session's identity may be edited here.
+ *
+ * Two conditions, both required. An Offering-linked Session takes its kind,
+ * groups and people from its Offering and from solver output, so an edit would
+ * be overwritten by the next apply — the route refuses one, and offering a
+ * control the server will reject is worse than showing none.
+ */
+const editable = computed(() => props.canUpdate && props.session?.offeringId === null);
+
+const groupRelation: RelationDef = {
+    key: 'groups',
+    label: 'Groups',
+    help: 'Nesting propagates: choosing a cohort also covers its seminars.',
+    resource: 'groups',
+    valueKey: 'groupId',
+    indentTree: true,
+    optionLabel: (row) => String(row.name),
+    emptyHint: 'No groups available in this term.',
+};
+
+/** Each control sends the WHOLE set it owns, matching how rooms already save. */
+function onGroupAdd(value: string) {
+    const next = [...(props.session?.groups ?? []).map((g) => g.groupId), value];
+
+    emit('set-details', { groupIds: [...new Set(next)] });
+}
+
+function onGroupRemove(value: string) {
+    const next = (props.session?.groups ?? []).map((g) => g.groupId).filter((id) => id !== value);
+
+    emit('set-details', { groupIds: next });
+}
+
+function onPeopleChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+
+    emit('set-details', { personIds: [...select.selectedOptions].map((option) => option.value) });
+}
+
 const confirmingDelete = ref(false);
 
 watch(() => props.session?.id, () => {
@@ -255,6 +405,8 @@ const emit = defineEmits<{
     'toggle-swap': [];
     'toggle-lock': [];
     delete: [];
+    /** A partial edit of what this Event IS; one request per control. */
+    'set-details': [patch: Record<string, unknown>];
     'set-rooms': [roomIds: string[]];
 }>();
 
@@ -327,7 +479,7 @@ const attendees = computed(() => (props.session?.people ?? [])
             opacity: 0.7;
         }
 
-        p { margin: 0; max-width: 24ch; }
+        p { max-width: 24ch; margin: 0; }
     }
 
     &_head {
@@ -337,6 +489,7 @@ const attendees = computed(() => (props.session?.people ?? [])
 
     &_title {
         margin: 0;
+
         font-size: 17px;
         font-weight: 650;
         line-height: 1.25;
@@ -357,6 +510,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         right: -4px;
 
         display: flex;
+
         padding: 4px;
         border: 0;
         border-radius: 6px;
@@ -380,11 +534,12 @@ const attendees = computed(() => (props.session?.people ?? [])
 
         dt {
             margin-bottom: 3px;
+
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.05em;
             color: $surface7;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         dd {
@@ -397,10 +552,44 @@ const attendees = computed(() => (props.session?.people ?? [])
 
     &_muted { color: $surface7; }
 
+    /* Editable fields on an Event. Read-only Sessions render text instead, so
+       these never appear where nothing may change. */
+    &_control {
+        width: 100%;
+        padding: 4px 6px;
+        border: 1px solid $surface5;
+        border-radius: 6px;
+
+        font: inherit;
+        color: inherit;
+
+        background: $surface0;
+    }
+
+    /* The title edits in place: it looks like the heading it replaces until
+       the pointer or focus lands on it. */
+    &_title--edit {
+        width: 100%;
+        padding: 2px 4px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+
+        font: inherit;
+        color: inherit;
+
+        background: transparent;
+
+        &:hover,
+        &:focus {
+            border-color: $surface5;
+            background: $surface0;
+        }
+    }
+
     &_violations {
         padding: 12px;
         border-radius: 8px;
-        background: rgba(169, 125, 45, 0.14);
+        background: rgb(169, 125, 45, 0.14);
 
         h3 {
             display: flex;
@@ -411,9 +600,9 @@ const attendees = computed(() => (props.session?.people ?? [])
 
             font-size: 12px;
             font-weight: 650;
-            letter-spacing: 0.03em;
             color: $warning300;
             text-transform: uppercase;
+            letter-spacing: 0.03em;
 
             svg { width: 15px; height: 15px; }
         }
@@ -422,6 +611,7 @@ const attendees = computed(() => (props.session?.people ?? [])
             display: flex;
             flex-direction: column;
             gap: 6px;
+
             margin: 0;
             padding-left: 16px;
 
@@ -431,7 +621,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         }
 
         &--hard {
-            background: rgba(169, 45, 70, 0.16);
+            background: rgb(169, 45, 70, 0.16);
 
             h3 { color: $error300; }
         }

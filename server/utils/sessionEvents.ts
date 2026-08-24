@@ -2,7 +2,8 @@ import type { Prisma } from '@prisma/client';
 import type { Tx } from './tenantDb';
 import type { RequestIdentity } from './tenantResolver';
 
-export type EventType = 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
+export type EventType =
+    | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
 
 /**
  * Appends to the immutable edit log (TAXONOMY.md §3).

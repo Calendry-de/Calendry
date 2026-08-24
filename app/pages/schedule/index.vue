@@ -109,6 +109,8 @@
                     :placing="editing.placing.value || editing.creating.value"
                     :swapping="editing.swapping.value"
                     :row-height="rowHeight"
+                    :term-week="filters.week.value"
+                    :slot-date-of="data.slotDateOf"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @select="editing.select"
                     @place="placeAt"
@@ -163,6 +165,13 @@
                 :swapping="editing.swapping.value"
                 :can-swap="canSwap"
                 :can-delete="canDeleteSession"
+                :can-update="canUpdateSession"
+                :kinds="data.kinds.value"
+                :people="data.people.value"
+                :groups="data.groups.value"
+                :session-date="editing.selected.value
+                    ? data.slotDateOf(editing.selected.value.termWeek, editing.selected.value.dayOfWeek)
+                    : null"
                 :rooms="data.rooms.value"
                 :busy="editing.busy.value"
                 :lookup="data.lookup"
@@ -172,6 +181,7 @@
                 @set-rooms="editing.setRooms"
                 @toggle-lock="editing.toggleLock"
                 @delete="deleteSelectedEvent"
+                @set-details="saveEventDetails"
             />
         </div>
     </div>
@@ -208,6 +218,7 @@ useHead({ title: 'Schedule' });
 const canTriggerSolver = useHasPermission('solver.trigger');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
+const canUpdateSession = useHasPermission('session.update');
 /**
  * A placement carries the week currently on screen.
  *
@@ -246,6 +257,31 @@ function cancelCreate() {
  * not a grid MODE — it changes nothing about what a click on the grid means,
  * which is the composable's own stated test for what belongs there.
  */
+/**
+ * One request per control, matching how rooms already save.
+ *
+ * Not a form with a Save button: the inspector edits a live row, and a single
+ * button spanning four independent fields could half-succeed with one error
+ * message covering all of them — the same objection the relations panel records
+ * for PUT-set sub-resources.
+ */
+async function saveEventDetails(patch: Record<string, unknown>) {
+    const target = editing.selected.value;
+
+    if (!target || target.offeringId !== null) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/sessions/${target.id}/details`, { method: 'POST', body: patch });
+        await data.refreshAll();
+    } catch (caught: unknown) {
+        const detail = (caught as { data?: { statusMessage?: string } }).data;
+
+        editing.error.value = detail?.statusMessage ?? 'Could not save that change.';
+    }
+}
+
 async function deleteSelectedEvent() {
     const target = editing.selected.value;
 

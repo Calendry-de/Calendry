@@ -11,8 +11,12 @@
             :key="`head-${day}`"
             class="grid_day"
         >
-            <span class="grid_day-long">{{ weekdayName(day) }}</span>
-            <span class="grid_day-short">{{ weekdayShort(day) }}</span>
+            <span class="grid_day-long">{{ weekdayName(day, locale) }}</span>
+            <span class="grid_day-short">{{ weekdayShort(day, locale) }}</span>
+            <span
+                v-if="dateOf(day)"
+                class="grid_day-date"
+            >{{ formatSlotDate(dateOf(day), locale) }}</span>
             <!--
                 Named only when this day's timeline actually differs from the
                 universal one. Silence would be the wrong default: with per-day
@@ -113,8 +117,9 @@
 <script setup lang="ts">
 import {
     type ScheduleSession, type SessionPlacement, type TimeGrid, type Violation,
-    blockTime, layoutDay, weekdayName, weekdayShort,
+    blockTime, formatSlotDate, layoutDay, weekdayName, weekdayShort,
 } from '~/composables/schedule';
+import { useViewerLocale } from '~/composables/locale';
 import { blockBoundaries, blockSpan, gapsOfDay } from '#shared/timeGrid';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
@@ -152,6 +157,10 @@ const props = defineProps<{
     /** Chips are pick targets rather than the grid's empty cells. */
     swapping: boolean;
     rowHeight: number;
+    /** The week on screen, so day headers can show real dates. */
+    termWeek: number;
+    /** Resolves a slot to a calendar date; null before a term is chosen. */
+    slotDateOf: (termWeek: number, dayOfWeek: number) => Date | null;
     /**
      * What choosing a cell will DO, for the slot's accessible name. `place` and
      * `create` both make cells the targets, and a blind user pressing one
@@ -172,6 +181,11 @@ defineEmits<{
  * shrinking to make room — which would have made the fix look like a
  * regression on every grid that has no breaks at all.
  */
+const locale = useViewerLocale();
+
+/** This column's calendar date, in the week currently shown. */
+const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
+
 const perMinute = computed(() => props.rowHeight / Math.max(1, props.grid.blockLengthMinutes));
 
 interface DayLayout {
@@ -315,6 +329,13 @@ function slotStyle(placement: SessionPlacement, day: number) {
         letter-spacing: 0.02em;
 
         &-short { display: none; }
+
+        &-date {
+            font-size: 11px;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            color: $surface7;
+        }
 
         &-note {
             padding: 1px 6px;

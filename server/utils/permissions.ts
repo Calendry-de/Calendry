@@ -92,6 +92,7 @@ export const PERMISSIONS: PermissionDef[] = [
      * `grant:permissions --all-missing` runs, and the symptom is a 403 on a
      * feature that visibly exists.
      */
+    { key: 'session.update', category: 'session', description: "Edit an Event's title, kind, groups and people" },
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
 
     // Operations

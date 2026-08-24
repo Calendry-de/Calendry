@@ -84,6 +84,28 @@ export function isoDate(date: Date): string {
     return date.toISOString().slice(0, 10);
 }
 
+/**
+ * The calendar date a `(termWeek, dayOfWeek)` slot falls on.
+ *
+ * ONE definition of an arithmetic that already existed three times: in
+ * `buildAcademicCalendar` (`addDays(firstMonday, week * 7)` then `addDays(
+ * weekStart, day)`), in `computeReferenceSlot` reading it back, and in SQL in
+ * `calendry_internal.federation_room_occupancy()`, whose comment notes it uses
+ * `date_trunc('week', …)` precisely so both sides anchor identically.
+ *
+ * UTC-ANCHORED, like everything else here. `mondayOf` builds from
+ * `Date.UTC(...)` so a slot's date is a calendar fact about the TENANT's
+ * timetable, never a moment shifted by whoever is looking at it. A viewer's
+ * locale changes how this date is written, never which date it is — CLAUDE.md's
+ * rule that timezone is display-only, applied at the one place that could
+ * violate it.
+ *
+ * `termWeek` is 1-based and `dayOfWeek` is an ISO weekday (1 = Monday).
+ */
+export function slotDate(termStart: Date, termWeek: number, dayOfWeek: number): Date {
+    return addDays(mondayOf(termStart), (termWeek - 1) * 7 + (dayOfWeek - 1));
+}
+
 export function addDays(date: Date, days: number): Date {
     return new Date(date.getTime() + days * MS_PER_DAY);
 }

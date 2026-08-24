@@ -81,12 +81,65 @@ export interface NamedRow { id: string; name: string }
 /** ISO weekday numbers, index 1-7. Never used to decide which days exist. */
 const WEEKDAY_NAMES = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export function weekdayName(iso: number): string {
+export function weekdayName(iso: number, locale?: string): string {
+    if (locale) {
+        return intlWeekday(iso, locale, 'long');
+    }
+
     return WEEKDAY_NAMES[iso] ?? `Day ${iso}`;
 }
 
-export function weekdayShort(iso: number): string {
+export function weekdayShort(iso: number, locale?: string): string {
+    if (locale) {
+        return intlWeekday(iso, locale, 'short');
+    }
+
+    // Slicing three characters is only correct for English. It is kept as the
+    // no-locale fallback so existing callers are unchanged, and every display
+    // site that shows a date now passes a locale.
     return weekdayName(iso).slice(0, 3);
+}
+
+/**
+ * A weekday name in the viewer's language.
+ *
+ * Anchored to a known ISO week (2024-01-01 was a Monday) and formatted in UTC,
+ * so the weekday asked for is the weekday returned. Formatting a "now"-based
+ * date would let the viewer's clock shift Monday into Sunday near midnight.
+ */
+const ISO_MONDAY_UTC = Date.UTC(2024, 0, 1);
+
+function intlWeekday(iso: number, locale: string, weekday: 'long' | 'short'): string {
+    if (iso < 1 || iso > 7) {
+        return `Day ${iso}`;
+    }
+
+    return new Intl.DateTimeFormat(locale, { weekday, timeZone: 'UTC' })
+        .format(new Date(ISO_MONDAY_UTC + (iso - 1) * 24 * 60 * 60 * 1000));
+}
+
+/**
+ * A slot's calendar date, written the way the viewer writes dates.
+ *
+ * `timeZone: 'UTC'` is not a detail — `slotDate()` returns a UTC-anchored
+ * midnight, and formatting it in the viewer's zone would move it to the
+ * previous day for anyone west of UTC. The tenant's timetable says which date a
+ * Session falls on; the viewer's locale says only how that date is spelled.
+ * CLAUDE.md's "timezone is display-only" rule, at the one place that could
+ * break it.
+ */
+export function formatSlotDate(
+    date: Date | null,
+    locale: string,
+    style: 'short' | 'full' = 'short',
+): string {
+    if (!date) {
+        return '';
+    }
+
+    return new Intl.DateTimeFormat(locale, style === 'full'
+        ? { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }
+        : { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date);
 }
 
 /**

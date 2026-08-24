@@ -187,6 +187,11 @@ enum SessionEventType {
   MOVE
   SWAP
   DELETE
+  /// Changing what an Event IS — title, kind, groups, people — as opposed to
+  /// where it sits, which is MOVE. Only ever written for an Event: an
+  /// Offering-linked Session takes those from its Offering and from solver
+  /// output, so the route that emits this refuses one.
+  UPDATE_DETAILS
   LOCK
   UNLOCK
 

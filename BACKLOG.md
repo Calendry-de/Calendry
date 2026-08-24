@@ -152,6 +152,48 @@ materialize and re-derives the structural violations from the applied rows, so
 the group clashes end up recorded anyway. It would NOT be masked for any
 violation type the app's own evaluator cannot compute.
 
+## Tracked gap: a tenant/Generation carrying any session_event cannot be deleted
+
+Surfaced during Events work (2026-08), not caused by it — `APPLY_GENERATION`
+events have existed since Stage 3, this was just never exercised before
+Events introduced the first per-Session `DELETE` events.
+
+Both `session_event`'s FKs (to `tenant`, to `generation`) are `ON DELETE
+CASCADE`, but the append-only trigger refuses every `UPDATE`/`DELETE` on the
+table — including the ones the CASCADE itself would need to perform. So a
+tenant or Generation with any event history literally cannot be removed
+through normal means; test suites work around it with `DISABLE TRIGGER`,
+which needs ownership, so a real production purge has no path at all.
+
+**Fix shape, by precedent:** the same narrow-permit pattern already used for
+`20260816180000_session_event_detach_on_session_delete` — permit exactly the
+CASCADE's own shape of mutation (nulling the FK column, or here, allowing the
+CASCADE delete itself to proceed) while keeping event *content* immutable.
+Not yet designed in detail; this is a real gap worth closing before this ever
+matters in production, not before.
+
+## Tracked, needs a decision: locale-aware date formatting — is this i18n's
+## first slice, or standalone?
+
+Built (2026-08): server-resolved (`Accept-Language`, not `navigator.language`)
+locale-aware weekday/date formatting on the schedule (day headers, inspector),
+`useState` carrying the server's resolved locale into hydration so SSR and
+client agree by construction, UTC pinned in every formatter so the viewer's
+locale decides how a date is spelled, never which date it is. Fixed an
+`Intl`-related point-free bug along the way (`.map(weekdayShort)` passing an
+array index as the locale argument) and a stale `blockTime()` call in the
+inspector that ignored `dayOfWeek` (same class of bug as the schedule-grid
+break-rendering fix).
+
+**Undecided:** is this the first slice of the parked i18n effort above, or a
+narrower, standalone "correct date formatting" fix that doesn't imply UI
+chrome translation is coming? These are genuinely different in scope — this
+work is mechanical `Intl` formatting with no translated strings involved, i18n
+is a full UI-copy sweep. Needs a decision so this doesn't get silently
+conflated with (or silently excluded from) the i18n item above.
+
+
+
 ## Cross-repo note: calendry-solver's run registry grows without bound
 
 The solver keeps runs in an in-memory `HashMap` with **no TTL and no eviction**,
@@ -230,19 +272,6 @@ prerequisite.
 
 ## Lecturer consistency across an Offering's Sessions
 
-**A question the per-group split now makes reachable (2026-08-24).** A
-multi-group Offering is solved as N independent series, one per Group. Once real
-lecturer-pool selection exists, that forces a choice nobody has made yet: may
-each series pick its OWN lecturer, or must all series of one Offering share one?
-Both are defensible — parallel deliveries of a subject often have different
-teachers, and a single small department often has only one — so it is a decision,
-not a detail.
-
-Nothing is blocked today: with only the fixed-lecturer case implemented, every
-series reuses the same `OfferingLecturer` set unchanged, exactly as before the
-split. This is flagged so the question is answered deliberately when the pool
-lands, rather than being settled by whatever the implementation happens to do.
-
 Once a lecturer is assigned for one Session of a recurring Offering, the same
 lecturer should hold every other Session of that Offering for the rest of the
 term — not switch session to session. Staff can still manually override a
@@ -263,8 +292,133 @@ future re-solve. Three layered gaps, in dependency order:
    inspector currently displays Lecturer read-only. Needs its own edit path
    (like Room now has), plus a decision on whether an override "locks" that
    one Session's lecturer against a future repair-mode solve.
+4. **Staff pre-assignment before generation (added 2026-08).** Staff should be
+   able to assign a specific lecturer to a specific Group's Offering *before*
+   a solve runs, as an alternative to leaving lecturer selection to the
+   solver's pool logic or to chance — e.g. "this teacher stays with this
+   class all year." A different entry point (pre-solve, staff-driven) into
+   the same underlying need as items 1–3; design together with the pool-
+   selection prerequisite, not separately.
+5. **New question, made reachable by the Offering-split fix (added 2026-08).**
+   An Offering with 2+ Groups attached now produces N independent parallel
+   session series (one per Group), not one combined session — see TAXONOMY.md's
+   Offering correction. That means "must every parallel series share the same
+   lecturer, or may each pick independently?" is now a real, reachable
+   question once genuine lecturer-pool selection exists (item 1), where
+   previously there was only ever one combined series to assign a lecturer
+   to. Design this together with items 1–2, not as an afterthought once pool
+   selection lands.
 
-## Scheduling pattern per Offering (block vs. distributed)
+## Explicit combined-group teaching (elective/track merging) — CONFIRMED
+## working; the gap is tooling, not data model
+
+Real scenario (2026-08): several source Groups (e.g. five classes) each let
+students choose a track (IT vs. Management); students choosing IT across all
+five classes should be taught together as one genuinely combined group,
+explicitly — not incidentally, because a room happened to fit everyone.
+
+**Confirmed end-to-end, no schema change needed.** Built a real fixture (a
+root "X-Elective" Group, six students drawn from two unrelated cohorts, each
+holding two Memberships) and proved capacity, attendee resolution, and
+`PersonDoubleBooking` all behave correctly — including proof-by-falsification
+(disabling the person rule re-introduced exactly the clashes it exists to
+catch). Nothing needed beyond existing `Group`/`Membership`/
+`offering.group_ids` mechanics.
+
+**The confirmed gap is tooling.** Building this fixture took six individual
+`PUT /persons/:id/groups` calls, one per student, each replacing that
+person's *entire* membership set — there is no bulk add/remove, and
+`ManageGroupTree` shows structure and `expectedSize` only, with no membership
+editor on the Group side at all. For a real elective of 30 students drawn
+from four cohorts, that's 30 individual round trips through a UI built for
+one-at-a-time editing. Worth its own design/build pass: bulk membership
+management on the Group side (add/remove many Persons at once), not a new
+data concept.
+
+## i18n / internationalization (client UI chrome, full sweep when started)
+
+Not started. Decided so far (2026-08): scope is client-side UI chrome and the
+app's own fixed catalogue labels (e.g. `shared/constraintTypes.ts`'s built-in
+descriptions) — never tenant-entered open vocabulary (Role/Group/kind names,
+custom constraint names), which stays free text regardless of display
+language, per the standing fixed-vs-open taxonomy principle. Server-generated
+messages (validation errors, etc.) are deliberately OUT of scope for now —
+client chrome only. When started, it's a full sweep (convert everything at
+once), not incremental — a long coexistence of translated and un-translated
+strings was explicitly rejected as more confusing than doing it properly in
+one pass.
+
+**Real, unresolved design questions before any sweep starts:**
+
+- Library/mechanism choice for Nuxt (e.g. `@nuxtjs/i18n`) — not evaluated yet.
+- Where does a "current locale" preference live? Likely a preference on
+  Person/Account, falling back to a Tenant default, falling back to a global
+  app default — mirroring how other per-person preferences would eventually
+  work, and connecting to the still-undesigned person-level self-service
+  access item above.
+- **Real SSR risk, worth taking seriously given this project's history.**
+  Nuxt i18n has known SSR/locale-detection ordering pitfalls, and this
+  codebase has hit the "a watcher/async-resolved value is wrong at first
+  render, corrects after hydration" bug shape four separate times already
+  (edit forms, `<select>`, the solver control, week navigation — see
+  Conventions in CLAUDE.md). Locale must be resolvable synchronously at first
+  render, not detected client-side after the fact, or this becomes bug number
+  five in that exact pattern.
+- Given the scale (a full sweep across every existing component), this likely
+  warrants its own dedicated multi-session effort rather than a single
+  dispatch — closer in size to a solver-slice-style build than a normal
+  feature task.
+
+
+
+A real university timetable (screenshot, 2026-08) shows session start/end times
+that don't align to any coherent fixed block grid — e.g. a session running
+10:00–12:00 nested inside a visually-labelled "9:00–12:15" period, alongside
+period lengths that vary block to block (60 min, 195 min, 90 min, 90 min, 90
+min in the same day) and a Session ("Stat1", 13:00–16:15) that spans straight
+across a 15-minute break — direct, concrete confirmation of the already-tracked
+"Session whose duration spans a break" question in Undecided, not a
+hypothetical edge case.
+
+**Promising direction worth testing first, before assuming a bigger
+rearchitecture is needed:** every boundary in the real example is a multiple of
+15 minutes. If so, this might be solvable by adopting a much finer base
+`blockLengthMinutes` (e.g. 15) rather than needing arbitrary/continuous-time
+placement — a "long" or "short" period then becomes an ordinary Session with a
+different `durationBlocks` at the same fine granularity, which the schema
+already fully supports, rather than a new per-block custom-length concept in
+`TimeGrid` itself. The non-uniform breaks feature already handles the gaps
+between macro-periods.
+
+**Real cost to weigh, not free:** a finer base unit multiplies the solver's
+slot count per day (more slots → larger occupancy bitmatrices, more candidates
+scored per repair), directly working against the careful performance tuning
+already measured (slice 5/6 benchmarks). Whether that cost is acceptable at
+real institution scale needs actual measurement, not assumption.
+
+**Working answer for the break-spanning question (B), reasoned through but not
+yet verified against real code:** the solver never needs to care — it only
+ever reasons in block indices, regardless of what wall-clock gap sits between
+them. The likely fix lives entirely on the rendering side: a Session's
+*wall-clock* end time should be computed by walking forward `durationBlocks`
+teaching-blocks through the same shared `blockBoundaries()` the grid already
+uses for row geometry, rather than raw `durationBlocks × blockLength`
+arithmetic — so a break falling inside a Session's span is naturally absorbed
+into a longer wall-clock duration, with `durationBlocks` continuing to count
+teaching blocks only. Reuses existing infrastructure rather than inventing a
+new concept.
+
+**Working answer for visual grouping (C):** likely resolves for free once (B)
+is fixed, since row heights are already proportional to real minutes — the
+one thing actually worth checking is whether the grid currently draws a
+divider line at every fine block boundary regardless of whether anything
+changes there, versus only at real Session/break boundaries. If it's the
+former, that's a small, contained fix, not a redesign.
+
+**(D) solver performance at finer granularity is unresolved and can't be
+reasoned to an answer — needs real benchmarking once (A) is investigated.**
+
+
 
 Two competing philosophies described in the scenario:
 
@@ -286,37 +440,35 @@ support for both.
 
 # Features not built
 
-## ~~Manual Session creation ("Events")~~ — API DONE 2026-08-23, UI still open
+## Manual Session creation ("Events") — mostly built, one gap remains
 
-`POST /api/sessions` exists, gated on the new `session.create` permission.
-`session.offering_id` is nullable and a NULL means the Session is an **Event**
-(TAXONOMY.md §2). Verified end to end against a live solver: an Event survives a
-real run + apply un-deleted and un-moved, **including when unlocked** — the
-exemption is that it belongs to no Offering and therefore to no solve's scope,
-not the lock.
+**Built (2026-08):** `POST /api/sessions` (creation, gated on `session.create`,
+via `fitsGrid()`), `DELETE /api/sessions/:id` (scoped to Events only —
+Offering-linked Sessions correctly refused with a 409), multi-group selection
+(reused `ManageRelationPicker`, the same component Offering management uses),
+and a required `title` field (refused for Offering-linked Sessions, required
+for Events — closed the "Untitled session"/empty-banner bug as a side effect).
 
-**The UI landed 2026-08-23** as a `create` mode on the schedule grid: "Add
-event" arms the grid, a slot click opens a form seeded with that day/block/week.
-Gated on `session.create` and hidden entirely without it.
+**Still open:** no edit path. Once created, an Event's `kind`, Room, Groups and
+People cannot be changed — only its placement (via the existing move flow).
+Correcting a mistake means delete-and-recreate.
 
-What is still thin, for whoever picks it up next:
+## A searchable person picker
 
-- **One group and one room only.** The form offers a single select for each,
-  while the API accepts arrays. Multi-select needs a real picker, and the
-  multi-room case runs into the tracked wire-format gap above.
-- **No people/lecturer assignment**, for the same reason — it wants a search
-  control, not a `<select>` of every person in the tenant.
-- ~~**No delete for an Event.**~~ **DONE.** `DELETE /api/sessions/:id` exists,
-  gated on its own `session.delete` permission, with a confirm action in the
-  schedule inspector. Scoped to Events: an Offering-linked Session returns 409,
-  because deleting one would leave its Offering's frequency unmet and the next
-  solve would place it again — removing a real Session is cancel-to-spare-bank
-  below, not this. **No EDIT for an Event still**: its kind, room, groups and
-  people cannot be changed after creation, only its placement (Move/Swap/Lock).
-- The kind picker is tenant vocabulary. Do not special-case "holiday" / "exam" /
-  "gathering" anywhere; `kind` is data (TAXONOMY.md §2). The form states the
-  CalendarPeriod distinction in prose and links to it, which is the only
-  treatment that does not hardcode a kind.
+The Event inspector and the Event creation form both pick people with a plain
+`<select multiple>` over EVERY person in the tenant. That is fine for the demo's
+twenty and wrong for a real institution's thousands — the list is unusable long
+before it is slow, and there is no way to find someone by name.
+
+Shipped that way deliberately: an Event nobody can be added to was the worse
+gap, and the scaling limit is visible rather than silent (the inspector says so
+above forty people). The proper control is a type-to-search field backed by the
+existing `q` filter on `/api/persons`, which already does substring matching —
+so this is a UI component, not new API surface.
+
+Both call sites should move together, and the Offering page's lecturer picker
+(`ManageRelationPicker` with `extraReference`) is the third consumer worth
+looking at while doing it: it has the same problem one entity over.
 
 ## Cancel-to-spare-bank
 
@@ -418,127 +570,6 @@ as a side effect of `minimize_day_usage`'s weight relative to others. Not a
 bug — flagged and explicitly kept as-is. Leaving this here as a note in case a
 future session finds the same shape and wonders whether it was intended.
 
-
----
-
-# Constraint management
-
-## Offering-scoped constraints are accepted but never reach the solver
-
-`constraint_scope.offering_id` exists and `PUT /api/constraints/:id/scopes`
-accepts it, but `assembleSolverInput` **skips the whole constraint** when any
-scope names an offering ([solverInput.ts:125](server/utils/solverInput.ts#L125)) —
-`ConstraintConfig` carries `applies_to_kinds` only, and widening the rule to
-every offering would be the opposite of what was configured.
-
-The constraint form therefore offers **kind scoping only**, deliberately. Closing
-this means a `calendry-proto` change (an offering dimension on
-`ConstraintConfig`) and is cross-repo. Until then, an offering scope set through
-the API is a rule that silently does not run in solves — which is why the UI
-does not offer one.
-
-## `refreshViolations()` ignores constraint scopes entirely
-
-No scope query anywhere in `server/utils/violations.ts`. A kind-scoped
-STRUCTURAL rule (the four double-booking types) still evaluates tenant-wide for
-manual edits, so scoping narrows the solver's view and not the live warnings.
-
-Not urgent — the four structural types are the ones a tenant is least likely to
-want scoped — but the two halves disagreeing is exactly the kind of divergence
-this project tracks rather than discovers later.
-
-## ~~Kind/offering-scoped variants are modelled and unused~~ — RESOLVED for kinds
-
-`constraint_scope` holds **zero rows** across all tenants (measured
-2026-08-23), so scoped variants are a modelled capability nobody has exercised.
-The grid renders them as a sub-list under their type's row and the builder can
-create one via `/manage/constraints/new?type=<key>`, but the scope PICKER
-itself is still the generic relations panel rather than a purpose-built
-control.
-
-Worth a design pass when someone actually needs one: "cap online share at 30%,
-except seminars at 50%" is the motivating case, and it wants a control that
-shows the default and the exception together rather than two independent rows.
-
-## `params` still accepts arbitrary JSON through the generic API
-
-Unchanged by the grid work and still open — see the entry under **Undecided**.
-The grid writes params through the same `PATCH /api/constraints/:id` as before,
-so a malformed param set is refused by nothing. The catalogue knows each type's
-parameter shape (`ConstraintParamDef`), so the fix is the same shape as
-`validateConstraintShape()`: consult the catalogue in a refinement.
-
----
-
-# Event log
-
-## A tenant or Generation carrying any `session_event` cannot be deleted
-
-Found 2026-08-23, while making `executePlan` emit DELETE events — the
-materialize test's teardown started failing with
-`session_event is append-only; DELETE is not permitted`.
-
-Both FKs are `ON DELETE CASCADE`:
-
-```
-session_event_tenant_id_fkey       -> tenant      CASCADE
-session_event_generation_id_fkey   -> generation  CASCADE
-```
-
-and `session_event_append_only` refuses `DELETE` unconditionally. So the schema
-says "when the tenant goes, its events go" and the trigger says "no", and the
-`DELETE FROM tenant` fails outright.
-
-**This is pre-existing, not caused by the DELETE events** — `apply.post.ts` has
-always written an `APPLY_GENERATION` event, so any tenant that ever applied a
-Generation was already undeletable. Emitting DELETE events only made a *test*
-tenant reach the same state, which is how it surfaced.
-
-Impact is currently low: nothing in the app deletes a tenant or a Generation, so
-this bites fixtures and manual cleanup rather than users. Test suites work around
-it with `ALTER TABLE ... DISABLE TRIGGER`, which requires ownership — a
-production purge or a GDPR-style erasure request could not.
-
-The shape of a fix already exists: migration `20260816180000` solved the exact
-analogue for `session_event.session_id` by narrowing the trigger to permit ONE
-specific shape (the FK's own `SET NULL` detach) while still refusing everything
-else. The equivalent here is harder because a cascade DELETE is not
-distinguishable from a hand-written one inside a row-level trigger. Options not
-yet evaluated: a session-local GUC the purge sets, or moving the guard to a
-`BEFORE DELETE` on the parent instead.
-
-**Do not "fix" it by dropping the trigger** — append-only enforcement is what
-TAXONOMY.md §3 rollback depends on.
-
-## `CREATE` and `DELETE` were unreachable enum values until 2026-08-23
-
-Recorded because it explains why neither had a shape to copy. `SessionEventType`
-declared all seven values, but nothing emitted `CREATE` (until `POST
-/api/sessions`) or `DELETE` (until `executePlan`). `materializeGeneration()`
-still writes no per-session CREATE or MOVE events — the Generation snapshot is
-the record for solver-originated placements, and only removals now get their own
-event, because a removal is the one change the snapshot cannot describe.
-
-If per-placement solver events are ever wanted, that is a deliberate decision
-about log volume (a 27,000-session apply would write 27,000 rows), not an
-oversight.
-
----
-
-# Overlaps to resolve
-
-## `CalendarPeriod` vs. an Event, for holidays
-
-Both can express "the 14th is a holiday" and they mean different things.
-`CalendarPeriod` (HOLIDAY/BREAK/EXAM) colours a **range of dates** and is what
-`minimize_exam_week_sessions` and the academic calendar read. An Event occupies
-a **room and a block**. TAXONOMY.md §2 now states the rule — *range of dates →
-CalendarPeriod; room and block → Event* — but nothing enforces it, and the
-manage UI offers both without explaining the difference.
-
-Worth revisiting when the Event UI is built: a "create event" flow that lets
-someone place a campus-wide holiday as a 1-block Session in one room would be
-technically valid and semantically wrong.
 
 ---
 

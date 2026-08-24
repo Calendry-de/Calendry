@@ -201,7 +201,12 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
         // ISO 1-7 through the same helper the schedule labels its columns with,
         // so a grid's days read identically here and on the timetable.
         return Array.isArray(value) && value.length
-            ? [...value].map(Number).sort((a, b) => a - b).map(weekdayShort).join(' ')
+            // Explicit arrow, NOT a bare `.map(weekdayShort)`: the helper now
+            // takes an optional locale as its second argument, and a point-free
+            // map would hand it the array INDEX — locale 0 falls through to
+            // English while locale 1 makes Intl throw a RangeError. Caught by
+            // the compiler; the arrow is what keeps it caught.
+            ? [...value].map(Number).sort((a, b) => a - b).map((iso) => weekdayShort(iso)).join(' ')
             : '—';
     }
 

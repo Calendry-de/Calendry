@@ -524,6 +524,24 @@ otherwise" is not one.
   Note also that **`refreshViolations()` ignores scopes entirely**, so scoping a
   structural rule narrows the SOLVER's view and not the live violation checks.
 
+- **Editing an EVENT is `POST /api/sessions/:id/details`, and it is Events-only.**
+  Title, kind, groups and people; placement and room stay on `move`, which
+  already owns them (`setRooms()` posts `roomIds` there). Adding room here would
+  mean two routes writing `session_room` under two permissions emitting two
+  event types.
+
+  Offering-linked Sessions are refused with 409 for the reason DELETE refuses
+  them: `kind_id` is copied from the Offering and groups/people come from solver
+  output, so a manual edit would be silently overwritten by the next apply.
+
+  `fitsGrid()` is deliberately NOT checked here — the route touches no placement
+  field, so a grid guard could never fail, and this codebase treats a guard that
+  cannot fail as worse than none.
+
+  The event type is `UPDATE_DETAILS`, not a generic `UPDATE`: the routing
+  convention above exists so the log records intent, and the payload carries
+  `before`/`after` for the CHANGED fields only.
+
 - **A per-entity API route must NOT live under `server/api/<resource>/` for a
   resource served by the generic scaffold.** `server/api/[resource]/` is the
   CRUD catch-all; creating a literal sibling directory makes Nitro match that

@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue';
 import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
 import { isOnGrid, sessionLabel, weeksInTerm } from '~/composables/schedule';
+import { slotDate } from '#shared/academicCalendar';
 import { useHasPermission } from '~/composables/session';
 
 /**
@@ -40,12 +41,30 @@ export function useScheduleData(filters: {
      * empty grid.
      */
     const asyncData = useAsyncData('schedule', async () => {
-        const [terms, timeGrids, groupRows, roomRows, personRows] = await Promise.all([
+        const [terms, timeGrids, groupRows, roomRows, personRows, kindRows] = await Promise.all([
             request<Term[]>('/api/terms'),
             request<TimeGrid[]>('/api/time-grids'),
             request<{ id: string; name: string; parentGroupId: string | null }[]>('/api/groups'),
             request<{ id: string; name: string; code: string }[]>('/api/rooms'),
             request<{ id: string; givenName: string; familyName: string }[]>('/api/persons'),
+            /*
+             * Joins the SAME wave rather than being fetched when the inspector
+             * opens — but INDIVIDUALLY TOLERANT, which the others do not need
+             * to be.
+             *
+             * `/schedule` is gated on `session.read`, and `session_kind.read` is
+             * a different permission the `viewer` role does not hold. Inside a
+             * bare `Promise.all` that 403 rejected the whole handler and
+             * rendered a COMPLETELY BLANK page — not an error, not a partial
+             * view. CLAUDE.md records this exact failure from Stage 6c and the
+             * rule it left: enumerate every endpoint a page calls and confirm
+             * each is covered by the permission the page is gated on.
+             *
+             * Degrading to an empty list is the honest fallback: a caller who
+             * cannot read kinds also cannot be offered a kind picker, and the
+             * schedule itself does not need them.
+             */
+            request<{ id: string; name: string }[]>('/api/session-kinds').catch(() => []),
         ]);
 
         const resolvedTermId = filters.termId.value || terms[0]?.id || '';
@@ -67,6 +86,7 @@ export function useScheduleData(filters: {
             groups: groupRows,
             rooms: roomRows.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
             people: personRows.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
+            kinds: kindRows,
             sessions,
             violations,
             resolvedTermId,
@@ -101,6 +121,7 @@ export function useScheduleData(filters: {
     const groups = computed(() => reference.value?.groups ?? []);
     const rooms = computed(() => reference.value?.rooms ?? []);
     const people = computed(() => reference.value?.people ?? []);
+    const kinds = computed(() => reference.value?.kinds ?? []);
 
     /**
      * Resolved through `resolvedTermId`, NOT `filters.termId`.
@@ -191,6 +212,20 @@ export function useScheduleData(filters: {
         },
     };
 
+    /**
+     * The calendar date a slot in THIS term falls on, or null when no term is
+     * resolved yet.
+     *
+     * Lives here because the term is here; every consumer (the grid's day
+     * headers, the inspector) would otherwise need the term's start date and
+     * would each re-derive the same arithmetic.
+     */
+    function slotDateOf(termWeek: number, dayOfWeek: number): Date | null {
+        const start = term.value?.startDate;
+
+        return start ? slotDate(new Date(start), termWeek, dayOfWeek) : null;
+    }
+
     function sessionTitle(id: string): string {
         return sessionLabel(allSessions.value.find((s) => s.id === id));
     }
@@ -200,11 +235,11 @@ export function useScheduleData(filters: {
     }
 
     return {
-        terms, groups, rooms, people, resolvedTermId,
+        terms, groups, rooms, people, kinds, resolvedTermId,
         term, totalWeeks, grid,
         allSessions, onGridSessions, offGridSessions,
         violations, violationsBySessionId,
-        lookup, sessionTitle,
+        lookup, sessionTitle, slotDateOf,
         pending, canReadViolations, refreshAll,
         /** The page awaits this — the one await, at setup top level. */
         ready: asyncData,
