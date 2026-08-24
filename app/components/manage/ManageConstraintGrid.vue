@@ -250,7 +250,7 @@ const defaultByType = computed(() => new Map(
  * Paired rather than passed bare, because the row component renders from the
  * TYPE (severity, description, parameter list) and a variant that named a type
  * outside the catalogue would otherwise render an empty shell. One that does is
- * dropped here and reported by `unknownVariantTypes` instead — the same
+ * dropped here and reported by `unknownTypeRows` instead — the same
  * report-never-omit rule the missing-type alarm follows.
  */
 const variants = computed(() => rows.value
