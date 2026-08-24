@@ -15,6 +15,7 @@ import {
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
 import { deriveCapacity } from '../../shared/groupCapacity';
+import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -75,6 +76,25 @@ export interface AssemblyReport {
      * different problems.
      */
     offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
+    /**
+     * Offerings that became SEVERAL independent series, one per attached Group.
+     *
+     * Reported because the change is invisible otherwise and it multiplies the
+     * problem: twelve Offerings with four Groups each become forty-eight wire
+     * entries and four times the placements. A solve that suddenly does that
+     * with no explanation is exactly the kind of silent change this codebase
+     * keeps getting bitten by.
+     */
+    offeringsSplitByGroup: { id: string; title: string; series: number }[];
+    /**
+     * Sessions of a split Offering that belong to no single series — they carry
+     * none or several of its Groups, so they predate the semantic change.
+     *
+     * Deliberately NOT sent to the solver, and deliberately not silent: they
+     * will be removed by the next apply, and the count is how a reviewer learns
+     * that before it happens.
+     */
+    legacyCombinedSessionsOmitted: number;
     /** Constraints not sent, with the reason. Never sent with invented defaults. */
     skippedConstraints: { id: string; type: string; reason: string }[];
     /**
@@ -107,6 +127,12 @@ export interface AssembledInput {
     referenceSlot: SlotRef;
     /** SHA-256 over the serialized input — makes "same problem?" answerable. */
     inputHash: string;
+    /**
+     * Scope in both languages: `wire` is what the solver must be told (split
+     * `offering::group` ids included), `real` is what the app records so
+     * `planMaterialization` can match against `session.offering_id`.
+     */
+    scopeOfferingIds: { wire: string[]; real: string[] };
     report: AssemblyReport;
 }
 
@@ -433,41 +459,87 @@ export async function assembleSolverInput(
         select: { groupId: true, personId: true },
     }));
 
-    const offerings: Offering[] = offeringRows.map((offering) => {
+    /**
+     * ONE WIRE OFFERING PER SERIES.
+     *
+     * An Offering carrying two or more Groups means an INDEPENDENT series per
+     * Group — each with the full frequency and its own room requirement — not
+     * one combined Session for the union. The solver needs no change to express
+     * that: N wire entries are indistinguishable from N hand-made Offerings,
+     * because it keys everything by wire id and echoes that id straight back.
+     *
+     * A single-group or group-less Offering emits exactly one entry under its
+     * REAL id, so nothing downstream changes for it.
+     */
+    const offeringsSplitByGroup: { id: string; title: string; series: number }[] = [];
+
+    /** Wire id -> the real Offering id, for the scope the app keeps. */
+    const realOfferingIdOf = new Map<string, string>();
+
+    const offerings: Offering[] = offeringRows.flatMap((offering) => {
         droppedEquipmentQuantities += offering.equipment.filter((link) => link.quantity !== null).length;
 
-        /**
-         * THE DOCUMENTED BEHAVIOUR, NOW REAL.
-         *
-         * `requiredCapacity` stays authoritative when a human set it — an
-         * explicit number is a decision, and a derived one must never overrule
-         * it. Only the NULL case derives, which is precisely what the schema
-         * comment and the form's help text have promised all along while
-         * `?? 0` quietly satisfied every room in the tenant.
-         */
-        const derived = offering.requiredCapacity === null
-            ? deriveCapacity(
-                offering.groups.map((link) => link.groupId),
-                capacityGroups,
-                capacityMemberships,
-            )
-            : null;
+        const groupIds = offering.groups.map((link) => link.groupId);
+        const split = splitsIntoSeries(groupIds);
 
-        if (derived && derived.capacity === null) {
-            offeringsWithNoDerivableCapacity.push({ id: offering.id, title: offering.title });
-        }
-
-        if (derived?.partialEnrolment && derived.capacity !== null && derived.estimate !== null) {
-            offeringsWithPartialEnrolment.push({
+        if (split) {
+            offeringsSplitByGroup.push({
                 id: offering.id,
                 title: offering.title,
-                members: derived.capacity,
-                expected: derived.estimate,
+                series: groupIds.length,
             });
         }
 
-        return {
-            id: offering.id,
+        /**
+         * Each series carries ONE group, so capacity is derived per series from
+         * that group alone — the existing single-group path, not the union.
+         *
+         * This is the point of the change as much as the scheduling is: four
+         * 24-person cohorts previously produced one requirement of 96, which no
+         * physical room in the demo tenant could satisfy. Four independent
+         * requirements of 24 fit the rooms that exist.
+         */
+        const seriesGroups: (string | null)[] = split ? groupIds : [null];
+
+        return seriesGroups.map((seriesGroupId) => {
+            const capacityGroupIds = seriesGroupId === null ? groupIds : [seriesGroupId];
+
+            /**
+             * THE DOCUMENTED BEHAVIOUR, NOW REAL.
+             *
+             * `requiredCapacity` stays authoritative when a human set it — an
+             * explicit number is a decision, and a derived one must never
+             * overrule it. Only the NULL case derives, which is precisely what
+             * the schema comment and the form's help text have promised all
+             * along while `?? 0` quietly satisfied every room in the tenant.
+             */
+            const derived = offering.requiredCapacity === null
+                ? deriveCapacity(capacityGroupIds, capacityGroups, capacityMemberships)
+                : null;
+
+            const wireId = seriesGroupId === null
+                ? offering.id
+                : wireOfferingId(offering.id, seriesGroupId);
+
+            realOfferingIdOf.set(wireId, offering.id);
+
+            // Reported per SERIES, since each has its own requirement and one
+            // series can be underivable while its siblings are fine.
+            if (derived && derived.capacity === null) {
+                offeringsWithNoDerivableCapacity.push({ id: wireId, title: offering.title });
+            }
+
+            if (derived?.partialEnrolment && derived.capacity !== null && derived.estimate !== null) {
+                offeringsWithPartialEnrolment.push({
+                    id: wireId,
+                    title: offering.title,
+                    members: derived.capacity,
+                    expected: derived.estimate,
+                });
+            }
+
+            return {
+            id: wireId,
             tenantId: options.tenantId,
             kind: offering.kind.key,
             requiredSessionCount: offering.frequency,
@@ -478,7 +550,11 @@ export async function assembleSolverInput(
             // requirement and the solver does not choose. Tracked as a modelling
             // limit rather than papered over with a guess.
             requiredLecturerCount: offering.lecturers.length,
-            groupIds: offering.groups.map((link) => link.groupId),
+            // The SERIES' own group, not the Offering's whole set. This is
+            // what makes each series independent — and it is what comes back in
+            // `PlacedSession.group_ids`, so materialization gets the one right
+            // group for `session_group` with no extra bookkeeping.
+            groupIds: capacityGroupIds,
             // The app models no direct per-Offering participants beyond groups.
             participantPersonIds: [],
             requiredRoomFeatures: offering.equipment.map((link) => link.equipment.key),
@@ -488,13 +564,80 @@ export async function assembleSolverInput(
             // Empty = any eligible Room. The app has no allow-list.
             allowedRoomIds: [],
             allowOnline: offering.allowOnline,
-        } as Offering;
+            } as Offering;
+        });
     });
 
-    const sessionInputs = sessionRows.map((session) => ({
+    /**
+     * EXISTING SESSIONS MUST SPEAK THE SPLIT'S LANGUAGE.
+     *
+     * `convert.rs` resolves an existing Session's Offering by matching its
+     * `offering_id` against the wire ids, and uses that to decide scope, to
+     * count what is `already_realized`, and to reuse Session ids. A Session
+     * still carrying its REAL Offering id after a split would resolve to
+     * nothing: it would become immovable out-of-scope occupancy, count toward
+     * no series, and the solver would place the full frequency again ON TOP of
+     * it. Duplication, silently.
+     *
+     * So a Session of a split Offering is re-pointed at the series whose Group
+     * it carries.
+     *
+     * A LEGACY COMBINED Session — one carrying none or several of the
+     * Offering's Groups — belongs to no series and is OMITTED from the wire
+     * entirely rather than sent as occupancy. It is going to be deleted by the
+     * apply (the app-side scope keeps the real Offering id, so the delete
+     * partition still reaches it), and freezing it as occupancy would block the
+     * very slots its replacements need while it waits to be removed.
+     */
+    const splitOfferingGroupIds = new Map<string, Set<string>>();
+
+    for (const offering of offeringRows) {
+        const ids = offering.groups.map((link) => link.groupId);
+
+        if (splitsIntoSeries(ids)) {
+            splitOfferingGroupIds.set(offering.id, new Set(ids));
+        }
+    }
+
+    let legacyCombinedSessionsOmitted = 0;
+
+    const wireSessionRows = sessionRows.filter((session) => {
+        const seriesGroups = session.offeringId
+            ? splitOfferingGroupIds.get(session.offeringId)
+            : undefined;
+
+        if (!seriesGroups) {
+            return true;
+        }
+
+        const owned = session.groups.map((link) => link.groupId).filter((id) => seriesGroups.has(id));
+
+        if (owned.length === 1) {
+            return true;
+        }
+
+        legacyCombinedSessionsOmitted += 1;
+
+        return false;
+    });
+
+    const sessionInputs = wireSessionRows.map((session) => ({
         id: session.id,
         tenantId: session.tenantId,
-        offeringId: session.offeringId,
+        offeringId: (() => {
+            const seriesGroups = session.offeringId
+                ? splitOfferingGroupIds.get(session.offeringId)
+                : undefined;
+
+            if (!seriesGroups) {
+                return session.offeringId;
+            }
+
+            // Exactly one by construction — the filter above kept only those.
+            const own = session.groups.map((link) => link.groupId).find((id) => seriesGroups.has(id))!;
+
+            return wireOfferingId(session.offeringId!, own);
+        })(),
         kindId: session.kindId,
         kindKey: session.kind.key,
         termWeek: session.termWeek,
@@ -624,6 +767,20 @@ export async function assembleSolverInput(
         input,
         referenceSlot,
         inputHash: hashInput(input),
+        /**
+         * The WIRE ids the solver must be given as scope, and the REAL Offering
+         * ids the app must record.
+         *
+         * They differ once anything is split, and both are needed: the solver
+         * places nothing for an Offering absent from its scope, while
+         * `planMaterialization` tests `inScope.has(session.offeringId)` against
+         * DB ids — so recording wire ids there would mean no existing Session
+         * was ever in scope and nothing would ever be deleted.
+         */
+        scopeOfferingIds: {
+            wire: [...realOfferingIdOf.keys()],
+            real: [...new Set(realOfferingIdOf.values())],
+        },
         report: {
             includedFederationRooms,
             externalOccupancySlots: externalOccupancy.length,
@@ -632,6 +789,8 @@ export async function assembleSolverInput(
             droppedEquipmentQuantities,
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
+            offeringsSplitByGroup,
+            legacyCombinedSessionsOmitted,
             skippedConstraints,
             severityMismatches,
             groupsOmitted: groupRows.length - sentGroupRows.length,

@@ -89,8 +89,23 @@ export default defineEventHandler(async (event) => {
             now: new Date(),
         });
 
+        /**
+         * TWO SCOPES, because they address different things.
+         *
+         * `offeringIds` is what gets STORED and later read by
+         * `planMaterialization`, which compares it against `session.offering_id`
+         * — real database ids. `wireOfferingIds` is what the SOLVER is given,
+         * and once a multi-group Offering is split into per-group series those
+         * are synthetic `offering::group` ids.
+         *
+         * Using one list for both breaks in one direction or the other: wire
+         * ids stored means no existing Session is ever in scope and nothing is
+         * ever deleted; real ids sent means the split series are outside scope
+         * and nothing is ever placed.
+         */
         const scope = {
-            offeringIds: body.offeringIds ?? assembled.input.offerings.map((offering) => offering.id),
+            offeringIds: body.offeringIds ?? assembled.scopeOfferingIds.real,
+            wireOfferingIds: body.offeringIds ?? assembled.scopeOfferingIds.wire,
             groupIds: body.groupIds ?? [],
             outsideScopePolicy: 'LOCK_POLICY_HARD',
         };
@@ -183,7 +198,8 @@ export default defineEventHandler(async (event) => {
         const response = await startRun({
             input: assembled.input,
             scope: {
-                offeringIds: scope.offeringIds,
+                // The WIRE ids — see the two-scopes note where `scope` is built.
+                offeringIds: scope.wireOfferingIds,
                 groupIds: scope.groupIds,
                 outsideScopePolicy: LockPolicy.LOCK_POLICY_HARD,
             },

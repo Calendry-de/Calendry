@@ -451,6 +451,45 @@ otherwise" is not one.
     row is reported loudly in the UI rather than omitted — omission is exactly
     what hid the gap above, in a list that looked complete.
 
+- **Two or more Groups on an Offering means N independent series, not one
+  combined Session.** TAXONOMY.md §2 states the rule and why it was always the
+  intended meaning. The mechanics worth knowing here:
+
+  - **The solver needs no knowledge of it.** A multi-group Offering is split
+    before assembly into one wire Offering per Group, id
+    `` `${offeringId}::${groupId}` ``, each with the full frequency and its own
+    capacity. `convert.rs` keys everything by wire id and echoes it back, so N
+    series are indistinguishable from N hand-made rows.
+  - **The mapping is ENCODED, not held in a side map.** Materialization runs at
+    APPLY, from `solver_run.result`, possibly days later and across a restart —
+    anything held in memory during assembly is gone by then. Reversal lives in
+    `parseWireOfferingId` and is called from exactly two places (the placement
+    path and the violation path); an id that cannot be reversed is counted, not
+    guessed.
+  - **Scope is stored in TWO languages.** `solver_run.scope.offeringIds` keeps
+    REAL ids because `planMaterialization` compares them to
+    `session.offering_id`; `wireOfferingIds` carries the split ids the solver is
+    given. One list for both breaks in one direction or the other — wire ids
+    stored means nothing is ever deleted, real ids sent means nothing is ever
+    placed.
+  - **Existing Sessions must be re-pointed or omitted.** `convert.rs` resolves an
+    existing Session's Offering by matching `offering_id` against wire ids, and
+    uses it for scope, `already_realized` and id reuse. A Session left on its
+    real id after a split becomes immovable out-of-scope occupancy that counts
+    toward no series — so the solver would place the full frequency again ON TOP
+    of it. A Session carrying exactly one of the Groups is re-pointed at that
+    series; a legacy COMBINED one (none or several) is omitted from the wire
+    entirely and removed by the apply, counted in
+    `report.legacyCombinedSessionsOmitted`.
+  - **No Offering rows are ever created.** Every resulting Session points at the
+    one real `offering_id`, with `session_group` carrying only that series'
+    Group.
+
+  Measured on the demo tenant: 12 Offerings became 48 wire entries, required
+  capacity fell from 96 to 24 per series, and a solve that previously had to put
+  all 65 Sessions online with 4 `MaxOnlineShare` violations produced 260
+  Sessions across the three physical rooms with zero violations.
+
 - **A non-default Constraint must name a scope, and scoping is KIND-ONLY in the
   UI.** Every live catalogue type has a default (tenant-wide) row, so a second
   UNSCOPED row of the same type is not an "additional rule" — it is a second

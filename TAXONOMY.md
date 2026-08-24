@@ -95,6 +95,45 @@ permissions remain out of scope (§9.4). Stage 7c makes the schema and RLS
 - **`kind`** [OPEN, tenant-defined, on Offering/Session] — replaces a fixed Lecture/Exam/Event split. Constraints must declare which kinds they apply to, since a tenant-defined kind (e.g. "staff_meeting") may not have a Group at all.
 - **`Assignment`** [FIXED relation] — Session ↔ Group, Session ↔ Person (direct/individual), Session ↔ Room, Session ↔ Lecturer.
 
+### What attaching several Groups to one Offering MEANS — correction (2026-08-24)
+
+An `Offering` with **exactly one** Group attached means **combined attendance**:
+one Session series, attended by that Group and its full descendant closure.
+Unchanged, and unchanged in implementation.
+
+An `Offering` with **two or more** Groups attached means **N independent
+parallel Session series — one per attached Group**. Each series gets the full
+`requiredSessionCount` and its own independently derived room capacity. It does
+NOT mean one shared Session for the union of the attached Groups.
+
+**This is a correction, not a revision.** The rule above was always the intended
+meaning; the app implemented the union reading, and that was a bug. A future
+reader should not treat the combined-for-many-Groups behaviour as an earlier,
+superseded version of this taxonomy — it was never the taxonomy.
+
+Why the rule is this way:
+
+- The attached Groups of a real Offering are **peers, not a cohort**. "dIT22 S1,
+  dIT22 S2, dWI22 S1, dWI22 S2 all take Accounting" describes four parallel
+  deliveries of one subject, not one lecture with 96 attendees. Nesting already
+  expresses "and everyone beneath": that is what a single attached Group means,
+  and it is why one Group needs no split.
+- The union reading produced a requirement no room could satisfy. Four 24-person
+  cohorts became a single demand for 96 seats against a tenant whose largest
+  room holds 24, so every Session was forced online — a schedule that was
+  feasible only because the constraint was wrong.
+- Frequency is per series because it belongs to the delivery, not to the
+  subject. An Offering that must happen six times must happen six times *for
+  each cohort taking it*; dividing it between them would silently under-serve
+  all of them.
+
+**No new entity, and no new rows.** This is a property of `offering_group`'s
+cardinality, read at solve time. The app splits a multi-group Offering into one
+wire Offering per Group before assembly — the solver sees N ordinary Offerings
+and needs no knowledge of the split — and every resulting `Session` still points
+at the ONE real `offering_id`, with `session_group` carrying only that series'
+Group. Nothing creates an Offering row per Group.
+
 ### Offering-less Sessions ("Events") — amendment (decided 2026-08-23)
 
 `Session.offering_id` is **nullable**. A Session with no Offering is an

@@ -230,6 +230,19 @@ prerequisite.
 
 ## Lecturer consistency across an Offering's Sessions
 
+**A question the per-group split now makes reachable (2026-08-24).** A
+multi-group Offering is solved as N independent series, one per Group. Once real
+lecturer-pool selection exists, that forces a choice nobody has made yet: may
+each series pick its OWN lecturer, or must all series of one Offering share one?
+Both are defensible — parallel deliveries of a subject often have different
+teachers, and a single small department often has only one — so it is a decision,
+not a detail.
+
+Nothing is blocked today: with only the fixed-lecturer case implemented, every
+series reuses the same `OfferingLecturer` set unchanged, exactly as before the
+split. This is flagged so the question is answered deliberately when the pool
+lands, rather than being settled by whatever the implementation happens to do.
+
 Once a lecturer is assigned for one Session of a recurring Offering, the same
 lecturer should hold every other Session of that Offering for the rest of the
 term — not switch session to session. Staff can still manually override a

@@ -2,6 +2,7 @@ import type { ConstraintViolation, PlacedSession, SolverOutput } from '@mindcoll
 import type { Tx } from './tenantDb';
 import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';
+import { parseWireOfferingId } from './offeringSplit';
 
 /**
  * Stage 5 — turning a solver result into real Session rows.
@@ -200,7 +201,29 @@ export async function planMaterialization(tx: Tx, options: {
     let placementsUnmapped = 0;
 
     for (const placed of output.sessions) {
-        const offering = offeringById.get(placed.offeringId);
+        /**
+         * UN-SPLIT FIRST, ALWAYS.
+         *
+         * A multi-group Offering is sent to the solver as one wire Offering PER
+         * GROUP, under a synthetic `offering::group` id, and the output echoes
+         * that id back. Every id from here on must be the REAL one: a Session
+         * points at the real Offering row, and no Offering row is ever created
+         * by a split.
+         *
+         * Reversal happens here and in the violation mapper below, and nowhere
+         * else — the same discipline the wire's other synthetic identity needs.
+         * An id that cannot be reversed with confidence is counted as unmapped
+         * rather than attached to a guess.
+         */
+        const parsed = parseWireOfferingId(placed.offeringId);
+
+        if (parsed.ambiguous) {
+            placementsUnmapped++;
+
+            continue;
+        }
+
+        const offering = offeringById.get(parsed.offeringId);
 
         // A placement for an Offering this term does not have cannot be written
         // — the FK would reject it. Counted rather than thrown: one bad
@@ -240,7 +263,7 @@ export async function planMaterialization(tx: Tx, options: {
                 ? 'create'
                 : samePlacement(placement, previous!) ? 'unchanged' : 'move',
             sessionId: current?.id ?? null,
-            offeringId: placed.offeringId,
+            offeringId: parsed.offeringId,
             placement,
             previous,
             roomId: placed.roomId || null,
@@ -571,11 +594,24 @@ async function materializeViolations(tx: Tx, options: {
          * would be counted twice for the same breach.
          */
         if (violation.sessionIds.length === 0) {
-            for (const offeringId of violation.offeringIds) {
-                const exists = await tx.offering.findFirst({
-                    where: { id: offeringId, tenantId },
-                    select: { id: true },
-                });
+            for (const wireOfferingId of violation.offeringIds) {
+                /**
+                 * The SECOND place a wire offering id must be reversed. A
+                 * violation on a split series names `offering::group`, and
+                 * `constraint_violation.offering_id` is a foreign key to the
+                 * real row — so without this every ExactFrequency breach on a
+                 * multi-group Offering would land in `violationsUnmapped` and
+                 * the tenant would see no violations at all for exactly the
+                 * Offerings most likely to have them.
+                 */
+                const parsed = parseWireOfferingId(wireOfferingId);
+
+                const exists = parsed.ambiguous
+                    ? null
+                    : await tx.offering.findFirst({
+                        where: { id: parsed.offeringId, tenantId },
+                        select: { id: true },
+                    });
 
                 if (!exists) {
                     counts.violationsUnmapped++;
@@ -583,7 +619,16 @@ async function materializeViolations(tx: Tx, options: {
                     continue;
                 }
 
-                await writeViolation(tx, { ...base, sessionId: null, offeringId });
+                /**
+                 * Several series of one Offering can each breach the same rule,
+                 * and they collapse onto one real Offering id. `writeViolation`
+                 * is find-then-write against
+                 * (constraint_id, session_id, offering_id), so the second
+                 * updates the first rather than colliding — the breach is
+                 * reported once against the Offering, which is the row a human
+                 * acts on.
+                 */
+                await writeViolation(tx, { ...base, sessionId: null, offeringId: parsed.offeringId });
 
                 counts.violationsOffering++;
             }
