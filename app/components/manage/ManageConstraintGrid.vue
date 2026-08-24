@@ -21,6 +21,18 @@
             An operator can repair this with <code>bun run backfill:constraints -- --all-missing</code>.
         </p>
 
+        <p
+            v-if="unknownTypeRows.length"
+            class="cgrid_alarm"
+            role="alert"
+        >
+            {{ unknownTypeRows.length }} stored rule{{ unknownTypeRows.length === 1 ? '' : 's' }}
+            name{{ unknownTypeRows.length === 1 ? 's' : '' }} a type this build does not know and
+            cannot be shown or edited here:
+            <code>{{ [...new Set(unknownTypeRows.map((r) => r.type))].join(', ') }}</code>.
+            The solver skips {{ unknownTypeRows.length === 1 ? 'it' : 'them' }} too.
+        </p>
+
         <section
             v-for="group in groups"
             :key="group.severity"
@@ -38,90 +50,36 @@
             </header>
 
             <ul class="cgrid_rows">
-                <li
+                <ManageConstraintRow
                     v-for="entry in group.entries"
                     :key="entry.type.key"
-                    class="cgrid_row"
-                    :class="{ 'cgrid_row--off': !entry.row.isEnabled }"
+                    :busy="busy.has(entry.row.id)"
+                    :can-read-kinds="canReadKinds"
+                    :can-update="canUpdate"
+                    :heading="entry.type.label"
+                    :kinds="kinds"
+                    :row="entry.row"
+                    :type="entry.type"
+                    @update:enabled="setEnabled(entry.row, $event)"
+                    @update:param="setParam(entry.row, $event.key, $event.value)"
+                    @update:scopes="setScopes(entry.row, $event)"
+                    @update:weight="setWeight(entry.row, $event)"
                 >
-                    <div class="cgrid_main">
-                        <label class="cgrid_toggle">
-                            <input
-                                :checked="entry.row.isEnabled"
-                                :disabled="!canUpdate || busy.has(entry.row.id)"
-                                type="checkbox"
-                                @change="setEnabled(entry.row, ($event.target as HTMLInputElement).checked)"
-                            >
-                            <span class="cgrid_name">{{ entry.type.label }}</span>
-                        </label>
-
-                        <p class="cgrid_desc">{{ entry.type.description }}</p>
-
-                        <div class="cgrid_controls">
-                            <label
-                                v-if="entry.row.severity === 'SOFT'"
-                                class="cgrid_weight"
-                            >
-                                <span>Weight</span>
-                                <input
-                                    :disabled="!canUpdate || busy.has(entry.row.id)"
-                                    min="0"
-                                    type="number"
-                                    :value="entry.row.weight ?? 0"
-                                    @change="setWeight(entry.row, ($event.target as HTMLInputElement).value)"
-                                >
-                            </label>
-
-                            <common-button
-                                v-if="entry.type.params.length"
-                                icon="material-symbols:tune"
-                                type="transparent"
-                                @click="toggleParams(entry.type.key)"
-                            >{{ openParams.has(entry.type.key) ? 'Hide' : 'Settings' }}</common-button>
-
-                            <common-button
-                                v-if="canCreate"
-                                icon="material-symbols:add"
-                                :to="`/manage/constraints/new?type=${entry.type.key}`"
-                                type="transparent"
-                            >Add scoped variant</common-button>
-                        </div>
-                    </div>
-
-                    <div
-                        v-if="openParams.has(entry.type.key) && entry.type.params.length"
-                        class="cgrid_params"
-                    >
-                        <template
-                            v-for="control in constraintParamControls(entry.type)"
-                            :key="control.param.key"
-                        >
-                            <ManageWeekdayPicker
-                                v-if="control.kind === 'weekdays'"
-                                :help="control.param.help"
-                                :label="control.param.label"
-                                :model-value="(paramValue(entry.row, control.param.key) as number[]) ?? []"
-                                :readonly="!canUpdate"
-                                @update:model-value="setParam(entry.row, control.param.key, $event)"
-                            />
-
-                            <ManageField
-                                v-else
-                                :field="control.field"
-                                :model-value="paramValue(entry.row, control.param.key)"
-                                :readonly="!canUpdate"
-                                @update:model-value="setParam(entry.row, control.param.key, $event)"
-                            />
-                        </template>
-                    </div>
-
-                </li>
+                    <template #actions>
+                        <common-button
+                            v-if="canCreate"
+                            icon="material-symbols:add"
+                            :to="`/manage/constraints/new?type=${entry.type.key}`"
+                            type="transparent"
+                        >Add scoped variant</common-button>
+                    </template>
+                </ManageConstraintRow>
             </ul>
         </section>
 
         <!--
             ADDITIONAL RULES — every non-default instance, in one place.
-            
+
             These are NOT listed again under their base rule's row. A variant is
             only meaningful relative to the rule it qualifies, so showing it in
             both places would put the same exception on screen twice and leave
@@ -141,55 +99,31 @@
                 v-if="variants.length"
                 class="cgrid_rows"
             >
-                <li
+                <ManageConstraintRow
                     v-for="variant in variants"
-                    :key="variant.id"
-                    class="cgrid_row"
-                    :class="{ 'cgrid_row--off': !variant.isEnabled }"
+                    :key="variant.row.id"
+                    :busy="busy.has(variant.row.id)"
+                    :can-read-kinds="canReadKinds"
+                    :can-update="canUpdate"
+                    :heading="variant.row.name"
+                    :kinds="kinds"
+                    :row="variant.row"
+                    :scope-required="true"
+                    :subtitle="`${variant.type.label} — narrowed from the tenant-wide rule.`"
+                    :type="variant.type"
+                    @update:enabled="setEnabled(variant.row, $event)"
+                    @update:param="setParam(variant.row, $event.key, $event.value)"
+                    @update:scopes="setScopes(variant.row, $event)"
+                    @update:weight="setWeight(variant.row, $event)"
                 >
-                    <div class="cgrid_main">
-                        <label class="cgrid_toggle">
-                            <input
-                                :checked="variant.isEnabled"
-                                :disabled="!canUpdate || busy.has(variant.id)"
-                                type="checkbox"
-                                @change="setEnabled(variant, ($event.target as HTMLInputElement).checked)"
-                            >
-                            <span class="cgrid_name">{{ variant.name }}</span>
-                        </label>
-
-                        <p class="cgrid_desc">
-                            <span
-                                class="cgrid_sev"
-                                :class="`cgrid_sev--${variant.severity.toLowerCase()}`"
-                            >{{ variant.severity }}</span>
-                            {{ typeLabel(variant.type) }}
-                            <span class="cgrid_scoped">· {{ scopeSummary(variant) }}</span>
-                        </p>
-
-                        <div class="cgrid_controls">
-                            <label
-                                v-if="variant.severity === 'SOFT'"
-                                class="cgrid_weight"
-                            >
-                                <span>Weight</span>
-                                <input
-                                    :disabled="!canUpdate || busy.has(variant.id)"
-                                    min="0"
-                                    type="number"
-                                    :value="variant.weight ?? 0"
-                                    @change="setWeight(variant, ($event.target as HTMLInputElement).value)"
-                                >
-                            </label>
-
-                            <common-button
-                                icon="material-symbols:edit-outline"
-                                :to="`/manage/constraints/${variant.id}`"
-                                type="transparent"
-                            >Edit</common-button>
-                        </div>
-                    </div>
-                </li>
+                    <template #actions>
+                        <common-button
+                            icon="material-symbols:edit-outline"
+                            :to="`/manage/constraints/${variant.row.id}`"
+                            type="transparent"
+                        >Edit</common-button>
+                    </template>
+                </ManageConstraintRow>
             </ul>
 
             <p
@@ -219,10 +153,9 @@
 import type { ConstraintTypeDef } from '#shared/constraintTypes';
 import type { ManageEntity } from '~/utils/manageRegistry';
 import type { useEntityList } from '~/composables/entityList';
-import ManageField from '~/components/manage/ManageField.vue';
-import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
-import { defaultConstraintTypes } from '#shared/constraintTypes';
-import { constraintParamControls } from '~/utils/constraintFields';
+import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
+import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
+import { defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
 
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
@@ -259,24 +192,16 @@ const props = defineProps<{
 defineModel<string>('search', { required: true });
 defineModel<number>('page', { required: true });
 
-interface ConstraintRow {
-    id: string;
-    type: string;
-    name: string;
-    severity: 'HARD' | 'SOFT';
-    weight: number | null;
-    params: Record<string, unknown> | null;
-    isEnabled: boolean;
-    isDefault: boolean;
-    /** Present because the resource `include`s them; kind-only in this UI. */
-    scopes?: { kindId: string | null; offeringId: string | null }[];
-}
+/**
+ * Declared by the row component and imported here, rather than described twice.
+ * The row is what reads these fields; the grid only fetches and routes them.
+ */
+type ConstraintRow = ConstraintRowData;
 
 const request = useRequestFetch();
 const { canUpdate } = useEntityPermissions(props.entity);
 
 const busy = ref(new Set<string>());
-const openParams = ref(new Set<string>());
 const error = ref<string | null>(null);
 
 const rows = computed(() => props.list.rows.value as unknown as ConstraintRow[]);
@@ -285,10 +210,24 @@ const defaultByType = computed(() => new Map(
     rows.value.filter((row) => row.isDefault).map((row) => [row.type, row]),
 ));
 
-/** Every non-default instance, newest rule types first for a stable order. */
+/**
+ * Every non-default instance, paired with its catalogue entry.
+ *
+ * Paired rather than passed bare, because the row component renders from the
+ * TYPE (severity, description, parameter list) and a variant that named a type
+ * outside the catalogue would otherwise render an empty shell. One that does is
+ * dropped here and reported by `unknownVariantTypes` instead — the same
+ * report-never-omit rule the missing-type alarm follows.
+ */
 const variants = computed(() => rows.value
     .filter((row) => !row.isDefault)
-    .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name)));
+    .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name))
+    .map((row) => {
+        const type = findConstraintType(row.type);
+
+        return type ? { type, row } : null;
+    })
+    .filter((entry): entry is { type: ConstraintTypeDef; row: ConstraintRow } => entry !== null));
 
 /*
  * Kind names for the scope summary.
@@ -316,23 +255,18 @@ const kindsData = useAsyncData(
 
 const kinds = computed(() => kindsData.data.value?.rows ?? []);
 
-const kindName = (id: string) => kinds.value.find((k) => k.id === id)?.name ?? id;
-
-const typeLabel = (key: string) => defaultConstraintTypes().find((t) => t.key === key)?.label ?? key;
-
-function scopeSummary(row: ConstraintRow): string {
-    const names = (row.scopes ?? [])
-        .map((scope) => (scope.kindId ? kindName(scope.kindId) : null))
-        .filter((name): name is string => Boolean(name));
-
-    if (!names.length) {
-        // Should be unreachable for a non-default row; stated rather than
-        // rendered as an empty string, which would read as "no scope needed".
-        return 'not scoped — this duplicates the tenant-wide rule';
-    }
-
-    return names.join(', ');
-}
+/**
+ * Whether the kinds list being empty means anything.
+ *
+ * The fetch above degrades to `[]` on failure so one missing permission cannot
+ * blank the page (the 6c rule). That is right, and it makes "this tenant has no
+ * session kinds" and "you may not read session kinds" render identically — the
+ * exact indistinguishable-failure shape CLAUDE.md keeps recording. The row uses
+ * this to say which one it is instead of asserting the wrong one.
+ *
+ * A UI gate only; the server decides what is actually readable.
+ */
+const canReadKinds = useHasPermission('session_kind.read');
 
 /**
  * Catalogue types with no row for this tenant. Surfaced, never hidden: the
@@ -341,6 +275,17 @@ function scopeSummary(row: ConstraintRow): string {
  */
 const missingTypes = computed(() => defaultConstraintTypes()
     .filter((type) => !defaultByType.value.has(type.key)));
+
+/**
+ * Rows naming a type the catalogue does not describe.
+ *
+ * Such a row cannot be rendered — there is no severity, description or
+ * parameter list to render it FROM — but it is still stored, still enabled and
+ * still read by `assembleSolverInput`, which skips it with its own reason. So
+ * it is reported here rather than dropped silently: a rule nobody can see is
+ * how `no_double_booking_person` stayed missing for a whole stage.
+ */
+const unknownTypeRows = computed(() => rows.value.filter((row) => !findConstraintType(row.type)));
 
 interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
 
@@ -371,22 +316,6 @@ const groups = computed(() => [
         entries: entriesFor('SOFT'),
     },
 ]);
-
-function paramValue(row: ConstraintRow, key: string): unknown {
-    return (row.params ?? {})[key] ?? null;
-}
-
-function toggleParams(key: string) {
-    const next = new Set(openParams.value);
-
-    if (next.has(key)) {
-        next.delete(key);
-    } else {
-        next.add(key);
-    }
-
-    openParams.value = next;
-}
 
 /**
  * Saves ONE field, immediately, per control.
@@ -439,6 +368,17 @@ function setWeight(row: ConstraintRow, raw: string) {
 
 const setParam = (row: ConstraintRow, key: string, value: unknown) =>
     patch(row, { params: { ...(row.params ?? {}), [key]: value } });
+
+/**
+ * The whole scope set, replaced wholesale — `writeChildren` deletes and
+ * recreates, so a partial list would silently drop the kinds it omits.
+ *
+ * Clearing a DEFAULT row's scopes is legal and widens it back to tenant-wide.
+ * Clearing a VARIANT's is refused by `constraintBeforeUpdate` with a 422, which
+ * lands in `error` below — the row warns first, but the server is the authority.
+ */
+const setScopes = (row: ConstraintRow, kindIds: string[]) =>
+    patch(row, { scopes: kindIds.map((kindId) => ({ kindId })) });
 </script>
 
 <style scoped lang="scss">
@@ -511,93 +451,15 @@ const setParam = (row: ConstraintRow, key: string, value: unknown) =>
         list-style: none;
     }
 
-    &_row {
-        padding: $space6;
-        border: 1px solid var(--border-color, rgb(128 128 128 / 30%));
-        border-radius: $radiusMd;
 
-        &--off {
-            opacity: 0.62;
-        }
-    }
 
-    &_main {
-        display: flex;
-        flex-wrap: wrap;
-        gap: $space4 $space6;
-        align-items: center;
-    }
 
-    &_toggle {
-        cursor: pointer;
-        display: flex;
-        gap: $space4;
-        align-items: center;
-    }
 
-    &_name {
-        font-weight: 600;
-    }
 
-    &_desc {
-        flex: 1 1 24ch;
-        margin: 0;
-        font-size: $fontSizeSm;
-        color: var(--text-secondary-color);
-    }
 
-    &_controls {
-        display: flex;
-        gap: $space4;
-        align-items: center;
-        margin-left: auto;
-    }
 
-    &_weight {
-        display: flex;
-        gap: $space2;
-        align-items: center;
-        font-size: $fontSizeSm;
 
-        input {
-            width: 6rem;
-            padding: $space2 $space4;
-            border: 1px solid var(--border-color, rgb(128 128 128 / 30%));
-            border-radius: $radiusSm;
 
-            font: inherit;
-            color: inherit;
-
-            background: transparent;
-        }
-    }
-
-    &_params {
-        display: flex;
-        flex-direction: column;
-        gap: $space4;
-
-        margin-top: $space6;
-        padding-top: $space6;
-        border-top: 1px solid var(--border-color, rgb(128 128 128 / 30%));
-    }
-
-    &_variants {
-        margin: $space6 0 0;
-        padding: $space4 0 0 $space7;
-        border-top: 1px solid var(--border-color, rgb(128 128 128 / 30%));
-        list-style: none;
-    }
-
-    &_variant {
-        display: flex;
-        gap: $space4;
-        align-items: center;
-
-        padding: $space2 0;
-
-        font-size: $fontSizeSm;
-    }
 
     &_empty {
         margin: 0;
@@ -609,9 +471,5 @@ const setParam = (row: ConstraintRow, key: string, value: unknown) =>
         color: var(--text-secondary-color);
     }
 
-    &_scoped {
-        font-size: $fontSizeXs;
-        color: var(--text-secondary-color);
-    }
 }
 </style>
