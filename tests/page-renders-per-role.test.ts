@@ -83,6 +83,17 @@ const PERSON_EDITOR = 'person-editor-page@test.local';
 const ENTITY_EDITOR = 'entity-editor@test.local';
 
 /**
+ * Only `availability.manage_own` — the self-service case.
+ *
+ * The sharpest instrument for the /my section, because it is the whole point of
+ * that section existing: a lecturer must reach their own settings WITHOUT
+ * `person.read`, `time_grid.read` or anything else. Everything those pages
+ * render travels in the response of the one endpoint behind this key, precisely
+ * so the link cannot lead somewhere that then 403s on a reference fetch.
+ */
+const SELF_SERVICE = 'self-service@test.local';
+
+/**
  * `viewer` holds ONLY `session.read` (pinned by auth-permissions.test.ts), so
  * it is the sharpest instrument available: any page it can reach that depends
  * on a second permission fails here.
@@ -93,6 +104,7 @@ const ROLES = [
     { name: 'constraintViewer', account: CONSTRAINT_VIEWER },
     { name: 'personEditor', account: PERSON_EDITOR },
     { name: 'entityEditor', account: ENTITY_EDITOR },
+    { name: 'selfService', account: SELF_SERVICE },
 ] as const;
 
 /**
@@ -202,6 +214,37 @@ const PAGES = [
         roles: ['admin', 'entityEditor'],
         marker: 'A101',
         why: 'the room\'s own code — present only once the form seeded',
+    },
+    {
+        /*
+         * The self-service pages, as somebody holding ONE permission. The marker
+         * is the block picker's own rendered clock time, which exists only if
+         * the TimeGrid arrived — and the grid arrives only because it travels
+         * with `/api/me/availability` rather than being fetched from
+         * `/api/time-grids`, which this role cannot read.
+         */
+        path: '/my/availability',
+        roles: ['selfService'],
+        marker: 'Submit for approval',
+        why: 'the veto form itself — present only once the grid and rows resolved',
+    },
+    {
+        path: '/my/preferences',
+        roles: ['selfService'],
+        marker: 'Recorded, not yet used by the scheduler',
+        why: 'the honest disclosure that preferences do not affect the timetable yet',
+    },
+    {
+        path: '/manage/availability/reviews',
+        roles: ['admin'],
+        marker: 'A declared window is a',
+        why: 'the review page body — proves the static route beats /manage/[entity]/[id]',
+    },
+    {
+        path: '/manage/availability/preferences',
+        roles: ['admin'],
+        marker: 'Preferred teaching days and blocks',
+        why: 'the overview page body, with every active person listed',
     },
 ] as const;
 
@@ -332,11 +375,40 @@ async function seedEntityEditor() {
     await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 }
 
+/** A person + account + role holding ONLY `availability.manage_own`. */
+async function seedSelfService() {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${SELF_SERVICE}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId: TENANT_A, key: 'self-service-page', name: 'Self Service' },
+    });
+
+    await ownerDb.accessRolePermission.create({
+        data: { accessRoleId: role.id, permissionKey: 'availability.manage_own', tenantId: TENANT_A },
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId: TENANT_A, givenName: 'Sol', familyName: 'Self', email: 'sol@a.test' },
+    });
+
+    await ownerDb.personAccessRole.create({
+        data: { personId: person.id, accessRoleId: role.id, tenantId: TENANT_A },
+    });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({
+        data: { email: SELF_SERVICE, passwordHash: template.passwordHash },
+    });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     await seed();
     await seedConstraintViewer();
     await seedPersonEditor();
     await seedEntityEditor();
+    await seedSelfService();
 
     for (const role of ROLES) {
         const { cookie } = await login(role.account, TEST_PASSWORD);
@@ -346,7 +418,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR]) {
+    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR, SELF_SERVICE]) {
         await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${email}'`);
     }
 
@@ -524,6 +596,91 @@ describe('every page renders for every role that can reach it', () => {
             expect(html).not.toContain('No groups defined yet');
             expect(html).not.toContain('No access roles defined yet');
         });
+    });
+
+    /**
+     * The /my section is reachable on ONE permission and nothing else.
+     *
+     * Paired with denials, because "the page rendered" alone would pass for a
+     * build where the section had no gate at all.
+     */
+    it('keeps /my to availability.manage_own, in both directions', async () => {
+        const denied = await fetch(`${BASE}/my/availability`, {
+            headers: { cookie: cookies.entityEditor! },
+            redirect: 'manual',
+        });
+
+        expect(denied.status, 'a person editor holds no availability permission').toBe(403);
+
+        const allowed = await fetch(`${BASE}/my/availability`, { headers: { cookie: cookies.selfService! } });
+
+        expect(allowed.status).toBe(200);
+
+        // ...and the same person cannot reach the ADMINISTRATOR side of the same
+        // feature, which is the whole reason manage_own and manage_any are
+        // separate keys.
+        const review = await fetch(`${BASE}/manage/availability/reviews`, {
+            headers: { cookie: cookies.selfService! },
+            redirect: 'manual',
+        });
+
+        expect(review.status).toBe(403);
+    });
+
+    /**
+     * A page nobody can NAVIGATE to might as well not exist.
+     *
+     * Every other assertion in this file fetches a URL directly, which is
+     * exactly how the /my section shipped with working pages, correct gating and
+     * no way to click into it: `ViewMenu` renders only entries carrying
+     * `inHeader`, and the section's two pages deliberately do not. The pages
+     * rendered, the middleware refused the right people, and the whole suite was
+     * green while the feature was unreachable.
+     *
+     * So the header itself is now asserted — in both directions, because "the
+     * link is there" proves nothing if it is there for everybody.
+     */
+    it('offers the /my section in the header to exactly the roles that can use it', async () => {
+        const header = async (role: string) => {
+            const html = await fetch(`${BASE}/`, { headers: { cookie: cookies[role]! } }).then((res) => res.text());
+
+            // The header nav only — the command palette renders every permitted
+            // entry into the same document, so matching the whole page would
+            // pass for a build with no header link at all.
+            return html.match(/<nav class="header__menu"[\s\S]*?<\/nav>/)?.[0] ?? '';
+        };
+
+        expect(await header('selfService'), 'the one role that needs it').toContain('My settings');
+        expect(await header('admin'), 'an admin holds manage_own too').toContain('My settings');
+
+        // The viewer holds only `session.read`; the person editor only
+        // `person.*`. Neither can use the section, so neither is offered it.
+        expect(await header('viewer')).not.toContain('My settings');
+        expect(await header('entityEditor')).not.toContain('My settings');
+
+        // The control: the header rendered at all for the roles asserted to
+        // lack the entry, rather than being empty for an unrelated reason.
+        expect(await header('viewer')).toContain('Home');
+        expect(await header('entityEditor')).toContain('Home');
+    });
+
+    it('offers both administrator availability screens on the /manage index', async () => {
+        const manage = async (role: string) => fetch(`${BASE}/manage`, { headers: { cookie: cookies[role]! } })
+            .then((res) => res.text())
+            .then((html) => html.split('<script type="application/json"')[0] ?? '');
+
+        const asAdmin = await manage('admin');
+
+        expect(asAdmin).toContain('Unavailability review');
+        expect(asAdmin).toContain('Teaching preferences');
+
+        // The self-service role holds `manage_own` and neither administrator
+        // key, so it sees the hub's other sections — none of them, in its case —
+        // but never these two.
+        const asSelfService = await manage('selfService');
+
+        expect(asSelfService).not.toContain('Unavailability review');
+        expect(asSelfService).not.toContain('Teaching preferences');
     });
 
     it('names WHICH permissions are missing, not just that access is denied', async () => {

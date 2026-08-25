@@ -1,0 +1,331 @@
+import { z } from 'zod';
+import type { Tx } from './tenantDb';
+import { isTotalBlackout, resolveHolidayWeeks, validateWindow } from '../../shared/availability';
+import type { HolidayResolution, TermWindow, UnavailabilityWindow } from '../../shared/availability';
+import { isoDate, overlaps, weekCountOf } from '../../shared/academicCalendar';
+
+/**
+ * Reading and writing person availability.
+ *
+ * THE SOLVER READ PATH LIVES HERE AND NOWHERE ELSE. `approvedBlackoutsFor` is
+ * the only function that turns `person_unavailability` rows into wire
+ * blackouts, so there is exactly one place the `status = APPROVED` filter can be
+ * wrong — and `tests/person-availability-wire.test.ts` fails if it is removed.
+ *
+ * That matters more than usual here. A PENDING window reaching the wire would
+ * apply a HARD constraint nobody approved, and it would do so silently: the
+ * timetable would simply come back with unplaced Sessions.
+ */
+
+/** One veto row as the app reads it back. */
+export interface UnavailabilityRow {
+    id: string;
+    personId: string;
+    days: number[];
+    blocks: number[];
+    weeks: number[];
+    reason: string | null;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    decisionNote: string | null;
+    decidedAt: Date | null;
+}
+
+/**
+ * APPROVED windows for the given people, in the term being solved.
+ *
+ * The ONLY read path into this table for solver input. Callers must not query
+ * `personUnavailability` directly — the two filters here are the whole safety
+ * property, and both were added because their absence was demonstrated rather
+ * than imagined:
+ *
+ *   status  a PENDING window on the wire applies a HARD rule nobody approved,
+ *           announcing itself only as unplaced Sessions
+ *   term    `weeks` counts ONE term's calendar. Sent to every solve, a stored
+ *           `weeks:[2]` reached both of the demo tenant's terms, where week 2
+ *           begins 2026-09-07 and 2027-10-11 — thirteen months apart
+ *
+ * `termId IS NULL` means every term, which is what a recurring weekly pattern
+ * means and what every row written before the column existed meant.
+ */
+export async function approvedBlackoutsFor(
+    tx: Tx,
+    personIds: readonly string[],
+    termId: string,
+): Promise<Map<string, UnavailabilityWindow[]>> {
+    const byPerson = new Map<string, UnavailabilityWindow[]>();
+
+    if (personIds.length === 0) {
+        return byPerson;
+    }
+
+    const rows = await tx.personUnavailability.findMany({
+        where: {
+            personId: { in: [...personIds] },
+            status: 'APPROVED',
+            OR: [{ termId: null }, { termId }],
+        },
+        select: { personId: true, days: true, blocks: true, weeks: true },
+        orderBy: { createdAt: 'asc' },
+    });
+
+    for (const row of rows) {
+        const windows = byPerson.get(row.personId) ?? [];
+
+        windows.push({ days: row.days, blocks: row.blocks, weeks: row.weeks });
+        byPerson.set(row.personId, windows);
+    }
+
+    return byPerson;
+}
+
+/**
+ * The grid limits a window is validated against.
+ *
+ * `blocksPerDay` is the MAXIMUM across the tenant's grids — a veto is not
+ * term-scoped, so it must stay expressible under every grid the tenant has.
+ * `defaultGrid` is what the "you have blocked N of M" summary counts against,
+ * because a summary needs ONE grid to be a number at all, and the default is the
+ * one the tenant's Terms use unless they say otherwise.
+ */
+export interface GridLimits {
+    blocksPerDay: number;
+    /**
+     * The whole grid shape, not just its dimensions.
+     *
+     * `blockTime()` needs the lengths, the start clock and the break overrides
+     * to name a block, and the pages in this area must not fetch
+     * `/api/time-grids` for them — that needs `time_grid.read`, which nobody
+     * holding only `availability.manage_own` has, and one refused fetch in a
+     * reference wave renders every control on the page over empty data.
+     */
+    defaultGrid: {
+        id: string;
+        name: string;
+        blocksPerDay: number;
+        activeDays: number[];
+        blockLengthMinutes: number;
+        startHour: number;
+        startMinute: number;
+        breakMinutes: number;
+        breaks: { afterBlockIndex: number; durationMinutes: number; label: string; dayOfWeek: number | null }[];
+    } | null;
+}
+
+export async function tenantGridLimits(tx: Tx, tenantId: string): Promise<GridLimits> {
+    const grids = await tx.timeGrid.findMany({
+        where: { tenantId },
+        select: {
+            id: true,
+            name: true,
+            blocksPerDay: true,
+            activeDays: true,
+            isDefault: true,
+            blockLengthMinutes: true,
+            startHour: true,
+            startMinute: true,
+            breakMinutes: true,
+            breaks: {
+                select: { afterBlockIndex: true, durationMinutes: true, label: true, dayOfWeek: true },
+            },
+        },
+        orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+    });
+
+    const defaultGrid = grids.find((grid) => grid.isDefault) ?? grids[0] ?? null;
+
+    return {
+        // A tenant with NO grid at all gets 0, which makes every block index
+        // invalid and every submission fail with a message naming the real
+        // cause. Falling back to some arbitrary number would accept indices that
+        // resolve to nothing.
+        blocksPerDay: grids.reduce((max, grid) => Math.max(max, grid.blocksPerDay), 0),
+        defaultGrid: defaultGrid
+            ? {
+                id: defaultGrid.id,
+                name: defaultGrid.name,
+                blocksPerDay: defaultGrid.blocksPerDay,
+                activeDays: defaultGrid.activeDays,
+                blockLengthMinutes: defaultGrid.blockLengthMinutes,
+                startHour: defaultGrid.startHour,
+                startMinute: defaultGrid.startMinute,
+                breakMinutes: defaultGrid.breakMinutes,
+                breaks: defaultGrid.breaks,
+            }
+            : null,
+    };
+}
+
+/**
+ * The tenant's terms, ordered, with their week counts.
+ *
+ * Travels with every availability response for the same reason the grid does: a
+ * page that fetched `/api/terms` for it would need `term.read`, which nobody
+ * holding only `availability.manage_own` has, and one refused fetch in a
+ * reference wave empties every control on the page.
+ */
+export async function tenantTerms(tx: Tx, tenantId: string): Promise<TermWindow[]> {
+    const rows = await tx.term.findMany({
+        where: { tenantId },
+        select: { id: true, name: true, startDate: true, endDate: true },
+        orderBy: { startDate: 'asc' },
+    });
+
+    return rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        startDate: isoDate(row.startDate),
+        endDate: isoDate(row.endDate),
+        weekCount: weekCountOf(row.startDate, row.endDate),
+    }));
+}
+
+/**
+ * Turn a picked date range into the term and week indices it blocks.
+ *
+ * THE TERM IS DERIVED FROM THE DATES, not chosen in the form. A person booking
+ * leave knows the dates; asking them which academic term contains them is asking
+ * them to do the lookup this function exists to do, and getting it wrong stores
+ * week indices against the wrong calendar.
+ *
+ * Both refusals below are deliberate rather than a best guess, because both
+ * "best guesses" are silently wrong:
+ *
+ *   no term contains it     the row would be stored and be inert forever
+ *   it spans two terms      one row cannot say "weeks of A and weeks of B";
+ *                           picking either loses half the absence
+ */
+export function resolveHolidayRange(
+    terms: readonly TermWindow[],
+    from: Date,
+    to: Date,
+): { term: TermWindow; resolution: HolidayResolution } {
+    if (to.getTime() < from.getTime()) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'The end date is before the start date.',
+            data: { field: 'endDate' },
+        });
+    }
+
+    const overlapping = terms.filter((term) => overlaps(
+        new Date(term.startDate),
+        new Date(term.endDate),
+        from,
+        to,
+    ));
+
+    if (overlapping.length === 0) {
+        const known = terms.length
+            ? terms.map((term) => `${term.name} (${term.startDate} to ${term.endDate})`).join(', ')
+            : 'none are configured';
+
+        throw createError({
+            statusCode: 422,
+            statusMessage: `Those dates fall outside every term, so nothing would be blocked. Terms: ${known}.`,
+            data: { field: 'startDate' },
+        });
+    }
+
+    if (overlapping.length > 1) {
+        throw createError({
+            statusCode: 422,
+            statusMessage: 'That range spans more than one term '
+                + `(${overlapping.map((term) => term.name).join(', ')}). `
+                + 'Enter one absence per term — a single entry counts the weeks of one term only.',
+            data: { field: 'endDate' },
+        });
+    }
+
+    const term = overlapping[0] as TermWindow;
+    const resolution = resolveHolidayWeeks(new Date(term.startDate), new Date(term.endDate), from, to);
+
+    if (resolution.weeks.length === 0) {
+        throw createError({
+            statusCode: 422,
+            statusMessage: `Those dates resolve to no teaching week of ${term.name}.`,
+            data: { field: 'startDate' },
+        });
+    }
+
+    return { term, resolution };
+}
+
+/**
+ * Payload for one submitted window.
+ *
+ * Ranges are NOT checked here. `validateWindow` needs the tenant's grid, which a
+ * synchronous zod refinement cannot read — the same split `constraintShapeRefinement`
+ * and `constraintBeforeUpdate` already make for the same reason.
+ */
+export const windowSchema = z.object({
+    days: z.array(z.number().int()).max(7).default([]),
+    blocks: z.array(z.number().int()).max(64).default([]),
+    weeks: z.array(z.number().int()).max(64).default([]),
+    reason: z.string().trim().max(500).nullish(),
+});
+
+/**
+ * A date-range absence, as the form submits it.
+ *
+ * Dates in, weeks out — the caller never sends week indices. Letting a client
+ * compute them would be a second implementation of `weekIndexOf`, which is the
+ * arithmetic this project already had to unify once after two copies agreed
+ * right up until they did not.
+ */
+export const holidaySchema = z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date.'),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date.'),
+    reason: z.string().trim().max(500).nullish(),
+});
+
+export const preferencesSchema = z.object({
+    preferredDays: z.array(z.number().int().min(1).max(7)).max(7).default([]),
+    preferredBlocks: z.array(z.number().int().min(0)).max(64).default([]),
+});
+
+/**
+ * Grid-aware refusal, shared by the self-service and administrator write paths
+ * so the two cannot diverge on what a legal window is.
+ *
+ * Deduplicates and sorts as a side effect: `[5,5,1]` and `[1,5]` are the same
+ * window, and storing both shapes would make two identical vetoes look
+ * different in the review queue.
+ */
+export function normaliseWindow(
+    input: { days: number[]; blocks: number[]; weeks: number[] },
+    limits: GridLimits,
+): UnavailabilityWindow {
+    const window: UnavailabilityWindow = {
+        days: [...new Set(input.days)].sort((a, b) => a - b),
+        blocks: [...new Set(input.blocks)].sort((a, b) => a - b),
+        weeks: [...new Set(input.weeks)].sort((a, b) => a - b),
+    };
+
+    const problems = validateWindow(window, { blocksPerDay: limits.blocksPerDay });
+
+    if (problems.length) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: problems.map((problem) => problem.message).join(' '),
+            data: { field: problems[0]?.field },
+        });
+    }
+
+    /*
+     * "Never available, on any day, in any week" is legal on the wire and the
+     * solver honours it literally. It is also almost always a mis-click, and it
+     * is the most destructive thing a veto can say — so it is refused at the
+     * boundary rather than routed through approval where somebody might wave it
+     * past in a list of twenty.
+     */
+    if (isTotalBlackout(window)) {
+        throw createError({
+            statusCode: 422,
+            statusMessage: 'That window names no day, block or week, which means "never available at all". '
+                + 'Pick at least one day, block or week.',
+            data: { field: 'days' },
+        });
+    }
+
+    return window;
+}

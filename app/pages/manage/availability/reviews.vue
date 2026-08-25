@@ -1,0 +1,633 @@
+<template>
+    <ManageShell
+        description="Unavailability people have declared for themselves, waiting on a decision."
+        title="Unavailability review"
+    >
+        <p class="intro">
+            A declared window is a <strong>hard</strong> rule for the scheduler, so a
+            self-declared one stays inert until it is approved here. Windows an
+            administrator entered directly are already approved — approving your own
+            authorized action would be ceremony, not control.
+        </p>
+
+        <p
+            v-if="error"
+            class="note note--error"
+            role="alert"
+        >{{ error }}</p>
+
+        <!--
+            ENTRY, not just review. `POST /api/availability/vetoes` existed from
+            the previous slice with nothing calling it — an administrator could
+            approve somebody else's window but not record one, which is the more
+            common case when leave is reported by email.
+        -->
+        <section
+            v-if="canDecide"
+            class="entry"
+        >
+            <header class="entry_head">
+                <h2>Record unavailability for someone</h2>
+                <span class="entry_hint">Entered here, it is approved immediately.</span>
+            </header>
+
+            <label class="entry_field">
+                <span class="entry_label">Person</span>
+                <select
+                    v-model="subject"
+                    class="entry_input"
+                >
+                    <!-- `:selected` so the choice survives SSR; see ManageField. -->
+                    <option
+                        :selected="!subject"
+                        value=""
+                    >— Pick a person —</option>
+                    <option
+                        v-for="person in people"
+                        :key="person.id"
+                        :selected="person.id === subject"
+                        :value="person.id"
+                    >{{ person.familyName }}, {{ person.givenName }}</option>
+                </select>
+            </label>
+
+            <div class="modes">
+                <button
+                    class="modes_tab"
+                    :class="{ 'modes_tab--on': mode === 'recurring' }"
+                    type="button"
+                    @click="mode = 'recurring'"
+                >
+                    <strong>Every week</strong>
+                    <span>Days or blocks they never teach</span>
+                </button>
+                <button
+                    class="modes_tab"
+                    :class="{ 'modes_tab--on': mode === 'holiday' }"
+                    type="button"
+                    @click="mode = 'holiday'"
+                >
+                    <strong>Specific dates</strong>
+                    <span>Holiday or another absence</span>
+                </button>
+            </div>
+
+            <template v-if="mode === 'holiday'">
+                <AvailabilityHolidayForm
+                    ref="holidayForm"
+                    :busy="busy === 'entry'"
+                    :error="entryError"
+                    submit-label="Record it"
+                    :terms="terms"
+                    @submit="submitHoliday"
+                />
+            </template>
+
+            <template v-else>
+                <ManageWeekdayPicker
+                    v-model="draftDays"
+                    help="Leave every day unticked to mean the whole week."
+                    label="Days"
+                />
+
+                <AvailabilityBlockPicker
+                    v-model="draftBlocks"
+                    :grid="grid"
+                    help="Leave every block unticked to mean the whole day."
+                    label="Blocks"
+                />
+
+                <p
+                    v-if="entryError"
+                    class="note note--error"
+                    role="alert"
+                >{{ entryError }}</p>
+
+                <div class="entry_actions">
+                    <common-button
+                        :disabled="busy === 'entry' || !subject || (!draftDays.length && !draftBlocks.length)"
+                        type="primary"
+                        @click="submitRecurring"
+                    >{{ busy === 'entry' ? 'Recording…' : 'Record it' }}</common-button>
+                </div>
+            </template>
+        </section>
+
+        <section class="queue">
+            <header class="queue_head">
+                <h2>Waiting for review</h2>
+                <span class="queue_count">{{ pending.length }}</span>
+            </header>
+
+            <p
+                v-if="!pending.length"
+                class="empty"
+            >Nothing is waiting. Decided windows are listed below.</p>
+
+            <ul
+                v-else
+                class="rows"
+            >
+                <li
+                    v-for="row in pending"
+                    :key="row.id"
+                    class="rows_row"
+                >
+                    <div class="rows_main">
+                        <strong>{{ nameOf(row) }}</strong>
+                        <span>{{ describeRow(row) }}</span>
+                        <span
+                            v-if="row.reason"
+                            class="rows_reason"
+                        >“{{ row.reason }}”</span>
+                    </div>
+
+                    <label class="rows_note">
+                        <span class="sr-only">Note for {{ nameOf(row) }}</span>
+                        <input
+                            v-model="notes[row.id]"
+                            maxlength="500"
+                            placeholder="Optional note back to them"
+                            type="text"
+                        >
+                    </label>
+
+                    <div class="rows_actions">
+                        <common-button
+                            :disabled="busy === row.id"
+                            type="primary"
+                            @click="decide(row.id, 'APPROVED')"
+                        >Approve</common-button>
+                        <common-button
+                            :disabled="busy === row.id"
+                            type="secondary"
+                            @click="decide(row.id, 'REJECTED')"
+                        >Reject</common-button>
+                    </div>
+                </li>
+            </ul>
+        </section>
+
+        <section class="queue">
+            <header class="queue_head">
+                <h2>Already decided</h2>
+                <span class="queue_count">{{ decided.length }}</span>
+            </header>
+
+            <p
+                v-if="!decided.length"
+                class="empty"
+            >Nothing decided yet.</p>
+
+            <ul
+                v-else
+                class="rows"
+            >
+                <li
+                    v-for="row in decided"
+                    :key="row.id"
+                    class="rows_row"
+                >
+                    <div class="rows_main">
+                        <span
+                            class="rows_status"
+                            :class="`rows_status--${row.status.toLowerCase()}`"
+                        >{{ row.status }}</span>
+                        <strong>{{ nameOf(row) }}</strong>
+                        <span>{{ describeRow(row) }}</span>
+                        <span
+                            v-if="row.decisionNote"
+                            class="rows_reason"
+                        >Note: {{ row.decisionNote }}</span>
+                    </div>
+
+                    <!--
+                        A rejected row is KEPT so the submitter can see what
+                        happened to it. Deleting is a separate, deliberate act
+                        rather than what rejecting silently does.
+                    -->
+                    <div class="rows_actions">
+                        <common-button
+                            :disabled="busy === row.id"
+                            type="destructive"
+                            @click="remove(row.id)"
+                        >Delete</common-button>
+                    </div>
+                </li>
+            </ul>
+        </section>
+    </ManageShell>
+</template>
+
+<script setup lang="ts">
+import type { TermWindow } from '#shared/availability';
+import type { TimeGrid } from '~/composables/schedule';
+import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
+import AvailabilityHolidayForm from '~/components/availability/AvailabilityHolidayForm.vue';
+import ManageShell from '~/components/manage/ManageShell.vue';
+import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
+import { describeWindow } from '~/utils/availabilityLabels';
+import { useHasPermission } from '~/composables/session';
+
+definePageMeta({
+    /*
+     * Gated INLINE rather than through the `manage` middleware: that one resolves
+     * the route segment against the entity registry and 404s anything it does
+     * not recognise, and this page is not a registry entity — it has no list,
+     * no row form and no `/api/reviews` resource behind it.
+     */
+    middleware: [
+        () => {
+            const held = new Set(useSession().value?.permissions ?? []);
+
+            if (!held.has('availability.manage_any')) {
+                return abortNavigation(createError({
+                    statusCode: 403,
+                    statusMessage: 'Reviewing unavailability needs availability.manage_any.',
+                }));
+            }
+        },
+    ],
+});
+
+useHead({ title: 'Unavailability review' });
+
+interface ReviewRow {
+    id: string;
+    personId: string;
+    days: number[];
+    blocks: number[];
+    weeks: number[];
+    termId: string | null;
+    term: { name: string } | null;
+    reason: string | null;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    decisionNote: string | null;
+    person: { givenName: string; familyName: string } | null;
+}
+
+interface PersonRow {
+    id: string;
+    givenName: string;
+    familyName: string;
+}
+
+const request = useRequestFetch();
+
+/*
+ * ONE endpoint now carries the whole page: the queue, the people to record for,
+ * the grid to name blocks and the terms to resolve dates against. It used to
+ * borrow the grid from the preferences endpoint, which worked and read as an
+ * accident; everything a page needs arriving under its own gate is the rule this
+ * area follows, and a second call was one more thing to get 403 on.
+ */
+const { data, refresh } = await useAsyncData(
+    'manage:availability-reviews',
+    () => request<{
+        rows: ReviewRow[];
+        people: PersonRow[];
+        grid: TimeGrid | null;
+        terms: TermWindow[];
+    }>('/api/availability/vetoes'),
+);
+
+const grid = computed(() => data.value?.grid ?? null);
+const terms = computed(() => data.value?.terms ?? []);
+const people = computed(() => data.value?.people ?? []);
+const rows = computed(() => data.value?.rows ?? []);
+const pending = computed(() => rows.value.filter((row) => row.status === 'PENDING'));
+const decided = computed(() => rows.value.filter((row) => row.status !== 'PENDING'));
+
+const notes = ref<Record<string, string>>({});
+const busy = ref<string | null>(null);
+const error = ref('');
+
+/** The entry form's own state, kept apart so a failed decision cannot blank it. */
+const subject = ref('');
+const mode = ref<'recurring' | 'holiday'>('recurring');
+const draftDays = ref<number[]>([]);
+const draftBlocks = ref<number[]>([]);
+const entryError = ref('');
+const holidayForm = ref<{ reset: () => void } | null>(null);
+
+// UI only — every route re-checks. Kept because the page is reachable with
+// `read_any` through a direct URL even though the nav offers it only to
+// `manage_any`.
+const canDecide = useHasPermission('availability.manage_any');
+
+/**
+ * A holiday row reads as its term and weeks, a recurring one as its pattern.
+ *
+ * `describeWindow` renders the wire's emptiness convention faithfully — empty
+ * `days` IS every day — which is right for a recurring window and misleading for
+ * a holiday, where the empty axes are how "the whole of these weeks" is spelled.
+ */
+function describeRow(row: ReviewRow): string {
+    if (row.weeks.length === 0) {
+        return describeWindow(row, grid.value);
+    }
+
+    const label = row.term?.name ?? 'term';
+    const weeks = row.weeks.map((week) => week + 1).join(', ');
+
+    return `${label}: week${row.weeks.length === 1 ? '' : 's'} ${weeks} — away all day`;
+}
+
+async function submitRecurring() {
+    busy.value = 'entry';
+    entryError.value = '';
+
+    try {
+        await request('/api/availability/vetoes', {
+            method: 'POST',
+            body: { personId: subject.value, days: draftDays.value, blocks: draftBlocks.value, weeks: [] },
+        });
+
+        draftDays.value = [];
+        draftBlocks.value = [];
+        await refresh();
+    } catch (cause) {
+        entryError.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that.';
+    } finally {
+        busy.value = null;
+    }
+}
+
+async function submitHoliday(payload: { startDate: string; endDate: string; reason: string | null }) {
+    if (!subject.value) {
+        entryError.value = 'Pick a person first.';
+
+        return;
+    }
+
+    busy.value = 'entry';
+    entryError.value = '';
+
+    try {
+        await request('/api/availability/vetoes/holidays', {
+            method: 'POST',
+            body: { ...payload, personId: subject.value },
+        });
+
+        holidayForm.value?.reset();
+        await refresh();
+    } catch (cause) {
+        entryError.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that.';
+    } finally {
+        busy.value = null;
+    }
+}
+
+function nameOf(row: ReviewRow): string {
+    return row.person
+        ? `${row.person.givenName} ${row.person.familyName}`.trim()
+        // An unresolvable reference shows the id rather than an empty cell: a
+        // missing name is something to see, not to hide.
+        : row.personId;
+}
+
+async function decide(id: string, decision: 'APPROVED' | 'REJECTED') {
+    if (!canDecide.value) {
+        return;
+    }
+
+    busy.value = id;
+    error.value = '';
+
+    try {
+        await request(`/api/availability/vetoes/${id}/decision`, {
+            method: 'POST',
+            body: { decision, note: notes.value[id]?.trim() || null },
+        });
+
+        await refresh();
+    } catch (cause) {
+        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that decision.';
+    } finally {
+        busy.value = null;
+    }
+}
+
+async function remove(id: string) {
+    busy.value = id;
+    error.value = '';
+
+    try {
+        await request(`/api/availability/vetoes/${id}`, { method: 'DELETE' });
+        await refresh();
+    } catch (cause) {
+        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not delete that.';
+    } finally {
+        busy.value = null;
+    }
+}
+</script>
+
+<style scoped lang="scss">
+.intro,
+.note,
+.empty {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    line-height: 1.6;
+    color: $content7;
+}
+
+.note--error {
+    font-weight: 600;
+    color: $error700;
+}
+
+.entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
+
+    background: $surface1;
+
+    &_head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: baseline;
+
+        h2 {
+            margin: 0;
+            font-size: var(--font-size-md);
+            font-weight: 680;
+            color: $content2;
+        }
+    }
+
+    &_hint {
+        font-size: var(--font-size-sm);
+        color: $content7;
+    }
+
+    &_field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+        max-width: 360px;
+    }
+
+    &_label {
+        font-size: var(--font-size-sm);
+        font-weight: 650;
+        color: $content4;
+    }
+
+    &_input {
+        width: 100%;
+        padding: 10px var(--space-5);
+        border: 1px solid $surface4;
+        border-radius: var(--radius-lg);
+
+        font-family: inherit;
+        font-size: var(--font-size-md);
+        color: $content3;
+
+        background: $surface0;
+    }
+
+    &_actions {
+        display: flex;
+        gap: var(--space-3);
+    }
+}
+
+.modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+
+    &_tab {
+        cursor: pointer;
+
+        display: flex;
+        flex: 1 1 200px;
+        flex-direction: column;
+        gap: 2px;
+
+        padding: var(--space-4) var(--space-5);
+        border: 1px solid $surface4;
+        border-radius: var(--radius-lg);
+
+        font-family: inherit;
+        text-align: left;
+
+        background: $surface0;
+
+        strong {
+            font-size: var(--font-size-md);
+            color: $content2;
+        }
+
+        span {
+            font-size: var(--font-size-sm);
+            color: $content7;
+        }
+
+        &--on {
+            border-color: $primary500;
+            background: $surface2;
+        }
+    }
+}
+
+.queue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+
+    &_head {
+        display: flex;
+        gap: var(--space-3);
+        align-items: baseline;
+
+        h2 {
+            margin: 0;
+            font-size: var(--font-size-md);
+            font-weight: 680;
+            color: $content2;
+        }
+    }
+
+    &_count {
+        font-size: var(--font-size-sm);
+        font-variant-numeric: tabular-nums;
+        color: $content7;
+    }
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+
+    margin: 0;
+    padding: 0;
+
+    list-style: none;
+
+    &_row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-4);
+        align-items: center;
+        justify-content: space-between;
+
+        padding: var(--space-5);
+        border-radius: var(--radius-xl);
+
+        background: $surface1;
+    }
+
+    &_main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        font-size: var(--font-size-sm);
+        color: $content3;
+    }
+
+    &_reason {
+        color: $content7;
+    }
+
+    &_status {
+        font-size: var(--font-size-xs);
+        font-weight: 700;
+
+        &--approved {
+            color: $success700;
+        }
+
+        &--rejected {
+            color: $error700;
+        }
+    }
+
+    &_note input {
+        min-width: 220px;
+        padding: 8px var(--space-4);
+        border: 1px solid $surface4;
+        border-radius: var(--radius-lg);
+
+        font-family: inherit;
+        font-size: var(--font-size-sm);
+        color: $content3;
+
+        background: $surface0;
+    }
+
+    &_actions {
+        display: flex;
+        gap: var(--space-2);
+    }
+}
+</style>

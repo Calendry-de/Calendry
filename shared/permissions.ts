@@ -124,6 +124,37 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'violation.read', category: 'violation', description: 'View current constraint violations' },
     { key: 'notification.preview', category: 'notification', description: 'Resolve who a Session change affects' },
 
+    /**
+     * Availability — declared unavailability (a HARD constraint) and soft
+     * scheduling preferences.
+     *
+     * `manage_own` is the SELF-SERVICE capability and covers reading and writing
+     * your own settings in one key. Splitting it would create "may write but not
+     * read your own availability", which is nonsense — and this catalogue has no
+     * implication mechanism, so a nonsense pairing is reachable by grant.
+     *
+     * It is a granted permission rather than an inherent right, and that was the
+     * load-bearing call in the design. The data is yours; the CONSEQUENCE is the
+     * tenant's, because an unreviewed veto can make a term infeasible. Tenants
+     * genuinely differ on whether staff self-declare or a scheduler collects it,
+     * so it has to be grantable.
+     *
+     * What it does NOT do is carry any "own row only" semantics of its own. The
+     * scoping is structural: `/api/me/*` takes no person id from the URL or the
+     * body, so another Person's row is unnameable rather than merely rejected. A
+     * self-scoped FLAG in this catalogue would mean the generic route machinery
+     * had to understand ownership, and a permission marked self-scoped that one
+     * route forgets to narrow reads as safe while being tenant-wide.
+     *
+     * `manage_any` is deliberately not folded into `person.update`. That
+     * currently means "rename people, change their email"; widening it to
+     * "declare when the timetable may not use them" would be a silent authority
+     * increase for everyone who already holds it.
+     */
+    { key: 'availability.manage_own', category: 'availability', description: 'Set your own unavailability and teaching preferences' },
+    { key: 'availability.read_any', category: 'availability', description: "View anyone's unavailability and preferences" },
+    { key: 'availability.manage_any', category: 'availability', description: 'Set, approve and reject unavailability for anyone' },
+
     // Administration
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
     { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },

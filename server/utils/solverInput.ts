@@ -14,6 +14,8 @@ import {
     weekIndexOf,
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
+import { HEAVY_VETO_RATIO, blockedSlotSummary } from '../../shared/availability';
+import { approvedBlackoutsFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
@@ -76,6 +78,21 @@ export interface AssemblyReport {
      * different problems.
      */
     offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
+    /**
+     * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO`
+     * of the teaching week.
+     *
+     * Warn-and-allow, per TAXONOMY.md §3. Heavy unavailability is legitimate and
+     * an administrator already approved it; what it must not do is stay
+     * invisible, because an infeasible term traces back to somebody's calendar
+     * far more often than to anything else in the input, and the solver's output
+     * cannot say so.
+     *
+     * Both numbers travel, so the threshold decides only WHETHER to mention it,
+     * never how bad it is — 20-of-40 and 39-of-40 are obviously different
+     * problems and neither is hidden behind the other.
+     */
+    personsWithHeavyVetoLoad: { id: string; name: string; blocked: number; total: number }[];
     /**
      * Offerings that became SEVERAL independent series, one per attached Group.
      *
@@ -409,6 +426,66 @@ export async function assembleSolverInput(
     // propagation is invisible until a timetable double-books a cohort.
     assertClosedUnderParent(sentGroupRows);
 
+    /**
+     * APPROVED unavailability only, through the single read path in
+     * `availability.ts`.
+     *
+     * Until this landed, `blackouts` was `[]` unconditionally — so
+     * `lecturer_veto`, a HARD constraint enabled by default in every tenant, ran
+     * against an empty set in every solve and could never once fire. It looked
+     * healthy the whole time, which is the point of the story rather than an
+     * aside: a rule with no data is indistinguishable from a rule that is
+     * satisfied.
+     *
+     * PENDING and REJECTED windows are excluded, and that filter is the safety
+     * property of the whole feature: an unreviewed veto reaching the wire would
+     * apply a hard constraint nobody approved, and would announce itself only as
+     * unplaced Sessions. Hence one read path, and a test that fails when the
+     * filter is removed.
+     */
+    const blackoutsByPerson = await approvedBlackoutsFor(
+        tx,
+        personRows.map((person) => person.id),
+        // The term being solved. A week-scoped window counts THIS calendar's
+        // weeks; one from another term would name a different fortnight.
+        term.id,
+    );
+
+    /**
+     * People who have blocked out a large share of the teaching week.
+     *
+     * Warn-and-allow, exactly as TAXONOMY.md §3 has it for manual edits: heavy
+     * unavailability is legitimate (a 20% appointment really is unavailable most
+     * of the week) and refusing it would be this layer overruling an
+     * administrator who already approved it. What it must not do is stay
+     * invisible — an infeasible term traces back to a person's calendar far more
+     * often than to anything else in the input, and that is not deducible from
+     * the solver's output.
+     *
+     * Counted against the DEFAULT grid, blanket windows only. See
+     * `blockedSlotSummary`.
+     */
+    const personsWithHeavyVetoLoad: { id: string; name: string; blocked: number; total: number }[] = [];
+
+    for (const person of personRows) {
+        const windows = blackoutsByPerson.get(person.id) ?? [];
+
+        if (windows.length === 0) {
+            continue;
+        }
+
+        const summary = blockedSlotSummary(windows, grid.activeDays, grid.blocksPerDay);
+
+        if (summary.total > 0 && summary.blocked / summary.total >= HEAVY_VETO_RATIO) {
+            personsWithHeavyVetoLoad.push({
+                id: person.id,
+                name: `${person.givenName} ${person.familyName}`.trim(),
+                blocked: summary.blocked,
+                total: summary.total,
+            });
+        }
+    }
+
     const persons: Person[] = personRows.map((person) => ({
         id: person.id,
         roleTags: person.personRoles.map((link) => link.role.key),
@@ -426,9 +503,17 @@ export async function assembleSolverInput(
         groupIds: person.memberships
             .map((link) => link.groupId)
             .filter((groupId) => sentGroupIds.has(groupId)),
-        // The app models no unavailability at all, so this is empty and
-        // LecturerVeto is unsendable. Tracked; see the Stage 3d follow-up.
-        blackouts: [],
+        blackouts: (blackoutsByPerson.get(person.id) ?? []).map((window) => ({
+            days: window.days,
+            blocks: window.blocks,
+            weeks: window.weeks,
+            // The wire carries a reason field; the app deliberately does not
+            // send one. A veto's reason is often personal (medical, caring),
+            // it changes no placement, and the solver never reads it — so it
+            // stays in the database where the tenant's own access rules govern
+            // it rather than travelling to a service that has no use for it.
+            reason: '',
+        })),
     }));
 
     const groups = sentGroupRows.map((group) => ({
@@ -797,6 +882,7 @@ export async function assembleSolverInput(
             droppedEquipmentQuantities,
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
+            personsWithHeavyVetoLoad,
             offeringsSplitByGroup,
             legacyCombinedSessionsOmitted,
             skippedConstraints,

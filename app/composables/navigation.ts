@@ -21,7 +21,7 @@ import { logout, useSession } from '~/composables/session';
  * the real auth model and is now deleted; gating runs on the permission
  * catalogue like everything else.
  */
-export type NavSection = 'schedule' | 'manage' | 'account';
+export type NavSection = 'schedule' | 'my' | 'manage' | 'account';
 
 export interface NavEntry {
     /** Stable id. Used as a key and for the palette's recent-selection memory. */
@@ -57,6 +57,7 @@ export interface ResolvedNavEntry extends NavEntry {
 
 export const NAV_SECTION_LABELS: Record<NavSection, string> = {
     schedule: 'Schedule',
+    my: 'My settings',
     manage: 'Manage',
     account: 'Account',
 };
@@ -126,7 +127,98 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             inHeader: true,
         },
 
+        {
+            id: 'my',
+            label: 'My settings',
+            description: 'Your own availability and teaching preferences.',
+            icon: 'material-symbols:manage-accounts-outline',
+            section: 'my',
+            keywords: ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences'],
+            /*
+             * IN THE HEADER, and gated on the one permission both of its pages
+             * need.
+             *
+             * Without this entry the whole section was unreachable by clicking:
+             * `ViewMenu` renders `useHeaderNav()`, which is entries carrying
+             * `inHeader`, and the two pages below deliberately do not carry it —
+             * they are section contents, exactly as the manage entities are.
+             * So the pages rendered, the middleware gated them correctly, and
+             * every test passed while a lecturer had no way to get there short
+             * of typing the URL or opening the palette.
+             *
+             * Unlike `manage`, this one DOES name a permission. That hub has
+             * none because "may read at least one section" is not a single key
+             * and has to be derived from the projected entries; here both pages
+             * are behind `availability.manage_own`, so the hub is too, and
+             * deriving it would be a rule with one input.
+             */
+            permission: 'availability.manage_own',
+            to: '/my',
+            inHeader: true,
+        },
+        {
+            id: 'my.availability',
+            label: 'My unavailability',
+            description: 'Days and blocks you cannot teach. Submitted for approval.',
+            icon: 'material-symbols:event-busy-outline',
+            section: 'my',
+            keywords: ['availability', 'unavailable', 'veto', 'blackout', 'absence', 'busy', 'my'],
+            /*
+             * ONE permission, and deliberately not the six-permission shape
+             * `/schedule` needs. Everything this page renders — the grid, the
+             * block times, the person's own rows — travels in the response of
+             * the single endpoint behind this key, precisely so the link cannot
+             * lead somewhere that then 403s on a reference fetch.
+             */
+            permission: 'availability.manage_own',
+            to: '/my/availability',
+        },
+        {
+            id: 'my.preferences',
+            label: 'My teaching preferences',
+            description: 'Days and times you would rather teach. Recorded, not yet used by the scheduler.',
+            icon: 'material-symbols:favorite-outline',
+            section: 'my',
+            keywords: ['preference', 'preferred', 'mornings', 'days', 'teaching', 'my'],
+            permission: 'availability.manage_own',
+            to: '/my/preferences',
+        },
+
         ...manageEntries(),
+
+        {
+            id: 'manage.availability-reviews',
+            label: 'Unavailability review',
+            description: 'Approve or reject unavailability people have declared for themselves.',
+            icon: 'material-symbols:fact-check-outline',
+            section: 'manage',
+            keywords: ['review', 'approve', 'reject', 'pending', 'veto', 'unavailability', 'blackout'],
+            /*
+             * Read needs either administration key; DECIDING needs manage_any.
+             * The nav gates on the narrower one because a page whose only
+             * actions are approve and reject is not worth offering to somebody
+             * who can do neither — the overview below is where `read_any`
+             * belongs.
+             */
+            permission: 'availability.manage_any',
+            to: '/manage/availability/reviews',
+        },
+        {
+            id: 'manage.availability-preferences',
+            label: 'Teaching preferences',
+            description: 'View and set anyone\u2019s preferred days and blocks.',
+            icon: 'material-symbols:groups-outline',
+            section: 'manage',
+            keywords: ['preferences', 'preferred days', 'mornings', 'staff', 'lecturer'],
+            /*
+             * `read_any` is enough to reach this page — viewing who prefers what
+             * without being able to change it is the whole reason that key
+             * exists as its own grant rather than being implied by manage_any.
+             * The page itself renders read-only without manage_any.
+             */
+            permission: 'availability.read_any',
+            to: '/manage/availability/preferences',
+        },
 
         {
             id: 'account.theme',

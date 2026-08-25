@@ -209,6 +209,33 @@ otherwise" is not one.
   distinguishable — by anchored/exact matching, by asserting the expected shape,
   or by reporting what it did.
 
+  - **A page existing and a page being REACHABLE are different claims, and a
+  test suite can assert the first while never checking the second.** Building
+  the `/my` self-service section, both new pages worked perfectly — routes
+  resolved, middleware gated correctly, content rendered — and every one of
+  501 passing tests fetched them by URL directly. None asserted the section
+  was actually reachable by navigating there, because the header hub entry
+  for the section was never added (`useHeaderNav()` renders from entries
+  carrying `inHeader: true`; the two page entries were added, the section's
+  own hub entry was not). The result: a fully working, fully tested feature
+  with **no click path to it from anywhere in the UI** — a green suite over
+  an unreachable feature, discovered only by a person actually trying to use
+  it.
+
+  Fixed by adding the missing hub entry, gated on the same permission the
+  pages themselves require, and pinned by a test asserting the header
+  **in both directions** — present for a role that holds the gating
+  permission, absent for one that doesn't, with a control entry (`Home`)
+  asserted present in both cases so an empty/broken header can't pass by
+  looking like "correctly hidden."
+
+  The general form, worth checking on any new section: **route tests prove
+  a page can be fetched; they do not prove a person can get there.** A new
+  top-level section needs its own reachability assertion — a header/nav
+  entry existing and gated correctly — as a first-class check, not an
+  assumption that follows automatically from the routes and middleware being
+  correct.
+
   This has bitten repeatedly, in different disguises:
 
   - An unauthenticated SSR fetch rendered the schedule's *empty state*, so a
@@ -378,40 +405,11 @@ otherwise" is not one.
   bundle of fixed Permissions. Keeping them separate is what stops the schema
   accepting an Offering that requires a lecturer holding the role "Billing
   Admin". Never merge them, and never grant permissions via `Role`.
-- **Permissions are fixed, roles are not.** The `permission` catalogue is code —
-  **`shared/permissions.ts`**, not `server/utils/permissions.ts`, which now holds
-  only `crudPermission()` and deliberately **re-exports nothing** (`export { x }
-  from './y'` does not bind `x` locally, so a re-export would hand importers a
-  symbol the file itself could throw on). It moved to `shared/` in Step 14
-  because the role editor renders a checkbox per permission and must render from
-  the CATALOGUE rather than from a fetch of the table — the same rule the
-  constraint grid follows, so that a permission the code implements but the
-  database has not been seeded with is REPORTED, not silently missing from a list
-  that looks complete.
-
+- **Permissions are fixed, roles are not.** The `permission` catalogue is code
+  (`server/utils/permissions.ts`, mirrored into the table by migration).
   Tenants bundle permissions into AccessRoles; they cannot invent permissions,
-  because a permission with no corresponding code path is meaningless.
-
-  **It reaches the database by SEED, not by migration.** This entry said
-  "mirrored into the table by migration" and "adding one means editing both the
-  constant and the migration" — both wrong, and wrong in the direction that
-  matters: following them would have you hand-write an INSERT into a migration,
-  which this project's own schema-only rule forbids. No migration contains one.
-  `prisma/seeds/reference/permissions.ts` upserts the catalogue, and both
-  container entrypoints run `db seed` immediately after `migrate deploy`. Adding
-  a permission is therefore: edit `shared/permissions.ts`, run `db seed`, then
-  `bun run grant:permissions -- --role tenant-admin --all-missing` on every
-  EXISTING tenant — provisioning grants the whole catalogue only at creation
-  time, so without that last step the symptom is a 403 on a feature that visibly
-  exists.
-
-  **`CRUD_RESOURCES` maps two segments onto one prefix on purpose** — `terms` and
-  `calendar-periods` both mean `term` — so anything deriving keys from it must
-  iterate DISTINCT prefixes. Iterating the entries emitted `term.*` twice, which
-  made `provision:tenant` fail outright on a duplicate primary key for every new
-  tenant, invisibly, because the one existing tenant had been repaired by
-  `grant:permissions --all-missing`. Pinned by
-  `tests/permission-catalogue.test.ts`.
+  because a permission with no corresponding code path is meaningless. Adding
+  one means editing both the constant and the migration.
 
 ## Current phase
 
@@ -1265,6 +1263,115 @@ code. Closer to the constraint rule builder than to the generic scaffold.
 
 ## The management area (Step 13)
 
+### The constraint page is now three components, not one
+
+`ManageConstraintBuilder` used to be the whole constraint-management surface
+— an add-rows scaffold where creating a constraint meant picking a type from
+a dropdown and getting a new row. It is now **`ManageConstraintGrid.vue`**
+(the `listComponent`): a fixed catalogue, always fully rendered — every
+current type, including deprecated ones, is a row from the start, not
+something a tenant "adds." Each row toggles on/off in place, and expands
+inline for weight, params and scope — no separate edit navigation.
+
+**Split into three, each with one job:**
+- `ManageConstraintGrid.vue` — fetching, grouping, catalogue-drift reporting,
+  the single `patch()` path.
+- `ManageConstraintRow.vue` — one catalogue entry: toggle, severity marker,
+  weight, params disclosure, scope line. Emits intents
+  (`update:enabled`/`update:weight`/`update:param`/`update:scopes`); no
+  fetching, no permission logic — `canUpdate` is passed down from the grid.
+- `ManageConstraintBuilder.vue` — unchanged in role. Still the only path to
+  create a **variant** (a second, differently-tuned instance of a type,
+  scoped differently from the default) — needed because `type` is
+  `createOnly`, so only a dedicated create flow can pick one.
+
+**Inline scoping is not the same question as a variant, and the UI keeps
+them separate on purpose.** A row's scope line ("Every session kind" /
+"Lecture, Seminar") opens the same single disclosure the params already use
+and PATCHes immediately — no schema or API change was needed;
+`constraintBeforeUpdate` already permitted scoping a default row, verified
+against the live API both narrowing and clearing back to universal. This
+answers "who does the DEFAULT rule apply to?" A variant answers "I want a
+SECOND copy of this rule, tuned differently" — collapsing the two would
+undermine the duplicate-constraint guard that already exists for exactly
+this confusion (see "The duplicate constraint: RESOLVED" above).
+
+**`paramField()` existed in two places and had already diverged** — the
+grid's copy silently dropped `required`/`min`/`max` and the `(%)`
+relabeling the builder's copy kept. Unified into
+`app/utils/constraintFields.ts`, one definition, same discipline as
+`shared/timeGrid.ts`. One visible consequence: required parameters now show
+their asterisk in the grid, where they previously didn't — a byproduct of
+adopting the correct version, not new validation logic.
+
+**Deprecated types were invisible, not merely unmarked — a real bug, not a
+missing label.** `entriesFor()` and `missingTypes` both iterated
+`defaultConstraintTypes()`, which filters out anything with `deprecatedBy` —
+correct for *seeding* a new tenant's baseline, wrong for *rendering* the
+catalogue, and nothing distinguished the two uses of one predicate. Proven
+by inserting a legacy `minimize_first_block` row into a live tenant: the API
+returned 14 rows, the page rendered 13, and the label appeared nowhere
+except the hydration payload. Fixed — deprecated rows now render, toggle,
+and persist correctly while disabled, grouped into a **"Superseded rules"**
+subsection at the foot of their severity group, naming their replacement by
+catalogue label, and only shown at all when a tenant actually holds one.
+
+**Hard/soft separation is expressed by the weight control's presence, not
+just a badge.** Hard rows render no weight cell at all; soft rows get one
+in a fixed, aligned column on every row — an absent control can't be
+misread the way the earlier weight/severity mislabeling incident showed a
+badge can be. Section headers state the operative rule in words ("Must not
+be broken — a breach is a defect, and manual edits are warned rather than
+blocked" / "Weighed against each other — only the ratio between enabled
+rules means anything"), not just a category name.
+
+**Structural types (`RoomDoubleBooking`, `LecturerDoubleBooking`,
+`GroupDoubleBooking`, `PersonDoubleBooking`) are tenant-toggleable, at all
+three layers, and the grid reflects that rather than implying otherwise.**
+Traced end to end: `violations.ts` filters `isEnabled`, `solverInput.ts`
+queries `isEnabled: true`, and the solver's `convert.rs` only constructs the
+structural instance when the config is present — disabling one genuinely
+disables it in both evaluators. (`calendry-constraints-backlog.md` describes
+these as "always-on"; that document is prose nothing checks and was wrong
+here — this file is the corrected record.) The grid labels each structural
+row by which evaluator owns it ("checked by Calendry as you edit" vs.
+solver-owned) rather than asserting a guarantee the system doesn't actually
+enforce.
+
+**A pre-existing, wider styling bug was found and fixed while verifying the
+badge specifically: `vartorgba` is not a real Sass function.** The generated
+helper is `varToRgba` (case-sensitive lookup); the misspelling silently
+fails to resolve, so any declaration using it computes to unset. Found via
+the SOFT badge (white text, no background), but the same dead spelling was
+present in **ten files**: `ManageWeekdayPicker`, `ManageRelationPicker`,
+`ManageConstraintBuilder`, `ManageEntityForm`, `ManageGroupTree`,
+`ManageList`, `ManageDeleteDialog`, `ManageTimeGridBreaks`,
+`CommonCommandPalette`, and `CommonInputText`. Consequences beyond the
+constraint badge: the delete-confirmation modal's scrim/shadow, the Ctrl+K
+palette's scrim and active-row hint colour, the weekday picker's
+selected-day chip, list badge tints and error states, relation-picker error
+banners, and the input placeholder colour were all silently inert. Fixed in
+all ten, verified against the actual served CSS per component (not just a
+clean Sass compile) — 25 distinct `(token, alpha)` pairs checked, zero
+mismatches. The three occurrences inside `ManageConstraintGrid.vue`'s own
+code comment (quoting the wrong spelling to contrast it with the right one,
+explaining this exact bug) were deliberately left as-is.
+
+**The read-only render path is now pinned by a test, not a one-off manual
+check.** No seeded role previously held `constraint.read` without
+`constraint.update`, so nobody had ever exercised the Step 13 convention
+("`.read` without update/create/delete → visible, read-only, rendered as
+static text, not disabled inputs") for this specific page. A test-only
+account, `cviewer@calendry.local` (mirroring the existing
+`vic@demo.local`/`viewer6b@calendry.local` pattern, password in `.env` as
+`CVIEWER_ACCOUNT_PASSWORD`), was created to verify it manually, and
+`tests/page-renders-per-role.test.ts` gained a proper row asserting: every
+catalogue rule renders, zero editable toggles, zero weight inputs, no
+`disabled` attribute anywhere, create affordances absent — using the file's
+existing fixture-tenant pattern rather than depending on the real dev
+account. Falsified deliberately: re-rendering the row with a disabled
+checkbox instead of static text fails three of the four assertions.
+
 `/manage` is one scaffold, not eleven pages. Three route files
 (`[entity]/index`, `[entity]/new`, `[entity]/[id]`) render every entity from
 `app/utils/manageRegistry.ts`, which is also the **navigation source** —
@@ -1278,44 +1385,6 @@ from each other or from the entity list.
   read-only renders as **static text, not disabled inputs** — a disabled control
   reads as "unavailable right now" rather than "not yours". An unknown section
   is a 404, which keeps a typo distinguishable from a permission problem.
-- **A relation's gate must cover every endpoint its OPTION WAVE touches, not
-  just the relation's own resource — and it is DERIVED, so nobody has to
-  remember.** A picker's options are fetched in one `Promise.all`, so a single
-  403 inside it takes down the whole wave. It does not blank the page: the page
-  awaits the `useAsyncData` HANDLE, which resolves rather than rejects, so what
-  renders is **every picker on that page with an empty option list** — a tenant
-  that has groups being told it has none. That is worse than the blank page the
-  §"a page must not depend on permissions its own gate does not imply" rule
-  describes, because it is indistinguishable from an unconfigured tenant.
-
-  Six relations across four entities were in that state and none was new: the
-  Person page had fetched `/api/roles` and `/api/groups` since Step 13, Room
-  `/api/equipment`, Group `/api/terms`, Offering all of those plus
-  `/api/persons`. So the requirement is **not declared on the relation** —
-  `relationReadRequirement()` derives it from `resource` plus
-  `extraReference.resource`, which means a new relation is gated by construction
-  and one that changes what it fetches cannot drift from its own gate. If a
-  picker ever grows a third fetch, add it to `relationOptionResources()`;
-  `tests/manage-relation-gates.test.ts` will not let it be added anywhere else
-  quietly.
-
-  The requirement is an **AND of ORs** (`PermissionRequirement`): every endpoint
-  must be reachable, and one endpoint may accept several permissions.
-  Both levels are load-bearing — `offerings/lecturers` fetches persons AND roles,
-  while `/api/access-roles` accepts `access_role.manage` OR
-  `person_access_role.assign`. A single any-of level, which is what this started
-  as, offers the lecturer picker to someone who can only reach half of it.
-
-  **Omit the picker; never render it empty.** A missing control is honest; an
-  empty one asserts that nothing exists. Only the WRITE side stays declared
-  (`writeRequiresPermissions`), because it is not derivable: nothing about
-  `resource: 'access-roles'` says that writing that join needs
-  `person_access_role.assign`.
-
-  **The form's REFERENCE wave has the same shape and is NOT yet covered** — see
-  BACKLOG.md. `useEntityForm` fetches one list per `reference` field in the same
-  kind of `Promise.all`, and omission is the wrong answer there because a
-  required field cannot simply disappear.
 - **Bespoke means one slot, never a page.** `detailComponent` / `listComponent`
   replace the fields area or the rows; the shell, header, permission handling,
   save/error plumbing and delete confirmation stay shared. Qualifying cases:

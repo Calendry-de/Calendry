@@ -36,6 +36,25 @@ enum CalendarPeriodKind {
   @@map("calendar_period_kind")
 }
 
+/// Whether a declared unavailability window is actually in force.
+///
+/// Self-declared windows land PENDING and are INERT until an administrator
+/// approves them — `Person.blackouts` on the wire carries approved rows only.
+/// That gate exists because a veto is a HARD constraint: an unreviewed one can
+/// make a term infeasible, and the failure surfaces as unplaced Sessions with
+/// nothing pointing back at the cause.
+///
+/// An administrator writing one directly (`availability.manage_any`) is
+/// approving their own authorized action, so it is written APPROVED with
+/// themselves recorded as the decider rather than queued for a rubber stamp.
+enum PersonUnavailabilityStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("person_unavailability_status")
+}
+
 /// Which owner a Generation came from.
 enum GenerationSource {
   SOLVER
@@ -286,6 +305,8 @@ model Tenant {
   accessRolePermissions AccessRolePermission[]
   personAccessRoles    PersonAccessRole[]
   solverRuns           SolverRun[]
+  personUnavailability PersonUnavailability[]
+  personPreferences    PersonPreference[]
 
   @@index([federationId])
   @@map("tenant")
@@ -327,6 +348,15 @@ model Person {
   authSessions      AuthSession[]
   accessRoles       PersonAccessRole[]
   solverRuns        SolverRun[]
+
+  /// Unavailability declared ABOUT this person (TAXONOMY.md §7, LecturerVeto).
+  unavailability PersonUnavailability[] @relation("PersonUnavailabilitySubject")
+  /// Rows this person SUBMITTED — their own, or somebody else's as an admin.
+  unavailabilitySubmitted PersonUnavailability[] @relation("PersonUnavailabilityAuthor")
+  /// Rows this person approved or rejected.
+  unavailabilityDecided PersonUnavailability[] @relation("PersonUnavailabilityDecider")
+
+  preference PersonPreference?
 
   @@unique([tenantId, email])
   @@unique([tenantId, externalRef])
@@ -381,6 +411,121 @@ model PersonRole {
   @@index([tenantId])
   @@index([roleId])
   @@map("person_role")
+}
+
+/// One declared unavailability window for a Person (TAXONOMY.md §7).
+///
+/// Maps 1:1 to `calendry.solver.v1.Unavailability`, INCLUDING its emptiness
+/// convention: an EMPTY array means "every value on that axis", so `{days:[5]}`
+/// is every Friday and `{blocks:[0]}` is every first block. NOTE that
+/// `person_preference` below INVERTS this — there an empty array means "no
+/// preference". Two adjacent tables with opposite emptiness semantics is
+/// exactly what a later reader gets wrong, so both say so.
+///
+/// Rows are IMMUTABLE once submitted: editing is delete-then-resubmit. An edit
+/// would need its own re-enters-pending state machine, and every deletion
+/// RELAXES the problem — approval exists to stop unilateral tightening, so a
+/// person may always delete their own row whatever its status.
+model PersonUnavailability {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  /// Whose time this is about.
+  personId String @map("person_id")
+
+  /// ISO weekday numbers, 1 = Monday. Empty = every day.
+  days Int[]
+  /// 0-based block index within the day. Empty = every block.
+  blocks Int[]
+  /// Index into the term's calendar weeks. Empty = every week.
+  ///
+  /// Only meaningful alongside `termId`, because the index counts weeks of ONE
+  /// term's calendar — the same index is thirteen months apart between this
+  /// tenant's two terms. A database CHECK enforces the pairing.
+  weeks Int[]
+
+  /// Which term's weeks `weeks` counts, and which solves this row applies to.
+  ///
+  /// NULL means EVERY term, which is what a recurring weekly pattern ("never
+  /// Friday afternoons") means and what every row written before this column
+  /// existed meant. Set for a date-range absence, which is anchored to real
+  /// dates and therefore to one term.
+  termId String? @map("term_id")
+
+  reason String?
+
+  status PersonUnavailabilityStatus @default(PENDING)
+
+  /// Who submitted it — the person themselves, or an administrator acting for
+  /// them. NULLABLE with ON DELETE SET NULL for the same reason
+  /// `session_event.session_id` is: an audit pointer must be allowed to outlive
+  /// the row it names, and deleting an administrator must not cascade away the
+  /// vetoes they entered for other people.
+  createdByPersonId String? @map("created_by_person_id")
+
+  /// Who decided, and when. `decided_at` is the FACT and carries the CHECK;
+  /// `decided_by_person_id` is a pointer that a person deletion may detach,
+  /// which is why the constraint is written against the timestamp instead.
+  decidedByPersonId String?   @map("decided_by_person_id")
+  decidedAt         DateTime? @map("decided_at") @db.Timestamptz(3)
+  /// Shown to the submitter on rejection, so a refusal is never silent.
+  decisionNote String? @map("decision_note")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  term      Term?   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  person    Person  @relation("PersonUnavailabilitySubject", fields: [personId], references: [id], onDelete: Cascade)
+  createdBy Person? @relation("PersonUnavailabilityAuthor", fields: [createdByPersonId], references: [id], onDelete: SetNull)
+  decidedBy Person? @relation("PersonUnavailabilityDecider", fields: [decidedByPersonId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([termId])
+  /// The review queue's own query: pending rows in this tenant.
+  @@index([tenantId, status])
+  /// The solver read path: approved rows for a set of people.
+  @@index([personId, status])
+  @@map("person_unavailability")
+}
+
+/// Soft scheduling preferences for one Person — "prefers mornings", "prefers
+/// Tuesdays".
+///
+/// STORED BUT NOT YET SOLVER-EFFECTIVE. Nothing reads this into `SolverInput`,
+/// because the wire has no field for it: `Person.preferred_days` /
+/// `preferred_blocks` and the `person_preference_fit` constraint type are a
+/// deliberately separate later slice that touches calendry-proto and the
+/// solver.
+///
+/// This is NOT the `lecturer_veto` bug repeating itself. That one was a HARD
+/// constraint, enabled by default in every tenant, silently fed an empty list —
+/// it looked healthy and could never fire. This table feeds nothing, claims to
+/// feed nothing, and the page where people enter the data says so.
+///
+/// An ABSENT row means "no preferences", so the write path DELETES the row when
+/// both arrays end up empty: that state then has exactly one representation
+/// instead of two that render identically.
+model PersonPreference {
+  /// Also the primary key: a Person has at most one preference row by
+  /// construction, not by a unique index somebody could drop.
+  personId String @id @map("person_id")
+  tenantId String @map("tenant_id")
+
+  /// ISO weekday numbers, 1 = Monday. EMPTY MEANS NO PREFERENCE — the opposite
+  /// of `person_unavailability` above, where empty means every value.
+  preferredDays Int[] @map("preferred_days")
+  /// 0-based block index within the day. Empty means no preference.
+  preferredBlocks Int[] @map("preferred_blocks")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("person_preference")
 }
 
 // ---------------------------------------------------------------------------
@@ -656,6 +801,8 @@ model Term {
   timeGrid TimeGrid? @relation(fields: [timeGridId], references: [id], onDelete: Restrict)
 
   calendarPeriods CalendarPeriod[]
+  /// Week-scoped absences whose week indices count THIS term's calendar.
+  personUnavailability PersonUnavailability[]
   offerings       Offering[]
   sessions        Session[]
   solverRuns      SolverRun[]
