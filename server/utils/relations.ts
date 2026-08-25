@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Tx } from './tenantDb';
+import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 
 /**
  * Registry for the join tables hanging off a core entity.
@@ -91,6 +92,21 @@ export interface RelationConfig {
         /** The set as just written. */
         rows: Record<string, unknown>[];
     }) => Promise<string[]>;
+    /**
+     * An invariant about the state the write LEAVES BEHIND. Runs inside the
+     * transaction after the replacement; throwing rolls it back.
+     *
+     * Distinct from `warnAfterWrite` deliberately, and not folded into it. That
+     * one means "this landed, and here is what it implies" — advisory, never a
+     * refusal. Conflating the two would make one hook's return value sometimes
+     * advice and sometimes a veto, which is precisely the ambiguity this
+     * codebase keeps writing rules against.
+     *
+     * `persons/access-roles` is the only user: revoking the last assignment is
+     * one of three routes to a tenant that cannot administer itself, and all
+     * three end in the same function.
+     */
+    afterWrite?: (ctx: { tx: Tx; tenantId: string; id: string }) => Promise<void>;
 }
 
 /** One Term that still uses a Group it is no longer scoped to. */
@@ -302,6 +318,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
         item: z.object({ accessRoleId: id }),
         select: { accessRoleId: true },
         writePermission: ['person_access_role.assign'],
+        afterWrite: ({ tx, tenantId }) => assertTenantRetainsAdministrator(tx, tenantId),
     },
 
     'persons/groups': {

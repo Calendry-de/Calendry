@@ -39,6 +39,10 @@ export default defineEventHandler(async (event) => {
                 await config.writeChildren({ tx, tenantId: identity.tenantId, id: row.id, children });
             }
 
+            // Invariants about the RESULT, measured after the write and inside
+            // the same transaction. Throwing here rolls the insert back.
+            await config.afterWrite?.({ tx, tenantId: identity.tenantId, id: row.id, action: 'create' });
+
             return row;
         });
 

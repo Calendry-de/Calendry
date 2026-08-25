@@ -347,3 +347,161 @@ describe('granting a role to a person', () => {
         expect(read.status).toBe(200);
     });
 });
+
+describe('a tenant cannot write away its own administration', () => {
+    /**
+     * The one invariant with no in-application recovery. Every other permission
+     * can be re-granted by an administrator; these two ARE the administrator, so
+     * losing the last holder means an operator with the owner database URL and
+     * two CLI runs.
+     *
+     * Three routes reach it and all three are checked, because closing one is
+     * exactly the shape of fix that leaves the other two open.
+     */
+    /**
+     * The fixture gives tenant A TWO administrators (Ada and Mel), which is
+     * realistic and makes "the last one" untestable — the first draft of this
+     * block revoked Ada's grant, got a correct 200 because Mel still held it,
+     * and then failed three later assertions with 403s that looked like a broken
+     * guard rather than a broken premise.
+     *
+     * So the extra assignments are lifted for the duration and put back after.
+     * Owner-side: this is arranging the world the tests observe, not exercising
+     * a route.
+     */
+    let liftedAdmins: { personId: string; accessRoleId: string }[] = [];
+
+    beforeAll(async () => {
+        const adminRole = await ownerDb.accessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, key: 'tenant-admin' },
+        });
+
+        const holders = await ownerDb.personAccessRole.findMany({
+            where: { tenantId: TENANT_A, accessRoleId: adminRole.id },
+            orderBy: { personId: 'asc' },
+        });
+
+        liftedAdmins = holders.slice(1).map((row) => ({ personId: row.personId, accessRoleId: row.accessRoleId }));
+
+        await ownerDb.personAccessRole.deleteMany({
+            where: { accessRoleId: adminRole.id, personId: { in: liftedAdmins.map((row) => row.personId) } },
+        });
+    });
+
+    afterAll(async () => {
+        for (const row of liftedAdmins) {
+            await ownerDb.personAccessRole.upsert({
+                where: { personId_accessRoleId: { personId: row.personId, accessRoleId: row.accessRoleId } },
+                create: { ...row, tenantId: TENANT_A },
+                update: {},
+            });
+        }
+    });
+
+    it('refuses an edit that would strip the last access_role.manage', async () => {
+        const admin = await ownerDb.accessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, key: 'tenant-admin' },
+        });
+
+        const stripped = await api<{ statusMessage?: string }>(`/api/access-roles/${admin.id}`, {
+            method: 'PATCH',
+            cookie: cookies.admin,
+            body: JSON.stringify({ permissions: [{ permissionKey: 'session.read' }] }),
+        });
+
+        expect(stripped.status).toBe(422);
+        expect(JSON.stringify(stripped.body)).toContain('access_role.manage');
+
+        // Rolled back, not partially applied: the guard runs inside the write
+        // transaction, so the grants it objected to were never left in place.
+        const held = await ownerDb.accessRolePermission.count({ where: { accessRoleId: admin.id } });
+
+        expect(held).toBeGreaterThan(1);
+    });
+
+    it('refuses revoking the last administrator\'s assignment', async () => {
+        const adminPerson = await ownerDb.personAccessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, accessRole: { key: 'tenant-admin' } },
+        });
+
+        const revoked = await api<{ statusMessage?: string }>(
+            `/api/persons/${adminPerson.personId}/access-roles`,
+            { method: 'PUT', cookie: cookies.admin, body: JSON.stringify([]) },
+        );
+
+        expect(revoked.status).toBe(422);
+
+        // The relation is a delete-then-insert; a guard that ran outside the
+        // transaction would leave the row deleted and report a refusal.
+        const still = await ownerDb.personAccessRole.count({
+            where: { personId: adminPerson.personId, accessRoleId: adminPerson.accessRoleId },
+        });
+
+        expect(still).toBe(1);
+    });
+
+    it('allows stepping back while somebody else still holds it', async () => {
+        const adminRole = await ownerDb.accessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, key: 'tenant-admin' },
+        });
+
+        // Two holders now, so one of them leaving is an ordinary handover rather
+        // than a lockout. Refusing this would be the guard inventing a rule
+        // nobody asked for.
+        await ownerDb.personAccessRole.create({
+            data: { personId: grantTargetId, accessRoleId: adminRole.id, tenantId: TENANT_A },
+        });
+
+        const original = await ownerDb.personAccessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, accessRoleId: adminRole.id, personId: { not: grantTargetId } },
+        });
+
+        const stepped = await api(`/api/persons/${original.personId}/access-roles`, {
+            method: 'PUT',
+            cookie: cookies.admin,
+            body: JSON.stringify([]),
+        });
+
+        expect(stepped.status).toBe(200);
+
+        // Put it back — later assertions in this file act as that administrator.
+        await ownerDb.personAccessRole.create({
+            data: { personId: original.personId, accessRoleId: adminRole.id, tenantId: TENANT_A },
+        });
+        await ownerDb.personAccessRole.deleteMany({
+            where: { personId: grantTargetId, accessRoleId: adminRole.id },
+        });
+    });
+
+    it('refuses deleting the provisioned tenant-admin role at all', async () => {
+        const admin = await ownerDb.accessRole.findFirstOrThrow({
+            where: { tenantId: TENANT_A, key: 'tenant-admin' },
+        });
+
+        const removed = await api<{ statusMessage?: string }>(`/api/access-roles/${admin.id}`, {
+            method: 'DELETE',
+            cookie: cookies.admin,
+        });
+
+        /*
+         * 409, not 403 — the caller holds `access_role.manage`; what refuses this
+         * is the row. Until Step 14 the button was merely hidden and this request
+         * succeeded, which for the system role is the shortest path to a tenant
+         * that cannot administer itself.
+         */
+        expect(removed.status).toBe(409);
+        expect(await ownerDb.accessRole.count({ where: { id: admin.id } })).toBe(1);
+    });
+
+    it('refuses deleting a system domain Role too, which was equally unguarded', async () => {
+        const role = await ownerDb.role.create({
+            data: { tenantId: TENANT_A, key: 'system-lecturer', name: 'Lecturer', isSystem: true },
+        });
+
+        const removed = await api(`/api/roles/${role.id}`, { method: 'DELETE', cookie: cookies.admin });
+
+        expect(removed.status).toBe(409);
+
+        await ownerDb.role.delete({ where: { id: role.id } });
+    });
+});

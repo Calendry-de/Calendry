@@ -101,6 +101,15 @@ export default defineEventHandler(async (event) => {
                 select: config.select,
             }) as Record<string, unknown>[];
 
+            /*
+             * An invariant about what the tenant is LEFT with, measured after
+             * the replacement and inside the same transaction — so a revocation
+             * that would strip the last administrator rolls back rather than
+             * being reported once it is too late. Runs BEFORE the warnings,
+             * which describe a set that stood.
+             */
+            await config.afterWrite?.({ tx, tenantId: identity.tenantId, id: id as string });
+
             /**
              * RESPONSE SHAPE IS CONDITIONAL, deliberately:
              *

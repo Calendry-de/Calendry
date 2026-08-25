@@ -3,6 +3,7 @@ import type { Tx } from './tenantDb';
 import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
 import { validateConstraintShape } from '../../shared/constraintTypes';
 import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
+import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 import { isPermissionKey } from '../../shared/permissions';
 import type { PermissionKey } from '../../shared/permissions';
 
@@ -116,6 +117,41 @@ export interface ResourceConfig {
         id: string;
         patch: Record<string, unknown>;
     }) => Promise<void>;
+    /**
+     * Runs INSIDE the write transaction, AFTER the row and its children have
+     * been written — on create, update AND delete. Throwing rolls the whole
+     * transaction back.
+     *
+     * The counterpart to `beforeCreate`/`beforeUpdate`, for an invariant about
+     * the RESULT rather than about the payload. `assertTenantRetainsAdministrator`
+     * is the reason it exists: predicting whether a write leaves a tenant unable
+     * to administer itself means reimplementing the write, and a guard that
+     * models a write can drift from it. Measuring the post-write state cannot.
+     *
+     * Wired into all three routes rather than only the ones that can currently
+     * breach something. A hook that fires on some writes and not others is the
+     * kind of rule that is true when written and quietly false a year later.
+     */
+    afterWrite?: (ctx: {
+        tx: Tx;
+        tenantId: string;
+        id: string;
+        action: 'create' | 'update' | 'delete';
+    }) => Promise<void>;
+    /**
+     * Boolean column marking rows PROVISIONING created, which a tenant must not
+     * delete (`role.is_system`, `access_role.is_system`).
+     *
+     * Declared here as well as in the client registry because until now it was
+     * client-only: `ManageEntityForm` hid the delete button and the API happily
+     * honoured `DELETE /api/roles/:id` for a system row anyway. Harmless for the
+     * domain Role; for an AccessRole it is a direct route to a tenant that
+     * cannot administer itself, since `tenant-admin` is the system row.
+     *
+     * A refusal, not a filter — 409 naming the row, so "provisioning owns this"
+     * stays distinguishable from "no such row".
+     */
+    systemFlag?: string;
     /**
      * Declared filters that are NOT plain column equality.
      *
@@ -446,6 +482,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
 
     roles: {
         model: 'role',
+        // Provisioning owns `is_system`; the UI has always hidden delete for
+        // such a row and the API has always allowed it. Same rule, now enforced
+        // where it is actually decided.
+        systemFlag: 'isSystem',
         create: z.object({
             key: z.string().min(1),
             name: z.string().min(1),
@@ -1108,6 +1148,19 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         async beforeUpdate({ tx, patch }) {
             await assertPermissionsSeeded(tx, patch.permissions);
         },
+        /*
+         * Editing a role's grants and deleting the role are two of the three
+         * ways a tenant can strip its own last administrator; revoking the last
+         * assignment is the third and lives on the relation. All three end in
+         * the same function, measured after the write.
+         */
+        afterWrite: ({ tx, tenantId }) => assertTenantRetainsAdministrator(tx, tenantId),
+        /*
+         * `tenant-admin` is provisioning's own row and the one every tenant
+         * starts with. Deleting it is the shortest path to a tenant that cannot
+         * administer itself, and the UI hiding the button was never a guard.
+         */
+        systemFlag: 'isSystem',
         create: z.object({
             key: z.string().min(1),
             name: z.string().min(1),

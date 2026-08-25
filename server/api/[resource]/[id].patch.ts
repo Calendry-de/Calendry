@@ -54,6 +54,13 @@ export default defineEventHandler(async (event) => {
                 await config.writeChildren({ tx, tenantId: identity.tenantId, id: id as string, children });
             }
 
+            // Only when something was actually written: a cross-tenant id
+            // updates zero rows and must report 404 rather than being measured
+            // against a tenant it did not touch.
+            if (updated.count > 0) {
+                await config.afterWrite?.({ tx, tenantId: identity.tenantId, id: id as string, action: 'update' });
+            }
+
             return updated;
         });
 

@@ -19,9 +19,45 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requireAnyPermission(event, tx, crudPermission(resource as string, 'delete'));
 
-        const result = await mapDbErrors(() =>
-            delegate(tx, config.model).deleteMany({ where: { id, tenantId: identity.tenantId } }),
-        );
+        /**
+         * Rows provisioning created and the tenant must not delete.
+         *
+         * Read BEFORE the delete, because after it there is nothing left to ask.
+         * This was client-only until Step 14 — `ManageEntityForm` hid the button
+         * and the route honoured the request anyway — which for `access_role`
+         * meant `tenant-admin` was one curl from gone.
+         *
+         * 409 rather than 403: the caller may well hold the delete permission.
+         * What refuses this is the row, not the person.
+         */
+        if (config.systemFlag) {
+            const row = await delegate(tx, config.model).findFirst({
+                where: { id, tenantId: identity.tenantId },
+                select: { id: true, [config.systemFlag]: true },
+            }) as Record<string, unknown> | null;
+
+            if (row?.[config.systemFlag]) {
+                throw createError({
+                    statusCode: 409,
+                    statusMessage: 'This row was created by provisioning and cannot be deleted.',
+                });
+            }
+        }
+
+        const result = await mapDbErrors(async () => {
+            const deleted = await delegate(tx, config.model).deleteMany({
+                where: { id, tenantId: identity.tenantId },
+            });
+
+            // Invariants about what the tenant is LEFT with — see `afterWrite`.
+            // Only when something was removed: a cross-tenant id deletes nothing
+            // and must report 404.
+            if (deleted.count > 0) {
+                await config.afterWrite?.({ tx, tenantId: identity.tenantId, id: id as string, action: 'delete' });
+            }
+
+            return deleted;
+        });
 
         if (result.count === 0) {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
