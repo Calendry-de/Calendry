@@ -1,0 +1,232 @@
+/**
+ * The fixed permission catalogue (TAXONOMY.md §4).
+ *
+ * Tenants configure ROLES — named bundles of these — but never the permissions
+ * themselves, because each one corresponds to a code path and tenants do not
+ * write code.
+ *
+ * WHY THIS IS IN `shared/` RATHER THAN `server/utils/`
+ *
+ * Four consumers need the identical list and cannot be allowed to disagree
+ * about it: the seed that mirrors it into the `permission` table, the operator
+ * CLIs that validate a requested key against it, the API that validates a
+ * submitted one, and — since Step 14 — the role editor, which renders a
+ * checkbox per permission.
+ *
+ * That last one is the reason for the move. The editor renders from THIS
+ * CATALOGUE, never from a fetch of the `permission` table, for the same reason
+ * the constraint grid renders from `shared/constraintTypes.ts`: a permission
+ * the code implements but the database has not been seeded with must be
+ * REPORTED, not silently missing from a list that looks complete.
+ *
+ * HOW IT REACHES THE DATABASE. Not by migration — migrations here are
+ * schema-only and the `permission` table is created empty on purpose. The rows
+ * are written by `prisma db seed` (prisma/seeds/reference/permissions.ts),
+ * which both container entrypoints run immediately after `migrate deploy`.
+ * Adding a permission is therefore: add it here, run `db seed`, then
+ * `bun run grant:permissions -- --role tenant-admin --all-missing` on every
+ * EXISTING tenant — provisioning grants the whole catalogue only at creation
+ * time, so without that last step the symptom is a 403 on a feature that
+ * visibly exists. Removing one is a breaking change for every tenant that
+ * assigned it.
+ */
+
+/** Entities served by the generic CRUD routes, and their permission prefix. */
+export const CRUD_RESOURCES = {
+    persons: 'person',
+    roles: 'role',
+    groups: 'group',
+    rooms: 'room',
+    equipment: 'equipment',
+    offerings: 'offering',
+    'time-grids': 'time_grid',
+    terms: 'term',
+    constraints: 'constraint',
+    // Tenant-open vocabulary (TAXONOMY.md §1): the `kind` values an Offering or
+    // Session can carry. Added in Step 13 because there was no way to create one
+    // — provisioning deliberately makes none, so a fresh tenant could not create
+    // an Offering at all, its `kindId` being a required FK to a table with no
+    // rows and no route.
+    //
+    // Note `session_kind`, not `session`: session.read/move/swap/lock are about
+    // placed Sessions. Being able to rename the vocabulary is not the same
+    // authority as being able to move the timetable.
+    'session-kinds': 'session_kind',
+    /**
+     * Holidays, break weeks and exam periods — the academic calendar
+     * (TAXONOMY.md §2, "FIXED, core from day one").
+     *
+     * Mapped to `term`, NOT a permission of its own. A calendar period is a
+     * child of Term with a mandatory `term_id`, exactly as `time_grid_break` is
+     * a child of TimeGrid, and the same reasoning applies: changing when a
+     * term's exam period falls IS editing the term. A separate
+     * `calendar_period.manage` would be authority over a TABLE rather than over
+     * a capability, and would need a backfill on every existing tenant or the
+     * feature 403s on a screen that visibly exists.
+     */
+    'calendar-periods': 'term',
+} as const;
+
+export type CrudAction = 'read' | 'create' | 'update' | 'delete';
+
+/**
+ * Prefixes, DEDUPLICATED — two segments share `term` on purpose (above).
+ *
+ * `CrudResource` is the segment; `CrudPrefix` is what the permission is named
+ * after. They are not the same set and conflating them is what produced the
+ * duplicate-key bug this file's history records.
+ */
+export type CrudResource = keyof typeof CRUD_RESOURCES;
+export type CrudPrefix = (typeof CRUD_RESOURCES)[CrudResource];
+
+const CRUD_ACTIONS = ['read', 'create', 'update', 'delete'] as const;
+
+interface PermissionShape {
+    key: string;
+    category: string;
+    description: string;
+}
+
+/**
+ * Everything that is not a CRUD verb on a managed entity.
+ *
+ * `as const satisfies` rather than a plain annotation: `satisfies` checks the
+ * shape without WIDENING the literals, which is what lets `PermissionKey` below
+ * be a real union of the keys instead of `string`. An annotation here would
+ * type-check identically and silently give up every downstream guarantee.
+ */
+const EXPLICIT_PERMISSIONS = [
+    // Session editing — explicit verbs, mirroring the routes (TAXONOMY.md §3).
+    { key: 'session.read', category: 'session', description: 'View the schedule' },
+    { key: 'session.create', category: 'session', description: 'Create a Session or Event directly' },
+    { key: 'session.move', category: 'session', description: 'Re-place a Session' },
+    { key: 'session.swap', category: 'session', description: 'Swap two Sessions' },
+    { key: 'session.lock', category: 'session', description: 'Lock or unlock a Session' },
+    /**
+     * Its own permission rather than a reuse of `session.create`.
+     *
+     * Deletion is irreversible in a way creation is not: an Event carries no
+     * Offering, so nothing re-creates it and the only record left is the DELETE
+     * event. Separating it lets a tenant grant "put things on the calendar"
+     * without also granting "take them off".
+     *
+     * NOTE the cost, which CLAUDE.md documents: a permission added after a
+     * tenant was provisioned is not held by anyone until
+     * `grant:permissions --all-missing` runs, and the symptom is a 403 on a
+     * feature that visibly exists.
+     */
+    { key: 'session.update', category: 'session', description: "Edit an Event's title, kind, groups and people" },
+    { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
+
+    // Operations
+    { key: 'generation.apply', category: 'generation', description: 'Promote a Generation to the current baseline' },
+    { key: 'solver.trigger', category: 'solver', description: 'Request a solver run' },
+    { key: 'violation.read', category: 'violation', description: 'View current constraint violations' },
+    { key: 'notification.preview', category: 'notification', description: 'Resolve who a Session change affects' },
+
+    // Administration
+    { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
+    { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },
+] as const satisfies readonly PermissionShape[];
+
+/**
+ * Every permission the code implements, as a UNION rather than `string`.
+ *
+ * This is what makes the role editor and the write-boundary schema typed
+ * against the same thing the seed writes: a checkbox bound to a key that is not
+ * in the catalogue, or a zod schema admitting one, is a compile error rather
+ * than a foreign-key violation discovered by a tenant.
+ */
+export type PermissionKey = `${CrudPrefix}.${CrudAction}` | (typeof EXPLICIT_PERMISSIONS)[number]['key'];
+
+export interface PermissionDef {
+    key: PermissionKey;
+    category: string;
+    description: string;
+}
+
+/**
+ * Iterated over DISTINCT PREFIXES, not over the entries.
+ *
+ * Two resource segments deliberately share one prefix: `calendar-periods` maps
+ * to `term`. Iterating the entries emitted `term.read/create/update/delete`
+ * TWICE — 57 entries where the catalogue has 53 keys.
+ *
+ * That was not cosmetic. `provision-tenant.ts` inserts this array into
+ * `access_role_permission` with a single `createMany` and no `skipDuplicates`,
+ * and Postgres rejects duplicate primary keys inside one INSERT — so
+ * provisioning a NEW tenant failed outright from the moment `calendar-periods`
+ * was added, with the existing tenant unaffected because
+ * `grant:permissions --all-missing` computes what is missing and skips
+ * duplicates. Anything rendering the catalogue as a list had the same problem
+ * one level up: two identical rows under one key.
+ *
+ * `Set` rather than a dedupe of the OUTPUT, so the duplication never exists.
+ * Pinned by tests/permission-catalogue.test.ts.
+ */
+function crudPermissions(): PermissionDef[] {
+    const out: PermissionDef[] = [];
+
+    for (const prefix of new Set(Object.values(CRUD_RESOURCES))) {
+        for (const action of CRUD_ACTIONS) {
+            out.push({
+                key: `${prefix}.${action}`,
+                category: prefix,
+                description: `${action} ${prefix.replace('_', ' ')} records`,
+            });
+        }
+    }
+
+    return out;
+}
+
+export const PERMISSIONS: readonly PermissionDef[] = [...crudPermissions(), ...EXPLICIT_PERMISSIONS];
+
+export const PERMISSION_KEYS: readonly PermissionKey[] = PERMISSIONS.map((p) => p.key);
+
+const PERMISSION_KEY_SET: ReadonlySet<string> = new Set<string>(PERMISSION_KEYS);
+
+/**
+ * Narrows an untrusted string to a catalogue key.
+ *
+ * The single place `unknown` becomes `PermissionKey` — used by the API schema
+ * and by the role editor when it reads a stored grant. Everything downstream of
+ * it is typed, so a key that is not in the catalogue is rejected once, at the
+ * boundary, with the key named.
+ */
+export function isPermissionKey(value: unknown): value is PermissionKey {
+    return typeof value === 'string' && PERMISSION_KEY_SET.has(value);
+}
+
+export function findPermission(key: string): PermissionDef | undefined {
+    return PERMISSIONS.find((permission) => permission.key === key);
+}
+
+export interface PermissionCategory {
+    key: string;
+    permissions: PermissionDef[];
+}
+
+/**
+ * The catalogue grouped for display, in catalogue order.
+ *
+ * Order comes from the array rather than an alphabetical sort so the editor
+ * shows the same shape this file reads in: the managed entities first, then
+ * the schedule verbs, then operations, then administration. A sort would put
+ * `access_role` at the top, which is the least commonly granted group.
+ */
+export function permissionCategories(): PermissionCategory[] {
+    const byKey = new Map<string, PermissionCategory>();
+
+    for (const permission of PERMISSIONS) {
+        const existing = byKey.get(permission.category);
+
+        if (existing) {
+            existing.permissions.push(permission);
+        } else {
+            byKey.set(permission.category, { key: permission.category, permissions: [permission] });
+        }
+    }
+
+    return [...byKey.values()];
+}

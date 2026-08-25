@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRUD_RESOURCES, PERMISSIONS, PERMISSION_KEYS } from '../server/utils/permissions';
+import { CRUD_RESOURCES, PERMISSIONS, PERMISSION_KEYS } from '#shared/permissions';
 
 /**
  * The permission catalogue must hold each key exactly once.

@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import { PERMISSIONS } from '../../../server/utils/permissions';
+import { PERMISSIONS } from '../../../shared/permissions';
 
 /**
  * REFERENCE seed — required in every environment, production included.
@@ -10,7 +10,7 @@ import { PERMISSIONS } from '../../../server/utils/permissions';
  * code-derived reference data rather than sample content, which is why it
  * belongs in a seed that always runs rather than in fixtures.
  *
- * `server/utils/permissions.ts` is the single source of truth; this file only
+ * `shared/permissions.ts` is the single source of truth; this file only
  * transports it into the database.
  */
 export interface PermissionSeedResult {

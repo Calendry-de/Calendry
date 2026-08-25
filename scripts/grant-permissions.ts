@@ -4,7 +4,7 @@
  * WHY THIS EXISTS
  * ---------------
  * `prisma db seed` keeps the `permission` catalogue in step with
- * `server/utils/permissions.ts`, but it deliberately does not touch
+ * `shared/permissions.ts`, but it deliberately does not touch
  * `access_role_permission` — which permissions a tenant's roles *hold* is
  * tenant configuration, not reference data, and a seed that silently widened
  * every tenant's admin role on every deploy would be a privilege escalation
@@ -42,7 +42,7 @@ import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { PERMISSION_KEYS } from '../server/utils/permissions';
+import { PERMISSION_KEYS, isPermissionKey } from '../shared/permissions';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
 function arg(name: string): string | undefined {
@@ -90,11 +90,11 @@ async function main() {
         // A typo'd permission key would otherwise fail on the foreign key with
         // an opaque message, or — worse, if it happened to be a prefix of a real
         // one — grant nothing and report success.
-        const unknown = requested.filter((key) => !PERMISSION_KEYS.includes(key));
+        const unknown = requested.filter((key) => !isPermissionKey(key));
 
         if (unknown.length) {
             console.error(`\nNot in the permission catalogue: ${unknown.join(', ')}`);
-            console.error('The catalogue is server/utils/permissions.ts. Permissions are code, not data.\n');
+            console.error('The catalogue is shared/permissions.ts. Permissions are code, not data.\n');
             process.exit(1);
         }
     }

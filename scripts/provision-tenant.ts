@@ -29,7 +29,7 @@ import { PrismaClient } from '@prisma/client';
 // The real hashing path. This script used to re-implement scrypt inline; a
 // second copy of the KDF drifts silently the moment the original changes.
 import { hashPassword } from '../server/utils/auth';
-import { PERMISSIONS } from '../server/utils/permissions';
+import { PERMISSIONS } from '../shared/permissions';
 import { defaultConstraintRow, defaultConstraintTypes } from '../shared/constraintTypes';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 

@@ -58,7 +58,7 @@ import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { PERMISSION_KEYS } from '../server/utils/permissions';
+import { isPermissionKey } from '../shared/permissions';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
 function arg(name: string): string | undefined {
@@ -104,11 +104,11 @@ async function main() {
     // Validation pass 1: the CODE catalogue. A typo'd key would otherwise fail
     // on the foreign key with an opaque message — or, if it happened to be a
     // prefix of a real one, grant something subtly different and report success.
-    const unknown = requested.filter((key) => !PERMISSION_KEYS.includes(key));
+    const unknown = requested.filter((key) => !isPermissionKey(key));
 
     if (unknown.length) {
         console.error(`\nNot in the permission catalogue: ${unknown.join(', ')}`);
-        console.error('The catalogue is server/utils/permissions.ts. Permissions are code, not data.\n');
+        console.error('The catalogue is shared/permissions.ts. Permissions are code, not data.\n');
         process.exit(1);
     }
 
