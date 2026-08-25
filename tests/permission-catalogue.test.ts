@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CRUD_RESOURCES, PERMISSIONS, PERMISSION_KEYS } from '#shared/permissions';
+import {
+    CRUD_RESOURCES,
+    PERMISSIONS,
+    PERMISSION_KEYS,
+    resourcePermissions,
+    satisfiesPermissionRequirement,
+} from '#shared/permissions';
 
 /**
  * The permission catalogue must hold each key exactly once.
@@ -69,5 +75,83 @@ describe('permission catalogue', () => {
         // a tenant, which is a worse place to find out than here.
         expect(PERMISSION_KEYS).toContain('access_role.manage');
         expect(PERMISSION_KEYS).toContain('person_access_role.assign');
+    });
+});
+
+/**
+ * Permission REQUIREMENTS: an AND of ORs.
+ *
+ * Both levels exist for a reason found by getting it wrong. A management page's
+ * relation picker fetches its options from one or more endpoints and may only
+ * be offered when EVERY one is reachable — while a single endpoint can accept
+ * several permissions. The any-of-only version of this gated `lecturers`, which
+ * fetches persons AND roles, on "either", and would have offered a picker that
+ * renders half empty.
+ */
+describe('permission requirements', () => {
+    const held = (...keys: string[]) => new Set(keys);
+
+    it('requires every clause', () => {
+        const both = ['person.read', 'role.read'];
+
+        expect(satisfiesPermissionRequirement(held('person.read', 'role.read'), both)).toBe(true);
+        expect(satisfiesPermissionRequirement(held('person.read'), both)).toBe(false);
+        expect(satisfiesPermissionRequirement(held('role.read'), both)).toBe(false);
+    });
+
+    it('accepts any member WITHIN a clause', () => {
+        const either = [['access_role.manage', 'person_access_role.assign']];
+
+        expect(satisfiesPermissionRequirement(held('access_role.manage'), either)).toBe(true);
+        expect(satisfiesPermissionRequirement(held('person_access_role.assign'), either)).toBe(true);
+        expect(satisfiesPermissionRequirement(held('session.read'), either)).toBe(false);
+    });
+
+    it('mixes the two levels', () => {
+        // "must read persons, and must be able to read access roles by either
+        // route" — the Person page's own shape.
+        const mixed = ['person.read', ['access_role.manage', 'person_access_role.assign']];
+
+        expect(satisfiesPermissionRequirement(held('person.read', 'person_access_role.assign'), mixed)).toBe(true);
+        expect(satisfiesPermissionRequirement(held('person_access_role.assign'), mixed)).toBe(false);
+        expect(satisfiesPermissionRequirement(held('person.read'), mixed)).toBe(false);
+    });
+
+    it('is satisfied by an empty requirement and never by an empty clause', () => {
+        expect(satisfiesPermissionRequirement(held(), [])).toBe(true);
+
+        // "One of nothing" fails CLOSED. The shape that produces it is a bug in
+        // whatever built the requirement; failing open would hide it behind a
+        // control that then 403s.
+        expect(satisfiesPermissionRequirement(held('person.read'), [[]])).toBe(false);
+    });
+});
+
+/**
+ * The resource → permission map, which the routes ENFORCE and the management UI
+ * PREDICTS. Two copies would disagree eventually, and the symptom would be a
+ * picker rendering empty rather than being absent.
+ */
+describe('resource permissions', () => {
+    it('follows the prefix rule for an ordinary resource', () => {
+        expect(resourcePermissions('rooms', 'read')).toEqual(['room.read']);
+        expect(resourcePermissions('time-grids', 'update')).toEqual(['time_grid.update']);
+    });
+
+    it('honours a declared override, including its any-of read', () => {
+        expect(resourcePermissions('access-roles', 'read'))
+            .toEqual(['access_role.manage', 'person_access_role.assign']);
+        expect(resourcePermissions('access-roles', 'delete')).toEqual(['access_role.manage']);
+    });
+
+    it('cannot answer for an unknown resource', () => {
+        // The caller turns this into 404; a fallback would invent a permission.
+        expect(resourcePermissions('widgets', 'read')).toBeUndefined();
+    });
+
+    it('resolves every resource the CRUD map names', () => {
+        for (const resource of Object.keys(CRUD_RESOURCES)) {
+            expect(resourcePermissions(resource, 'read'), resource).toBeDefined();
+        }
     });
 });

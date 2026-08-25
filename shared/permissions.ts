@@ -230,3 +230,95 @@ export function permissionCategories(): PermissionCategory[] {
 
     return [...byKey.values()];
 }
+
+/**
+ * Resources whose permissions are NOT `<prefix>.<action>`.
+ *
+ * `access_role` is the case that forced this. The catalogue has held
+ * `access_role.manage` and `person_access_role.assign` since the beginning —
+ * two capabilities, not eight CRUD verbs — and inventing
+ * `access_role.read/create/update/delete` to fit the generic shape would mean
+ * editing the catalogue, re-seeding, and backfilling every existing tenant, to
+ * end up with `access_role.manage` still checked by nothing. The registry bends
+ * to the catalogue, not the other way round.
+ *
+ * ANY of the listed permissions is sufficient, which matters for exactly one
+ * entry: reading the role list. The manage SECTION requires
+ * `access_role.manage`, but the Person page's role picker needs the same list
+ * under `person_access_role.assign` — a tenant may reasonably define a
+ * registrar who grants existing roles without being able to invent new ones.
+ *
+ * SHARED, not server-only, and that is the point of it living here. The routes
+ * enforce this map; the management UI has to PREDICT it, so that a page never
+ * assembles a fetch wave it will be refused. Two copies of "what does reading
+ * rooms require" would disagree eventually, and the symptom would be a picker
+ * that renders empty instead of being absent — the exact failure this map is
+ * now used to prevent.
+ */
+export const RESOURCE_PERMISSIONS: Record<string, Partial<Record<CrudAction, readonly PermissionKey[]>>> = {
+    'access-roles': {
+        read: ['access_role.manage', 'person_access_role.assign'],
+        create: ['access_role.manage'],
+        update: ['access_role.manage'],
+        delete: ['access_role.manage'],
+    },
+};
+
+/**
+ * Permissions accepted for one action on a resource — ANY one is sufficient.
+ *
+ * `undefined` means the question cannot be answered: either the resource is not
+ * served by the generic routes at all, or it is declared above and does not
+ * name this action. The two are different problems and the caller distinguishes
+ * them — the API answers 404 for the first and 500 for the second, rather than
+ * falling through to a prefix rule that would gate a write on a permission
+ * nobody chose.
+ */
+export function resourcePermissions(
+    resource: string,
+    action: CrudAction,
+): readonly PermissionKey[] | undefined {
+    const declared = RESOURCE_PERMISSIONS[resource];
+
+    if (declared) {
+        return declared[action];
+    }
+
+    const prefix = CRUD_RESOURCES[resource as CrudResource];
+
+    return prefix ? [`${prefix}.${action}`] : undefined;
+}
+
+/**
+ * A permission requirement: AND of ORs.
+ *
+ * Each entry must be satisfied; an entry that is an ARRAY is satisfied by any
+ * one of its members. So:
+ *
+ *     ['role.read']                                  role.read
+ *     ['person.read', 'role.read']                   BOTH
+ *     [['access_role.manage', 'person_access_role.assign']]   EITHER
+ *
+ * The two levels are not decoration. A management page's relation picker
+ * fetches its options from one or more endpoints, and it may only be offered if
+ * EVERY one of them is reachable — while a single endpoint can accept SEVERAL
+ * permissions. One level cannot express both, and the version of this that had
+ * only the any-of level got the `lecturers` picker wrong: it fetches persons
+ * AND roles, so "any of person.read, role.read" would have offered a picker
+ * that renders half empty.
+ */
+export type PermissionRequirement = readonly (string | readonly string[])[];
+
+/** Whether `held` satisfies every clause of `requirement`. */
+export function satisfiesPermissionRequirement(
+    held: ReadonlySet<string>,
+    requirement: PermissionRequirement,
+): boolean {
+    return requirement.every((clause) => (typeof clause === 'string'
+        ? held.has(clause)
+        // An EMPTY alternatives array is unsatisfiable, deliberately. It means
+        // "one of nothing", and the shape that produces it is a bug in whatever
+        // built the requirement — failing closed reports it, failing open hides
+        // it behind a control that then 403s.
+        : clause.some((permission) => held.has(permission))));
+}
