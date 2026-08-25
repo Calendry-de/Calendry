@@ -1,4 +1,5 @@
 import type { Component } from 'vue';
+import ManageAccessRoleForm from '~/components/manage/ManageAccessRoleForm.vue';
 import ManageCalendarPeriodForm from '~/components/manage/ManageCalendarPeriodForm.vue';
 import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder.vue';
 import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
@@ -38,6 +39,13 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
     TimeGridEditor: ManageTimeGridEditor,
     ConstraintBuilder: ManageConstraintBuilder,
     CalendarPeriodForm: ManageCalendarPeriodForm,
+    /**
+     * AccessRoleForm  the grants are a matrix over the FIXED permission
+     *                 catalogue, which is code rather than an entity, so there
+     *                 is no resource for a relation picker to draw options from
+     *                 and no fetch that could be authoritative about them.
+     */
+    AccessRoleForm: ManageAccessRoleForm,
 };
 
 export const LIST_COMPONENTS: Record<string, Component> = {

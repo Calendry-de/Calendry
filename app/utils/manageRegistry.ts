@@ -156,6 +156,23 @@ export interface ManageEntity {
     key: string;
     /** Permission prefix from the server catalogue, e.g. 'person'. */
     permissionPrefix: string;
+    /**
+     * Actions whose permission is NOT `<permissionPrefix>.<action>`.
+     *
+     * `access-roles` is the only entity that needs it: the catalogue has held
+     * `access_role.manage` — one capability covering all four verbs — since long
+     * before this section existed, and inventing four CRUD permissions to fit
+     * the naming convention would mean a catalogue edit, a re-seed and a
+     * backfill on every tenant, to arrive at `access_role.manage` still checked
+     * by nothing.
+     *
+     * Mirrors the server's own RESOURCE_PERMISSIONS, with one deliberate
+     * difference: the server also accepts `person_access_role.assign` for the
+     * READ, so the Person page's role picker works for a registrar. The manage
+     * SECTION stays `access_role.manage`-only — a registrar has no business in a
+     * screen whose every button they would be refused.
+     */
+    permissionOverrides?: Partial<Record<'read' | 'create' | 'update' | 'delete', string>>;
     label: string;
     plural: string;
     icon: string;
@@ -850,6 +867,65 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             },
         ],
     },
+
+    /**
+     * AccessRole — who may DO what, as opposed to the domain Role directly
+     * above, which is scheduling vocabulary and grants nothing (TAXONOMY.md §4
+     * vs §2). The two share a word and nothing else, so both descriptions say
+     * which one they are.
+     *
+     * Last in the array, and therefore last in the sidebar: it is the section
+     * a tenant visits least and the one whose entries are hardest to undo.
+     */
+    {
+        key: 'access-roles',
+        // Unused for permissions (see `permissionOverrides`), but the field is
+        // required and naming the table is still the honest answer.
+        permissionPrefix: 'access_role',
+        permissionOverrides: {
+            read: 'access_role.manage',
+            create: 'access_role.manage',
+            update: 'access_role.manage',
+            delete: 'access_role.manage',
+        },
+        label: 'Access role',
+        plural: 'Access roles',
+        icon: 'material-symbols:admin-panel-settings-outline',
+        description: 'Who may do what — bundles of permissions people are granted.',
+        keywords: ['access', 'permission', 'role', 'admin', 'rights', 'authorization', 'security'],
+        title: (row) => String(row.name ?? 'Access role'),
+        detailComponent: 'AccessRoleForm',
+        // `tenant-admin` is provisioning's own row: renamable, never deletable.
+        // The server refuses it too — this only stops offering the button.
+        systemFlag: 'isSystem',
+        columns: [
+            { key: 'key', label: 'Key', format: 'code' },
+            { key: 'name', label: 'Name' },
+            { key: 'description', label: 'Description', secondary: true },
+        ],
+        fields: [
+            {
+                key: 'key',
+                label: 'Key',
+                type: 'text',
+                required: true,
+                createOnly: true,
+                help: 'Stable identifier. `create:account --role <key>` and any import address the role by it, '
+                    + 'so it cannot be changed later.',
+            },
+            { key: 'name', label: 'Name', type: 'text', required: true },
+            { key: 'description', label: 'Description', type: 'textarea' },
+            /*
+             * The grants. `custom` because the control is a matrix over the
+             * fixed catalogue rather than a field, and because the value is an
+             * ARRAY — the shape that renders as "[object Object]" if it ever
+             * reaches ManageField. Declared here so it takes part in the draft,
+             * dirty tracking and the payload, exactly as `constraint.scopes`
+             * does.
+             */
+            { key: 'permissions', label: 'Permissions', type: 'text', custom: true },
+        ],
+    },
 ];
 
 
@@ -859,7 +935,7 @@ export function findManageEntity(key: string | undefined): ManageEntity | undefi
 
 /** The four CRUD permissions for an entity, in catalogue form. */
 export function entityPermission(entity: ManageEntity, action: 'read' | 'create' | 'update' | 'delete'): string {
-    return `${entity.permissionPrefix}.${action}`;
+    return entity.permissionOverrides?.[action] ?? `${entity.permissionPrefix}.${action}`;
 }
 
 /**
