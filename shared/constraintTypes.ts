@@ -231,10 +231,35 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'online_onsite_same_day_exclusion',
         wireField: 'onlineOnsiteSameDay',
-        label: 'No mixing online and on-site in a day',
-        description: 'A group is not asked to be on campus and online on the same day.',
+        /*
+         * SOFT since the reclassification, and the label had to move with it.
+         *
+         * "No mixing…" was a promise the solver stopped keeping: it used to
+         * eliminate a mixing placement outright, and now prices one, so a
+         * schedule may legitimately come back with a mixed day when every
+         * alternative cost more. A label that still said "No" would be the
+         * control asserting the opposite of the behaviour — the same reason
+         * MinimizeRoomRank's label had to change when its direction became
+         * configurable.
+         *
+         * The KEY is unchanged and must stay unchanged: `type` is createOnly,
+         * so renaming it would orphan every stored row rather than migrate it.
+         */
+        label: 'Minimize online/on-site switching in a day',
+        description: 'Prefer not to ask a group to be on campus and online on the same day.',
         evaluator: 'solver',
-        severity: 'HARD',
+        severity: 'SOFT',
+        /*
+         * Sits above the block-placement preferences (3–5) and below exam weeks
+         * (8): switching delivery mode mid-day is a real cost to a cohort, but
+         * it is not the thing a term is planned around.
+         *
+         * NOT OPTIONAL. `defaultConstraintRow` throws for a SOFT type with no
+         * `defaultWeight`, rather than seeding 0 — which the solver reads as
+         * "count it, do not steer" and would look like a deliberate choice.
+         * Pinned by tests/constraint-catalogue.test.ts.
+         */
+        defaultWeight: 5,
         params: [],
     },
     {
