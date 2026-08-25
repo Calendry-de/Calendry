@@ -202,6 +202,56 @@ otherwise" is not one.
   operations (`move`, `swap`, `lock`, `apply-generation`) are explicit verbs
   on the Session resource, not generic PATCHes, so the event log can record
   intent, not just a diff.
+- **`/` is the PUBLIC landing page; the signed-in home is `/dashboard`.** The
+  root is a marketing page for calendry.de, readable with no session; the page
+  that used to be there — session overview plus the permission-filtered list of
+  destinations — moved unchanged to `/dashboard`.
+
+  Two things this touched that are easy to get wrong again:
+
+  - **`auth.global.ts` now has TWO exemption lists, and they are not
+    interchangeable.** `PUBLIC_ROUTES` (`/login`, `/change-password`) are the
+    AUTH pages: they need no session *and* bounce a signed-in visitor into the
+    app, because a sign-in form is meaningless once you are signed in.
+    `ANONYMOUS_ROUTES` (`/`) needs no session and bounces nobody — the landing
+    page is exactly as useful to someone holding a cookie, and it returns
+    before any session fetch, so the root renders identically for everyone.
+    Putting `/` in the first list would make the roadmap unreadable to every
+    signed-in user.
+  - **`HOME_ROUTE` in `app/utils/routes.ts` is the only place "where a signed-in
+    session belongs" is written.** It was `'/'` in four: the guard's two redirect
+    fallbacks, its no-redirect-query special case, and the login page's
+    destination resolver. Four literals that must move together is how a
+    post-login redirect ends up landing on a marketing page.
+
+  Note what this does NOT do: it is one anonymous **marketing** route, not the
+  public data access described in BACKLOG.md § "Public, unauthenticated access
+  patterns". It reads no session, calls no API and exposes no tenant data, which
+  is why it needed no new RLS boundary — the shareable student schedule and the
+  kiosk display are still unbuilt and still need a real design pass.
+
+  Two consequences a test caught rather than a person: `tests/login-flow.test.ts`
+  had pinned `/` as a protected page (that assertion now names `/dashboard`, and
+  a new one asserts the root serves publicly), and the header-nav check in
+  `tests/page-renders-per-role.test.ts` fetched `/` purely as "a page with the
+  default layout" — against the `empty`-layout landing page it found no nav and
+  would have reported every role as correctly not offered the `/my` section.
+- **The landing page's claims are checked against BACKLOG.md by a test.** Copy
+  lives in `app/utils/landingContent.ts` rather than in nine templates, for the
+  reason this file keeps rediscovering: prose is checked by nobody. So
+  `tests/landing-page.test.ts` parses the § "Current phase" checklist out of
+  `BACKLOG.md` and asserts the unchecked entries are exactly the ones the page
+  presents as not built — with a guard that the parse found something, since a
+  renamed heading would otherwise make every assertion pass over an empty list.
+  Tick a box in BACKLOG.md without touching the page and it fails, naming the
+  mismatch. Falsified deliberately: ticking `Import (CSV/Excel)` fails it.
+
+  The contact CTA is a `mailto:` draft, not a POST. An endpoint could only log
+  the enquiry and return 200 — a success message over a write nobody receives —
+  and persisting it would mean a public unauthenticated write into a
+  tenant-scoped table, i.e. a fourth RLS exception for a contact form. The
+  address is one constant (`CONTACT_EMAIL`), and the composer takes the mailbox
+  as an argument so its tests cannot pass by hardcoding.
 - **Guards and detection conditions must fail loudly or match exactly.** Never
   write a check whose failure mode is a silent no-op indistinguishable from the
   correct case. If a condition can both "correctly find nothing" *and*

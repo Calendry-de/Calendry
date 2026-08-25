@@ -1,4 +1,5 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
+import { HOME_ROUTE, LANDING_ROUTE } from '~/utils/routes';
 
 /**
  * Route guard: every page needs a session except the ones listed here.
@@ -13,7 +14,27 @@ import { fetchSession, isSignedIn, useSession } from '~/composables/session';
  */
 const PUBLIC_ROUTES = ['/login', '/change-password'];
 
+/**
+ * Pages that need no session AND care about nobody's.
+ *
+ * Distinct from PUBLIC_ROUTES, which are the AUTH pages: those bounce a
+ * signed-in visitor into the app, because a sign-in form is meaningless once you
+ * are signed in. The public landing page is not meaningless to a signed-in
+ * visitor — bouncing someone off it because they happen to hold a cookie would
+ * make the roadmap unreadable to the people most likely to want it.
+ *
+ * `/` is that page. The authenticated home is `/dashboard`, which is where
+ * signing in lands and what a protected page redirects back to.
+ */
+const ANONYMOUS_ROUTES = [LANDING_ROUTE];
+
 export default defineNuxtRouteMiddleware(async (to) => {
+    // Before anything else, and before any session fetch: this page renders the
+    // same for everyone, so there is nothing to resolve and nowhere to redirect.
+    if (ANONYMOUS_ROUTES.includes(to.path)) {
+        return;
+    }
+
     const session = useSession();
 
     // Fetch once per navigation cycle; cached across subsequent route changes.
@@ -31,11 +52,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
         // to change institution, which is a session mutation rather than a
         // re-login.
         if (signedIn && to.query.select !== '1') {
-            const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '/';
+            const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : HOME_ROUTE;
 
             // Only internal paths: an open redirect would let a crafted link
             // bounce a freshly authenticated user to another origin.
-            return navigateTo(redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/');
+            return navigateTo(redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : HOME_ROUTE);
         }
 
         return;
@@ -44,7 +65,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (!signedIn) {
         return navigateTo({
             path: '/login',
-            query: to.fullPath === '/' ? undefined : { redirect: to.fullPath },
+            query: to.fullPath === HOME_ROUTE ? undefined : { redirect: to.fullPath },
         });
     }
 });

@@ -57,6 +57,13 @@
             <p class="login_note">
                 Accounts are created by an administrator. There is no self-service sign-up.
             </p>
+
+            <p class="login_note">
+                New to Calendry? <NuxtLink
+                    class="login_link"
+                    :to="LANDING_ROUTE"
+                >What it is, and what it does not do yet</NuxtLink>.
+            </p>
         </form>
 
         <!-- STEP 2 — tenant selection, only when the account has several identities -->
@@ -94,6 +101,7 @@
 
 <script setup lang="ts">
 import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
+import { HOME_ROUTE, LANDING_ROUTE } from '~/utils/routes';
 
 /**
  * Two-step sign-in.
@@ -131,7 +139,7 @@ function destination(): string {
     const redirect = route.query.redirect;
 
     if (typeof redirect !== 'string' || !redirect.startsWith('/') || redirect.startsWith('//')) {
-        return '/';
+        return HOME_ROUTE;
     }
 
     return redirect;
@@ -254,6 +262,11 @@ async function finish() {
         margin: 8px 0 0;
         font-size: 12px;
         color: $content7;
+    }
+
+    &_link {
+        color: $primary600;
+        text-decoration: underline;
     }
 }
 </style>

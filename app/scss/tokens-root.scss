@@ -15,6 +15,13 @@
     --font-size-xl: 24px;    // page titles
     --font-size-2xl: 32px;   // was 32, 38 — display
 
+    // Display step for the public landing surface only. Added deliberately
+    // rather than hardcoding a literal in a landing component: the app screens
+    // are dense by design and top out at 32px, but a marketing hero read at
+    // arm's length needs one step above that. Nothing inside /manage or
+    // /schedule should reach for it.
+    --font-size-3xl: 44px;
+
     // Border radius — 4 steps. The stray 9px was an inner corner and stays a
     // derivation: calc(var(--radius-xl) - 1px).
     --radius-sm: 4px;
@@ -32,4 +39,12 @@
     --space-6: 16px;
     --space-7: 24px;
     --space-8: 32px;
+
+    // Section rhythm, same reasoning as --font-size-3xl: the app's largest gap
+    // is 32px because its screens are dense, and a public page's vertical
+    // rhythm genuinely is larger than any gap inside a toolbar. Three steps,
+    // added deliberately, so the landing components hold no spacing literals.
+    --space-9: 48px;
+    --space-10: 64px;
+    --space-11: 96px;
 }

@@ -642,7 +642,12 @@ describe('every page renders for every role that can reach it', () => {
      */
     it('offers the /my section in the header to exactly the roles that can use it', async () => {
         const header = async (role: string) => {
-            const html = await fetch(`${BASE}/`, { headers: { cookie: cookies[role]! } }).then((res) => res.text());
+            // `/dashboard`, not `/`: the root is the PUBLIC landing page and uses
+            // the `empty` layout, which renders no header at all — so fetching it
+            // here would find no nav and report every role as "correctly not
+            // offered the section".
+            const html = await fetch(`${BASE}/dashboard`, { headers: { cookie: cookies[role]! } })
+                .then((res) => res.text());
 
             // The header nav only — the command palette renders every permitted
             // entry into the same document, so matching the whole page would

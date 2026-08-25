@@ -36,10 +36,20 @@ afterAll(async () => {
 
 describe('unauthenticated routing', () => {
     it('redirects a protected page to /login', async () => {
-        const res = await page('/');
+        // `/` is the PUBLIC landing page, so the protected home is /dashboard —
+        // and this assertion has to name it, or the suite would be testing the
+        // guard against a route the guard deliberately ignores.
+        const res = await page('/dashboard');
 
         expect(res.status).toBe(302);
         expect(res.location).toContain('/login');
+    });
+
+    it('serves the public landing page at / without a session', async () => {
+        const res = await page('/');
+
+        expect(res.status).toBe(200);
+        expect(res.html).toContain('In active development');
     });
 
     it('preserves the intended destination as ?redirect', async () => {
@@ -60,21 +70,24 @@ describe('unauthenticated routing', () => {
 });
 
 describe('authenticated routing', () => {
-    it('lets a signed-in user onto the landing page', async () => {
+    it('lets a signed-in user onto the home page', async () => {
         const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
-        const res = await page('/', cookie);
+        const res = await page('/dashboard', cookie);
 
         expect(res.status).toBe(200);
         expect(res.html).toContain('Tenant A');
         expect(res.html).toContain('Ada Alpha');
     });
 
-    it('bounces a signed-in user away from /login', async () => {
+    it('bounces a signed-in user away from /login, to the signed-in home', async () => {
         const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
         const res = await page('/login', cookie);
 
         expect(res.status).toBe(302);
-        expect(res.location).toBe('/');
+        // Not `/`: bouncing a signed-in user onto the marketing page would be a
+        // redirect loop's worth of confusion, and HOME_ROUTE exists to keep the
+        // guard and the login page agreeing about this one path.
+        expect(res.location).toBe('/dashboard');
     });
 
     it('honours ?redirect after signing in', async () => {
@@ -91,7 +104,7 @@ describe('authenticated routing', () => {
 
         // Protocol-relative URLs are the classic open-redirect vector.
         expect(res.status).toBe(302);
-        expect(res.location).toBe('/');
+        expect(res.location).toBe('/dashboard');
     });
 
     it('still allows /login?select=1 so a signed-in user can switch tenant', async () => {
@@ -115,11 +128,11 @@ describe('tenant selection gate', () => {
         const cookie = cookieFrom(res.setCookie);
 
         // Authenticated but not situated in a tenant: the guard must not treat
-        // this as signed in, or the landing page would render with no tenant.
-        const landing = await page('/', cookie);
+        // this as signed in, or the home page would render with no tenant.
+        const home = await page('/dashboard', cookie);
 
-        expect(landing.status).toBe(302);
-        expect(landing.location).toContain('/login');
+        expect(home.status).toBe(302);
+        expect(home.location).toContain('/login');
 
         // ...and the login page must let it stay, so selection can finish.
         expect((await page('/login', cookie)).status).toBe(200);
@@ -130,7 +143,7 @@ describe('tenant selection gate', () => {
             body: JSON.stringify({ tenantId: f.tenantB }),
         });
 
-        const after = await page('/', cookie);
+        const after = await page('/dashboard', cookie);
 
         expect(after.status).toBe(200);
         expect(after.html).toContain('Tenant B');

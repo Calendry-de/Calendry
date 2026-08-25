@@ -92,8 +92,11 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             description: 'Session overview.',
             icon: 'material-symbols:other-houses-outline',
             section: 'schedule',
-            keywords: ['home', 'start', 'landing'],
-            to: '/',
+            // Not 'landing': `/` is the PUBLIC landing page and this entry is
+            // the signed-in home, so that keyword would send a Ctrl+K search
+            // for the marketing page to the dashboard instead.
+            keywords: ['home', 'start', 'dashboard', 'overview'],
+            to: '/dashboard',
             inHeader: true,
         },
         {
