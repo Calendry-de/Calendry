@@ -46,8 +46,13 @@ yet.
 - [x] Group↔Term scoping — many-to-many, fail-open (unscoped = universal),
       with a reference-derived solver filter and a save-time warning when
       scoping a Group out of a Term that still uses it
-- [ ] AccessRole / permission management UI (Step 14) — the operator CLI
-      `create:role` exists; the tenant-facing UI and its API do not
+- [x] **AccessRole / permission management UI (Step 14) — COMPLETE.** Compose a
+      role from the fixed permission catalogue, grant it from the Person page,
+      and neither route can leave a tenant unable to administer itself. Closed
+      three things found on the way: `provision:tenant` had been failing on a
+      duplicate permission key since `calendar-periods` was added, `systemFlag`
+      was UI-only so the provisioned roles were deletable over the API, and six
+      relation pickers were gated on less than their own option wave needed
 - [x] **Solver integration Stages 1–7 — COMPLETE.** Start a solve, never lose
       the result, review it, apply or discard it; person-level clash detection,
       Federation-shared Rooms with real cross-tenant occupancy, and
@@ -491,26 +496,45 @@ the actual constraint/settings configuration that was active. "View what was
 configured when this calendar was generated" needs the real snapshot
 persisted, not just its hash.
 
-## Step 14: AccessRole management has no UI and no API
+## The FORM's reference wave is not permission-gated
 
-Tenant roles are editable **only by operator CLIs**: `provision:tenant` (grants
-the whole catalogue to `tenant-admin` at creation), `create:role` (composes a new
-role from an explicit permission list) and `grant:permissions` (backfills onto an
-existing role). A tenant admin still cannot compose a role, and no route is
-behind any of it:
+The sibling of the relation-option gap that Step 14 closed, in the other
+composable, and deliberately left open because the same answer does not work.
 
-- `access_role.manage` and `person_access_role.assign` are in the permission
-  catalogue and granted to `tenant-admin`, but **no endpoint checks either** —
-  they are currently unreachable code paths.
-- `access_role`, `access_role_permission` and `person_access_role` are not in
-  `RESOURCES` or `RELATIONS`, so the generic CRUD and relation routes do not
-  serve them.
+`useEntityForm` fetches one list per `reference` field in a single
+`Promise.all` — and those endpoints carry their own permissions, which the
+page's gate does not imply:
 
-That is deliberate for Step 13 (the brief scoped it to the nine core entities)
-and is the whole of Step 14. Note the shape it needs is unusual: AccessRole is
-tenant data, but the permissions it bundles are *code*, so its editor is a
-picker over the fixed catalogue rather than a free-form form — closer to the
-constraint rule builder than to the generic scaffold.
+    offerings form  ->  /api/terms          term.read
+                        /api/session-kinds  session_kind.read
+                        /api/roles          role.read
+    terms form      ->  /api/time-grids     time_grid.read
+
+A caller holding `offering.read` but not `term.read` takes down the whole wave.
+Worse than the relation case: the ROW is fetched in that same `Promise.all`, so
+`row` is null, the draft seeds empty, and the edit form renders **blank inputs
+over a record that has data** — the Step 13 SSR bug's exact symptom, from a
+different cause.
+
+**Why the relation fix does not transfer.** Relations are omitted when their
+options are unreachable, because a missing picker is honest. A `reference` field
+cannot be omitted: `termId` is REQUIRED on an Offering, and a create form
+silently missing it produces a 400 the user cannot act on. The plausible answers
+are (a) gate the whole page on the union, as `/schedule` does via
+`schedulePermissions.ts`, naming what is missing; or (b) render the field as
+static text showing the stored id with a note that resolving it needs
+`term.read`. (a) is consistent with the schedule precedent and blunter; (b) keeps
+partial editing possible and is more code.
+
+Not urgent: every seeded role that can reach these pages today also holds the
+reads. It becomes reachable the moment a tenant composes a narrow role through
+the new editor — which Step 14 has just made easy, so this should not sit
+indefinitely.
+
+`tests/manage-relation-gates.test.ts` covers the relation side only. Whichever
+answer is chosen, the form side needs the equivalent, and the check has to read
+the rendered VALUES rather than count inputs — counting is how the original
+Step 13 instance survived a whole phase.
 
 ## Import / Export / Notifications
 
