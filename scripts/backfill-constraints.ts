@@ -26,22 +26,51 @@
  *
  * So: an audited, opt-in operator action, run once after adding a type.
  *
- * WHAT IT WILL NOT DO
- * -------------------
+ * WHAT `--all-missing` WILL NOT DO
+ * --------------------------------
  * It only ever CREATES rows that are absent. It never edits an existing row —
  * not its weight, not its enabled state, not its name. A tenant who disabled a
  * rule or retuned a weight keeps that decision; re-running is idempotent and
  * silent.
  *
+ * `--retype` IS THE DELIBERATE EXCEPTION, AND WHY IT EXISTS
+ * --------------------------------------------------------
+ * The catalogue pins severity per type, because the severity IS the meaning. So
+ * when a type's declared severity CHANGES — `online_onsite_same_day_exclusion`
+ * went HARD to SOFT when the tenant asked for mixing to be discouraged rather
+ * than forbidden — every stored row is left contradicting the catalogue, and no
+ * amount of creating absent rows fixes it.
+ *
+ * Leaving them is not a neutral option. `toWireConstraint` reads the CATALOGUE's
+ * severity, not the row's, so a stored HARD row under a SOFT catalogue entry
+ * ships as `weight: row.weight ?? 0` — and a HARD row's weight is NULL by
+ * database CHECK. Zero means "count it, do not steer". The rule would stop
+ * filtering AND stop steering in one deploy, reported only as a line in
+ * `report.severityMismatches`.
+ *
+ * So this mode updates `severity` and `weight` TOGETHER in one statement, which
+ * is also the only way to satisfy `constraint_weight_matches_severity`
+ * (HARD ⇒ weight NULL, SOFT ⇒ weight NOT NULL) — writing either alone would be
+ * refused by the database mid-flight.
+ *
+ * It still touches nothing else: `is_enabled`, `name`, `params` and scoped
+ * variants' own settings are the tenant's and stay as they are.
+ *
  *   bun run backfill:constraints -- --all-missing --dry-run
  *   bun run backfill:constraints -- --all-missing
- *   bun run backfill:constraints -- --all-missing --tenant test --yes
+ *   bun run backfill:constraints -- --retype online_onsite_same_day_exclusion --dry-run
+ *   bun run backfill:constraints -- --retype online_onsite_same_day_exclusion --tenant test --yes
  */
 import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { defaultConstraintRow, defaultConstraintTypes } from '../shared/constraintTypes';
+import {
+    CONSTRAINT_TYPE_KEYS,
+    defaultConstraintRow,
+    defaultConstraintTypes,
+    findConstraintType,
+} from '../shared/constraintTypes';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
 function arg(name: string): string | undefined {
@@ -50,25 +79,171 @@ function arg(name: string): string | undefined {
     return index === -1 ? undefined : process.argv[index + 1];
 }
 
+/**
+ * Realign every stored row of ONE type with the catalogue's current severity.
+ *
+ * Severity and weight move together in a single UPDATE, because
+ * `constraint_weight_matches_severity` refuses HARD-with-weight and
+ * SOFT-without — so writing either alone fails, and writing them in two
+ * statements would fail on the first.
+ *
+ * Rows already matching the catalogue are left alone and reported as such, so a
+ * re-run is idempotent and says so rather than claiming to have done work.
+ */
+async function retypeMode(
+    prisma: PrismaClient,
+    url: string,
+    options: { key: string; tenantSlug?: string; dryRun: boolean; skipConfirm: boolean },
+): Promise<void> {
+    const type = findConstraintType(options.key);
+
+    if (!type) {
+        console.error(`\nNot a catalogue type: '${options.key}'.`);
+        console.error(`The catalogue is shared/constraintTypes.ts. Known: ${CONSTRAINT_TYPE_KEYS.join(', ')}\n`);
+        process.exit(1);
+    }
+
+    if (!type.severity) {
+        console.error(
+            `\n'${type.key}' declares no fixed severity — the tenant chooses it, so there is\n`
+            + 'nothing to realign to. Nothing was changed.\n',
+        );
+        process.exit(1);
+    }
+
+    /*
+     * The catalogue is the authority on what the rows SHOULD be, and
+     * `defaultConstraintRow` is the one function that reads it — including the
+     * throw for a SOFT type with no `defaultWeight`, which is what stops this
+     * command from quietly writing weight 0 and disabling the rule it is
+     * repairing.
+     */
+    const target = defaultConstraintRow(type);
+
+    console.log(`Realigning ${describeTarget(url)}...`);
+    console.log(`\nType      ${type.key}`);
+    console.log(`Catalogue ${target.severity}${target.weight === null ? '' : `, weight ${target.weight}`}`);
+
+    const tenants = await prisma.tenant.findMany({
+        where: options.tenantSlug ? { slug: options.tenantSlug } : {},
+        select: { id: true, slug: true },
+        orderBy: { slug: 'asc' },
+    });
+
+    if (tenants.length === 0) {
+        console.error(options.tenantSlug ? `\nNo tenant with slug '${options.tenantSlug}'.\n` : '\nNo tenants exist.\n');
+        process.exit(1);
+    }
+
+    const rows = await prisma.constraint.findMany({
+        where: { type: type.key, tenantId: { in: tenants.map((t) => t.id) } },
+        select: { id: true, tenantId: true, name: true, severity: true, weight: true, isDefault: true },
+    });
+
+    const slugOf = new Map(tenants.map((t) => [t.id, t.slug]));
+    // Already correct rows are counted, not skipped silently: "0 to change"
+    // reads very differently from "0 rows found", and only one of them means
+    // the command has nothing to do.
+    const stale = rows.filter((row) => row.severity !== target.severity || row.weight !== target.weight);
+
+    console.log(`Tenants   ${tenants.length} (${tenants.map((t) => t.slug).join(', ')})`);
+    console.log(`Rows      ${rows.length} of this type, ${stale.length} to change\n`);
+
+    for (const row of stale) {
+        console.log(
+            `  ${slugOf.get(row.tenantId)}: ${row.isDefault ? 'default' : `variant "${row.name}"`}`
+            + ` ${row.severity}/${row.weight ?? 'null'} → ${target.severity}/${target.weight ?? 'null'}`,
+        );
+    }
+
+    if (stale.length === 0) {
+        console.log(rows.length === 0
+            ? '\nNo rows of this type exist. Nothing to change.\n'
+            : '\nEvery row already matches the catalogue. Nothing to change.\n');
+
+        return;
+    }
+
+    if (options.dryRun) {
+        console.log('\n--dry-run: nothing was written.\n');
+
+        return;
+    }
+
+    if (!options.skipConfirm) {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const answer = await rl.question(`\nRewrite ${stale.length} row(s)? Type 'retype' to confirm: `);
+
+        rl.close();
+
+        if (answer.trim() !== 'retype') {
+            console.error('\nDoes not match. Nothing was changed.\n');
+            process.exit(1);
+        }
+    }
+
+    const written = await prisma.constraint.updateMany({
+        where: { id: { in: stale.map((row) => row.id) } },
+        // BOTH fields, one statement. The CHECK pairs them, so this is not a
+        // stylistic choice — either alone is refused.
+        data: { severity: target.severity, weight: target.weight },
+    });
+
+    console.log(`\nRewrote ${written.count} row(s).`);
+    console.log('Enabled state, names, params and scope rows were not touched.\n');
+
+    console.log('AUDIT ' + JSON.stringify({
+        ts: new Date().toISOString(),
+        action: 'constraint.retyped',
+        type: type.key,
+        to: { severity: target.severity, weight: target.weight },
+        tenants: [...new Set(stale.map((row) => slugOf.get(row.tenantId)))],
+        rewritten: written.count,
+        operator: `${userInfo().username}@${hostname()}`,
+        via: 'cli:backfill-constraints',
+    }));
+}
+
 async function main() {
     const allMissing = process.argv.includes('--all-missing');
+    const retype = arg('retype');
     const tenantSlug = arg('tenant');
     const dryRun = process.argv.includes('--dry-run');
     const skipConfirm = process.argv.includes('--yes');
 
-    if (!allMissing) {
+    if (allMissing && retype) {
         console.error(
-            'Missing required --all-missing.\n\n'
-            + '  bun run backfill:constraints -- --all-missing [--tenant <slug>] [--dry-run] [--yes]\n\n'
-            + 'The flag is required rather than implied so the command cannot be run by accident;\n'
-            + 'there is deliberately no per-type selection, because a partially-seeded tenant is the\n'
-            + 'exact state this repairs.',
+            '\n--all-missing and --retype do different things and must not be combined.\n'
+            + 'One creates absent rows; the other rewrites existing ones. Run them separately\n'
+            + 'so each is audited for what it actually did.\n',
+        );
+        process.exit(1);
+    }
+
+    if (!allMissing && !retype) {
+        console.error(
+            'Missing required --all-missing or --retype <key>.\n\n'
+            + '  bun run backfill:constraints -- --all-missing [--tenant <slug>] [--dry-run] [--yes]\n'
+            + '  bun run backfill:constraints -- --retype <key> [--tenant <slug>] [--dry-run] [--yes]\n\n'
+            + 'A flag is required rather than implied so the command cannot be run by accident.\n'
+            + '`--all-missing` has deliberately no per-type selection, because a partially-seeded\n'
+            + 'tenant is the exact state it repairs; `--retype` is per-type by nature.',
         );
         process.exit(1);
     }
 
     const url = resolveOwnerDatabaseUrl();
     const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+
+    if (retype) {
+        try {
+            await retypeMode(prisma, url, { key: retype, tenantSlug, dryRun, skipConfirm });
+        } finally {
+            await prisma.$disconnect();
+        }
+
+        return;
+    }
 
     try {
         console.log(`Backfilling ${describeTarget(url)}...`);

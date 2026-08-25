@@ -1623,6 +1623,37 @@ The order matters, and each step depends on the one before it.
   visibly exists. Backfill with
   `bun run grant:permissions -- --role tenant-admin --all-missing`
   (`--dry-run` first; owner connection, audited to stdout like `reset:password`).
+- **Changing a constraint type's SEVERITY needs a backfill, and it must run
+  BEFORE or WITH the deploy that carries the new catalogue — never after.**
+
+  `toWireConstraint` reads the CATALOGUE's severity, not the row's:
+
+  ```ts
+  weight: type.severity === 'SOFT' ? (row.weight ?? 0) : 0,
+  ```
+
+  A stored HARD row has `weight = NULL` by database CHECK
+  (`constraint_weight_matches_severity`). So in any window where the app carries
+  a SOFT catalogue entry and the rows still say HARD, every enabled row of that
+  type ships as **weight 0** — which the solver reads as "count it, do not
+  steer". The rule stops filtering *and* stops steering, and the only trace is a
+  line in `report.severityMismatches` that nothing surfaces to a human. It is
+  the silently-disabled-rule failure with a deploy-ordering trigger.
+
+  Repair with
+  `bun run backfill:constraints -- --retype <key>` (`--dry-run` first; owner
+  connection, audited to stdout). It rewrites `severity` and `weight` in ONE
+  statement because the CHECK pairs them — writing either alone is refused
+  mid-flight — and touches nothing else, so a tenant's enabled state, name,
+  params and scoped variants survive.
+
+  This is the deliberate exception to `--all-missing`'s rule that the command
+  never edits an existing row. The two modes cannot be combined, for the reason
+  they are separate: one creates what is absent, the other rewrites what is
+  there, and an audit line should say which happened.
+
+  `online_onsite_same_day_exclusion` HARD → SOFT is the case that established
+  this.
 - **A rebuilt dev database has one role and one account.** To restore the
   under-privileged accounts the permission-gated checks need:
   `bun run create:role -- --tenant test --key viewer --name "Schedule Viewer"
