@@ -1,4 +1,6 @@
 import type { EntityRow, ManageEntity, RelationDef } from '~/utils/manageRegistry';
+import { relationReadRequirement } from '~/utils/manageRegistry';
+import { satisfiesPermissionRequirement } from '#shared/permissions';
 import { useSession } from '~/composables/session';
 
 export type RelationRow = Record<string, unknown>;
@@ -33,19 +35,26 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
      * Relations this caller may see at all.
      *
      * FILTERED HERE, BEFORE THE FETCH, and that is the whole point. The option
-     * lists below are one `Promise.all`, so a single 403 inside it rejects the
-     * handler and the page renders as NOTHING — not an error, not a partial
-     * view, blank. That has happened twice already (CLAUDE.md's 6c rule) and
-     * both times the cause was a page calling an endpoint its own gate did not
-     * imply.
+     * lists below are ONE `Promise.all`, so a single 403 inside it takes down
+     * the entire wave — and because the page awaits the useAsyncData HANDLE,
+     * which resolves rather than rejects, the result is not the blank page
+     * CLAUDE.md's 6c rule describes but every picker on the page rendering an
+     * EMPTY option list. Measured: a person editor's Person page then says "No
+     * roles defined yet" over a tenant that has them.
+     *
+     * OMITTED, not degraded, per the same rule the schedule gate follows: a
+     * missing picker is honest, an empty one asserts that nothing exists.
+     *
+     * The requirement is DERIVED from the resources each wave touches
+     * (`relationReadRequirement`), so a relation cannot drift from its own gate
+     * and a new one is covered by construction.
      *
      * Read synchronously at setup rather than through a computed: `defs` drives
      * the fetch, and permissions do not change while a page is open. Anything a
      * watcher seeds is undefined at first render on the server.
      */
     const defs: RelationDef[] = (entity.relations ?? []).filter(
-        (def) => !def.requiresAnyPermission?.length
-            || def.requiresAnyPermission.some((permission) => held.has(permission)),
+        (def) => satisfiesPermissionRequirement(held, relationReadRequirement(def)),
     );
 
     /**
@@ -56,8 +65,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
      * one step further along.
      */
     function canWrite(def: RelationDef): boolean {
-        return !def.writeRequiresAnyPermission?.length
-            || def.writeRequiresAnyPermission.some((permission) => held.has(permission));
+        return satisfiesPermissionRequirement(held, def.writeRequiresPermissions ?? []);
     }
 
     const asyncData = useAsyncData(`manage-relations:${entity.key}:${id ?? 'new'}`, async () => {

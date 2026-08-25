@@ -68,6 +68,21 @@ const CONSTRAINT_VIEWER = 'constraint-viewer@test.local';
 const PERSON_EDITOR = 'person-editor-page@test.local';
 
 /**
+ * Only `person.*` and `room.*` — no role.read, group.read or equipment.read.
+ *
+ * The systemic case. SIX relation pickers across four entities fetched their
+ * options from a resource their page's own gate did not cover, and none of them
+ * was new: the Person page has fetched `/api/roles` and `/api/groups` since
+ * Step 13, and the Room page `/api/equipment`. What that produced was not a
+ * blank page but every picker on the page rendering an EMPTY option list — a
+ * tenant with groups being told it has none.
+ *
+ * One account across two entities on purpose: the point is that this was never
+ * about access roles.
+ */
+const ENTITY_EDITOR = 'entity-editor@test.local';
+
+/**
  * `viewer` holds ONLY `session.read` (pinned by auth-permissions.test.ts), so
  * it is the sharpest instrument available: any page it can reach that depends
  * on a second permission fails here.
@@ -77,6 +92,7 @@ const ROLES = [
     { name: 'viewer', account: ACCOUNTS.viewerA },
     { name: 'constraintViewer', account: CONSTRAINT_VIEWER },
     { name: 'personEditor', account: PERSON_EDITOR },
+    { name: 'entityEditor', account: ENTITY_EDITOR },
 ] as const;
 
 /**
@@ -164,6 +180,28 @@ const PAGES = [
         roles: ['personEditor'],
         marker: 'Fix',
         why: 'the person\'s own name — present only once the whole relation wave resolved',
+    },
+    {
+        /*
+         * The same page for a role holding ONLY `person.*`. Every picker on it
+         * is now omitted, and the page still has to render the record — an
+         * absence check that a blank page would pass is no check at all.
+         */
+        path: '/manage/persons/:personEditorId',
+        roles: ['entityEditor'],
+        marker: 'Fix',
+        why: 'the person\'s own name, with every relation picker gated away',
+    },
+    {
+        /*
+         * The Room page, which had the identical gap through `/api/equipment`
+         * and has nothing to do with access roles. Included because one instance
+         * of a systemic bug proves nothing about the other five.
+         */
+        path: '/manage/rooms/test-room-private-a',
+        roles: ['admin', 'entityEditor'],
+        marker: 'A101',
+        why: 'the room\'s own code — present only once the form seeded',
     },
 ] as const;
 
@@ -260,10 +298,45 @@ async function seedPersonEditor() {
     await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 }
 
+/**
+ * A person + account + role holding `person.*` and `room.*` and nothing else.
+ * Same lifecycle reasoning as the two fixtures above.
+ */
+async function seedEntityEditor() {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${ENTITY_EDITOR}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId: TENANT_A, key: 'entity-editor', name: 'Entity Editor' },
+    });
+
+    await ownerDb.accessRolePermission.createMany({
+        data: [
+            'person.read', 'person.create', 'person.update', 'person.delete',
+            'room.read', 'room.create', 'room.update', 'room.delete',
+        ].map((permissionKey) => ({ accessRoleId: role.id, permissionKey, tenantId: TENANT_A })),
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId: TENANT_A, givenName: 'Eve', familyName: 'Entity', email: 'eve@a.test' },
+    });
+
+    await ownerDb.personAccessRole.create({
+        data: { personId: person.id, accessRoleId: role.id, tenantId: TENANT_A },
+    });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({
+        data: { email: ENTITY_EDITOR, passwordHash: template.passwordHash },
+    });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     await seed();
     await seedConstraintViewer();
     await seedPersonEditor();
+    await seedEntityEditor();
 
     for (const role of ROLES) {
         const { cookie } = await login(role.account, TEST_PASSWORD);
@@ -273,7 +346,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR]) {
+    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR]) {
         await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${email}'`);
     }
 
@@ -380,6 +453,77 @@ describe('every page renders for every role that can reach it', () => {
             .then((body) => body.split('<script type="application/json"')[0] ?? '');
 
         expect(asAdmin).toContain('Access roles');
+    });
+
+    /**
+     * THE SYSTEMIC CASE: a picker whose options come from a resource the page's
+     * own gate does not cover is OMITTED, never rendered empty.
+     *
+     * Six relations across four entities were in that state before this, and
+     * only one of them involved access roles. The Person and Room pages are both
+     * checked here because one instance of a systemic bug proves nothing about
+     * the other five.
+     *
+     * Every absence is paired with an admin rendering the SAME page. That
+     * pairing is the whole discipline of this file: "the page does not contain
+     * X" passes just as well for a page that rendered nothing.
+     */
+    describe('relation pickers whose options are out of reach', () => {
+        const body = (path: string, role: string) =>
+            fetch(`${BASE}${path}`, { headers: { cookie: cookies[role]! } })
+                .then((res) => res.text())
+                // Rendered body only. The hydration payload carries the registry
+                // as JSON, and matching there would pass for a page that
+                // rendered nothing at all.
+                .then((html) => html.split('<script type="application/json"')[0] ?? '');
+
+        it('omits all three pickers on the Person page for a person.*-only role', async () => {
+            const html = await body(`/manage/persons/${personEditorId}`, 'entityEditor');
+
+            // The record itself still renders — this is an edit form, not a
+            // denial. Only the controls it cannot populate are gone.
+            expect(html).toContain('Fix');
+            expect(html).not.toContain('Scheduling roles');
+            expect(html).not.toContain('Group memberships');
+            expect(html).not.toContain('Access roles');
+
+            /*
+             * The control. Without it, all three assertions above would pass
+             * against a build where the page simply failed to render — which is
+             * precisely the shape of the bug being fixed.
+             */
+            const asAdmin = await body(`/manage/persons/${personEditorId}`, 'admin');
+
+            expect(asAdmin).toContain('Scheduling roles');
+            expect(asAdmin).toContain('Group memberships');
+            expect(asAdmin).toContain('Access roles');
+        });
+
+        it('omits the equipment picker on the Room page for a room.*-only role', async () => {
+            const html = await body('/manage/rooms/test-room-private-a', 'entityEditor');
+
+            expect(html).toContain('A101');
+            expect(html).not.toContain('Equipment in this room');
+
+            const asAdmin = await body('/manage/rooms/test-room-private-a', 'admin');
+
+            expect(asAdmin).toContain('Equipment in this room');
+        });
+
+        it('never renders a picker with an empty option list where the fetch was refused', async () => {
+            /*
+             * The failure this replaced, stated directly: the old behaviour kept
+             * the picker and showed its `emptyHint`, so a tenant that HAS roles
+             * and groups was told it has none. If a relation is ever offered
+             * without its options being reachable, that hint comes back — on a
+             * page whose fixture demonstrably has both.
+             */
+            const html = await body(`/manage/persons/${personEditorId}`, 'entityEditor');
+
+            expect(html).not.toContain('No roles defined yet');
+            expect(html).not.toContain('No groups defined yet');
+            expect(html).not.toContain('No access roles defined yet');
+        });
     });
 
     it('names WHICH permissions are missing, not just that access is denied', async () => {

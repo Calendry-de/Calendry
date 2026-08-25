@@ -1,3 +1,6 @@
+import type { PermissionRequirement } from '#shared/permissions';
+import { resourcePermissions } from '#shared/permissions';
+
 /**
  * The management area's entity registry — a client mirror of the server's
  * `RESOURCES` (server/utils/resources.ts).
@@ -136,45 +139,22 @@ export interface RelationDef {
     };
     emptyHint?: string;
     /**
-     * Permissions that make this relation VISIBLE at all — ANY one is enough.
-     * Absent means visible to anyone who can read the parent.
+     * What makes this relation EDITABLE. Absent means the parent's `.update`,
+     * which is what the PUT requires by default.
      *
-     * Note the ANY, which is the opposite of `NavEntry.permission`'s ALL. The
-     * two are answering different questions: a nav entry needs every permission
-     * its page will use, while this needs one of the several that can reach a
-     * single endpoint.
-     *
-     * THIS IS A REAL GUARD, not a nicety, and the symptom was measured rather
-     * than assumed. Every relation's option list is fetched in ONE
-     * `Promise.all`, so a single 403 inside it takes down the whole wave — and
-     * because `useEntityRelations` awaits the useAsyncData handle (which
-     * resolves rather than rejects), the result is not a blank page but EVERY
-     * picker on the page rendering an empty option list. Verified live: with
-     * this line removed, a person editor's Person page says "No roles defined
-     * yet" over a tenant that has them.
-     *
-     * The value must therefore be the OPTION ENDPOINT's own requirement:
-     * `/api/access-roles` accepts `access_role.manage` or
-     * `person_access_role.assign`, so those are the two listed here.
-     *
-     * ANY, not ALL, because this relation's options come from ONE endpoint that
-     * accepts either. A relation whose wave needs TWO endpoints — `lecturers`
-     * fetches persons AND roles — is not expressible here and would need an
-     * all-of form. That gap is pre-existing and deliberately not papered over
-     * with a field whose semantics do not fit it.
-     */
-    requiresAnyPermission?: readonly string[];
-    /**
-     * Permissions that make it EDITABLE — ANY one is enough. Absent means the
-     * parent's `.update`, which is what the PUT requires by default.
-     *
-     * Separate from visibility because they are separate facts here: seeing
-     * which roles somebody holds rides on `person.read`, while granting one is
+     * Separate from VISIBILITY, which is derived rather than declared — see
+     * `relationReadRequirement` below. They are separate facts: seeing which
+     * roles somebody holds rides on `person.read`, while granting one is
      * `person_access_role.assign`. Collapsing them would either hide
      * information a person editor may legitimately see, or offer them a control
      * whose every change answers 403.
+     *
+     * Declared rather than derived because it is not derivable: nothing about
+     * `resource: 'access-roles'` says that WRITING this join needs a capability
+     * from a different part of the catalogue. Only the server's
+     * `RelationConfig.writePermission` knows, and this mirrors it.
      */
-    writeRequiresAnyPermission?: readonly string[];
+    writeRequiresPermissions?: PermissionRequirement;
     /**
      * Narrow the option list by a field on the row being edited.
      *
@@ -536,8 +516,13 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 valueKey: 'accessRoleId',
                 optionLabel: (row) => String(row.name ?? row.key),
                 emptyHint: 'No access roles defined yet.',
-                requiresAnyPermission: ['access_role.manage', 'person_access_role.assign'],
-                writeRequiresAnyPermission: ['person_access_role.assign'],
+                /*
+                 * No read gate declared: it is DERIVED from `resource` — see
+                 * `relationReadRequirement`. `/api/access-roles` accepts either
+                 * administration permission, and the derivation says so without
+                 * this entry having to know.
+                 */
+                writeRequiresPermissions: ['person_access_role.assign'],
             },
             {
                 key: 'groups',
@@ -983,6 +968,59 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
 
 export function findManageEntity(key: string | undefined): ManageEntity | undefined {
     return MANAGE_ENTITIES.find((entity) => entity.key === key);
+}
+
+/**
+ * Every resource one relation's option wave fetches from.
+ *
+ * The relation's own membership GET (`/api/{entity}/{id}/{relation}`) is NOT in
+ * here: it is gated on the PARENT's `.read`, which is the page gate itself, so
+ * it can never be the thing that fails.
+ *
+ * This is the one place that knows what a picker fetches. A relation that grows
+ * a third fetch must be added here, and the test below will not let it be
+ * forgotten quietly.
+ */
+export function relationOptionResources(def: RelationDef): string[] {
+    return [def.resource, ...(def.extraReference ? [def.extraReference.resource] : [])];
+}
+
+/**
+ * What a caller needs in order to be OFFERED this relation — derived, never
+ * declared.
+ *
+ * WHY DERIVED. Every relation's option list is fetched in ONE `Promise.all`, so
+ * a single 403 inside it takes down the whole wave — and because
+ * `useEntityRelations` awaits the useAsyncData handle, which RESOLVES rather
+ * than rejects, the result is not a blank page but every picker on the page
+ * rendering an empty option list. Measured, not assumed: with this gating
+ * removed, a person editor's Person page says "No roles defined yet" over a
+ * tenant that has them. A page-wide lie, and indistinguishable from an
+ * unconfigured tenant.
+ *
+ * A DECLARED field would have to be right on every relation, forever, including
+ * the six that already had it wrong before anyone noticed. Deriving it from the
+ * resources the wave actually touches means a new relation is gated by
+ * construction, and a relation that changes what it fetches cannot drift from
+ * its own gate.
+ *
+ * The result is an AND of ORs: every endpoint must be reachable (AND), and one
+ * endpoint may accept several permissions (OR). `lecturers` is why both levels
+ * are needed — it fetches persons AND roles.
+ */
+export function relationReadRequirement(def: RelationDef): PermissionRequirement {
+    return relationOptionResources(def).map((resource) => {
+        const permissions = resourcePermissions(resource, 'read');
+
+        /*
+         * A resource nothing can name fails CLOSED — an empty clause is
+         * unsatisfiable, so the picker is hidden rather than offered against an
+         * endpoint whose gate nobody can predict. That would be a silent
+         * vanishing, which this codebase treats as worse than a loud failure,
+         * so `tests/manage-relation-gates.test.ts` refuses to let one ship.
+         */
+        return permissions ? [...permissions] : [];
+    });
 }
 
 /** The four CRUD permissions for an entity, in catalogue form. */
