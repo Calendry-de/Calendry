@@ -183,50 +183,8 @@ otherwise" is not one.
   Generation snapshot (solver output or manual baseline). Never mutate a
   Session in place without emitting the corresponding event — rollback and
   audit depend on the log being complete.
-
-  **What the solver path does and does not log, deliberately.** Applying a
-  Generation writes ONE `APPLY_GENERATION` event, not one per placement — the
-  snapshot is the record, and a 27,000-Session apply would otherwise write
-  27,000 rows. The exception is **deletion**: `executePlan` emits a `DELETE`
-  event per removed Session, because a removal is the one change a snapshot of
-  what-now-exists cannot describe. Until 2026-08-23 it emitted none, so "what
-  was removed, and from where" had no answer at all.
-
-  Order matters there and is easy to get wrong: the event is written **before**
-  the row is deleted. `session_event.session_id` is `ON DELETE SET NULL` and the
-  append-only trigger permits exactly that detach (migration `20260816180000`),
-  so the pointer is nulled while the payload keeps the placement. Writing the
-  event afterwards would produce a row pointing at nothing, indistinguishable
-  from the detached case.
 - **Locked Sessions are solver-exempt.** A solver re-run must skip locked
   Sessions entirely, not just deprioritize them.
-- **An offering-less Session is an EVENT, and its exemption is structural, not
-  the lock.** `session.offering_id` is nullable (TAXONOMY.md §2); NULL means a
-  human placed this and no recurring demand stands behind it.
-  `planMaterialization()`'s delete partition requires `inScope.has(offeringId)`,
-  and an Event belongs to no Offering, so no solve's scope can reach it —
-  including a solve that has never heard of it. `POST /api/sessions` also
-  defaults `is_locked` to true, but **the lock is defence in depth**: it is one
-  UPDATE from being cleared, whereas the missing Offering is a property of what
-  the row IS. Verified against a live solver both ways, locked and unlocked.
-
-  **Deleting one is Events-only, and that boundary is load-bearing.**
-  `DELETE /api/sessions/:id` refuses an Offering-linked Session with 409: its
-  Offering declares a frequency, so deleting the Session leaves that unmet and
-  the next solve re-creates it — the delete would appear to work and silently
-  undo itself. Removing a real Session means deciding whether it is re-placed or
-  held as unplaced-but-tracked, which is the deferred cancel-to-spare-bank
-  feature. 409 rather than 404 so "belongs to an Offering" stays distinguishable
-  from "no such Session".
-
-  Two consequences that must not be "tidied":
-
-  - the delete partition names `offeringId === null` as its own clause rather
-    than relying on `Set.has(null)` being false — an exemption that works but is
-    invisible would break silently the moment `inScope` changes shape;
-  - `toWireSession` forces `isLocked` for an Event exactly as it already does
-    for a federation-shared Session, so the solver receives it as **occupancy**
-    and never proposes moving something the apply would refuse to write.
 - **Hard-constraint violations from manual edits: warn, don't block.** The
   UI/API must surface current violations as a queryable state, not just a
   one-time toast at edit time.
@@ -420,183 +378,6 @@ otherwise" is not one.
   bundle of fixed Permissions. Keeping them separate is what stops the schema
   accepting an Offering that requires a lecturer holding the role "Billing
   Admin". Never merge them, and never grant permissions via `Role`.
-- **A constraint TYPE with no row is a silently disabled rule, not a neutral
-  absence.** `refreshViolations()` evaluates only the types the tenant has a
-  `constraint_def` row for, and `constraint_violation.constraint_id` is NOT
-  NULL, so a type nobody created is a rule that never runs and never says so.
-
-  This bit for real and for a long time: `no_double_booking_person` was added to
-  the catalogue in Stage 7a and never added to `provision-tenant.ts`'s
-  hand-written three-item list, so the person-clash check had **never run in any
-  real tenant** — while `tests/violations-person-clash.test.ts` passed the whole
-  time, because it creates its own constraint row.
-
-  Closed structurally (TAXONOMY.md §2 amendment): every tenant now holds exactly
-  one **default row per live catalogue type**, enforced by the partial unique
-  index `constraint_one_default_per_type` on `(tenant_id, type) WHERE is_default`.
-  Provisioning derives the set from `CONSTRAINT_TYPES` rather than listing it,
-  so a new type is provisioned by construction; existing tenants are repaired
-  with `bun run backfill:constraints -- --all-missing`.
-
-  Three things to keep:
-
-  - **A tenant opts out by DISABLING a default row, never by deleting it.**
-    Deleting makes the rule unreachable again; disabling makes it off.
-  - **Deprecated types get no default row** (`defaultConstraintTypes()` filters
-    on `deprecatedBy`). They stay in the catalogue so existing rows remain
-    renderable, but seeding a fresh one would resurrect a superseded rule as a
-    first-class option. Two are deprecated today, so the catalogue has 15
-    entries and **13 live types**.
-  - **The grid renders from the CATALOGUE, not from the fetch.** A type with no
-    row is reported loudly in the UI rather than omitted — omission is exactly
-    what hid the gap above, in a list that looked complete.
-
-- **Two or more Groups on an Offering means N independent series, not one
-  combined Session.** TAXONOMY.md §2 states the rule and why it was always the
-  intended meaning. The mechanics worth knowing here:
-
-  - **The solver needs no knowledge of it.** A multi-group Offering is split
-    before assembly into one wire Offering per Group, id
-    `` `${offeringId}::${groupId}` ``, each with the full frequency and its own
-    capacity. `convert.rs` keys everything by wire id and echoes it back, so N
-    series are indistinguishable from N hand-made rows.
-  - **The mapping is ENCODED, not held in a side map.** Materialization runs at
-    APPLY, from `solver_run.result`, possibly days later and across a restart —
-    anything held in memory during assembly is gone by then. Reversal lives in
-    `parseWireOfferingId` and is called from exactly two places (the placement
-    path and the violation path); an id that cannot be reversed is counted, not
-    guessed.
-  - **Scope is stored in TWO languages.** `solver_run.scope.offeringIds` keeps
-    REAL ids because `planMaterialization` compares them to
-    `session.offering_id`; `wireOfferingIds` carries the split ids the solver is
-    given. One list for both breaks in one direction or the other — wire ids
-    stored means nothing is ever deleted, real ids sent means nothing is ever
-    placed.
-  - **Existing Sessions must be re-pointed or omitted.** `convert.rs` resolves an
-    existing Session's Offering by matching `offering_id` against wire ids, and
-    uses it for scope, `already_realized` and id reuse. A Session left on its
-    real id after a split becomes immovable out-of-scope occupancy that counts
-    toward no series — so the solver would place the full frequency again ON TOP
-    of it. A Session carrying exactly one of the Groups is re-pointed at that
-    series; a legacy COMBINED one (none or several) is omitted from the wire
-    entirely and removed by the apply, counted in
-    `report.legacyCombinedSessionsOmitted`.
-  - **No Offering rows are ever created.** Every resulting Session points at the
-    one real `offering_id`, with `session_group` carrying only that series'
-    Group.
-
-  Measured on the demo tenant: 12 Offerings became 48 wire entries, required
-  capacity fell from 96 to 24 per series, and a solve that previously had to put
-  all 65 Sessions online with 4 `MaxOnlineShare` violations produced 260
-  Sessions across the three physical rooms with zero violations.
-
-- **A non-default Constraint must name a scope, and scoping is KIND-ONLY in the
-  UI.** Every live catalogue type has a default (tenant-wide) row, so a second
-  UNSCOPED row of the same type is not an "additional rule" — it is a second
-  tenant-wide rule with its own weight, and both reach the solver. That is the
-  duplicate-constraint defect this project already fixed once, and the "Add
-  scoped variant" button reintroduced it by creating rows it had no way to
-  scope: `GET /api/constraints/:id/scopes` returned `[]` and nothing in the UI
-  could change that.
-
-  Three things hold it together, and each was chosen against an alternative:
-
-  - **Scopes travel in the constraint's own payload** (`childKeys: ['scopes']`),
-    not as a relation. `ManageRelationsPanel` cannot edit relations before the
-    row exists, so "create then scope" would leave a window in which the variant
-    IS the duplicate. Same mechanism `time-grids` uses for `breaks`.
-  - **`beforeCreate` refuses an unscoped variant when a default exists, and
-    `beforeUpdate` refuses an edit that would empty the scopes.** Guarding only
-    create would let the same state be reached in two requests. This cannot be a
-    database constraint — "has at least one row in another table" is not a CHECK,
-    and the partial unique index governs only how many DEFAULTS exist.
-  - **The "exclude types that already have a default" alternative is unworkable
-    by construction**: all thirteen live types have one, so the picker would be
-    empty.
-
-  **Kind scopes only in the form.** `constraint_scope` can name an Offering and
-  the relation endpoint still accepts one, but `assembleSolverInput` SKIPS a
-  constraint scoped to offerings outright — `ConstraintConfig` carries
-  `applies_to_kinds` and nothing else, and sending it unscoped would widen the
-  rule rather than narrow it. An offering picker would be a control whose main
-  effect is switching the rule off in the next solve.
-
-  Note also that **`refreshViolations()` ignores scopes entirely**, so scoping a
-  structural rule narrows the SOLVER's view and not the live violation checks.
-
-- **Editing an EVENT is `POST /api/sessions/:id/details`, and it is Events-only.**
-  Title, kind, groups and people; placement and room stay on `move`, which
-  already owns them (`setRooms()` posts `roomIds` there). Adding room here would
-  mean two routes writing `session_room` under two permissions emitting two
-  event types.
-
-  Offering-linked Sessions are refused with 409 for the reason DELETE refuses
-  them: `kind_id` is copied from the Offering and groups/people come from solver
-  output, so a manual edit would be silently overwritten by the next apply.
-
-  `fitsGrid()` is deliberately NOT checked here — the route touches no placement
-  field, so a grid guard could never fail, and this codebase treats a guard that
-  cannot fail as worse than none.
-
-  The event type is `UPDATE_DETAILS`, not a generic `UPDATE`: the routing
-  convention above exists so the log records intent, and the payload carries
-  `before`/`after` for the CHANGED fields only.
-
-- **A per-entity API route must NOT live under `server/api/<resource>/` for a
-  resource served by the generic scaffold.** `server/api/[resource]/` is the
-  CRUD catch-all; creating a literal sibling directory makes Nitro match that
-  segment statically and stop considering the dynamic branch, so **every** route
-  for that resource 404s. Measured while adding the derived-capacity endpoint:
-  `GET /api/offerings` returned "Page not found" while `/api/rooms`,
-  `/api/groups` and `/api/persons` stayed 200 — the whole Offerings section
-  dead, from adding one unrelated file. The endpoint lives at
-  `/api/offering-capacity/:id` for exactly this reason.
-
-- **`Offering.requiredCapacity` derives when NULL — really, now.** Both the
-  schema comment and the form's help text promised derivation from the attached
-  Groups; nothing derived, `assembleSolverInput` mapped `?? 0`, and the solver's
-  filter is `room.capacity < min_capacity`, so 0 admitted every Room. Measured
-  on the demo tenant: twelve Offerings of 96 attendees each, all with NULL, all
-  placed into 24-seat rooms.
-
-  The rule lives once, in `shared/groupCapacity.ts`, because two consumers need
-  the identical number: the solver input and the Offering form's read-only note.
-
-  **Counting is a UNION, not a sum**, and that is the whole design. Two
-  independent double-counts exist — a person enrolled at both a leaf and an
-  ancestor (legal data), and an Offering carrying both a Group and one of its
-  own descendants. Both are fixed by taking the union of every attached Group's
-  own-plus-descendants closure and counting DISTINCT people. The `expectedSize`
-  fallback needs the same dedup, so it sums only the MAXIMAL attached Groups:
-  "IT Security" (48) plus its child "dIT22 S1" (24) is 48, not 72 — verified
-  live in both the membership and estimate forms.
-
-  **Real membership always beats `expectedSize`**, including when it is smaller —
-  an enrolment list is a fact and an estimate is a number someone typed once.
-  The consequence: a PARTIAL roll shrinks the requirement. Enrol 4 of 96 and the
-  derived capacity is 4, measured rather than hypothesised.
-
-  That is not blocked, because the roll is still the honest count. It is
-  REPORTED: `report.offeringsWithPartialEnrolment` carries `{ members, expected }`
-  whenever the roll is below `ENROLMENT_COMPLETE_RATIO` (0.9) of the estimate,
-  and the Offering form says so next to the field. Three things about that
-  threshold are deliberate:
-
-  - **It is not zero-tolerance.** A roll is always slightly short — late
-    enrolment, drops — so flagging any shortfall would fire on nearly every
-    Offering and train people to skip the report.
-  - **It decides only WHETHER to mention it, never severity.** Both numbers
-    travel, so 4-of-96 and 86-of-96 both surface and are obviously different
-    problems. A slightly-wrong threshold degrades into noise, not silence.
-  - **No estimate means no flag.** Absence of an `expectedSize` anywhere in the
-    closure is not evidence of completeness, and inventing a comparison would be
-    the silent-narrowing failure one level up.
-
-  **Underivable is reported, not silently zero.** The wire field is a plain
-  uint32 with no absent case, so 0 is still sent — but the Offering lands in
-  `report.offeringsWithNoDerivableCapacity` beside the other narrowings. The bug
-  being fixed was the silence, not the zero.
-
 - **Permissions are fixed, roles are not.** The `permission` catalogue is code —
   **`shared/permissions.ts`**, not `server/utils/permissions.ts`, which now holds
   only `crudPermission()` and deliberately **re-exports nothing** (`export { x }
@@ -663,6 +444,84 @@ solver has no way to detect.
 `calendry-proto` is consumed here as a normal npm dependency and by the Rust
 side as a pinned git submodule. It is published to **GitHub Packages, not
 npmjs.org**, which requires authentication to install even though it is public.
+
+## `MinimizeRoomRank` gains a direction: `invert`
+
+"Spare the best rooms" only ever penalized `room.rank >= rank_threshold`.
+When asked for the opposite ("prefer higher-ranked rooms for lessons"), a
+**parameter was chosen over a new catalogue type** — deliberately, and for a
+reason worth keeping: two separate types (`MinimizeRoomRank` /
+`MaximizeRoomRank`) could both be enabled simultaneously, penalizing high and
+low ranks at once, a contradictory configuration nothing would prevent, since
+each type gets its own default row and the one-default-per-type index only
+governs within a single type. A direction parameter makes that
+unrepresentable. Same trajectory as `MinimizeBlockUsage` absorbing
+`MinimizeFirstBlock`/`MinimizeLastBlock`, and `MinimizeDayUsage` absorbing
+"minimize Saturday" — this codebase merges directions into one parameterised
+type rather than multiplying types per direction.
+
+**Wire:** `MinimizeRoomRank` gains `bool invert = 2` (field 1,
+`rank_threshold`, unchanged). `false` (default, and what every existing row
+means when the field is absent) = penalize `rank >= threshold` — spare the
+best rooms. `true` = penalize `rank <= threshold` — prefer them. Confirmed
+old peers keep their exact meaning: encoding `{rank_threshold: 2}` with no
+`invert` produces `ba01 02 0802` under both 0.4.0 and 0.5.0, decoding to
+`invert: false` either way.
+
+Published as `calendry-proto@0.5.0`. **Correction to this file's own
+history**: the `MinimizeBlockUsage` entry previously recorded that version as
+`0.3.0`; it actually shipped in `0.4.0`. Nothing was published between
+0.2.0 and 0.3.2 — those three tags point at the same commit
+(`7856748`, byte-identical proto trees), evidently re-tag attempts carrying
+no schema change. `0.4.0` (`506dacd`) is the commit that actually added
+`MinimizeBlockUsage`. Corrected here since `package.json`'s `^0.4.0` and the
+vendored submodule had been correct all along — only this file's prose was
+stale, which is exactly the drift risk this file's own "tracked entries need
+re-verification" rule describes.
+
+**Solver-side grading, not just a boolean branch.** Implementing `invert`
+surfaced that `MinimizeRoomRank` was the first constraint type to need a
+*graded* penalty rather than a flat per-instance weight: a room 8 ranks past
+the threshold should cost more than one 1 rank past it, or the search has no
+gradient to descend. A new `severity()` function (0.0..=1.0, normalized
+against the room set's own rank span) scales this rule's contribution;
+every other constraint type still returns `1.0` and costs exactly its
+configured weight per instance, unchanged.
+
+**The 0.0..=1.0 cap is load-bearing, not cosmetic.** `hard_penalty =
+sum(all soft weights) × placements + 1` depends on that sum bounding what any
+achievable soft configuration can cost — see the negative-weight incident
+already in this file ("RESOLVED: constraint shape is now validated at the
+write boundary") for what happens when that bound is violated. A raw
+distance multiplier (rank 10 costing 10× rank 1, unbounded) would break the
+same guarantee from the other direction. Normalizing against the rank span
+keeps a gradient for the search to use while keeping this rule's maximum
+contribution identical to every other soft rule's.
+
+The objective breakdown (previously `count × weight`) was updated to match —
+left alone, it would have reported a number the actual objective no longer
+contains, the same "search and reporting disagree" failure class already
+guarded against elsewhere in this file. `raw_count` (a plain count of
+sessions in discouraged rooms) is kept separate and unscaled, since that is
+the actual question a human asks when reading this number.
+
+Measured, before → after, same inputs (ranks 0,1,2,3,10, threshold 2, 6
+lessons): `[0,0,1,1,10,10]` → `[0,0,1,1,2,2]` — the search now fills outward
+from the least-bad room and leaves the extreme one empty, rather than being
+indifferent to how far past the threshold it reaches.
+
+**New tenants are now provisioned with `invert: true`** in
+`minimize_high_ranking_rooms`'s seeded params — i.e. the default going
+forward, when this rule IS enabled, is "prefer higher-ranked rooms," not
+"spare them." **`enabledByDefault` itself stays `false`**, unchanged from
+every other non-structural type — flipping a rule's direction for a tenant
+that already has it configured is safe; enabling a previously-off rule for
+everyone is not, per this file's existing reasoning for why
+`defaultConstraintRow` only auto-enables the four structural types.
+
+Catalogue label renamed from "Spare the best rooms" to **"Steer room choice
+by rank"**, since the old name was only accurate for one setting of the new
+parameter.
 
 ### Installing the proto package: three traps, all hit for real
 
@@ -751,6 +610,49 @@ replayable produces a different answer and blames the wrong thing.
 
 `StartRunResponse.seed` echoes the seed actually used (0 = solver picks one), so
 a run is reproducible even when the caller did not choose the seed.
+
+### Default `maxMoves` raised: 50,000 → 30,000,000
+
+The old default was stopping most real solves at roughly 21% of the distance
+to convergence. Measured serially at seed 42 (solver restarted between runs,
+to avoid the idempotency-key trap below):
+
+| `maxMoves` | termination | moves | elapsed | objective |
+|---|---|---|---|---|
+| 5,000,000 | move_budget | 5,002,752 | 886 ms | 441.9 |
+| 10,000,000 | move_budget | 10,000,384 | 1,773 ms | 431.6 |
+| 20,000,000 | move_budget | 20,000,256 | 3,603 ms | 430.0 |
+| 30,000,000 | **converged** | 23,791,104 | 4,293 ms | 430.0 |
+| 50,000,000 | converged | 23,791,104 | 4,283 ms | 430.0 |
+
+The real term converges at 23.79M moves in ~4.3s. `maxMoves` default is now
+**30,000,000** — enough headroom to reach convergence on this instance, with
+50M shown to buy nothing further once converged (same moves, same objective)
+while costing ~9s on anything that doesn't converge.
+
+**Wall-clock cap raised alongside it, 10s → 30s, and this is the more
+important number to remember why.** Only `move_budget` and `converged`
+terminations are reproducible (see the Determinism section above) —
+`time_budget` is not. At ~5.5M moves/s, a non-converging instance reaches
+30M moves in ~5.4s, which left only 1.85× headroom against the old 10s cap:
+hardware roughly twice as slow would hit the wall-clock cap first and lose
+reproducibility on exactly the runs that most need it. The wall cap exists
+as a safety net, not as the intended terminator — raising it doesn't make
+runs slower, it just keeps the move budget as the one that actually binds.
+
+**Correction to a stale comment removed in the same change:** the old code
+comment claimed small instances "converge out long before five million
+moves," reasoning from a *stagnation limit* (which counts iterations) as if
+it were comparable to the move budget (which counts moves) — they are not
+the same quantity, and this tenant's real term needs 23.79M moves to
+converge, not under 5M.
+
+**Reminder for anyone re-measuring this**: the idempotency key is
+`<inputHash>:<seed>` and does **not** include the budget — see "Idempotency:
+the key is `<inputHash>:<seed>`" above. Two calls with the same input/seed
+but different `maxMoves` return the *same* run. The solver must be
+genuinely restarted between measurements, or every "new" run silently
+replays the first one.
 
 ### Idempotency: the key is `<inputHash>:<seed>`
 
@@ -1140,37 +1042,6 @@ degrading to showing ids rather than blanking the page.
 
 The general rule, worth applying to any new page: **enumerate every endpoint a
 page calls and confirm each is covered by the permission the page is gated on.**
-
-**This rule was written down and then broken anyway, twice.** Prose is checked by
-nobody, so it is now also a test: `tests/page-renders-per-role.test.ts` renders
-each page as each seeded role and asserts the CONTENT came back, not merely a
-200 — a blanked page returns 200 with a shell, which is exactly how both
-incidents passed review. Adding a reference fetch that some role cannot reach
-fails there immediately, whoever adds it.
-
-A lint rule was considered and rejected: it could spot a `.catch`-less fetch
-inside `Promise.all`, but it cannot know which permission an endpoint needs or
-which the page is gated on, so it would fire on every correct reference wave and
-be suppressed into uselessness. The symptom is trivially checkable even though
-the cause is not.
-
-**Adding a page means adding a row to that table**, with a marker that only
-exists once the data resolved.
-
-That suite found a third instance on its first run — `/schedule` had no page
-gate at all while its wave needed five reads beyond `session.read` — and it is
-now **fixed**: the page is gated on all six via `app/utils/schedulePermissions.ts`,
-read by the route middleware AND by the nav entry, so the link is not offered to
-someone the route will refuse.
-
-**Gated rather than made tolerant, deliberately.** Degrading each fetch to an
-empty list keeps the page up but renders "No time grid configured" — a LIE to
-someone whose tenant has one and who merely may not read it, sending them to fix
-the wrong thing. The denial instead NAMES the missing permissions, because the
-whole reason this broke is that the page's real requirements were invisible.
-
-`session_kind.read` is deliberately not among the six: kinds feed the Event
-editor's picker, not the grid, so that one fetch stays individually tolerant.
 A `Promise.all` of reference fetches turns one missing permission into a blank
 screen, which is the least diagnosable failure a UI has. This bit again in the
 schedule inspector's lecturer/group display (routes fetching `/api/roles` would
@@ -1673,19 +1544,6 @@ The order matters, and each step depends on the one before it.
   production and must not be removed.
 - **Rebuilding a dev database:** `bun run db-reset` (`prisma migrate reset`)
   replays the migrations *and* runs the seed automatically.
-- **Adding a CONSTRAINT TYPE needs a backfill too, for the same reason.**
-  `provision:tenant` creates one default row per live catalogue type at creation
-  time only, so a type added later leaves every EXISTING tenant without a row —
-  and a missing row is a rule that never runs (see Conventions). Repair with
-  `bun run backfill:constraints -- --all-missing` (`--dry-run` first; owner
-  connection, audited to stdout).
-
-  It only ever CREATES absent rows and never edits an existing one, so a
-  tenant's toggles, weights and params survive a re-run untouched. Deliberately
-  not part of `db seed`: the seed runs on every deploy and carries reference
-  data that is code, whereas constraint rows are tenant data — a seed writing
-  them per deploy is the same mistake as one silently widening AccessRoles.
-
 - **Adding a permission needs a fourth step.** `db seed` mirrors the catalogue
   into the `permission` table, but it deliberately does not touch
   `access_role_permission` — which permissions a tenant's roles *hold* is tenant
@@ -1778,29 +1636,7 @@ label, dayOfWeek}` — where `dayOfWeek NULL` means every active day and a
 day-specific row beats it **at that position only**, so "same lunch every day,
 but Friday's afternoon break differs" is one extra row, not a duplicated day.
 
-**`shared/timeGrid.ts` is the single definition of when a block starts — and
-that now includes RENDERING.** `ScheduleGrid.vue` was built before breaks
-existed and kept a uniform stride (`grid-auto-rows` + one CSS row per block)
-long after the feature landed, so a tenant with a 45-minute morning break saw
-their blocks butted together while the time column correctly read 12:15 then
-13:00. Times right, picture contradicting them.
-
-It is now laid out in MINUTES from `blockBoundaries()`, per day. **One CSS grid
-could not be fixed by adding break rows**: row heights are shared across
-columns, and a day-specific break means two days genuinely have different block
-start times. So each day is its own positioned stack sized from
-`blockBoundaries(grid, day)`, the time gutter shows the universal timeline as a
-reference, and a day that differs drifts from it visibly and is labelled "own
-breaks". Verified on the demo tenant: Mon–Thu and Sat at 193.85px with a 45-min
-break, Friday at 216.92px with a 120-min one.
-
-`breakAfter()` and `gapsOfDay()` were added for the same reason the walk was:
-the editor's preview had grown its OWN break lookup
-(`breaks.find(b => b.afterBlockIndex === i && (b.dayOfWeek === day || b.dayOfWeek === null))`),
-which returns whichever row is first in the array — so with a universal and a
-day-specific break at one position it could NAME one break while `blockTime()`
-had already applied the other's DURATION. A fourth divergent stride in embryo,
-in the one component whose purpose is showing the two agree. Both
+**`shared/timeGrid.ts` is the single definition of when a block starts.** Both
 `blockTime()` (what a block is called) and `blockOfMinute()` (which block it is
 now) walk cumulative boundaries through it. They answer inverse questions about
 one timeline, and if they disagreed the schedule would render one time while
@@ -1856,17 +1692,7 @@ the two relative booleans so "avoid the last block, however long the day gets"
 stays expressible without re-editing every time the grid changes. A strict
 superset; nothing is lost.
 
-Published as `calendry-proto@0.4.0`. **This entry said 0.3.0 until 2026-08-24;
-that was wrong, and the way it was wrong is worth keeping.** `v0.2.0`, `v0.3.0`,
-`v0.3.1` and `v0.3.2` are four tags on ONE commit (`7856748`) with byte-identical
-proto trees — publish retries that shipped no schema change. The commit that
-actually adds `MinimizeBlockUsage` (`506dacd`) is tagged `v0.4.0` alone, which is
-why `package.json` depends on `^0.4.0` while the submodule's newest commit is
-still MinimizeBlockUsage. Nothing was published "between" the two numbers; the
-version in this file was simply never corrected after the retries. Read a tag,
-not a memory: `git -C vendor/calendry-solver/vendor/calendry-proto log -1 <tag>`.
-
-Fields 20/21 (the old types) are kept and
+Published as `calendry-proto@0.3.0`. Fields 20/21 (the old types) are kept and
 marked `deprecated`, not removed — `buf breaking` rejects removal outright, and
 a peer on the old schema may still send them. The app's catalogue keeps both
 old types too, marked `deprecatedBy`, since `type` is `createOnly` and removing
@@ -1878,30 +1704,44 @@ the new proto message, not just a passing unit test against a plain object cast.
 
 ## Resolved, with the reasoning kept
 
+- ~~**Two definitions of "how many weeks in a term," disagreeing on ~50% of
+  terms.**~~ **RESOLVED.** `weekCountOf` (`shared/academicCalendar.ts`,
+  Monday-anchored: `floor((mondayOf(end) − mondayOf(start))/7) + 1`) and
+  `weeksInTerm` (`app/composables/schedule.ts`, raw span:
+  `ceil((end − start)/7)`) computed the same question differently, and agreed
+  only when a term happened to start on a Monday. Confirmed on a real term
+  (Wintersemester, Sat-start, 2027-10-02 → 2027-12-23): the classifier, the
+  calendar-period UI, the solver's calendar assembly, and `POST
+  /api/sessions`'s own validation all agreed on 13 weeks via `weekCountOf`;
+  the schedule toolbar alone rendered "Week 1 / 12" via `weeksInTerm`, making
+  week 13 reachable server-side (`POST /api/sessions` with `termWeek: 13`
+  returned 201) but invisible in the UI at any URL, including `?week=13`,
+  which silently clamped back to 1.
+
+  `weeksInTerm` is deleted. The toolbar now calls `weekCountOf`, the same
+  function every other consumer already used — one more instance of the
+  "two implementations of one concept" drift this file has been bitten by
+  before (TimeGrid's `blockTime()`/`blockOfMinute()`, the missing-indexes
+  entry). Regression test in `tests/schedule-first-render.test.ts` uses a
+  Saturday-start term and asserts the two formulas disagree on those exact
+  dates before comparing the rendered count, so it can't quietly stop
+  discriminating if the fixture changes.
+
+  **A related, currently-harmless duplication was found and left alone,
+  worth knowing about:** `solverInput.ts` and `solverCalendar.ts` each
+  independently compute a Monday-anchored week INDEX for a given date
+  (`floor((mondayOf(date) − firstMonday)/7d)`) — no live disagreement, both
+  correctly Monday-anchored, but the same shape with no shared helper.
+  **Since resolved** (2026-08-25): extracted into `weekIndexOf` in
+  `shared/academicCalendar.ts`, with `weekCountOf` itself now expressed
+  through it, so a term's total and a date's index can't drift apart by
+  construction.
+
 **Open bugs and deferred work live in [BACKLOG.md](BACKLOG.md).** What follows
 is the opposite: problems that ARE fixed, kept here because each one's fix
 encodes a decision that would otherwise look arbitrary — and that someone could
 reasonably "fix" back to something worse. Deleting these would delete the
 argument, not the bug.
-
-- **~~Applying a Generation rebased `generation_id` on every unlocked Session in
-  the TENANT.~~ FIXED 2026-08-23.** `apply.post.ts` ran
-  `updateMany({ where: { tenantId, isLocked: false } })` with no term filter, so
-  applying a run for one term re-attributed every *other* term's Sessions to a
-  Generation that never placed them.
-
-  It survived because the damage is invisible: the schedule renders identically
-  either way, no constraint is affected, and `generation_id` is only read when
-  someone asks where a placement came from — which nothing in the UI does yet.
-  A provenance bug in a system whose whole audit story is provenance.
-
-  Now scoped to the applied term, and additionally excludes Events
-  (`offeringId: { not: null }`): a human placed an Event, so "which run produced
-  this" has the answer NONE, and overwriting that would make it
-  indistinguishable from solver output. Do not widen either filter back —
-  `updateMany` with fewer conditions looks like a simplification and is a
-  correctness regression that no test outside `generation_id` assertions would
-  catch.
 
 - ~~**Three hand-written indexes are MISSING from the database.**~~ **RESOLVED
   BY MEASUREMENT — no migration, and deliberately so.** The accidental migration
