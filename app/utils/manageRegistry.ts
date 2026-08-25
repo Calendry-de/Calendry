@@ -136,6 +136,46 @@ export interface RelationDef {
     };
     emptyHint?: string;
     /**
+     * Permissions that make this relation VISIBLE at all — ANY one is enough.
+     * Absent means visible to anyone who can read the parent.
+     *
+     * Note the ANY, which is the opposite of `NavEntry.permission`'s ALL. The
+     * two are answering different questions: a nav entry needs every permission
+     * its page will use, while this needs one of the several that can reach a
+     * single endpoint.
+     *
+     * THIS IS A REAL GUARD, not a nicety, and the symptom was measured rather
+     * than assumed. Every relation's option list is fetched in ONE
+     * `Promise.all`, so a single 403 inside it takes down the whole wave — and
+     * because `useEntityRelations` awaits the useAsyncData handle (which
+     * resolves rather than rejects), the result is not a blank page but EVERY
+     * picker on the page rendering an empty option list. Verified live: with
+     * this line removed, a person editor's Person page says "No roles defined
+     * yet" over a tenant that has them.
+     *
+     * The value must therefore be the OPTION ENDPOINT's own requirement:
+     * `/api/access-roles` accepts `access_role.manage` or
+     * `person_access_role.assign`, so those are the two listed here.
+     *
+     * ANY, not ALL, because this relation's options come from ONE endpoint that
+     * accepts either. A relation whose wave needs TWO endpoints — `lecturers`
+     * fetches persons AND roles — is not expressible here and would need an
+     * all-of form. That gap is pre-existing and deliberately not papered over
+     * with a field whose semantics do not fit it.
+     */
+    requiresAnyPermission?: readonly string[];
+    /**
+     * Permissions that make it EDITABLE — ANY one is enough. Absent means the
+     * parent's `.update`, which is what the PUT requires by default.
+     *
+     * Separate from visibility because they are separate facts here: seeing
+     * which roles somebody holds rides on `person.read`, while granting one is
+     * `person_access_role.assign`. Collapsing them would either hide
+     * information a person editor may legitimately see, or offer them a control
+     * whose every change answers 403.
+     */
+    writeRequiresAnyPermission?: readonly string[];
+    /**
      * Narrow the option list by a field on the row being edited.
      *
      * `{ filter: 'termId', from: 'termId' }` fetches
@@ -486,6 +526,18 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 valueKey: 'roleId',
                 optionLabel: (row) => String(row.name ?? row.key),
                 emptyHint: 'No roles defined yet.',
+            },
+            {
+                key: 'access-roles',
+                label: 'Access roles',
+                help: 'What this person may DO in Calendry. Distinct from the scheduling roles '
+                    + 'above, which are vocabulary and grant nothing.',
+                resource: 'access-roles',
+                valueKey: 'accessRoleId',
+                optionLabel: (row) => String(row.name ?? row.key),
+                emptyHint: 'No access roles defined yet.',
+                requiresAnyPermission: ['access_role.manage', 'person_access_role.assign'],
+                writeRequiresAnyPermission: ['person_access_role.assign'],
             },
             {
                 key: 'groups',

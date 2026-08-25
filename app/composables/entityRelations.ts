@@ -1,4 +1,5 @@
 import type { EntityRow, ManageEntity, RelationDef } from '~/utils/manageRegistry';
+import { useSession } from '~/composables/session';
 
 export type RelationRow = Record<string, unknown>;
 
@@ -24,8 +25,40 @@ export type RelationRow = Record<string, unknown>;
  */
 export function useEntityRelations(entity: ManageEntity, id: string | undefined) {
     const request = useRequestFetch();
+    const session = useSession();
 
-    const defs: RelationDef[] = entity.relations ?? [];
+    const held = new Set(session.value?.permissions ?? []);
+
+    /**
+     * Relations this caller may see at all.
+     *
+     * FILTERED HERE, BEFORE THE FETCH, and that is the whole point. The option
+     * lists below are one `Promise.all`, so a single 403 inside it rejects the
+     * handler and the page renders as NOTHING — not an error, not a partial
+     * view, blank. That has happened twice already (CLAUDE.md's 6c rule) and
+     * both times the cause was a page calling an endpoint its own gate did not
+     * imply.
+     *
+     * Read synchronously at setup rather than through a computed: `defs` drives
+     * the fetch, and permissions do not change while a page is open. Anything a
+     * watcher seeds is undefined at first render on the server.
+     */
+    const defs: RelationDef[] = (entity.relations ?? []).filter(
+        (def) => !def.requiresAnyPermission?.length
+            || def.requiresAnyPermission.some((permission) => held.has(permission)),
+    );
+
+    /**
+     * Whether this caller may WRITE one relation, as opposed to see it.
+     *
+     * UX only — the PUT re-checks. What it buys is not offering a control whose
+     * every change answers 403, which is the same lie a disabled input tells
+     * one step further along.
+     */
+    function canWrite(def: RelationDef): boolean {
+        return !def.writeRequiresAnyPermission?.length
+            || def.writeRequiresAnyPermission.some((permission) => held.has(permission));
+    }
 
     const asyncData = useAsyncData(`manage-relations:${entity.key}:${id ?? 'new'}`, async () => {
         if (!defs.length || !id) {
@@ -204,6 +237,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
 
     return {
         defs,
+        canWrite,
         drafts,
         busy,
         errors,

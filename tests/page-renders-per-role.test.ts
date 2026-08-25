@@ -57,6 +57,17 @@ const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 const CONSTRAINT_VIEWER = 'constraint-viewer@test.local';
 
 /**
+ * Everything a person editor plausibly holds, and NOTHING about access roles.
+ *
+ * `role.read` and `group.read` are in there because the Person page's relation
+ * wave already fetched `/api/roles` and `/api/groups` long before this feature
+ * — a role holding only `person.*` gets every picker on that page reporting
+ * "nothing defined yet", which is a separate and pre-existing gap. Including
+ * them keeps this fixture aimed at the one thing it is testing.
+ */
+const PERSON_EDITOR = 'person-editor-page@test.local';
+
+/**
  * `viewer` holds ONLY `session.read` (pinned by auth-permissions.test.ts), so
  * it is the sharpest instrument available: any page it can reach that depends
  * on a second permission fails here.
@@ -65,6 +76,7 @@ const ROLES = [
     { name: 'admin', account: ACCOUNTS.adminA },
     { name: 'viewer', account: ACCOUNTS.viewerA },
     { name: 'constraintViewer', account: CONSTRAINT_VIEWER },
+    { name: 'personEditor', account: PERSON_EDITOR },
 ] as const;
 
 /**
@@ -115,6 +127,43 @@ const PAGES = [
         roles: ['admin', 'constraintViewer'],
         marker: 'A room cannot host two sessions that overlap',
         why: 'a catalogue rule\'s description — present only once the rows rendered',
+    },
+    {
+        /*
+         * Same reasoning as the constraint grid: the permission matrix renders
+         * from the CATALOGUE, so the marker is one permission's own description
+         * rather than a heading. A heading survives a failed fetch; this does
+         * not.
+         */
+        path: '/manage/access-roles/new',
+        roles: ['admin'],
+        marker: 'Grant or revoke access roles',
+        why: 'a catalogue permission\'s description — present only once the matrix rendered',
+    },
+    {
+        /*
+         * THE OPTION-WAVE TRAP, pinned — and measured rather than assumed.
+         *
+         * The Person page fetches every relation's option list in ONE
+         * `Promise.all`, and one of those is now `/api/access-roles`, which no
+         * person permission reaches. What that does is not a blank page, which
+         * is what the 6c rule describes: `useEntityRelations` awaits the
+         * useAsyncData HANDLE, which resolves rather than rejects, so the page
+         * renders with every picker's options EMPTY. Verified live with the
+         * gate removed — the scheduling-role picker then says "No roles defined
+         * yet" to a tenant that has them.
+         *
+         * Same family, worse symptom in one respect: a page-wide lie instead of
+         * an obvious absence. `requiresAnyPermission` drops the relation before
+         * the wave is assembled.
+         *
+         * The marker is the person's own name, which only exists once the form
+         * seeded from the awaited row.
+         */
+        path: '/manage/persons/:personEditorId',
+        roles: ['personEditor'],
+        marker: 'Fix',
+        why: 'the person\'s own name — present only once the whole relation wave resolved',
     },
 ] as const;
 
@@ -172,9 +221,49 @@ async function seedConstraintViewer() {
     await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 }
 
+/** The person editor's own Person row, which is also the page under test. */
+let personEditorId = '';
+
+/**
+ * A person + account + role holding every `person.*` permission and nothing
+ * else. Same lifecycle reasoning as `seedConstraintViewer` above.
+ */
+async function seedPersonEditor() {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${PERSON_EDITOR}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId: TENANT_A, key: 'person-editor-page', name: 'Person Editor' },
+    });
+
+    await ownerDb.accessRolePermission.createMany({
+        data: [
+            'person.read', 'person.create', 'person.update', 'person.delete',
+            'role.read', 'group.read',
+        ].map((permissionKey) => ({ accessRoleId: role.id, permissionKey, tenantId: TENANT_A })),
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId: TENANT_A, givenName: 'Fix', familyName: 'Editor', email: 'fix@a.test' },
+    });
+
+    personEditorId = person.id;
+
+    await ownerDb.personAccessRole.create({
+        data: { personId: person.id, accessRoleId: role.id, tenantId: TENANT_A },
+    });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({
+        data: { email: PERSON_EDITOR, passwordHash: template.passwordHash },
+    });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     await seed();
     await seedConstraintViewer();
+    await seedPersonEditor();
 
     for (const role of ROLES) {
         const { cookie } = await login(role.account, TEST_PASSWORD);
@@ -184,7 +273,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${CONSTRAINT_VIEWER}'`);
+    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR]) {
+        await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${email}'`);
+    }
+
     await teardown();
     await ownerDb.$disconnect();
 });
@@ -193,7 +285,11 @@ describe('every page renders for every role that can reach it', () => {
     for (const page of PAGES) {
         for (const role of page.roles) {
             it(`${page.path} renders for ${role}`, async () => {
-                const res = await fetch(`${BASE}${page.path}`, { headers: { cookie: cookies[role]! } });
+                // Ids are not known until the fixture is seeded, so the table
+                // names a placeholder rather than growing a second mechanism
+                // for "pages that need a row".
+                const path = page.path.replace(':personEditorId', personEditorId);
+                const res = await fetch(`${BASE}${path}`, { headers: { cookie: cookies[role]! } });
 
                 /*
                  * The status is asserted per row, because a DENIAL is a correct
@@ -215,6 +311,76 @@ describe('every page renders for every role that can reach it', () => {
             });
         }
     }
+
+    /**
+     * The manage sections a role may not read are not there AT ALL — no nav
+     * entry, and a direct URL redirects to /manage. Asserted as a REDIRECT
+     * rather than as an absent marker: "the page did not contain X" passes just
+     * as well for a page that failed to render, which is the trap this whole
+     * file exists to catch.
+     */
+    it('hides /manage/access-roles from a role without access_role.manage', async () => {
+        for (const role of ['viewer', 'constraintViewer', 'personEditor']) {
+            const res = await fetch(`${BASE}/manage/access-roles`, {
+                headers: { cookie: cookies[role]! },
+                redirect: 'manual',
+            });
+
+            expect(res.status, `${role} should be redirected away`).toBe(302);
+            expect(res.headers.get('location')).toBe('/manage');
+        }
+
+        // The control: the section EXISTS and renders for someone. Without this
+        // the assertions above would pass against a build where the route was
+        // simply broken for everybody.
+        const admin = await fetch(`${BASE}/manage/access-roles`, {
+            headers: { cookie: cookies.admin! },
+            redirect: 'manual',
+        });
+
+        expect(admin.status).toBe(200);
+        expect(await admin.text()).toContain('Access roles');
+    });
+
+    /**
+     * The person editor sees the person page and its scheduling-role picker, and
+     * does NOT see the access-role picker — one page, two relations, two
+     * different answers.
+     *
+     * Paired deliberately: "the access-role picker is absent" means nothing
+     * unless the page rendered its other pickers, which is exactly how a blank
+     * page passes an absence check.
+     */
+    it('omits the access-role picker for a person editor while keeping the page', async () => {
+        const html = await fetch(`${BASE}/manage/persons/${personEditorId}`, {
+            headers: { cookie: cookies.personEditor! },
+        }).then((res) => res.text())
+            // Rendered body only — the hydration payload carries the registry
+            // as JSON, and matching there would pass for a page that rendered
+            // nothing at all.
+            .then((body) => body.split('<script type="application/json"')[0] ?? '');
+
+        expect(html).toContain('Scheduling roles');
+        expect(html).toContain('Group memberships');
+        expect(html).not.toContain('Access roles');
+
+        /*
+         * The option wave RESOLVED — this is the assertion that makes the
+         * absence above mean something. If the access-roles fetch had been left
+         * in and 403'd, every picker on this page would render with an empty
+         * option list, and "no Access roles heading" would pass while the page
+         * quietly told the user their tenant has no groups.
+         */
+        expect(html, 'the surviving pickers must still have their options').toContain('Cohort A');
+
+        // The control, again: an admin on the SAME page does get it.
+        const asAdmin = await fetch(`${BASE}/manage/persons/${personEditorId}`, {
+            headers: { cookie: cookies.admin! },
+        }).then((res) => res.text())
+            .then((body) => body.split('<script type="application/json"')[0] ?? '');
+
+        expect(asAdmin).toContain('Access roles');
+    });
 
     it('names WHICH permissions are missing, not just that access is denied', async () => {
         /*

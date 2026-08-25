@@ -29,7 +29,7 @@
             :error="relations.errors.value[def.key]"
             :extra-options="relations.extraOptionsFor(def)"
             :options="relations.optionsFor(def)"
-            :readonly="!canUpdate"
+            :readonly="!canUpdate || !relations.canWrite(def)"
             :rows="relations.drafts.value[def.key] ?? []"
             :saved="!!relations.saved.value[def.key]"
             :warnings="relations.warnings.value[def.key]"
