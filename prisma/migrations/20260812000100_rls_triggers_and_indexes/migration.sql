@@ -448,9 +448,15 @@ CREATE INDEX auth_session_active_idx
 -- 9. Permission catalogue table (STRUCTURE ONLY — no rows)
 -- ---------------------------------------------------------------------------
 --
--- Migrations are schema-only. The 46 catalogue rows are reference data and are
+-- Migrations are schema-only. The 53 catalogue rows are reference data and are
 -- populated by `prisma db seed` (prisma/seeds/reference/permissions.ts), which
 -- both container entrypoints run immediately after `migrate deploy`.
+--
+-- The count is descriptive, not a contract: the catalogue is code
+-- (shared/permissions.ts) and grows. It said 46 until Step 14, which is the
+-- hazard of writing a number into a file that can never be re-run — this
+-- migration is applied everywhere and editing its SQL would be a checksum
+-- failure, so only the comment can ever be corrected.
 --
 -- A freshly migrated database therefore has an EMPTY permission table, and
 -- provisioning a tenant against it fails on the access_role_permission foreign

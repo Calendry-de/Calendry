@@ -597,11 +597,40 @@ otherwise" is not one.
   `report.offeringsWithNoDerivableCapacity` beside the other narrowings. The bug
   being fixed was the silence, not the zero.
 
-- **Permissions are fixed, roles are not.** The `permission` catalogue is code
-  (`server/utils/permissions.ts`, mirrored into the table by migration).
+- **Permissions are fixed, roles are not.** The `permission` catalogue is code —
+  **`shared/permissions.ts`**, not `server/utils/permissions.ts`, which now holds
+  only `crudPermission()` and deliberately **re-exports nothing** (`export { x }
+  from './y'` does not bind `x` locally, so a re-export would hand importers a
+  symbol the file itself could throw on). It moved to `shared/` in Step 14
+  because the role editor renders a checkbox per permission and must render from
+  the CATALOGUE rather than from a fetch of the table — the same rule the
+  constraint grid follows, so that a permission the code implements but the
+  database has not been seeded with is REPORTED, not silently missing from a list
+  that looks complete.
+
   Tenants bundle permissions into AccessRoles; they cannot invent permissions,
-  because a permission with no corresponding code path is meaningless. Adding
-  one means editing both the constant and the migration.
+  because a permission with no corresponding code path is meaningless.
+
+  **It reaches the database by SEED, not by migration.** This entry said
+  "mirrored into the table by migration" and "adding one means editing both the
+  constant and the migration" — both wrong, and wrong in the direction that
+  matters: following them would have you hand-write an INSERT into a migration,
+  which this project's own schema-only rule forbids. No migration contains one.
+  `prisma/seeds/reference/permissions.ts` upserts the catalogue, and both
+  container entrypoints run `db seed` immediately after `migrate deploy`. Adding
+  a permission is therefore: edit `shared/permissions.ts`, run `db seed`, then
+  `bun run grant:permissions -- --role tenant-admin --all-missing` on every
+  EXISTING tenant — provisioning grants the whole catalogue only at creation
+  time, so without that last step the symptom is a 403 on a feature that visibly
+  exists.
+
+  **`CRUD_RESOURCES` maps two segments onto one prefix on purpose** — `terms` and
+  `calendar-periods` both mean `term` — so anything deriving keys from it must
+  iterate DISTINCT prefixes. Iterating the entries emitted `term.*` twice, which
+  made `provision:tenant` fail outright on a duplicate primary key for every new
+  tenant, invisibly, because the one existing tenant had been repaired by
+  `grant:permissions --all-missing`. Pinned by
+  `tests/permission-catalogue.test.ts`.
 
 ## Current phase
 
@@ -1378,6 +1407,44 @@ from each other or from the entity list.
   read-only renders as **static text, not disabled inputs** — a disabled control
   reads as "unavailable right now" rather than "not yours". An unknown section
   is a 404, which keeps a typo distinguishable from a permission problem.
+- **A relation's gate must cover every endpoint its OPTION WAVE touches, not
+  just the relation's own resource — and it is DERIVED, so nobody has to
+  remember.** A picker's options are fetched in one `Promise.all`, so a single
+  403 inside it takes down the whole wave. It does not blank the page: the page
+  awaits the `useAsyncData` HANDLE, which resolves rather than rejects, so what
+  renders is **every picker on that page with an empty option list** — a tenant
+  that has groups being told it has none. That is worse than the blank page the
+  §"a page must not depend on permissions its own gate does not imply" rule
+  describes, because it is indistinguishable from an unconfigured tenant.
+
+  Six relations across four entities were in that state and none was new: the
+  Person page had fetched `/api/roles` and `/api/groups` since Step 13, Room
+  `/api/equipment`, Group `/api/terms`, Offering all of those plus
+  `/api/persons`. So the requirement is **not declared on the relation** —
+  `relationReadRequirement()` derives it from `resource` plus
+  `extraReference.resource`, which means a new relation is gated by construction
+  and one that changes what it fetches cannot drift from its own gate. If a
+  picker ever grows a third fetch, add it to `relationOptionResources()`;
+  `tests/manage-relation-gates.test.ts` will not let it be added anywhere else
+  quietly.
+
+  The requirement is an **AND of ORs** (`PermissionRequirement`): every endpoint
+  must be reachable, and one endpoint may accept several permissions.
+  Both levels are load-bearing — `offerings/lecturers` fetches persons AND roles,
+  while `/api/access-roles` accepts `access_role.manage` OR
+  `person_access_role.assign`. A single any-of level, which is what this started
+  as, offers the lecturer picker to someone who can only reach half of it.
+
+  **Omit the picker; never render it empty.** A missing control is honest; an
+  empty one asserts that nothing exists. Only the WRITE side stays declared
+  (`writeRequiresPermissions`), because it is not derivable: nothing about
+  `resource: 'access-roles'` says that writing that join needs
+  `person_access_role.assign`.
+
+  **The form's REFERENCE wave has the same shape and is NOT yet covered** — see
+  BACKLOG.md. `useEntityForm` fetches one list per `reference` field in the same
+  kind of `Promise.all`, and omission is the wrong answer there because a
+  required field cannot simply disappear.
 - **Bespoke means one slot, never a page.** `detailComponent` / `listComponent`
   replace the fields area or the rows; the shell, header, permission handling,
   save/error plumbing and delete confirmation stay shared. Qualifying cases:
