@@ -1,7 +1,7 @@
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { getRelation, relationDelegate } from '../../../utils/relations';
 import { crudPermission } from '../../../utils/permissions';
-import { requirePermission } from '../../../utils/requirePermission';
+import { requireAnyPermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /** The current membership set of one relation, e.g. an Offering's Groups. */
@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         // Reading a relation is reading the parent. Nothing here needs authority
         // the parent's own list page does not already require.
-        await requirePermission(event, tx, crudPermission(config.parent, 'read'));
+        await requireAnyPermission(event, tx, crudPermission(config.parent, 'read'));
 
         return mapDbErrors(() => relationDelegate(tx, config.model).findMany({
             where: {

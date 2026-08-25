@@ -34,13 +34,13 @@ export async function loadPermissions(tx: Tx, personId: string): Promise<Set<str
 }
 
 /**
- * Asserts the caller holds `permission`, throwing 403 otherwise.
+ * The caller's permissions, loaded once per request.
  *
  * Cached on the event for the duration of the request: a single handler may
  * check several permissions, and re-querying per check would multiply round
  * trips inside an already-open transaction.
  */
-export async function requirePermission(event: H3Event, tx: Tx, permission: string): Promise<void> {
+async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
     const identity = requireIdentity(event);
 
     if (!identity.actorPersonId) {
@@ -54,6 +54,13 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
         event.context.permissions = held;
     }
 
+    return held;
+}
+
+/** Asserts the caller holds `permission`, throwing 403 otherwise. */
+export async function requirePermission(event: H3Event, tx: Tx, permission: string): Promise<void> {
+    const held = await heldPermissions(event, tx);
+
     if (!held.has(permission)) {
         // 403 rather than 404: the caller is legitimately inside this tenant, so
         // hiding the existence of the action buys nothing and makes the API
@@ -63,4 +70,45 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
             statusMessage: `Missing permission '${permission}'.`,
         });
     }
+}
+
+/**
+ * Asserts the caller holds AT LEAST ONE of `permissions`.
+ *
+ * Used by the generic CRUD routes, which resolve a resource to a LIST of
+ * acceptable permissions (`crudPermission`). For every resource driven by the
+ * `<prefix>.<action>` rule that list holds exactly one element, so this is the
+ * same check `requirePermission` performs; only `access-roles` currently names
+ * two, and only for reading — see the note on RESOURCE_PERMISSIONS.
+ *
+ * An EMPTY list is a 500, not a pass. "Any of nothing" is vacuously false, but
+ * the shape that produces it is a registry mistake, and a route that silently
+ * required nothing is the worst possible reading of a guard whose failure mode
+ * must never be a quiet no-op.
+ */
+export async function requireAnyPermission(
+    event: H3Event,
+    tx: Tx,
+    permissions: readonly string[],
+): Promise<void> {
+    if (permissions.length === 0) {
+        throw createError({
+            statusCode: 500,
+            statusMessage: 'No permission declared for this route.',
+        });
+    }
+
+    const held = await heldPermissions(event, tx);
+
+    if (permissions.some((permission) => held.has(permission))) {
+        return;
+    }
+
+    // Every acceptable permission is named. A caller told only the first one
+    // would go and get granted a permission they may not need, and a tenant
+    // admin reading the message would configure the wrong role.
+    throw createError({
+        statusCode: 403,
+        statusMessage: `Missing permission '${permissions.join("' or '")}'.`,
+    });
 }

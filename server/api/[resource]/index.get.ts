@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, getResource } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /**
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
     const query = await getValidatedQuery(event, config.filters.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, crudPermission(resource as string, 'read'));
+        await requireAnyPermission(event, tx, crudPermission(resource as string, 'read'));
 
 
         /**

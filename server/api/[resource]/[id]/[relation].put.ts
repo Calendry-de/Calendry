@@ -3,7 +3,7 @@ import { mapDbErrors } from '../../../utils/dbErrors';
 import { getRelation, relationDelegate } from '../../../utils/relations';
 import { delegate, getResource } from '../../../utils/resources';
 import { crudPermission } from '../../../utils/permissions';
-import { requirePermission } from '../../../utils/requirePermission';
+import { requireAnyPermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
@@ -27,8 +27,22 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, z.array(config.item).max(500).parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        // Editing what an Offering requires IS editing the Offering.
-        await requirePermission(event, tx, crudPermission(config.parent, 'update'));
+        /**
+         * Editing what an Offering requires IS editing the Offering — so the
+         * default is the parent's own `.update`, per the rule at the top of
+         * relations.ts.
+         *
+         * `writePermission` is the exception, and `persons/access-roles` is why
+         * it exists: granting someone authority is NOT editing a person. The
+         * catalogue already says so, with `person_access_role.assign` as its own
+         * capability, and a tenant that lets a registrar assign roles is not
+         * thereby letting them rename people or change their email.
+         */
+        await requireAnyPermission(
+            event,
+            tx,
+            config.writePermission ?? crudPermission(config.parent, 'update'),
+        );
 
         const parentConfig = getResource(config.parent);
 

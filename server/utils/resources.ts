@@ -3,6 +3,8 @@ import type { Tx } from './tenantDb';
 import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
 import { validateConstraintShape } from '../../shared/constraintTypes';
 import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
+import { isPermissionKey } from '../../shared/permissions';
+import type { PermissionKey } from '../../shared/permissions';
 
 /**
  * Registry driving generic CRUD for the nine tenant-scoped core entities.
@@ -367,6 +369,53 @@ async function calendarPeriodBeforeUpdate(ctx: {
 
 const id = z.string().min(1);
 const optionalId = z.string().min(1).nullish();
+
+/**
+ * One permission key, narrowed to the catalogue at the write boundary.
+ *
+ * `z.custom` rather than `z.string().refine(...)` so the parsed value is typed
+ * `PermissionKey` instead of `string` — the point of the union being real. An
+ * unknown key is a 400 naming the field, not a foreign-key violation surfacing
+ * as a 409 that says nothing about which key was wrong.
+ */
+const permissionKeySchema = z.custom<PermissionKey>(isPermissionKey, {
+    message: 'Not in the permission catalogue (shared/permissions.ts). Permissions are code, not data.',
+});
+
+/**
+ * The submitted keys exist as ROWS, not merely in the code.
+ *
+ * A distinct check from the schema above, and `create:role` makes the same
+ * distinction for the same reason: the code can be ahead of the database, since
+ * the catalogue is SEEDED rather than migrated. Without this the failure is an
+ * opaque foreign-key violation on `permission_key`; with it, the answer names
+ * the keys and the command that fixes them.
+ *
+ * Reads the whole table — 53 rows, only on writes — rather than a query per
+ * key.
+ */
+async function assertPermissionsSeeded(tx: Tx, submitted: unknown): Promise<void> {
+    if (!Array.isArray(submitted) || submitted.length === 0) {
+        return;
+    }
+
+    const requested = submitted
+        .map((row) => (row as { permissionKey?: unknown }).permissionKey)
+        .filter((key): key is PermissionKey => isPermissionKey(key));
+
+    const seeded = new Set((await tx.permission.findMany({ select: { key: true } })).map((row) => row.key));
+    const missing = requested.filter((key) => !seeded.has(key));
+
+    if (missing.length) {
+        throw createError({
+            statusCode: 422,
+            statusMessage: `${missing.length} permission(s) exist in the code but not in the database `
+                + `(${missing.slice(0, 6).join(', ')}${missing.length > 6 ? ' …' : ''}). `
+                + 'The catalogue is seeded, not migrated — run `bun run db-seed`.',
+            data: { field: 'permissions' },
+        });
+    }
+}
 
 export const RESOURCES: Record<string, ResourceConfig> = {
     persons: {
@@ -962,6 +1011,130 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         filters: z.object({ key: z.string().optional() }),
         orderBy: { key: 'asc' },
         searchFields: ['key', 'name'],
+    },
+
+    /**
+     * AccessRole — a tenant-defined bundle of the FIXED permission catalogue
+     * (TAXONOMY.md §4). Not the domain `Role`, which is scheduling vocabulary.
+     *
+     * Until Step 14 this table had no route at all: `provision:tenant` minted
+     * one role and the operator CLIs were the only way to make another. It is
+     * an ordinary tenant-scoped table behind `tenant_isolation`, so nothing
+     * about serving it here is special — except the permissions, which are
+     * `access_role.manage` rather than four CRUD verbs (see
+     * RESOURCE_PERMISSIONS), and the grants, which are the child rows below.
+     */
+    'access-roles': {
+        model: 'accessRole',
+        /*
+         * The grants travel WITH the role on read, because every screen that
+         * shows a role shows what it holds. Bounded by construction: there are
+         * 53 permissions and a handful of roles per tenant.
+         */
+        include: { permissions: true },
+        /**
+         * Permissions are CHILD ROWS, not a RELATION, and the distinction is
+         * structural rather than stylistic.
+         *
+         * `RELATIONS` is a picker over existing ENTITIES — it needs an API
+         * resource to fetch its options from (`resource: 'groups'`). Permissions
+         * are code: there is no `/api/permissions` resource, and there must not
+         * be one, because the editor renders from `shared/permissions.ts` so
+         * that a permission the database has not been seeded with is REPORTED
+         * rather than silently missing.
+         *
+         * They also have to arrive in the same request as the row. A relation is
+         * saved separately, so "create then grant" would leave a window holding
+         * a role that grants nothing — and `create:role` already refuses that
+         * state on the CLI, for the reason it prints: a role holding nothing is
+         * a role that does nothing, and it will be assigned to someone who then
+         * cannot do anything and has no way to tell why.
+         *
+         * Same mechanism `time-grids` uses for `breaks` and `constraints` for
+         * `scopes`, written in one transaction for the same reason.
+         */
+        childKeys: ['permissions'],
+        async writeChildren({ tx, tenantId, id, children }) {
+            const rows = (children.permissions ?? []) as { permissionKey: PermissionKey }[];
+
+            // Replaced wholesale, like every other set here: the submitted list
+            // is the authority.
+            await tx.accessRolePermission.deleteMany({ where: { accessRoleId: id, tenantId } });
+
+            if (rows.length) {
+                await tx.accessRolePermission.createMany({
+                    data: rows.map((row) => ({
+                        accessRoleId: id,
+                        tenantId,
+                        permissionKey: row.permissionKey,
+                    })),
+                    // A duplicate in the submitted set is a client mistake, not a
+                    // reason to fail: the resulting SET is the same either way.
+                    // This is also the exact shape that broke `provision:tenant`
+                    // when the catalogue held one key twice.
+                    skipDuplicates: true,
+                });
+            }
+        },
+        async beforeCreate({ tx, tenantId, data, children }) {
+            await assertPermissionsSeeded(tx, children.permissions);
+
+            /*
+             * Fails loudly rather than upserting, and says which role it clashed
+             * with. `@@unique([tenantId, key])` is the real guard and still
+             * catches the race this check cannot; what this adds is a message
+             * that names the incumbent instead of "Already exists."
+             */
+            const key = data.key as string | undefined;
+
+            if (!key) {
+                return;
+            }
+
+            const clash = await tx.accessRole.findFirst({
+                where: { tenantId, key },
+                select: { name: true },
+            });
+
+            if (clash) {
+                throw createError({
+                    statusCode: 409,
+                    statusMessage: `An access role with the key '${key}' already exists in this tenant `
+                        + `("${clash.name}"). This creates a role; it does not update one.`,
+                    data: { field: 'key' },
+                });
+            }
+        },
+        async beforeUpdate({ tx, patch }) {
+            await assertPermissionsSeeded(tx, patch.permissions);
+        },
+        create: z.object({
+            key: z.string().min(1),
+            name: z.string().min(1),
+            description: z.string().nullish(),
+            /*
+             * Required on create, and at least one. See `childKeys` above: this
+             * is the CLI's rule ("a role holding nothing is a role that does
+             * nothing") expressed where the API can enforce it too, rather than
+             * only in the form — the divergence the constraint-shape work
+             * already had to close once.
+             *
+             * `is_system` is deliberately absent from both schemas. Provisioning
+             * owns it; a role that could declare itself undeletable through the
+             * API would be a way to make a role nobody can remove.
+             */
+            permissions: z.array(z.object({ permissionKey: permissionKeySchema })).min(1),
+        }),
+        update: z.object({
+            // `key` is createOnly: it is the stable identifier `create:account
+            // --role <key>` and any import addresses the role by.
+            name: z.string().min(1).optional(),
+            description: z.string().nullish(),
+            permissions: z.array(z.object({ permissionKey: permissionKeySchema })).min(1).optional(),
+        }),
+        filters: z.object({ key: z.string().optional() }),
+        orderBy: { key: 'asc' },
+        searchFields: ['key', 'name', 'description'],
     },
 };
 

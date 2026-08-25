@@ -1,7 +1,7 @@
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, demoteExclusiveSiblings, getResource, splitChildren } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /** Update one row by id, scoped to the caller's tenant. */
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, config.update.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, crudPermission(resource as string, 'update'));
+        await requireAnyPermission(event, tx, crudPermission(resource as string, 'update'));
 
         // updateMany, not update: it takes a full where clause, so the tenant
         // predicate is part of the statement. A cross-tenant id updates zero

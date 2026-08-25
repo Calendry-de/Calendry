@@ -43,6 +43,26 @@ export interface RelationConfig {
     /** Columns returned on GET, in addition to the parent key. */
     select: Record<string, boolean>;
     /**
+     * Permissions accepted by the PUT, ANY one of which is sufficient.
+     *
+     * Absent means the parent's own `.update`, which is the rule stated at the
+     * top of this file and right for every relation that describes what the
+     * parent NEEDS: changing which rooms an Offering requires IS editing the
+     * Offering.
+     *
+     * `persons/access-roles` is the case it does not fit. Granting somebody
+     * authority is not editing a person, and the catalogue already says so —
+     * `person_access_role.assign` is its own capability precisely so a tenant
+     * can let a registrar assign existing roles without also letting them
+     * rename people. Defaulting it to `person.update` would hand every person
+     * editor the ability to make themselves an administrator.
+     *
+     * READS are deliberately not overridable and stay on the parent's `.read`:
+     * seeing who holds which role inside your own tenant is not privileged, and
+     * gating it would blank the Person page for anyone who may edit people.
+     */
+    writePermission?: readonly string[];
+    /**
      * True when the join table has no `tenant_id` column of its own.
      * `room_equipment` is the odd one out: its tenant column is nullable because
      * a federation-owned Room has no owning tenant.
@@ -259,6 +279,29 @@ export const RELATIONS: Record<string, RelationConfig> = {
         parentKey: 'personId',
         item: z.object({ roleId: id }),
         select: { roleId: true },
+    },
+
+    /**
+     * Which AccessRoles a Person holds — what they may DO, as opposed to what
+     * they ARE (`persons/roles`, immediately above, is the scheduling
+     * vocabulary and grants nothing).
+     *
+     * A PUT-set like every other collection here, and the picker is
+     * `ManageRelationPicker` unchanged: this genuinely is a choice among
+     * existing rows, unlike a role's own permissions, which are code and live
+     * on the role's payload instead.
+     *
+     * Behind `person_access_role.assign` rather than `person.update` — see
+     * `writePermission`.
+     */
+    'persons/access-roles': {
+        parent: 'persons',
+        parentModel: 'person',
+        model: 'personAccessRole',
+        parentKey: 'personId',
+        item: z.object({ accessRoleId: id }),
+        select: { accessRoleId: true },
+        writePermission: ['person_access_role.assign'],
     },
 
     'persons/groups': {

@@ -1,7 +1,7 @@
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, getResource } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /**
@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, crudPermission(resource as string, 'delete'));
+        await requireAnyPermission(event, tx, crudPermission(resource as string, 'delete'));
 
         const result = await mapDbErrors(() =>
             delegate(tx, config.model).deleteMany({ where: { id, tenantId: identity.tenantId } }),

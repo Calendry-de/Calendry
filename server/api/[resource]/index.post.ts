@@ -1,7 +1,7 @@
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, demoteExclusiveSiblings, getResource, splitChildren } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /** Create a row owned by the caller's tenant. */
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, config.create.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, crudPermission(resource as string, 'create'));
+        await requireAnyPermission(event, tx, crudPermission(resource as string, 'create'));
 
         // tenant_id comes from resolved identity, never from the request body —
         // otherwise a caller could mint rows into another tenant. The RLS WITH

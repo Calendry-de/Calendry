@@ -1,7 +1,7 @@
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, getResource } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /** Fetch one row by id, scoped to the caller's tenant. */
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, crudPermission(resource as string, 'read'));
+        await requireAnyPermission(event, tx, crudPermission(resource as string, 'read'));
 
         // findFirst with an explicit tenant predicate rather than findUnique by
         // id: a guessed id from another tenant must read as "not found", not as
