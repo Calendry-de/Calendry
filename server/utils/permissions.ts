@@ -54,10 +54,32 @@ export const CRUD_RESOURCES = {
 
 export type CrudAction = 'read' | 'create' | 'update' | 'delete';
 
+/**
+ * Iterated over DISTINCT PREFIXES, not over the entries.
+ *
+ * Two resource segments deliberately share one prefix: `calendar-periods` maps
+ * to `term`, because a calendar period is a child of Term and editing one IS
+ * editing the term (see the note on that entry). Iterating the entries
+ * therefore emitted `term.read/create/update/delete` TWICE — 57 entries where
+ * the catalogue has 53 keys.
+ *
+ * That was not cosmetic. `provision-tenant.ts` inserts this array into
+ * `access_role_permission` with a single `createMany` and no `skipDuplicates`,
+ * and Postgres rejects duplicate primary keys inside one INSERT — so provisioning
+ * a NEW tenant failed outright from the moment `calendar-periods` was added,
+ * with the existing tenant unaffected because `grant:permissions --all-missing`
+ * computes what is missing and skips duplicates. Anything rendering the
+ * catalogue as a list had the same problem one level up: two identical rows
+ * under one key.
+ *
+ * `Set` rather than a dedupe of the OUTPUT, so the duplication never exists:
+ * a deduped output would still let a caller reading `CRUD_RESOURCES` directly
+ * reintroduce it.
+ */
 function crudPermissions(): PermissionDef[] {
     const out: PermissionDef[] = [];
 
-    for (const prefix of Object.values(CRUD_RESOURCES)) {
+    for (const prefix of new Set(Object.values(CRUD_RESOURCES))) {
         for (const action of ['read', 'create', 'update', 'delete'] as CrudAction[]) {
             out.push({
                 key: `${prefix}.${action}`,
