@@ -28,11 +28,19 @@
  */
 export const CONTACT_EMAIL = 'noah@calendry.de';
 
-/** A titled explanation, rendered as a card. */
+/**
+ * A titled explanation.
+ *
+ * NO ICON FIELD, deliberately. These were twelve `material-symbols` glyphs at
+ * `$primary600` — a generic B2B icon set that said nothing this product does,
+ * spent the accent on decoration (which `DESIGN.md` reserves for "where a
+ * session may land"), and included `auto-awesome`, the AI sparkle, directly
+ * above copy promising numbers off a benchmark rather than a pitch deck. The
+ * sections are typographic now; the only icons left on the page are the two
+ * roadmap state markers, which encode meaning.
+ */
 export interface LandingFeature {
     id: string;
-    /** Iconify name; must resolve in an installed collection (tests/icon-names.test.ts). */
-    icon: string;
     title: string;
     body: string;
 }
@@ -58,7 +66,6 @@ export interface LandingRoadmapItem {
 export const FEATURES: LandingFeature[] = [
     {
         id: 'model',
-        icon: 'material-symbols:database',
         title: 'One place for what a timetable is made of',
         body: 'Rooms, classes and cohorts, staff and students, courses, terms, and your own daily '
             + 'block structure. Your vocabulary stays yours: role names, session types and room '
@@ -66,7 +73,6 @@ export const FEATURES: LandingFeature[] = [
     },
     {
         id: 'editing',
-        icon: 'material-symbols:swap-horiz',
         title: 'Change a schedule without breaking it quietly',
         body: 'Move a session, swap two, or lock one so nothing may touch it. If a change clashes '
             + 'with something — a double-booked room, a class in two places at once — Calendry '
@@ -75,7 +81,6 @@ export const FEATURES: LandingFeature[] = [
     },
     {
         id: 'solver',
-        icon: 'material-symbols:auto-awesome',
         title: 'Ask for a timetable, then judge it',
         body: 'Start a run and watch it work; cancel it if you change your mind. When it finishes '
             + 'you get a proposal shown against the schedule you already have, with what it would '
@@ -83,7 +88,6 @@ export const FEATURES: LandingFeature[] = [
     },
     {
         id: 'people',
-        icon: 'material-symbols:groups',
         title: 'Everyone sees their own slice',
         body: 'You compose the permission roles for your institution, so who can read the '
             + 'schedule, who can move a session and who can run the solver are separate '
@@ -95,25 +99,17 @@ export const FEATURES: LandingFeature[] = [
 /**
  * BUILT SO FAR — every line traces to an `[x]` in BACKLOG.md § "Current phase".
  *
+ * ORDER IS EDITORIAL, NOT THE CHECKLIST'S. It was BACKLOG.md's order, which
+ * opened on "Multi-tenant data model and API" and buried "Schedule view and
+ * editor" third — answering an architecture question first for a reader whose
+ * first question is "can it hold my week". The list now runs from what a
+ * timetabling officer touches daily to what an evaluator asks about last.
+ *
  * `note` exists to keep the claim narrow. "Solver integration" without a note
  * would be read as "it schedules your whole institution for you"; with one it
  * says exactly which four operations exist.
  */
 export const BUILT: LandingRoadmapItem[] = [
-    {
-        id: 'tenancy',
-        state: 'done',
-        title: 'Multi-tenant data model and API',
-        note: 'Institutions are isolated in the database itself, not only in application code. A '
-            + 'query issued without institution context returns nothing rather than everything.',
-    },
-    {
-        id: 'auth',
-        state: 'done',
-        title: 'Sign-in and per-institution permission roles',
-        note: 'One account can act in several institutions and picks which at sign-in. Roles are '
-            + 'composed from a fixed catalogue of permissions, per institution, in the UI.',
-    },
     {
         id: 'schedule',
         state: 'done',
@@ -174,6 +170,20 @@ export const BUILT: LandingRoadmapItem[] = [
         note: 'The same inputs and the same seed produce a byte-identical timetable — as long as '
             + 'the run ended on its move budget rather than on a clock, which the run itself '
             + 'reports.',
+    },
+    {
+        id: 'auth',
+        state: 'done',
+        title: 'Sign-in and per-institution permission roles',
+        note: 'One account can act in several institutions and picks which at sign-in. Roles are '
+            + 'composed from a fixed catalogue of permissions, per institution, in the UI.',
+    },
+    {
+        id: 'tenancy',
+        state: 'done',
+        title: 'Multi-tenant data model and API',
+        note: 'Institutions are isolated in the database itself, not only in application code. A '
+            + 'query issued without institution context returns nothing rather than everything.',
     },
 ];
 
@@ -244,7 +254,6 @@ export const NEXT: LandingRoadmapItem[] = [
 export const PRINCIPLES: LandingFeature[] = [
     {
         id: 'warn',
-        icon: 'material-symbols:warning-outline',
         title: 'Warn, never block',
         body: 'A person editing a timetable usually knows something the rules do not. So an edit '
             + 'that breaks a hard rule is permitted, and the breach becomes queryable state '
@@ -252,7 +261,6 @@ export const PRINCIPLES: LandingFeature[] = [
     },
     {
         id: 'groups',
-        icon: 'material-symbols:groups-outline',
         title: 'Nested groups really do clash',
         body: 'Booking a programme blocks its cohorts, and booking a cohort blocks the '
             + 'programme. Clash detection walks the whole ancestor-and-descendant relationship '
@@ -260,7 +268,6 @@ export const PRINCIPLES: LandingFeature[] = [
     },
     {
         id: 'isolation',
-        icon: 'material-symbols:shield-outline',
         title: 'Isolation in the database, not in the code',
         body: 'Every institution-scoped table is guarded by row-level security, and the '
             + 'application connects as a role that owns nothing. The failure mode of a mistake '
@@ -269,7 +276,6 @@ export const PRINCIPLES: LandingFeature[] = [
     },
     {
         id: 'time',
-        icon: 'material-symbols:schedule',
         title: 'Nothing about time is hardcoded',
         body: 'Days per week, blocks per day, block length and the uneven breaks between blocks '
             + 'come from each institution\'s own grid. There is no assumed Monday-to-Friday and '
@@ -278,7 +284,6 @@ export const PRINCIPLES: LandingFeature[] = [
     },
     {
         id: 'events',
-        icon: 'material-symbols:history',
         title: 'Every edit is an event',
         body: 'Creates, moves, swaps, deletes and locks are appended to a log, on top of the '
             + 'generation they started from, with the person who did it. Reading that history '
@@ -287,11 +292,26 @@ export const PRINCIPLES: LandingFeature[] = [
     },
 ];
 
+/**
+ * The one measurement set large enough to read as the argument it is.
+ *
+ * ONE number, in running text — not a three-up stat row with an accent, which
+ * is the stock template and would put "27,000", "350ms" and "4s" at equal
+ * weight when only the first pair is the claim. `figure` carries tabular
+ * numerals for the same reason every clock time in the schedule does.
+ */
+export const TECH_LEAD = {
+    figure: '27,000 sessions, placed in about 350 milliseconds.',
+    note: 'That is a synthetic large-university instance. The development '
+        + 'database\'s own term runs all the way to convergence in about four '
+        + 'seconds. Both numbers came off a benchmark rather than a pitch deck, '
+        + 'and both will move as the constraint set grows.',
+};
+
 /** The technically-curious section. Plain sentences, real numbers, no adjectives. */
 export const TECHNICAL_NOTES: LandingFeature[] = [
     {
         id: 'app',
-        icon: 'material-symbols:storage',
         title: 'The application',
         body: 'Nuxt and TypeScript over PostgreSQL. Tenant isolation is enforced by row-level '
             + 'security policies; the schedule\'s history is an append-only event log applied on '
@@ -299,20 +319,10 @@ export const TECHNICAL_NOTES: LandingFeature[] = [
     },
     {
         id: 'solver',
-        icon: 'material-symbols:bolt',
         title: 'The solver',
         body: 'A separate stateless Rust service, reached over gRPC against a shared schema. '
             + 'Hybrid constructive placement followed by large-neighbourhood local search with '
             + 'simulated annealing, over fourteen constraint types. It holds no database: every '
             + 'run is a complete snapshot the application sends it.',
-    },
-    {
-        id: 'scale',
-        icon: 'material-symbols:tune',
-        title: 'Measured, not estimated',
-        body: 'A synthetic large-university instance of 27,000 sessions solves in roughly 350 '
-            + 'milliseconds; the development database\'s own term runs all the way to '
-            + 'convergence in about four seconds. Both numbers came off a benchmark rather than a '
-            + 'pitch deck, and both will move as the constraint set grows.',
     },
 ];

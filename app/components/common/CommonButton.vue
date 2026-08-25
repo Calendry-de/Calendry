@@ -223,6 +223,20 @@ const getAttrs = computed(() => {
     outline: none;
     box-shadow: none;
 
+    /*
+     * MUST STAY. `outline: none` above compiles scoped to (0,2,0) and therefore
+     * BEATS the global `:focus-visible` rule in layout.scss at (0,1,0) — so
+     * without this, keyboard focus on any button in the product was invisible
+     * except where a variant happened to change its own background. The
+     * `--type-primary` focus background lived inside `@include pc`, so on any
+     * viewport under 1366px tabbing to a primary action showed nothing at all.
+     * Declared here rather than per-variant so a new variant cannot forget it.
+     */
+    &:focus-visible {
+        outline: 2px solid $primary400;
+        outline-offset: 2px;
+    }
+
     &_content {
         width: 100%;
         min-width: min-content;
@@ -240,8 +254,33 @@ const getAttrs = computed(() => {
         }
     }
 
+    /*
+     * WHY THE LABEL IS WHITE AND THE STATES GO DARKER.
+     *
+     * This was `$typographyPrimaryOrig` — which resolves through
+     * `variables.scss` to `$content5Orig`, the BODY TEXT colour, baked as a raw
+     * hex so it does not follow the theme. On the `$primary500` fill that
+     * measured 2.49:1, and 1.87:1 on the old focus background: the product's
+     * primary action failed WCAG AA on its own label in every theme.
+     *
+     * White measures 5.01:1 on `$primary500`. The catch is that the base
+     * `@include pc` hover lightens to `$primary400`, where white is only
+     * 3.80:1 — so the hover and focus states are restated here to move DOWN
+     * the ramp instead ($primary600 = 6.66:1, $primary700 = 8.78:1). Darkening
+     * on a light ground is also the conventional direction.
+     */
     &--type-primary {
-        color: $typographyPrimaryOrig;
+        color: $whiteOrig;
+
+        @include hover {
+            &:hover {
+                background: var(--hover-color, $primary600);
+            }
+        }
+
+        &:active, &:focus-visible {
+            background: var(--focus-color, $primary700);
+        }
     }
 
     &_icon {
@@ -390,7 +429,17 @@ const getAttrs = computed(() => {
     &--disabled {
         opacity: 0.24;
 
+        /*
+         * The disabled primary keeps an INK label, not the variant's white one.
+         * This background is a 2%-alpha white wash — effectively the page — so
+         * white-on-white would be invisible, which is the regression the label
+         * change above would otherwise have introduced in a state nobody looks
+         * at. (The `opacity: 0.24` above is pre-existing and makes every
+         * disabled control very faint regardless; that is a separate,
+         * app-wide question and is deliberately not changed here.)
+         */
         &.button--type-primary {
+            color: $typographyPrimary;
             background: $whiteAlpha2;
         }
 

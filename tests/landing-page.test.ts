@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES } from '../app/utils/landingContent';
+import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH_LEAD } from '../app/utils/landingContent';
 
 /**
  * The public landing page at `/`: it renders for a visitor with no session, and
@@ -80,6 +80,77 @@ describe('the page states what it is', () => {
         // description of its own with an empty string, so "a description tag
         // exists" would pass over an empty one.
         expect(html).toContain('content="Calendry is a multi-tenant timetabling platform');
+    });
+
+    it('wraps its content in a main landmark', async () => {
+        const { html } = await page('/');
+
+        // The whole app had no <main> anywhere. On a page with a sticky bar and
+        // a footer, the content needs a landmark to be skippable at all.
+        expect(html).toContain('<main');
+    });
+
+    it('does not stamp the developer build version over the marketing copy', async () => {
+        const { html } = await page('/');
+
+        // `ViewVersion` is position: fixed at z-index 10000. On this page it
+        // pinned "v0.0.1" in the corner permanently, duplicating the hero
+        // badge's deliberate statement with a bare number a stranger reads as
+        // "this does not exist yet". Still present on /login, asserted below.
+        expect(html).not.toContain('class="version"');
+        expect(html).toContain('In active development');
+    });
+
+    it('keeps the version stamp on the other pages that layout serves', async () => {
+        // The counterpart assertion: the gate is route-specific, not a deletion.
+        const { html } = await page('/login');
+
+        expect(html).toContain('class="version"');
+    });
+
+    it('renders the hero figure — the one place the product is visible', async () => {
+        const { html } = await page('/');
+
+        // A timetabling page with no timetable on it was the critique's first
+        // finding. The figure is drawn from the schedule's own geometry, so
+        // these are its cells, its session chips and its placement targets.
+        expect(html).toContain('grid_cell');
+        expect(html).toContain('grid_chip');
+        expect(html).toContain('grid_target');
+    });
+
+    it('leads the technical band with the measured figure', async () => {
+        const { html } = await page('/');
+
+        expect(html).toContain(TECH_LEAD.figure);
+    });
+
+    it('puts the form BEFORE the section that tells a registrar to skip it', async () => {
+        const { html } = await page('/');
+
+        // Reading order is the argument. "Under the hood" opens by telling a
+        // timetabling officer to skip it, and it used to sit between her and
+        // the form — so the last thing she read before the CTA was addressed to
+        // somebody else, followed by "Calendry cannot send mail yet".
+        expect(html.indexOf('id="contact"')).toBeLessThan(html.indexOf('id="under-the-hood"'));
+        expect(html.indexOf('id="contact"')).toBeGreaterThan(-1);
+    });
+
+    it('offers a way to act without scrolling back to the top', async () => {
+        const { html } = await page('/');
+
+        // There were two conversion affordances in 1,500 words, both in the
+        // hero. The sticky bar and the mid-page callout are the other two.
+        expect(html).toContain('topbar');
+        expect(html).toContain('callout_text');
+    });
+
+    it('carries link-preview metadata, because that is how the page gets forwarded', async () => {
+        const { html } = await page('/');
+
+        expect(html).toContain('property="og:title"');
+        expect(html).toContain('property="og:description"');
+        expect(html).toContain('name="twitter:card"');
     });
 
     it('renders every section', async () => {

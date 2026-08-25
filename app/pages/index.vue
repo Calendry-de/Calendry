@@ -1,72 +1,75 @@
 <template>
     <div class="landing">
         <landing-top-bar/>
-        <landing-hero/>
 
-        <landing-section
-            id="what"
-            eyebrow="What it does"
-            title="A timetable you can hold, and one you can ask for"
-            lead="Two halves. This application stores and presents the schedule and everything it
-                is made of; a separate solver service builds candidate placements from your rules
-                and hands them back for a person to accept or reject."
-        >
-            <landing-feature-list :items="FEATURES"/>
-        </landing-section>
+        <main id="main">
+            <landing-hero/>
 
-        <landing-section
-            id="built"
-            eyebrow="Built so far"
-            title="What works today"
-            lead="Not a demo reel. Everything below is implemented, in use against a real database,
-                and covered by this repository's integration suite."
-        >
-            <landing-roadmap-list :items="BUILT"/>
-        </landing-section>
+            <landing-section
+                id="what"
+                title="A timetable you can hold, and one you can ask for"
+                lead="Two halves. This application stores and presents the schedule and everything
+                    it is made of; a separate solver service builds candidate placements from your
+                    rules and hands them back for a person to accept or reject."
+            >
+                <landing-capability-list :items="FEATURES"/>
+            </landing-section>
 
-        <landing-section
-            id="next"
-            eyebrow="What's next"
-            title="Not built yet, and honest about it"
-            lead="Calendry is being built in phases, and each of these is a phase rather than a
-                promise with a date on it. Where a decision is still open, it says which one."
-        >
-            <landing-roadmap-list :items="NEXT"/>
-        </landing-section>
+            <landing-section
+                id="built"
+                title="What works today"
+                lead="Not a demo reel. Everything below is implemented, in use against a real
+                    database, and covered by this repository's integration suite."
+            >
+                <landing-roadmap-list :items="BUILT"/>
 
-        <landing-section
-            id="why"
-            eyebrow="Why it works this way"
-            title="Decisions worth defending"
-            lead="Timetabling software fails in specific, recognisable ways. These are the choices
-                made against them — each one is a rule the codebase is actually built on, not a
-                slogan."
-        >
-            <landing-feature-list :items="PRINCIPLES"/>
-        </landing-section>
+                <landing-callout
+                    text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
+                    action="Get in touch"
+                    href="#contact"
+                />
+            </landing-section>
 
-        <landing-section
-            id="under-the-hood"
-            eyebrow="Under the hood"
-            title="For the technically curious"
-            lead="Skip this if you are here to schedule a term rather than to read about how."
-        >
-            <landing-feature-list
-                :items="TECHNICAL_NOTES"
-                :columns="3"
-            />
-        </landing-section>
+            <landing-section
+                id="next"
+                title="Not built yet, and honest about it"
+                lead="Calendry is being built in phases, and each of these is a phase rather than a
+                    promise with a date on it. Where a decision is still open, it says which one."
+            >
+                <landing-roadmap-list :items="NEXT"/>
+            </landing-section>
 
-        <landing-section
-            id="contact"
-            eyebrow="Get in touch"
-            title="Tell us about your institution"
-            lead="Calendry is being built for real timetables, so the useful conversation is about
-                yours: how many rooms and cohorts, what your week looks like, and what breaks
-                today."
-        >
-            <landing-contact-capture/>
-        </landing-section>
+            <landing-section
+                id="why"
+                title="Decisions worth defending"
+                lead="Timetabling software fails in specific, recognisable ways. These are the
+                    choices made against them — each one is a rule the codebase is actually built
+                    on, not a slogan."
+            >
+                <landing-principle-list :items="PRINCIPLES"/>
+            </landing-section>
+
+            <landing-section
+                id="contact"
+                title="Tell us about your institution"
+                lead="Calendry is being built for real timetables, so the useful conversation is
+                    about yours: how many rooms and cohorts, what your week looks like, and what
+                    breaks today."
+            >
+                <landing-contact-capture/>
+            </landing-section>
+
+            <landing-section
+                id="under-the-hood"
+                title="For the technically curious"
+                tone="inverse"
+            >
+                <landing-tech-band
+                    :lead="TECH_LEAD"
+                    :items="TECHNICAL_NOTES"
+                />
+            </landing-section>
+        </main>
 
         <landing-footer/>
     </div>
@@ -79,6 +82,7 @@ import {
     NEXT,
     PRINCIPLES,
     TECHNICAL_NOTES,
+    TECH_LEAD,
 } from '~/utils/landingContent';
 
 /**
@@ -88,9 +92,6 @@ import {
  * now `/dashboard`. Whoever arrives at calendry.de has, by definition, not
  * signed in yet, so the root belongs to the people who have never heard of
  * Calendry; a visitor who does hold a session lands here too and clicks through.
- * The redirect chain moved with it: an anonymous visit to any protected page
- * still bounces to `/login`, and signing in now lands on `/dashboard` rather
- * than on this page.
  *
  * PUBLIC. `auth.global.ts` is deny-by-default, so a new page is protected the
  * moment it exists; `/` is listed in that middleware's ANONYMOUS_ROUTES — which
@@ -103,43 +104,64 @@ import {
  * LAYOUT. `empty`, so the app header — menu, session control, tenant switcher —
  * stays out of a page whose reader has no session.
  *
+ * READING ORDER IS THE ARGUMENT, and it changed. It used to run
+ * hero → what it does → what works → what's next → why → under the hood →
+ * contact, which put the section that opens "skip this if you are here to
+ * schedule a term" directly between a registrar and the form, and left the last
+ * words before the CTA as an admission that the product cannot send email. The
+ * technical band now CLOSES the page, after the form: an evaluator will happily
+ * scroll past a contact form, and a timetabling officer will not scroll past a
+ * section addressed to somebody else. What a reader leaves with is a measured
+ * number rather than a missing feature.
+ *
  * COMPOSITION. Content lives in `~/utils/landingContent`, section markup in
  * `app/components/landing/`. This file only arranges them: pages compose, they
  * do not implement.
  */
 definePageMeta({ layout: 'empty' });
 
+const title = 'Timetabling for schools and universities';
+const description = 'Calendry is a multi-tenant timetabling platform for schools and universities: '
+    + 'a calendar management application plus a solver service that proposes schedules for a person '
+    + 'to review. In active development.';
+
 useHead({
     // The layout's titleTemplate appends " | Calendry", so naming the product
     // again here would render it twice.
-    title: 'Timetabling for schools and universities',
+    title,
     meta: [
-        {
-            name: 'description',
-            content: 'Calendry is a multi-tenant timetabling platform for schools and '
-                + 'universities: a calendar management application plus a solver service that '
-                + 'proposes schedules for a person to review. In active development.',
-        },
+        { name: 'description', content: description },
+        /*
+         * Open Graph and Twitter, because the way this page actually reaches a
+         * decision-maker is somebody pasting it into Slack or Teams — and with
+         * no tags at all it arrives there as a bare URL. `og:image` is
+         * deliberately absent rather than pointed at a file that does not
+         * exist: it needs a real asset, and a broken image card is worse than
+         * a text one.
+         */
+        { property: 'og:type', content: 'website' },
+        { property: 'og:site_name', content: 'Calendry' },
+        { property: 'og:title', content: `${ title } | Calendry` },
+        { property: 'og:description', content: description },
+        { property: 'og:locale', content: 'en' },
+        { name: 'twitter:card', content: 'summary' },
+        { name: 'twitter:title', content: `${ title } | Calendry` },
+        { name: 'twitter:description', content: description },
     ],
 });
 </script>
 
 <style scoped lang="scss">
 .landing {
+    /*
+     * Full width, with every section constraining its own content. The page used
+     * to be a centred 1040px column, which meant a full-bleed band — the
+     * inverse-toned technical section — could only be drawn with a `100vw`
+     * breakout, and that overflows horizontally as soon as a scrollbar takes up
+     * space. Sections own their ground; `_measure` owns the reading width.
+     */
     display: flex;
     flex-direction: column;
-    gap: $space11;
-
-    // The reading measure, centred. Wider than a form and narrower than the
-    // schedule grid, which is the only surface in this app that wants a whole
-    // desktop.
-    width: min(1040px, 100%);
-    margin: 0 auto;
-    padding: $space7 $space7 $space9;
-
-    @include mobileOnly {
-        gap: $space9;
-        padding: $space6 $space5 $space8;
-    }
+    width: 100%;
 }
 </style>

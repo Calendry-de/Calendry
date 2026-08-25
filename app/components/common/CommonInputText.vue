@@ -3,23 +3,39 @@
         class="input"
         :class="{ 'input--focused': focused }"
     >
-        <div
+        <!--
+            A REAL <label for>, not a styled div.
+            This was a `<div class="input_label">` sitting OUTSIDE the `<label>`
+            that wraps the input, with no `for`, no `id` and no aria-label — so
+            the visible text was not associated with the field at all and the
+            accessible name fell back to the placeholder, or to nothing. Every
+            form in the product was affected; it surfaced on the landing page
+            because that form's two named fields are its only conversion path.
+        -->
+        <label
             v-if="$slots.default"
             class="input_label"
+            :for="inputId"
         >
             <slot/>
-        </div>
+        </label>
         <div
             class="input_container"
             :class="{ 'input_container--error': isLengthExceeded && inputLengthCheck }"
         >
-            <label class="input__input">
+            <!--
+                A <div>, not a second <label>: the association now lives on the
+                visible label above, and two labels for one control makes the
+                accessible name order implementation-defined.
+            -->
+            <div class="input__input">
                 <Icon
                     v-if="icon"
                     class="input__input_icon"
                     :name="icon"
                 />
                 <input
+                    :id="inputId"
                     ref="inputRef"
                     v-bind="inputAttrs"
                     v-model="model"
@@ -32,7 +48,7 @@
                     @focusout="focused = false"
                     @input="$emit('input', $event)"
                 >
-            </label>
+            </div>
         </div>
         <div
             v-if="inputLengthCheck"
@@ -91,6 +107,12 @@ const focused = defineModel('focused', { type: Boolean });
 const model = defineModel({ type: String, default: null });
 
 const inputRef = ref<HTMLInputElement | null>(null);
+
+/**
+ * `useId()` rather than a random string: it is stable across server and client,
+ * so the `for`/`id` pair survives hydration instead of mismatching.
+ */
+const inputId = useId();
 
 const currentLength = computed(() => model.value?.length);
 const isLengthExceeded = computed(() => currentLength.value > props.maxInputLength);
