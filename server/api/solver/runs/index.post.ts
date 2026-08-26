@@ -30,7 +30,7 @@ const bodySchema = z.object({
      * to matter, and a wall clock only as a backstop. A run that ends on wall
      * clock is NOT replayable (CLAUDE.md), so it should be the exception.
      */
-    maxMoves: z.coerce.number().int().min(1).max(100_000_000).optional(),
+    maxMoves: z.coerce.number().int().min(1).max(100_000_000_000).optional(),
     maxWallMillis: z.coerce.number().int().min(1).max(600_000).optional(),
     /** 0 = let the solver choose; whatever it picks is echoed back and stored. */
     seed: z.coerce.number().int().min(0).optional(),

@@ -141,12 +141,20 @@ function emptyCounts() {
 }
 
 /**
- * Violations on the schedule as it stands, so the review screen can show a
- * DELTA rather than an absolute the reader has no baseline for.
+ * Violations on the schedule as it stands, so the review screen has a baseline
+ * to state alongside the proposal's own count.
+ *
+ * NOT A DELTA, and this comment used to say it was — the Stage 6c decision the
+ * review component enforces is the opposite. These rows come from this app's
+ * evaluator, which fills `constraint_violation` from the four STRUCTURAL
+ * double-booking rules only, while the proposal's count is the solver reporting
+ * on all 14 constraint types. Measured on the same timetable they disagree: the
+ * solver reported 23 where this evaluator then found 41 rows. Subtracting them
+ * would be the most misleading thing the screen could say, so it renders them as
+ * two separate readings with the incomparability stated first.
  *
  * Computed here rather than left to a second client fetch: two independently
- * scoped requests would silently compare different populations, and a delta
- * between mismatched populations is worse than no delta.
+ * scoped requests would silently describe different populations.
  */
 async function summarizeCurrentViolations(tx: Tx, tenantId: string, termId: string | undefined) {
     const rows = await tx.constraintViolation.findMany({

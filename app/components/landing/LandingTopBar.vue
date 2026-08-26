@@ -7,7 +7,7 @@
                 aria-label="Calendry"
             >
                 <common-logo
-                    :size="28"
+                    :size="64"
                     wordmark
                 />
             </NuxtLink>

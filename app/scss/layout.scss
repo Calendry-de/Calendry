@@ -34,8 +34,19 @@ html, body {
     background: rgba(124, 89, 188, 0.45);
 }
 
+/*
+ * The focus ring is a non-text UI indicator and needs 3:1 against what it sits
+ * on (WCAG 1.4.11). `$primary400` (#58B4A7) measured 2.31:1 against the page
+ * ground and 1.99:1 against a raised chip — the ring a keyboard user depends on
+ * was the least visible thing on the screen.
+ *
+ * `$primary600` measures 4.51:1 on the light ground. The primary ramp is NOT
+ * theme-swapped (only surface/content are — see `themesList`), so the dark
+ * ground gets the light end of the same ramp explicitly rather than inheriting a
+ * value composed for the opposite background.
+ */
 :focus-visible {
-    outline: 2px solid $primary400;
+    outline: 2px solid $primary600;
     outline-offset: var(--space-1);
 }
 

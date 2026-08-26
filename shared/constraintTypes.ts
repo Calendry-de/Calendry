@@ -510,6 +510,74 @@ export function findConstraintType(key: string | undefined): ConstraintTypeDef |
     return CONSTRAINT_TYPES.find((type) => type.key === key);
 }
 
+/**
+ * A constraint type as a human label, whichever of its three names arrives.
+ *
+ * WHY THREE NAMESPACES REACH THE SAME UI
+ * --------------------------------------
+ * The review screen renders two violation breakdowns side by side, and they
+ * arrive keyed differently:
+ *
+ *   this app's evaluator  `detail.reason`      room_double_booked
+ *   this catalogue        `key`                no_double_booking_room
+ *   the solver's report   proto constraint     RoomDoubleBooking
+ *
+ * Rendered raw, two adjacent lists used two naming conventions and one of them
+ * was a wire enum ("4 × MaxOnlineShare"). Resolving all three through the
+ * catalogue is what makes the two panels speak one language.
+ *
+ * The solver's names are DERIVED from `wireField` rather than listed again:
+ * `maxOnlineShare` → `MaxOnlineShare` is the proto's own convention, so a new
+ * type gets its label the moment it gets a wire field, instead of needing a
+ * second table somebody has to remember.
+ *
+ * UNKNOWN KEYS ARE SPACED, NOT NAMED. A token this catalogue does not know
+ * renders as itself, readably — never as a guessed label. `unknown` is the
+ * evaluator's own placeholder for a violation row with no reason recorded and
+ * gets said plainly, because inventing a rule name for it would be the exact
+ * "confidently wrong" failure this file exists to prevent.
+ */
+const CONSTRAINT_LABEL_INDEX: Record<string, string> = (() => {
+    const index: Record<string, string> = {};
+
+    for (const type of CONSTRAINT_TYPES) {
+        index[type.key] = type.label;
+
+        if (type.wireField) {
+            index[type.wireField.charAt(0).toUpperCase() + type.wireField.slice(1)] = type.label;
+        }
+    }
+
+    /**
+     * The app evaluator's own `reason` strings, which are not catalogue keys —
+     * `violations.ts` writes them as the shape of the breach it found, one
+     * reason covering two catalogue types (lecturer and attendee double-booking
+     * both report `person_double_booked`). Mapped explicitly for that reason:
+     * deriving them would have to pick one of the two types and would be wrong
+     * half the time.
+     */
+    index.room_double_booked = 'Room double-booked';
+    index.person_double_booked = 'Person double-booked';
+    index.group_double_booked = 'Group double-booked';
+    index.unknown = 'Reason not recorded';
+
+    return index;
+})();
+
+export function constraintTypeLabel(type: string): string {
+    const known = CONSTRAINT_LABEL_INDEX[type];
+
+    if (known) {
+        return known;
+    }
+
+    // Readable, and visibly not a label this catalogue vouches for.
+    return type
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+        .trim();
+}
+
 export const CONSTRAINT_TYPE_KEYS = CONSTRAINT_TYPES.map((type) => type.key);
 
 /**

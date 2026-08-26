@@ -232,8 +232,13 @@ const getAttrs = computed(() => {
      * viewport under 1366px tabbing to a primary action showed nothing at all.
      * Declared here rather than per-variant so a new variant cannot forget it.
      */
+
+    /* Same contrast reasoning as the global rule in layout.scss: $primary400
+       measured 2.31:1 against the page ground, under the 3:1 a focus indicator
+       needs. This rule exists at all because `outline: none` above outranks the
+       global one. */
     &:focus-visible {
-        outline: 2px solid $primary400;
+        outline: 2px solid $primary600;
         outline-offset: 2px;
     }
 

@@ -280,70 +280,108 @@ export function describeViolation(violation: Violation, lookup: {
 }
 
 /**
- * Side-by-side layout for sessions whose block ranges overlap.
+ * Side-by-side layout for anything whose block ranges overlap.
  *
- * Grouping by identical start block is not enough: a session starting at block 1
+ * Grouping by identical start block is not enough: an item starting at block 1
  * overlaps one that started at block 0 and runs for two blocks, and the two land
  * in different grid areas that intersect — so they stack, and the upper chip's
  * hover lift reveals the one underneath.
  *
- * This is the ordinary calendar algorithm. Sessions that transitively overlap
- * form a cluster; within a cluster each session takes the first column free at
- * its start block, and every member is sized to 1/columns of the day's width.
- * Equal columns rather than a "+N more" affordance: in a timetabling tool an
- * overlap is usually a defect the user is trying to SEE, so hiding any of them
- * defeats the purpose.
+ * This is the ordinary calendar algorithm. Items that transitively overlap form
+ * a cluster; within a cluster each takes the first column free at its start
+ * block. Nothing is ever dropped from a cluster: in a timetabling tool an
+ * overlap is usually a defect the user is trying to SEE, and on the review
+ * screen it is a placement someone is being asked to accept. How a cluster too
+ * crowded to fan is PRESENTED is `clusterSlots`' decision, not this one.
  */
-export interface SessionPlacement {
-    session: ScheduleSession;
-    /** 0-based column within the overlap cluster. */
-    column: number;
-    /** How many columns the cluster needs; 1 when nothing overlaps. */
-    columns: number;
+/** What the packer needs to know about an item; anything else is the caller's. */
+export interface PackedSpan {
+    /** Tie-break, so equal spans order deterministically across renders. */
+    key: string;
+    /** First occupied block. */
+    start: number;
+    /** How many blocks it occupies; at least 1. */
+    span: number;
 }
 
-export function layoutDay(sessions: ScheduleSession[]): SessionPlacement[] {
-    const ordered = [...sessions].sort((a, b) => (
-        a.blockIndex - b.blockIndex || b.durationBlocks - a.durationBlocks || a.id.localeCompare(b.id)
+export interface Packed<T> {
+    item: T;
+    column: number;
+    columns: number;
+    /**
+     * Identifies the overlap cluster this item belongs to — every member of a
+     * cluster shares it. A presentation that wants to treat a crowded cluster
+     * differently (the review grid collapses one past a legibility floor) needs
+     * to address the cluster as a unit, and `columns` alone cannot name WHICH.
+     */
+    cluster: string;
+}
+
+/**
+ * The packing itself, over anything that occupies a block range.
+ *
+ * GENERIC BECAUSE THERE ARE TWO GRIDS. `ScheduleGrid` packs Sessions for the
+ * live schedule; `ScheduleReviewGrid` packs ReviewPlacements, which have no
+ * Session id at all when the solver proposes a NEW placement. That component
+ * previously fanned everything sharing an exact `day:blockIndex` key and split
+ * the width evenly, which meant a multi-block placement overlapping a
+ * single-block one was drawn on top of it rather than beside it — the very bug
+ * described above, reintroduced by a second implementation. One algorithm, two
+ * callers, no third copy.
+ */
+export function packSpans<T>(items: T[], read: (item: T) => PackedSpan): Packed<T>[] {
+    const spans = items.map((item) => ({ item, ...read(item) }));
+
+    const ordered = [...spans].sort((a, b) => (
+        a.start - b.start || b.span - a.span || a.key.localeCompare(b.key)
     ));
 
-    const end = (s: ScheduleSession) => s.blockIndex + s.durationBlocks;
-    const out: SessionPlacement[] = [];
+    const out: Packed<T>[] = [];
 
-    let cluster: SessionPlacement[] = [];
+    let cluster: Packed<T>[] = [];
     let clusterEnd = -1;
+    let clusterStart = -1;
     // Last occupied block per column, so a column can be reused once free.
     let columnEnds: number[] = [];
 
     const flush = () => {
         const columns = columnEnds.length || 1;
+        const name = `c${clusterStart}`;
 
         for (const placement of cluster) {
             placement.columns = columns;
+            placement.cluster = name;
         }
 
         out.push(...cluster);
         cluster = [];
         columnEnds = [];
         clusterEnd = -1;
+        clusterStart = -1;
     };
 
-    for (const session of ordered) {
+    for (const entry of ordered) {
+        const end = entry.start + Math.max(1, entry.span);
+
         // A gap with nothing running closes the cluster: what follows cannot
         // overlap anything in it, so it starts its own column count.
-        if (cluster.length && session.blockIndex >= clusterEnd) {
+        if (cluster.length && entry.start >= clusterEnd) {
             flush();
         }
 
-        let column = columnEnds.findIndex((occupiedUntil) => occupiedUntil <= session.blockIndex);
+        if (!cluster.length) {
+            clusterStart = entry.start;
+        }
+
+        let column = columnEnds.findIndex((occupiedUntil) => occupiedUntil <= entry.start);
 
         if (column === -1) {
             column = columnEnds.length;
         }
 
-        columnEnds[column] = end(session);
-        clusterEnd = Math.max(clusterEnd, end(session));
-        cluster.push({ session, column, columns: 1 });
+        columnEnds[column] = end;
+        clusterEnd = Math.max(clusterEnd, end);
+        cluster.push({ item: entry.item, column, columns: 1, cluster: '' });
     }
 
     if (cluster.length) {
@@ -352,3 +390,4 @@ export function layoutDay(sessions: ScheduleSession[]): SessionPlacement[] {
 
     return out;
 }
+

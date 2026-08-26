@@ -119,8 +119,15 @@ const PAGES = [
     {
         path: '/schedule',
         roles: ['admin'],
-        marker: 'grid_col',
-        why: 'the week grid itself — present only once the reference wave resolved',
+        marker: 'grid_cell',
+        /*
+         * Was `grid_col`, the per-day column wrapper. The grid no longer has
+         * one: blocks are shared grid ROWS and every cell names its own row and
+         * column, so the day columns are grid tracks rather than elements. A
+         * cell is the equivalent structural marker — it exists only once the
+         * reference wave resolved and the TimeGrid could be read.
+         */
+        why: 'a grid cell — present only once the reference wave resolved',
     },
     {
         /*
@@ -137,6 +144,39 @@ const PAGES = [
         status: 403,
         marker: 'do not have permission to view the schedule',
         why: 'a stated denial, not an empty grid and not a blank shell',
+    },
+    {
+        /*
+         * A proposal that does not exist must say SO.
+         *
+         * This row is the regression pin for Stage 6c's worst failure: the
+         * review page's primary preview fetch is the one thing on it that is
+         * not tolerant, and a rejection nulled `preview`, fell through to the
+         * "this Generation was not produced by a solver run" branch, and
+         * interpolated `undefined` into `terminalMessage`. A 403, a 404, a
+         * dropped connection and a genuine manual-baseline Generation were
+         * indistinguishable, and one of them was asserted as fact.
+         *
+         * The marker is data-dependent by construction — it exists only once
+         * the fetch has come back 404.
+         */
+        path: '/schedule/review/01a04015-0000-0000-0000-000000000000',
+        roles: ['admin'],
+        marker: 'No such proposal',
+        why: 'the 404 branch, which only renders once the preview fetch failed',
+    },
+    {
+        /*
+         * The review routes are gated on `session.read` by their own
+         * middleware, so a role without it gets a STATED denial. Before that
+         * middleware existed this returned 200 and told the reader the proposal
+         * was "undefined".
+         */
+        path: '/schedule/review/01a04015-0000-0000-0000-000000000000',
+        roles: ['constraintViewer'],
+        status: 403,
+        marker: 'do not have permission to review schedule proposals',
+        why: 'a stated denial, not a sentence about the data',
     },
     {
         path: '/manage',
@@ -456,6 +496,133 @@ describe('every page renders for every role that can reach it', () => {
             });
         }
     }
+
+    /**
+     * `/schedule/proposals` is reachable on `session.read` ALONE — and that is
+     * the point of it having its own middleware.
+     *
+     * The contrast with the row above is the whole claim: the same `viewer`
+     * account is REFUSED `/schedule` (it needs six reads to draw a grid) and
+     * ADMITTED here (every reference fetch on this page is tolerant). Borrowing
+     * the schedule's gate would have denied the department head PRODUCT.md names
+     * as the reviewer — the exact person this page exists for.
+     *
+     * Asserted on a data-dependent branch rather than on the static header, and
+     * with the failure branch asserted ABSENT, because "the page contained the
+     * heading" passes just as well for a page whose fetch rejected.
+     */
+    it('admits a session.read-only role to /schedule/proposals', async () => {
+        for (const role of ['admin', 'viewer'] as const) {
+            const res = await fetch(`${BASE}/schedule/proposals`, { headers: { cookie: cookies[role]! } });
+
+            expect(res.status, `/schedule/proposals refused ${role}`).toBe(200);
+
+            const html = await res.text();
+
+            expect(html, `/schedule/proposals failed to load for ${role}`)
+                .not.toContain('Could not load proposals');
+
+            /*
+             * Either outcome of a SUCCESSFUL fetch is acceptable — the fixture
+             * tenant may or may not hold proposals depending on what ran before
+             * it — but one of them must be present. A shell with neither is the
+             * blank-page failure this file exists to catch.
+             */
+            const resolved = html.includes('props_row')
+                || html.includes('Nothing awaiting a decision')
+                || html.includes('No proposals yet');
+
+            expect(resolved, `/schedule/proposals rendered neither rows nor an empty state for ${role}`)
+                .toBe(true);
+        }
+    });
+
+    /**
+     * The review screen must never state a fact about a proposal it could not
+     * read.
+     *
+     * Two assertions, and the second is why this is a test rather than a note:
+     * the absent sentence is only meaningful once the page has been shown to
+     * have RENDERED, otherwise "does not contain the falsehood" passes for a
+     * page that rendered nothing at all. Same rule as the redirect assertion
+     * below.
+     */
+    it('never claims a proposal it could not read proposes nothing', async () => {
+        const res = await fetch(`${BASE}/schedule/review/01a04015-0000-0000-0000-000000000000`, {
+            headers: { cookie: cookies.admin! },
+        });
+
+        expect(res.status).toBe(200);
+
+        const html = await res.text();
+
+        // Rendered, and rendered the failure branch specifically.
+        expect(html).toContain('No such proposal');
+
+        // The two shapes of the original bug.
+        expect(html, 'the empty-state sentence is a claim about the proposal, not about the fetch')
+            .not.toContain('was not produced by a solver run');
+        expect(html, 'a raw undefined reached user-facing copy')
+            .not.toMatch(/proposal is undefined/i);
+    });
+
+    /**
+     * A proposal must be REACHABLE by clicking, from both of its entry points.
+     *
+     * Same failure mode the /my section shipped with, and worse here: before
+     * this, the only link to `/schedule/review/:id` in the entire codebase was
+     * inside `ScheduleSolverControl`'s transient `finished` state, which a page
+     * reload destroys — and `adopt()` re-adopts only runs that are still ACTIVE.
+     * So a proposal was reachable for a few minutes, by one person, while
+     * dozens sat READY in the database. Every page test passed throughout.
+     *
+     * Asserted in both directions: a link offered to everybody proves nothing.
+     */
+    it('offers a route to proposals from the schedule and the palette', async () => {
+        // Entry point 1: the schedule toolbar, gated on `session.read` rather
+        // than `solver.trigger` — the person who reviews a schedule is usually
+        // not the person allowed to generate one.
+        const schedule = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.admin! } })
+            .then((res) => res.text());
+
+        expect(schedule, 'the schedule toolbar lost its route to the proposals list')
+            .toContain('href="/schedule/proposals"');
+
+        // Entry point 2: the nav registry, which renders into the palette.
+        const palette = async (role: string) => fetch(`${BASE}/dashboard`, {
+            headers: { cookie: cookies[role]! },
+        }).then((res) => res.text());
+
+        const adminHtml = await palette('admin');
+        const viewerHtml = await palette('viewer');
+        const withoutHtml = await palette('constraintViewer');
+
+        /*
+         * MATCHED AS AN `href` ATTRIBUTE, not as a bare path.
+         *
+         * The bare string first passed the positive cases and then FAILED the
+         * negative one, because the dev server inlines a route manifest naming
+         * every page — so `/schedule/proposals` appears in the document of a
+         * role that cannot reach it. A guard that matches build metadata instead
+         * of a link is the "matches for the wrong reason" failure in miniature:
+         * it would also have gone green had the actual link disappeared.
+         */
+        const LINK = 'href="/schedule/proposals"';
+
+        expect(adminHtml).toContain(LINK);
+        expect(viewerHtml, 'session.read alone is the gate, and the viewer holds it')
+            .toContain(LINK);
+
+        /*
+         * The negative direction, and it needs the page proven to have rendered
+         * first — otherwise "no proposals entry" passes for a blank dashboard,
+         * which is the trap this file exists to catch.
+         */
+        expect(withoutHtml, 'the dashboard itself failed to render, so the absence below proves nothing')
+            .toContain('Ctrl');
+        expect(withoutHtml, 'offered to a role without session.read')
+            .not.toContain(LINK);
+    });
 
     /**
      * The manage sections a role may not read are not there AT ALL — no nav

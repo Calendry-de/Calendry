@@ -1,3 +1,4 @@
+import { weekCountOf } from '#shared/academicCalendar';
 import type { NamedRow, TimeGrid } from '~/composables/schedule';
 
 /**
@@ -105,6 +106,174 @@ export function terminationSentence(reason: string | null): string {
     }
 }
 
+/**
+ * Why the preview could not be read, as something renderable.
+ *
+ * The screen used to have no such concept. The primary fetch is the one thing
+ * here that is NOT tolerant — a proposal whose preview cannot be read is not a
+ * degraded page, it is no page — so a rejection nulled `summary.data`, `preview`
+ * computed to `null`, and the template fell through to its two "this proposal
+ * proposes nothing" branches. A 403, a 404, a dropped connection and a genuine
+ * manual-baseline Generation all rendered the same sentence, and that sentence
+ * asserted a fact about the data. Naming the failure is what makes the four
+ * distinguishable.
+ */
+export interface ReviewLoadError {
+    kind: 'forbidden' | 'notFound' | 'failed';
+    title: string;
+    detail: string;
+    /** Whether retrying could plausibly succeed. A 403 will not fix itself. */
+    retryable: boolean;
+}
+
+/** `useAsyncData`'s error, narrowed without trusting its shape. */
+function statusCodeOf(error: unknown): number | null {
+    if (typeof error !== 'object' || error === null) {
+        return null;
+    }
+
+    const code = (error as { statusCode?: unknown }).statusCode;
+
+    return typeof code === 'number' ? code : null;
+}
+
+function describeLoadError(error: unknown): ReviewLoadError {
+    switch (statusCodeOf(error)) {
+        case 401:
+            return {
+                kind: 'forbidden',
+                title: 'Your session has expired',
+                detail: 'Sign in again to review this proposal.',
+                retryable: false,
+            };
+        case 403:
+            return {
+                kind: 'forbidden',
+                title: 'You cannot review this proposal',
+                detail: 'Reviewing proposals needs the session.read permission. '
+                    + 'Ask a tenant administrator to grant it.',
+                retryable: false,
+            };
+        case 404:
+            return {
+                kind: 'notFound',
+                title: 'No such proposal',
+                detail: 'It may have been removed, or the link may point at another institution.',
+                retryable: false,
+            };
+        default:
+            return {
+                kind: 'failed',
+                title: 'Could not load this proposal',
+                detail: 'The preview did not come back. Nothing has been changed — try again.',
+                retryable: true,
+            };
+    }
+}
+
+/**
+ * How each diff state is named and drawn.
+ *
+ * Here rather than in a component because BOTH presentations render it — the
+ * week grid and the mobile agenda — and a chip labelled "Added" in one and
+ * "Created" in the other, or carrying a different icon, is the drift that makes
+ * two views of one dataset look like two datasets.
+ */
+export const DIFF_TAG: Record<DiffAction, string> = {
+    create: 'Added',
+    move: 'Moved',
+    unchanged: 'Unchanged',
+    delete: 'Removed',
+};
+
+export const DIFF_ICON: Record<DiffAction, string> = {
+    create: 'material-symbols:add-circle-outline',
+    move: 'material-symbols:arrow-forward',
+    unchanged: 'material-symbols:remove',
+    delete: 'material-symbols:cancel-outline',
+};
+
+/** Where a placement is drawn: a removal sits where it still is, not where it isn't. */
+export function shownAt(item: ReviewPlacement): Placement {
+    return item.action === 'delete' && item.previous ? item.previous : item.placement;
+}
+
+/**
+ * The whole placement as one sentence.
+ *
+ * The grid encodes WHEN in `grid-column` and `grid-row` — inline geometry, which
+ * no assistive technology reads. A moved chip announced its action, its
+ * offering, its room and where it came FROM, and never said when it now is: the
+ * one fact a move actually consists of.
+ */
+export function describePlacement(
+    item: ReviewPlacement,
+    slotLabel: (placement: Placement) => string,
+    offeringName: (id: string) => string,
+    roomName: (id: string) => string,
+): string {
+    const parts = [DIFF_TAG[item.action], offeringName(item.offeringId), slotLabel(shownAt(item))];
+
+    if (item.roomId) {
+        parts.push(roomName(item.roomId));
+    }
+
+    if (item.action === 'move' && item.previous) {
+        parts.push(item.previous.termWeek === item.placement.termWeek
+            ? `moved from ${slotLabel(item.previous)}`
+            : `moved from ${slotLabel(item.previous)} in week ${item.previous.termWeek}`);
+    }
+
+    return parts.join(', ');
+}
+
+/**
+ * What applying will do, in words, at the button that does it.
+ *
+ * The reviewer reads the plan at the top of the screen and then commits from a
+ * header 800px away; nothing restated the consequence where the decision is
+ * actually made. Built from the same `plan` the summary renders, so the sentence
+ * cannot claim a different change than the screen shows.
+ *
+ * Ordered by how much each clause should worry someone: removals first — they
+ * are the destructive part — then additions, then moves. Zero-count clauses are
+ * omitted, because "0 removed" spends a reviewer's attention on nothing.
+ */
+export function applyConsequence(
+    plan: ReviewPreview['plan'],
+    proposedHard: number,
+): string {
+    const clauses: string[] = [];
+
+    if (plan.deleted > 0) {
+        clauses.push(`${plan.deleted} session${plan.deleted === 1 ? '' : 's'} removed`);
+    }
+
+    if (plan.created > 0) {
+        clauses.push(`${plan.created} added`);
+    }
+
+    if (plan.moved > 0) {
+        clauses.push(`${plan.moved} moved`);
+    }
+
+    const changes = clauses.length ? clauses.join(', ') : 'no placement changes';
+    const parts = [`Replace this term's timetable — ${changes}.`];
+
+    if (proposedHard > 0) {
+        parts.push(
+            `${proposedHard} hard-rule issue${proposedHard === 1 ? '' : 's'} the solver could not resolve `
+            + 'will be recorded against the schedule.',
+        );
+    }
+
+    if (plan.skippedLocked > 0) {
+        parts.push(`${plan.skippedLocked} locked session${plan.skippedLocked === 1 ? '' : 's'} stay as they are.`);
+    }
+
+    return parts.join(' ');
+}
+
 export function useGenerationReview(generationId: string) {
     const request = useRequestFetch();
 
@@ -144,7 +313,13 @@ export function useGenerationReview(generationId: string) {
         };
 
         const [terms, timeGrids, rooms, persons, groups] = await Promise.all([
-            optional<{ id: string; name: string; timeGridId: string | null }>('/api/terms'),
+            optional<{
+                id: string;
+                name: string;
+                timeGridId: string | null;
+                startDate: string;
+                endDate: string;
+            }>('/api/terms'),
             optional<TimeGrid>('/api/time-grids'),
             optional<{ id: string; name: string; code: string }>('/api/rooms'),
             optional<{ id: string; givenName: string; familyName: string }>('/api/persons'),
@@ -160,10 +335,38 @@ export function useGenerationReview(generationId: string) {
     const preview = computed(() => summary.data.value?.preview ?? null);
     const plan = computed(() => preview.value?.plan ?? null);
 
+    /**
+     * A load failure, or null. Read BEFORE any "there is nothing here" branch:
+     * "nothing to review" is a statement about the proposal and may only be made
+     * once the proposal has actually been read.
+     */
+    const loadError = computed<ReviewLoadError | null>(() => (
+        summary.error.value ? describeLoadError(summary.error.value) : null
+    ));
+
     const term = computed(() => {
         const termId = preview.value?.run?.termId;
 
         return summary.data.value?.terms.find((t) => t.id === termId) ?? null;
+    });
+
+    /**
+     * How many weeks the term has — not how many the proposal touches.
+     *
+     * `weekSummary` only carries weeks that RECEIVE placements, so a proposal
+     * that pulls 258 sessions into weeks 1–5 of 13 left weeks 6–13 unselectable:
+     * precisely the weeks a reviewer needs to look at, because those are the ones
+     * being emptied. Null when the term cannot be read (a tolerant fetch may
+     * have degraded), and the page falls back to the weeks it does know.
+     */
+    const weekCount = computed<number | null>(() => {
+        const value = term.value;
+
+        if (!value?.startDate || !value?.endDate) {
+            return null;
+        }
+
+        return weekCountOf(new Date(value.startDate), new Date(value.endDate));
     });
 
     const grid = computed<TimeGrid | null>(() => {
@@ -217,8 +420,31 @@ export function useGenerationReview(generationId: string) {
         return changesOnly.value ? all.filter((p) => p.action !== 'unchanged') : all;
     });
 
+    /**
+     * TWO flags, not one.
+     *
+     * A single `applying` ref drove both actions, so discarding a proposal
+     * relabelled the Apply button to "Applying…" and rendered "Writing
+     * placements — a large proposal takes a few seconds." The two operations
+     * mean opposite things; a reviewer watching the destructive-sounding message
+     * during the safe action has been told something false about what the system
+     * is doing.
+     */
     const applying = ref(false);
+    const discarding = ref(false);
+    const busy = computed(() => applying.value || discarding.value);
     const actionError = ref<string | null>(null);
+
+    /**
+     * What just happened, once something has.
+     *
+     * `apply()` used to end in `navigateTo('/schedule')` — the highest-stakes
+     * action in the product finishing as a silent screen change, with no
+     * confirmation that it worked and no statement of what it did. The outcome
+     * is held here instead, and the page stays put to say so: the proposal's own
+     * status becomes APPLIED, which the screen already knows how to render.
+     */
+    const outcome = ref<{ action: 'applied' | 'discarded'; version: number } | null>(null);
 
     async function apply() {
         applying.value = true;
@@ -227,35 +453,44 @@ export function useGenerationReview(generationId: string) {
         try {
             // Materializing a thousand placements took ~2.7s in verification, so
             // this is a real wait rather than a formality.
-            await $fetch(`/api/generations/${generationId}/apply`, { method: 'POST', body: {} });
-            await navigateTo('/schedule');
+            await request(`/api/generations/${generationId}/apply`, { method: 'POST', body: {} });
+
+            outcome.value = { action: 'applied', version: preview.value?.generation.version ?? 0 };
+
+            // Re-read rather than navigate: the row is now APPLIED, and the
+            // reviewer should see that stated on the thing they just decided.
+            await summary.refresh();
         } catch (e) {
-            actionError.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not apply.';
+            actionError.value = (e as { statusMessage?: string }).statusMessage
+                ?? 'Could not apply this proposal. The schedule is unchanged.';
         } finally {
             applying.value = false;
         }
     }
 
     async function discard() {
-        applying.value = true;
+        discarding.value = true;
         actionError.value = null;
 
         try {
-            await $fetch(`/api/generations/${generationId}/discard`, { method: 'POST', body: {} });
-            await navigateTo('/schedule');
+            await request(`/api/generations/${generationId}/discard`, { method: 'POST', body: {} });
+
+            outcome.value = { action: 'discarded', version: preview.value?.generation.version ?? 0 };
+            await summary.refresh();
         } catch (e) {
-            actionError.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not discard.';
+            actionError.value = (e as { statusMessage?: string }).statusMessage
+                ?? 'Could not discard this proposal. It is still awaiting a decision.';
         } finally {
-            applying.value = false;
+            discarding.value = false;
         }
     }
 
     return {
-        summary, preview, plan, term, grid,
+        summary, preview, plan, term, grid, loadError, weekCount,
         offerings, rooms, people, groups, lookup,
         termWeek, groupId, roomId, personId, changesOnly,
         placements, weekPending: computed(() => weekData.pending.value),
-        applying, actionError, apply, discard,
+        applying, discarding, busy, outcome, actionError, apply, discard,
         refresh: async () => {
             await summary.refresh();
             await weekData.refresh();

@@ -37,6 +37,7 @@
             :violation-count="data.violations.value.length"
             :can-read-violations="data.canReadViolations.value"
             :can-trigger-solver="canTriggerSolver"
+            :can-review-proposals="canReviewProposals"
             :can-create-session="canCreateSession"
             :creating="editing.creating.value"
             :solver-term-id="data.resolvedTermId.value"
@@ -223,6 +224,13 @@ useHead({ title: 'Schedule' });
 definePageMeta({ middleware: 'schedule' });
 
 const canTriggerSolver = useHasPermission('solver.trigger');
+/**
+ * The proposals list, not the solver. Reviewing what the solver produced needs
+ * `session.read`; producing it needs `solver.trigger`. A department head
+ * typically holds the first and not the second, and used to have no route to a
+ * proposal at all.
+ */
+const canReviewProposals = useHasPermission('session.read');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
 const canUpdateSession = useHasPermission('session.update');

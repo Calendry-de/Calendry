@@ -145,8 +145,25 @@ export type ColorsList = keyof typeof colorsList;
 
 /**
  * `dark` swaps the two ramps: surfaces take the dark values, content takes the
- * light ones. Nothing else is theme-dependent — the semantic colours read
- * acceptably on both grounds and are deliberately not duplicated here.
+ * light ones.
+ *
+ * THE SEMANTIC RAMPS ARE PARTLY THEME-DEPENDENT TOO, and this comment used to
+ * claim otherwise — "the semantic colours read acceptably on both grounds" was
+ * measured and is false at the dark end of each ramp. Used as FOREGROUND on the
+ * dark ground (`$surface1` = #18181B), `$error700` measures 2.21:1 and
+ * `$success700` 2.71:1 — both under the 3:1 a non-text indicator needs, and far
+ * under text's 4.5:1. `schedule-panel.scss` had already worked around this
+ * locally by reaching for `$error300`/`$warning400` instead, which is the same
+ * finding discovered one component at a time.
+ *
+ * So the 600 and 700 steps — the two used as borders, icons, counts and link
+ * text — take the light end of their own ramp under `dark`. The 300–500 steps
+ * are NOT remapped: they are used as fills and tints, where the light theme's
+ * values are already correct against a dark surface.
+ *
+ * This changes no light-theme value, and adds no custom property: `useLayout()`
+ * emits every entry of `colorsList` regardless and merely overrides the ones
+ * named here.
  */
 export const themesList = {
     dark: {
@@ -167,6 +184,18 @@ export const themesList = {
         content5: '#D5D5E4',
         content6: '#bfbfc2',
         content7: '#aaaaac',
+
+        // Foreground steps, lifted to the light end of their own ramp. Each
+        // value is an existing token from the same ramp, not a new colour:
+        // 600 takes the 500 value, 700 takes the 400 one.
+        primary600: '#2F9E8F',
+        primary700: '#58B4A7',
+        success600: '#2E9E58',
+        success700: '#5CB77D',
+        warning600: '#D69B33',
+        warning700: '#E4B662',
+        error600: '#D14A4F',
+        error700: '#E0777A',
     },
 } satisfies Record<string, PartialRecord<ColorsList, string>>;
 

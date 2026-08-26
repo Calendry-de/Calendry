@@ -117,6 +117,41 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             inHeader: true,
         },
         {
+            /*
+             * IN THE MANAGE SECTION, though the route lives under /schedule.
+             *
+             * Section membership is decided by the id prefix — `useManageSections`
+             * filters on `manage.` — so this entry appears in the /manage
+             * sidebar, the /manage index and the palette, while `to` keeps the
+             * path where it belongs: alongside the schedule routes, sharing
+             * their `review` middleware. Same shape as
+             * `manage.availability-reviews`, which is also a review queue rather
+             * than a managed entity.
+             *
+             * Both menus render `entry.to` directly, so a manage-section entry
+             * pointing outside /manage needs nothing special.
+             */
+            id: 'manage.proposals',
+            label: 'Proposals',
+            description: 'Solver-produced schedules awaiting a decision.',
+            icon: 'material-symbols:fact-check-outline',
+            section: 'manage',
+            keywords: ['proposal', 'proposals', 'generation', 'solver', 'review', 'apply', 'pending'],
+            /*
+             * ONE permission, unlike its sibling `/schedule`.
+             *
+             * This page and the review screen it leads to are gated on
+             * `session.read` alone, matching `GET /api/generations`. Their
+             * reference fetches are individually TOLERANT — a caller who cannot
+             * read terms sees "Term unknown" rather than a refusal — so the
+             * six-permission schedule gate would deny people the data allows.
+             * The rule that matters is that the LINK and the ROUTE agree, and
+             * both name this key.
+             */
+            permission: 'session.read',
+            to: '/schedule/proposals',
+        },
+        {
             id: 'manage',
             label: 'Manage',
             description: 'Configure the entities the timetable is built from.',

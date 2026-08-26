@@ -2,14 +2,18 @@
     <div
         class="grid"
         :class="{ 'grid--placing': placing, 'grid--swapping': swapping }"
-        :style="gridStyle"
+        :style="cssVars"
     >
-        <div class="grid_corner" />
+        <div
+            class="grid_corner"
+            :style="{ gridRow: 1, gridColumn: 1 }"
+        />
 
         <div
-            v-for="day in grid.activeDays"
+            v-for="(day, index) in grid.activeDays"
             :key="`head-${day}`"
             class="grid_day"
+            :style="{ gridRow: 1, gridColumn: index + 2 }"
         >
             <span class="grid_day-long">{{ weekdayName(day, locale) }}</span>
             <span class="grid_day-short">{{ weekdayShort(day, locale) }}</span>
@@ -18,135 +22,147 @@
                 class="grid_day-date"
             >{{ formatSlotDate(dateOf(day), locale) }}</span>
             <!--
-                Named only when this day's timeline actually differs from the
-                universal one. Silence would be the wrong default: with per-day
-                stacks the column simply sits at different offsets, which reads
-                as a rendering glitch unless the reason is stated.
+                Named only when this day's blocks do not start at the times in
+                the gutter. Silence would be the wrong default: the rows are
+                shared, so a day with its own breaks CANNOT be drawn at its own
+                offsets, and a viewer comparing a chip's time to the column
+                beside it deserves to know why they differ.
             -->
             <span
                 v-if="dayDiffers(day)"
                 class="grid_day-note"
-                :title="`This day has its own break schedule, so its blocks do not line up with the time column.`"
+                title="This day has its own break schedule, so its blocks do not start at the times in the left column."
             >own breaks</span>
         </div>
 
         <!--
-            THE TIME COLUMN IS THE UNIVERSAL TIMELINE, and a day with its own
-            breaks is deliberately allowed to drift out of alignment with it.
-            One shared set of row heights cannot be correct for two days whose
-            blocks start at different clock times, so the geometry is per-day
-            and the gutter is a reference rather than a claim about every column.
+            THE TIME COLUMN SHARES ITS ROWS WITH THE BLOCKS IT LABELS.
+
+            It used to be absolute offsets computed from minutes, per day, with
+            the gutter computing its own — so the two agreed only as long as
+            nothing outgrew its block. Four sessions in one slot either shrank to
+            unreadable slivers or overflowed, and once they overflowed the
+            columns and the gutter disagreed about where 16:15 was.
+
+            Now a block's label and that block's cells are in the same grid row.
+            Whatever makes the row taller moves the label with it; nothing is
+            computed, so nothing can drift.
         -->
-        <div
-            class="grid_gutter"
-            :style="{ height: `${universal.totalHeight}px` }"
+        <template
+            v-for="row in rows"
+            :key="`${row.kind}-${row.index}`"
         >
             <div
-                v-for="block in universal.blocks"
-                :key="`t-${block.index}`"
+                v-if="row.kind === 'block'"
                 class="grid_time"
-                :style="{ top: `${block.top}px`, height: `${block.height}px` }"
+                :style="{ gridRow: row.line, gridColumn: 1 }"
             >
-                <span class="grid_time-start">{{ block.start }}</span>
-                <span class="grid_time-end">{{ block.end }}</span>
+                <span class="grid_time-start">{{ row.start }}</span>
+                <span class="grid_time-end">{{ row.end }}</span>
             </div>
 
-            <div
-                v-for="gap in universal.gaps"
-                :key="`tg-${gap.afterBlockIndex}`"
-                class="grid_gap-time"
-                :style="{ top: `${gap.top}px`, height: `${gap.height}px` }"
-            >{{ gap.minutes }}′</div>
-        </div>
+            <template v-else>
+                <div
+                    class="grid_gap-time"
+                    :style="{ gridRow: row.line, gridColumn: 1 }"
+                >{{ row.minutes }}′</div>
+
+                <!--
+                    A break is inert by construction — no handler, no tabindex —
+                    so placement mode cannot target it. A Session may not START
+                    in a gap: there is no block index for it, and `fitsGrid()`
+                    would have nothing to validate.
+
+                    One band across every day, because these are the UNIVERSAL
+                    gaps, and its row is sized to its own label rather than to a
+                    share of the block height.
+                -->
+                <div
+                    class="grid_gap"
+                    :style="{ gridRow: row.line, gridColumn: '2 / -1' }"
+                >
+                    <span class="grid_gap-label">{{ row.label ?? 'Break' }}</span>
+                    <span class="grid_gap-mins">{{ row.minutes }} min</span>
+                </div>
+            </template>
+        </template>
+
+        <button
+            v-for="cell in cells"
+            :key="cell.key"
+            type="button"
+            class="grid_cell"
+            :class="{ 'grid_cell--target': placing }"
+            :style="cell.style"
+            :disabled="!placing"
+            :aria-label="cell.label"
+            @click="placing && $emit('place', { dayOfWeek: cell.day, blockIndex: cell.blockIndex })"
+        />
 
         <div
-            v-for="day in grid.activeDays"
-            :key="`col-${day}`"
-            class="grid_col"
-            :style="{ height: `${layoutFor(day).totalHeight}px` }"
+            v-for="slot in slots"
+            :key="slot.key"
+            class="grid_slot"
+            :class="{ 'grid_slot--compact': slot.compact }"
+            :style="slot.style"
         >
-            <button
-                v-for="block in layoutFor(day).blocks"
-                :key="`cell-${day}-${block.index}`"
-                type="button"
-                class="grid_cell"
-                :class="{ 'grid_cell--target': placing }"
-                :style="{ top: `${block.top}px`, height: `${block.height}px` }"
-                :disabled="!placing"
-                :aria-label="placing
-                    ? `${targetVerb ?? 'Move to'} ${weekdayName(day)} ${block.start}`
-                    : undefined"
-                @click="placing && $emit('place', { dayOfWeek: day, blockIndex: block.index })"
+            <ScheduleSessionChip
+                v-for="session in slot.items"
+                :key="session.id"
+                :session="session"
+                :violations="violations.get(session.id) ?? []"
+                :selected="session.id === selectedId"
+                :dimmed="placing && session.id !== selectedId"
+                :targetable="swapping && session.id !== selectedId"
+                @select="$emit('select', session.id)"
             />
-
-            <!--
-                A break is a real, non-interactive interval. Rendered as its own
-                element rather than as padding between cells so it can carry the
-                label and duration, and so its HEIGHT is the gap's actual
-                minutes — the thing the old uniform-row grid could not express.
-            -->
-            <div
-                v-for="gap in layoutFor(day).gaps"
-                :key="`gap-${day}-${gap.afterBlockIndex}`"
-                class="grid_gap"
-                :style="{ top: `${gap.top}px`, height: `${gap.height}px` }"
-            >
-                <span class="grid_gap-label">{{ gap.label ?? 'Break' }}</span>
-                <span class="grid_gap-mins">{{ gap.minutes }} min</span>
-            </div>
-
-            <div
-                v-for="placement in placementsFor(day)"
-                :key="placement.session.id"
-                class="grid_slot"
-                :style="slotStyle(placement, day)"
-            >
-                <ScheduleSessionChip
-                    :session="placement.session"
-                    :violations="violations.get(placement.session.id) ?? []"
-                    :selected="placement.session.id === selectedId"
-                    :dimmed="placing && placement.session.id !== selectedId"
-                    :targetable="swapping && placement.session.id !== selectedId"
-                    @select="$emit('select', placement.session.id)"
-                />
-            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
 import {
-    type ScheduleSession, type SessionPlacement, type TimeGrid, type Violation,
-    blockTime, formatSlotDate, layoutDay, weekdayName, weekdayShort,
+    type ScheduleSession, type TimeGrid, type Violation,
+    blockTime, formatSlotDate, weekdayName, weekdayShort,
 } from '~/composables/schedule';
 import { useViewerLocale } from '~/composables/locale';
-import { blockBoundaries, blockSpan, gapsOfDay } from '#shared/timeGrid';
+import { clusterSlots, useGridGeometry } from '~/composables/gridGeometry';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
 /**
- * The week grid, laid out in MINUTES rather than in uniform rows.
+ * The week grid, laid out in ROWS that grow with what is in them.
  *
- * WHY THIS STOPPED BEING ONE CSS GRID
+ * WHY IT STOPPED BEING PER-DAY MINUTE OFFSETS
  *
- * It used to be `grid-auto-rows: var(--row-height)` with one row per block, so
- * every gap between blocks rendered as zero height. The TimeGrid break feature
- * — schema, `blockBoundaries()`, the editor's preview — was built without this
- * component ever being updated, so a tenant with a 45-minute morning break saw
- * their blocks butted together while the time column correctly said 12:15 then
- * 13:00. The times were right and the picture contradicted them.
+ * It was `grid-auto-rows: var(--row-height)` with one row per block, so every
+ * gap between blocks rendered as zero height — the TimeGrid break feature was
+ * built without this component ever being updated, and a tenant with a
+ * 45-minute morning break saw their blocks butted together while the time column
+ * correctly said 12:15 then 13:00.
  *
- * A single grid cannot be fixed by adding break rows, because row heights are
- * shared across columns and a DAY-SPECIFIC break means two days genuinely have
- * different block start times. So each day is now its own positioned stack
- * sized from its OWN `blockBoundaries(grid, day)`, and the time column shows
- * the universal timeline as a reference. Where a day differs it visibly drifts
- * from that reference, which is the honest picture rather than a bug.
+ * The fix for that was a per-day absolutely-positioned stack sized from each
+ * day's own `blockBoundaries()`, which was minute-true and let a day with its
+ * own breaks visibly drift from the gutter. But a block's height was then a
+ * function of the density setting alone, so several sessions in one slot either
+ * fanned into unreadable slivers or overflowed their block — and when they
+ * overflowed, each column and the gutter computed offsets independently and
+ * disagreed about where a time was.
  *
- * NO GEOMETRY IS COMPUTED HERE. Every offset comes from `blockBoundaries()`,
- * `blockSpan()` and `gapsOfDay()` in `shared/timeGrid.ts` — the same walk
- * `blockTime()` and `blockOfMinute()` use. A local `blockLength + breakMinutes`
- * stride is exactly what that module was created to delete; three of them had
- * accumulated once already.
+ * So the rows are shared and CONTENT-SIZED (`useGridGeometry`): a block row is
+ * at least the chosen density and grows when its fullest day needs more, and a
+ * block's label sits in the same row as its cells. Alignment is structural.
+ *
+ * WHAT THAT COSTS: per-day drift can no longer be drawn. A day whose own breaks
+ * move its blocks is NAMED in its header instead, its cells' accessible labels
+ * carry that day's real clock times, and the gutter is explicitly the shared
+ * timeline rather than a claim about every column.
+ *
+ * NO GEOMETRY IS COMPUTED HERE. Rows, spans and slot placement come from
+ * `useGridGeometry` / `clusterSlots`, over `blockBoundaries()`, `blockSpan()`
+ * and `gapsOfDay()` in `shared/timeGrid.ts` — the same walk `blockTime()` and
+ * `blockOfMinute()` use. A local `blockLength + breakMinutes` stride is exactly
+ * what that module was created to delete; three of them had accumulated once
+ * already, and the review grid needs the identical projection.
  */
 const props = defineProps<{
     grid: TimeGrid;
@@ -175,121 +191,65 @@ defineEmits<{
     place: [target: { dayOfWeek: number; blockIndex: number }];
 }>();
 
-/**
- * Pixels per minute, anchored so a BLOCK keeps exactly the height it had
- * before. Breaks then add their real duration on top, rather than every row
- * shrinking to make room — which would have made the fix look like a
- * regression on every grid that has no breaks at all.
- */
 const locale = useViewerLocale();
 
 /** This column's calendar date, in the week currently shown. */
 const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
 
-const perMinute = computed(() => props.rowHeight / Math.max(1, props.grid.blockLengthMinutes));
+const { rows, rowSpan, dayDiffers, cssVars } = useGridGeometry(
+    computed(() => props.grid),
+    computed(() => props.rowHeight),
+);
 
-interface DayLayout {
-    blocks: { index: number; top: number; height: number; start: string; end: string }[];
-    gaps: { afterBlockIndex: number; minutes: number; label: string | null; top: number; height: number }[];
-    totalHeight: number;
-}
-
-function layoutOf(day: number | null): DayLayout {
-    const bounds = blockBoundaries(props.grid, day);
-    const origin = bounds[0] ?? 0;
-    const ppm = perMinute.value;
-    const px = (minute: number) => (minute - origin) * ppm;
-
-    return {
-        blocks: Array.from({ length: props.grid.blocksPerDay }, (_, index) => ({
-            index,
-            top: px(bounds[index] ?? origin),
-            height: props.grid.blockLengthMinutes * ppm,
-            ...blockTime(props.grid, index, day),
-        })),
-        gaps: gapsOfDay(props.grid, day).map((gap) => ({
-            ...gap,
-            top: px((bounds[gap.afterBlockIndex] ?? origin) + props.grid.blockLengthMinutes),
-            height: gap.minutes * ppm,
-        })),
-        totalHeight: px(bounds[bounds.length - 1] ?? origin),
-    };
-}
-
-// Memoised per render: `layoutFor` is called several times per day in the
-// template, and each call otherwise re-walks the boundaries.
-const layouts = computed(() => {
-    const map = new Map<number, DayLayout>();
-
-    for (const day of props.grid.activeDays) {
-        map.set(day, layoutOf(day));
-    }
-
-    return map;
-});
-
-const universal = computed(() => layoutOf(null));
-
-const layoutFor = (day: number) => layouts.value.get(day) ?? universal.value;
+const blockRows = computed(() => rows.value.filter(
+    (row): row is Extract<typeof row, { kind: 'block' }> => row.kind === 'block',
+));
 
 /**
- * Whether this day's timeline differs from the universal one.
+ * The target layer: one button per day per block, explicitly placed.
  *
- * Compared on the resolved BOUNDARIES rather than by looking for a
- * day-specific break row, because a row that happens to restate the universal
- * duration changes nothing a viewer can see, and flagging it would be noise.
+ * The accessible name resolves THIS DAY's clock time, not the gutter's. With
+ * shared rows a day carrying its own breaks starts its blocks elsewhere, and
+ * announcing the shared timeline would promise a slot the move would not make.
  */
-function dayDiffers(day: number): boolean {
-    const mine = layoutFor(day).blocks;
-    const theirs = universal.value.blocks;
-
-    return mine.some((block, index) => block.top !== theirs[index]?.top);
-}
-
-const gridStyle = computed(() => ({
-    '--day-count': String(props.grid.activeDays.length),
-    '--row-height': `${props.rowHeight}px`,
-}));
-
-const placementsFor = (day: number) => layoutDay(props.sessions.filter((s) => s.dayOfWeek === day));
+const cells = computed(() => props.grid.activeDays.flatMap((day, index) => (
+    blockRows.value.map((row) => ({
+        key: `cell-${day}-${row.index}`,
+        day,
+        blockIndex: row.index,
+        label: props.placing
+            ? `${props.targetVerb ?? 'Move to'} ${weekdayName(day)} `
+                + `${blockTime(props.grid, row.index, day).start}`
+            : undefined,
+        style: { gridRow: String(row.line), gridColumn: String(index + 2) },
+    }))
+)));
 
 /**
- * A session is positioned from its own day's timeline and sized from its first
- * block's start to its last block's end — so a multi-block Session that spans a
- * break VISIBLY spans it, gap included.
- *
- * That is deliberate and deliberately not a decision: whether such a placement
- * should be legal at all is the open question in CLAUDE.md. Drawing it as it is
- * stored shows the situation instead of hiding it behind a contiguous chip.
+ * Sessions packed against overlaps, one positioned slot per column of each
+ * cluster — or, past the fan limit, one full-width slot whose members stack
+ * under each other. `clusterSlots` owns that rule; both grids share it.
  */
-function slotStyle(placement: SessionPlacement, day: number) {
-    const { session, column, columns } = placement;
-    const bounds = blockBoundaries(props.grid, day);
-    const origin = bounds[0] ?? 0;
-    const first = blockSpan(props.grid, session.blockIndex, day);
-    const last = blockSpan(props.grid, session.blockIndex + session.durationBlocks - 1, day);
-    const width = 100 / columns;
-
-    return {
-        top: `${(first.start - origin) * perMinute.value}px`,
-        height: `${(last.end - first.start) * perMinute.value}px`,
-        width: `${width}%`,
-        left: `${column * width}%`,
-    };
-}
+const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clusterSlots(
+    props.sessions.filter((session) => session.dayOfWeek === day),
+    (session) => ({
+        key: session.id,
+        start: session.blockIndex,
+        span: session.durationBlocks,
+    }),
+    { column: String(index + 2), rowSpan, dayKey: day },
+)));
 </script>
-
 <style scoped lang="scss">
 .grid {
     /*
-     * Two rows only: headers, then the stacks. Blocks are no longer grid rows —
-     * they are positioned inside each column from real minutes, because row
-     * heights are shared across columns and two days with different breaks do
-     * not share a timeline. See the component comment.
+     * Rows come from `gridTemplateRows` in the inline style, because the row
+     * COUNT is data: one per block, one per break. Nothing here auto-places —
+     * every child names its own row and column — which is what keeps the time
+     * column in column 1 no matter what is scheduled.
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
-    grid-template-rows: auto auto;
     gap: 1px;
 
     padding: 1px;
@@ -357,13 +317,8 @@ function slotStyle(placement: SessionPlacement, day: number) {
         }
     }
 
-    &_gutter,
-    &_col {
-        position: relative;
-        background: $surface5;
-    }
-
-    &_gutter {
+    &_time,
+    &_gap-time {
         position: sticky;
         z-index: 1;
         left: 0;
@@ -374,10 +329,6 @@ function slotStyle(placement: SessionPlacement, day: number) {
     }
 
     &_time {
-        position: absolute;
-        right: 0;
-        left: 0;
-
         display: flex;
         flex-direction: column;
         gap: 2px;
@@ -400,12 +351,8 @@ function slotStyle(placement: SessionPlacement, day: number) {
         }
     }
 
-    /* The gap's duration beside the time column, so the drift is measurable. */
+    /* The break's duration beside the time column, so it is measurable. */
     &_gap-time {
-        position: absolute;
-        right: 0;
-        left: 0;
-
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -418,12 +365,7 @@ function slotStyle(placement: SessionPlacement, day: number) {
     }
 
     &_cell {
-        position: absolute;
-        right: 0;
-        left: 0;
-
         border: 0;
-
         appearance: none;
         background: $surface0;
 
@@ -472,10 +414,6 @@ function slotStyle(placement: SessionPlacement, day: number) {
      * block index for it, and `fitsGrid()` would have nothing to validate.
      */
     &_gap {
-        position: absolute;
-        right: 0;
-        left: 0;
-
         overflow: hidden;
         display: flex;
         gap: 6px;
@@ -505,14 +443,54 @@ function slotStyle(placement: SessionPlacement, day: number) {
     &_slot {
         pointer-events: none;
 
-        position: absolute;
-
         display: flex;
+        gap: 2px;
 
         min-width: 0;
         padding: 2px;
 
         > * { pointer-events: auto; }
+
+        /*
+         * A crowded cluster stacks under itself instead of fanning into
+         * slivers. The row it sits in grows to fit (`minmax(var(--row-height),
+         * auto)`), so nothing overflows and nothing is hidden — see
+         * `clusterSlots`.
+         */
+        &--compact {
+            flex-direction: column;
+            gap: 1px;
+
+            /*
+             * THE COMPACT CHIP — the same chip, one line high.
+             *
+             * `:deep` because the chip owns its own scoped styles and this is a
+             * layout decision the CONTAINER makes: the same component is a tall
+             * card when it has a column to itself and a single line when it is
+             * one of six sharing a slot. Nothing is removed — title, kind, lock
+             * and violation icons all survive, laid out inline and ellipsised
+             * rather than stacked.
+             */
+            :deep(.chip) {
+                flex: none;
+                flex-direction: row;
+                gap: 8px;
+                align-items: baseline;
+                justify-content: flex-start;
+
+                min-height: 24px;
+                padding: 3px 8px;
+            }
+
+            :deep(.chip_meta) {
+                flex: none;
+            }
+
+            :deep(.chip_title) {
+                flex: 0 1 auto;
+                white-space: nowrap;
+            }
+        }
 
         /*
          * While PLACING, chips stop intercepting clicks so the cell beneath is

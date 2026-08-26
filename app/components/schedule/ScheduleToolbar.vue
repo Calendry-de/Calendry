@@ -124,6 +124,24 @@
                 :term-id="solverTermId"
             />
 
+            <!--
+                THE DURABLE WAY TO A PROPOSAL.
+                The solver control's own "Review" button is a HANDOFF for the
+                person who just started a run: it lives in a transient `finished`
+                state that a page reload destroys, and `adopt()` only re-adopts
+                runs that are still ACTIVE. So a proposal was reachable for
+                minutes, by one person. This link does not expire, and it is
+                gated on `session.read` rather than `solver.trigger` — the
+                department head who reviews a schedule is usually not the person
+                allowed to generate one.
+            -->
+            <common-button
+                v-if="canReviewProposals"
+                icon="material-symbols:fact-check-outline"
+                type="transparent"
+                to="/schedule/proposals"
+            >Proposals</common-button>
+
             <label class="bar_field">
                 <span>Density</span>
                 <select
@@ -169,6 +187,8 @@ defineProps<{
     violationCount: number;
     canReadViolations: boolean;
     canTriggerSolver: boolean;
+    /** `session.read` — deliberately not `solver.trigger`; see the link's note. */
+    canReviewProposals: boolean;
     canCreateSession: boolean;
     creating: boolean;
     /** Correct at first render, unlike the term-id model, which a
