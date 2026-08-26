@@ -1,4 +1,5 @@
 import type { UnavailabilityWindow } from '#shared/availability';
+import { describeWeightMultiplier } from '#shared/availability';
 import type { TimeGrid } from '~/composables/schedule';
 import { blockTime, weekdayName } from '~/composables/schedule';
 
@@ -40,7 +41,11 @@ export function describeWindow(window: UnavailabilityWindow, grid: TimeGrid | nu
  * where the inversion is easiest to see and hardest to get wrong by accident.
  */
 export function describePreferences(
-    preference: { preferredDays: number[]; preferredBlocks: number[] } | null,
+    preference: {
+        preferredDays: number[];
+        preferredBlocks: number[];
+        weightMultiplier?: number | null;
+    } | null,
     grid: TimeGrid | null,
 ): string {
     if (!preference || (!preference.preferredDays.length && !preference.preferredBlocks.length)) {
@@ -57,6 +62,22 @@ export function describePreferences(
         parts.push(preference.preferredBlocks
             .map((index) => (grid ? `${index + 1} (${blockTime(grid, index).start})` : String(index + 1)))
             .join(', '));
+    }
+
+    /*
+     * The override belongs in the COLLAPSED summary, not only in the expanded
+     * editor: "who has a non-default weight" is a question about the whole list,
+     * and answering it by opening five hundred rows is not answering it.
+     *
+     * Absent by design when there is no override — `null` is the ordinary state
+     * and naming it on every row would bury the exceptions it exists to reveal.
+     * A multiplier cannot appear without a preference, since clearing both axes
+     * deletes the row it lives on.
+     */
+    const weight = describeWeightMultiplier(preference.weightMultiplier);
+
+    if (weight) {
+        parts.push(weight);
     }
 
     return parts.join(' · ');

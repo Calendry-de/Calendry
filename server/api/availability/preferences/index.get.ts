@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
                 id: true,
                 givenName: true,
                 familyName: true,
-                preference: { select: { preferredDays: true, preferredBlocks: true } },
+                preference: { select: { preferredDays: true, preferredBlocks: true, weightMultiplier: true } },
                 personRoles: { select: { role: { select: { key: true, name: true } } } },
             },
         }),

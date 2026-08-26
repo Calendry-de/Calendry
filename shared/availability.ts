@@ -182,9 +182,51 @@ export interface TermWindow {
     weekCount: number;
 }
 
+/**
+ * The clamp on a per-person preference weight, declared ONCE.
+ *
+ * In `shared/` because three places need the same two numbers and a copy in any
+ * of them is a second definition that agrees until it does not: the zod schema
+ * on the administrator write path, the control that edits the value, and the
+ * database CHECK `person_preference_weight_multiplier_range` (which cannot
+ * import this, so the migration states the same range and says why).
+ *
+ * A multiplier, not an absolute weight — see the `PersonPreference` model
+ * comment for why an absolute override rots when the tenant default changes.
+ */
+export const WEIGHT_MULTIPLIER_MIN = 0.5;
+export const WEIGHT_MULTIPLIER_MAX = 2;
+
+/**
+ * How an override reads in a summary line, or `null` when there is nothing to
+ * say because the person is on the tenant default.
+ *
+ * In `shared/` rather than beside the other label helpers in `app/utils/` for a
+ * plain reason: those import `~/composables/schedule`, which only resolves
+ * inside Nuxt, so anything there is unreachable from a unit test. The rule
+ * itself — default says nothing, an override names its factor — is worth
+ * testing directly.
+ */
+export function describeWeightMultiplier(value: number | null | undefined): string | null {
+    return value == null ? null : `counts ${value}×`;
+}
+
+/** True when a multiplier is a legal override. `null` is legal — it means "default". */
+export function isWeightMultiplierInRange(value: number | null): boolean {
+    return value === null
+        || (Number.isFinite(value) && value >= WEIGHT_MULTIPLIER_MIN && value <= WEIGHT_MULTIPLIER_MAX);
+}
+
 export interface PersonPreferences {
     preferredDays: number[];
     preferredBlocks: number[];
+    /**
+     * Administrator-set multiplier on the tenant-wide preference weight.
+     * `null`/absent means "use the tenant default". Optional here because
+     * `preferencesAreEmpty` and the self-service page only ever deal in the two
+     * axes — the weight is not part of what makes a preference exist.
+     */
+    weightMultiplier?: number | null;
 }
 
 export function preferencesAreEmpty(preferences: PersonPreferences): boolean {

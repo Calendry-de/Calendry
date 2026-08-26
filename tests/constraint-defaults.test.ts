@@ -77,6 +77,23 @@ describe('the catalogue half', () => {
         expect(enabled).toEqual([...STRUCTURAL_CONSTRAINT_TYPES].sort());
     });
 
+    it('does NOT auto-enable person_preference_fit', () => {
+        /*
+         * Two reasons it must ship off. It steers the SOLVER, and enabling a
+         * previously-off rule for every tenant on upgrade changes the timetable
+         * they get from their next run — not a change a backfill is entitled to
+         * make. And its proto field has not shipped, so an enabled row would be
+         * skipped at assembly time anyway.
+         */
+        const type = CONSTRAINT_TYPES.find((candidate) => candidate.key === 'person_preference_fit')!;
+        const row = defaultConstraintRow(type);
+
+        expect(row.isEnabled).toBe(false);
+        // SOFT, so the CHECK demands a weight even while disabled.
+        expect(row.severity).toBe('SOFT');
+        expect(row.weight).toBeGreaterThan(0);
+    });
+
     it('includes no_double_booking_person — the rule that was unreachable', () => {
         expect(defaultConstraintTypes().map((t) => t.key)).toContain('no_double_booking_person');
     });

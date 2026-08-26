@@ -1,4 +1,4 @@
-import { preferencesSchema, tenantGridLimits } from '../../../utils/availability';
+import { staffPreferencesSchema, tenantGridLimits } from '../../../utils/availability';
 import { preferencesAreEmpty } from '../../../../shared/availability';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
@@ -18,7 +18,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  */
 export default defineEventHandler(async (event) => {
     const personId = getRouterParam(event, 'personId');
-    const body = await readValidatedBody(event, preferencesSchema.parse);
+    const body = await readValidatedBody(event, staffPreferencesSchema.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
         await requirePermission(event, tx, 'availability.manage_any');
@@ -45,8 +45,16 @@ export default defineEventHandler(async (event) => {
         }
 
         return mapDbErrors(async () => {
-            // Both axes empty IS "no preference", and that state has exactly one
-            // representation: no row.
+            /*
+             * Both axes empty IS "no preference", and that state has exactly one
+             * representation: no row.
+             *
+             * DELIBERATE CONSEQUENCE: the weight override goes with it. A
+             * multiplier modifies a preference, so it cannot outlive one — a row
+             * holding only a weight would be a factor applied to nothing. The
+             * axes are therefore what decides existence, and `weightMultiplier`
+             * is only ever read on a row that already has something to weight.
+             */
             if (preferencesAreEmpty(body)) {
                 await tx.personPreference.deleteMany({ where: { personId: person.id, tenantId: identity.tenantId } });
 
@@ -56,13 +64,14 @@ export default defineEventHandler(async (event) => {
             const data = {
                 preferredDays: [...new Set(body.preferredDays)].sort((a, b) => a - b),
                 preferredBlocks: [...new Set(body.preferredBlocks)].sort((a, b) => a - b),
+                weightMultiplier: body.weightMultiplier,
             };
 
             return tx.personPreference.upsert({
                 where: { personId: person.id },
                 create: { personId: person.id, tenantId: identity.tenantId, ...data },
                 update: data,
-                select: { preferredDays: true, preferredBlocks: true },
+                select: { preferredDays: true, preferredBlocks: true, weightMultiplier: true },
             });
         });
     });

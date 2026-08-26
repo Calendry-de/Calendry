@@ -82,9 +82,50 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     it('maps every catalogue type to a distinct wire field', () => {
-        const fields = CONSTRAINT_TYPES.map((type) => type.wireField);
+        // Types awaiting their proto field have no wireField yet — see below.
+        const fields = CONSTRAINT_TYPES
+            .map((type) => type.wireField)
+            .filter((field): field is NonNullable<typeof field> => field !== undefined);
 
         expect(new Set(fields).size).toBe(fields.length);
+    });
+
+    it('describes person_preference_fit as a SOFT, solver-owned, parameterless rule', () => {
+        const type = findConstraintType('person_preference_fit');
+
+        expect(type).toBeTruthy();
+        expect(type!.severity).toBe('SOFT');
+        expect(type!.evaluator).toBe('solver');
+        // Same architecture as lecturer_veto: the values live on the Person, so
+        // there is nothing to configure on the row but the weight.
+        expect(type!.params).toEqual([]);
+        expect(type!.defaultWeight).toBeGreaterThan(0);
+    });
+
+    it('SKIPS a type whose proto field has not shipped, rather than encoding nothing', () => {
+        /*
+         * The failure this prevents: `toWireConstraint` assembles the config with
+         * an `as ConstraintConfig` cast and ts-proto encodes only fields it
+         * knows, so a fabricated field name would produce a ConstraintConfig
+         * with no params set — a rule the tenant enabled and weighted that is
+         * silently absent from every run. The rule ships disabled, but a tenant
+         * admin can flip it on before the proto catches up, so "off by default"
+         * is not the guard.
+         */
+        const result = toWireConstraint(
+            { ...row(), type: 'person_preference_fit', severity: 'SOFT', weight: 5 },
+            noKinds,
+        );
+
+        expect('skip' in result).toBe(true);
+        expect((result as { skip: string }).skip).toContain('no field for this type yet');
+    });
+
+    it('leaves person_preference_fit without a wire field until the proto carries it', () => {
+        // The inverse of the assertion above, so the two cannot both drift: if
+        // somebody adds the wireField, the skip test fails and this one tells
+        // them why it existed.
+        expect(findConstraintType('person_preference_fit')!.wireField).toBeUndefined();
     });
 
     it('sends a parameterless type as an empty variant', () => {

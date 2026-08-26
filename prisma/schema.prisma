@@ -492,6 +492,13 @@ model PersonUnavailability {
 /// Soft scheduling preferences for one Person — "prefers mornings", "prefers
 /// Tuesdays".
 ///
+/// THE TWO AXES ARE ADDITIVE: each earns credit independently, so a Tuesday
+/// first block earns both. The data deliberately cannot express "Tuesday
+/// mornings only" — that conjunction would need a (day x block) matrix rather
+/// than two arrays, and is a separate preference kind if anyone ever needs it.
+/// Stated here because nothing else states it, and the first evaluator to read
+/// these columns would otherwise fix the semantics by accident.
+///
 /// STORED BUT NOT YET SOLVER-EFFECTIVE. Nothing reads this into `SolverInput`,
 /// because the wire has no field for it: `Person.preferred_days` /
 /// `preferred_blocks` and the `person_preference_fit` constraint type are a
@@ -517,6 +524,28 @@ model PersonPreference {
   preferredDays Int[] @map("preferred_days")
   /// 0-based block index within the day. Empty means no preference.
   preferredBlocks Int[] @map("preferred_blocks")
+
+  /// How much THIS person's preference counts, relative to the tenant-wide
+  /// weight on the `person_preference_fit` constraint row.
+  ///
+  /// NULL means "use the tenant default" and is the only representation of that
+  /// state, the same discipline that makes an absent ROW mean "no preferences".
+  /// Clamped to [0.5, 2.0] by a CHECK and by the administrator write path.
+  ///
+  /// A MULTIPLIER rather than an absolute weight, because an absolute override
+  /// silently rots when the tenant changes its default: raising the default
+  /// from 5 to 20 would turn "count this person double" into "count them at a
+  /// fifth". A dimensionless factor is unaffected.
+  ///
+  /// `Float`, not `Decimal`: the wire field is a `double` and the solver
+  /// multiplies doubles, so this keeps one representation end to end. Both
+  /// clamp bounds are exactly representable.
+  ///
+  /// ADMINISTRATOR-ONLY. The self-service path REFUSES this field rather than
+  /// dropping it — a person raising their own weight is the unilateral
+  /// escalation that soft preferences are otherwise free of, and it is the one
+  /// place the two write paths stop being the same operation.
+  weightMultiplier Float? @map("weight_multiplier")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)

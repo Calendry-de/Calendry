@@ -243,11 +243,27 @@ login:
 
 ## Per-person soft preferences
 
+**Design pass done — see [per-person-preferences-design.md](per-person-preferences-design.md).
+This entry's premise is stale and the file corrects it:** the storage, both
+write paths (self-service and staff-on-behalf), validation and both UIs are
+BUILT. What is missing is exactly three artifacts — a `person_preference_fit`
+catalogue entry, a `Person.preferred` wire field, and a solver evaluator. The
+data shape is not "on `Person`"; it is the `person_preference` table, and it has
+been since the availability work.
+
+**All five design questions were decided on 2026-08-26** and stage 1 of the
+record's rollout is closed: preference axes combine additively; the weight is a
+tenant-wide default times a per-person multiplier clamped to `[0.5, 2.0]`; only
+lecturers' preferences count; cost accrues raw per placement (so the term stays
+placement-local and visible to `ruin_worst`); and the table is widened rather
+than split, with a grid-shaped room-type preference expected next. Stages 2–7 are
+proposed and have had no build session.
+
 E.g. "this tutor prefers mornings," "this tutor prefers these days if
 possible." Every existing soft constraint is tenant-configured and broadly
 scoped (a kind, a rank threshold); a preference belonging to one individual
-Person is a new data shape (on `Person`) and needs new solver logic reading
-per-person data, not just a new catalogue entry.
+Person needs new solver logic reading per-person data, not just a new catalogue
+entry.
 
 ## Compactness / "minimize gaps in the day"
 
@@ -289,6 +305,18 @@ future re-solve. Three layered gaps, in dependency order:
    required count, no real choice); a genuine pool returns `UNIMPLEMENTED`
    today. Nothing can be "consistent" until the solver can choose from options
    at all.
+
+   **Implementing this silently invalidates a precomputation elsewhere — read
+   [per-person-preferences-design.md](per-person-preferences-design.md) § 6
+   before starting.** Per-person preferences price a placement from a
+   `pref_cost[placement][day][block]` table whose entry is the MEAN over that
+   placement's lecturer set, collapsed once at setup. That is only valid while
+   the lecturer set is fixed before the search runs, which is true *because*
+   pool selection is unimplemented. The failure mode if it ships without that
+   table changing: a stale mean computed over whichever lecturers the Offering
+   happened to list, still inside its weight bound and still plausible-looking,
+   quietly pricing the wrong people's preferences — no error, no violation, just
+   a schedule optimised for lecturers who are not the ones teaching it.
 2. **The new constraint itself.** Once pool selection exists, "same lecturer
    for every Session of one Offering" is an aggregate over an entire Offering's
    Sessions across the whole term — related to the compactness item above in

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { Tx } from './tenantDb';
-import { isTotalBlackout, resolveHolidayWeeks, validateWindow } from '../../shared/availability';
+import {
+    WEIGHT_MULTIPLIER_MAX,
+    WEIGHT_MULTIPLIER_MIN,
+    isTotalBlackout,
+    resolveHolidayWeeks,
+    validateWindow,
+} from '../../shared/availability';
 import type { HolidayResolution, TermWindow, UnavailabilityWindow } from '../../shared/availability';
 import { isoDate, overlaps, weekCountOf } from '../../shared/academicCalendar';
 
@@ -281,6 +287,23 @@ export const holidaySchema = z.object({
 export const preferencesSchema = z.object({
     preferredDays: z.array(z.number().int().min(1).max(7)).max(7).default([]),
     preferredBlocks: z.array(z.number().int().min(0)).max(64).default([]),
+});
+
+/**
+ * The ADMINISTRATOR preference payload. Identical to `preferencesSchema` plus
+ * the weight override, which only this path accepts.
+ *
+ * `null` clears the override back to the tenant default; an absent key means the
+ * same thing, because this is a PUT and replaces the whole preference state.
+ * Once a UI exposes the control it must therefore send the current value on
+ * every save, exactly as it already sends both axes.
+ */
+export const staffPreferencesSchema = preferencesSchema.extend({
+    weightMultiplier: z.number()
+        .min(WEIGHT_MULTIPLIER_MIN)
+        .max(WEIGHT_MULTIPLIER_MAX)
+        .nullable()
+        .default(null),
 });
 
 /**

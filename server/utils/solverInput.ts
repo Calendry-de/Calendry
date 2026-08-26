@@ -179,6 +179,23 @@ export function toWireConstraint(row: {
         return { skip: `'${row.type}' is not in the constraint catalogue (shared/constraintTypes.ts).` };
     }
 
+    /*
+     * A catalogue entry whose proto field has not shipped yet. Skipped, and
+     * named in the report, rather than encoded: the config is assembled with an
+     * `as ConstraintConfig` cast and ts-proto writes only fields it knows, so a
+     * fabricated field name would leave the request with a ConstraintConfig
+     * carrying no params at all — a rule the tenant enabled, weighted, and that
+     * silently never reached the solver. This is the same refusal the
+     * offering-scope branch below makes for the same reason: when the wire
+     * cannot express it, say so, never approximate.
+     */
+    if (!type.wireField) {
+        return {
+            skip: 'The wire has no field for this type yet, so it cannot be sent. '
+                + 'Enabling it has no effect until the proto carries it.',
+        };
+    }
+
     const params = (row.params && typeof row.params === 'object' ? row.params : {}) as Record<string, unknown>;
     const missing = missingConstraintParams(type, params);
 

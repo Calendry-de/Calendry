@@ -50,6 +50,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_high_ranking_rooms',
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
+    'person_preference_fit',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -115,8 +116,24 @@ export type WireConstraintField =
 
 export interface ConstraintTypeDef {
     key: string;
-    /** Which `ConstraintConfig` field this becomes on the wire. */
-    wireField: WireConstraintField;
+    /**
+     * Which `ConstraintConfig` field this becomes on the wire.
+     *
+     * OPTIONAL, for exactly one situation: a type whose catalogue entry lands
+     * before the proto field that carries it. `person_preference_fit` is the
+     * first — the wire field arrives in a later slice, and the alternative was
+     * naming a `ConstraintConfig` field that does not exist. That would not
+     * fail: `toWireConstraint` builds the config with an `as` cast and
+     * ts-proto's encoder writes only fields it knows, so the constraint would
+     * be dropped from the request with nothing reporting it — the tenant sees
+     * a rule that is enabled, weighted, and silently absent from every run.
+     *
+     * A type with no `wireField` is SKIPPED by `toWireConstraint` and named in
+     * the assembly report, which is the same channel offering-scoped rows
+     * already use for "configured, cannot cross". Leave it unset until the
+     * field exists; setting it is what makes the rule live.
+     */
+    wireField?: WireConstraintField;
     label: string;
     /** One sentence, in the tenant's language rather than the schema's. */
     description: string;
@@ -460,6 +477,31 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         evaluator: 'solver',
         severity: 'SOFT',
         defaultWeight: 3,
+        params: [],
+    },
+    {
+        key: 'person_preference_fit',
+        /*
+         * NO `wireField` YET — the proto field lands in the next slice. See the
+         * long note on `wireField` above for why naming a non-existent field
+         * would be worse than skipping: this rule is reported as unable to
+         * cross rather than encoded into nothing.
+         */
+        label: 'Honour personal preferences',
+        description:
+            'Prefer the days and blocks a lecturer has said they would rather teach. '
+            + 'Only lecturers\' preferences count, and a breach is never a defect — this '
+            + 'competes with the other soft rules on weight alone.',
+        evaluator: 'solver',
+        /*
+         * Same architecture as `lecturer_veto`, one severity down: the VALUES
+         * live on the Person (`person_preference`), and this row is the
+         * tenant-level switch plus how much the tenant cares. Hence `params:
+         * []` — there is nothing to configure here that is not either the
+         * weight or somebody's own stated preference.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
         params: [],
     },
 ];

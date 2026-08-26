@@ -22,6 +22,9 @@ import { api, login } from './helpers/client';
  * administrator's own entry is approved on arrival, because queueing it would
  * mean approving your own authorized action.
  */
+/** Pages are fetched directly; the api() helper is for JSON routes. */
+const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
+
 let f: Fixtures;
 
 const LECTURER = 'lecturer-self@test.local';
@@ -359,6 +362,201 @@ describe('preferences', () => {
         });
 
         expect(refused.status).toBe(403);
+    });
+
+    it('REFUSE a weightMultiplier on the self-service path, rather than dropping it', async () => {
+        /*
+         * The one place the two write paths stop being the same operation. A
+         * person raising their own weight is the unilateral escalation that soft
+         * preferences are otherwise free of.
+         *
+         * Asserting a 400 and NOT a silent 200 is the whole point: zod strips
+         * unknown keys, so the accepted-and-discarded behaviour would look
+         * identical to success from the caller's side.
+         */
+        const refused = await api<{ data?: { field?: string } }>('/api/me/preferences', {
+            method: 'PUT',
+            cookie: cookies.lecturer,
+            body: JSON.stringify({ preferredDays: [2], preferredBlocks: [0], weightMultiplier: 2 }),
+        });
+
+        expect(refused.status).toBe(400);
+
+        // And nothing was written, so the refusal is not partial.
+        const row = await ownerDb.personPreference.findFirst({
+            where: { personId: personIds['lecturer-self'] },
+        });
+
+        expect(row?.weightMultiplier ?? null).toBeNull();
+    });
+
+    it('let an administrator set a weightMultiplier inside the clamp', async () => {
+        const set = await api<{ weightMultiplier: number | null }>(
+            '/api/availability/preferences/' + personIds['lecturer-other'],
+            {
+                method: 'PUT',
+                cookie: cookies.reviewer,
+                body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: 1.5 }),
+            },
+        );
+
+        expect(set.status).toBe(200);
+        expect(set.body.weightMultiplier).toBe(1.5);
+
+        const stored = await ownerDb.personPreference.findFirstOrThrow({
+            where: { personId: personIds['lecturer-other'] },
+        });
+
+        expect(stored.weightMultiplier).toBe(1.5);
+    });
+
+    it.each([
+        ['below the floor', 0.4],
+        ['above the ceiling', 2.1],
+    ])('REFUSE a weightMultiplier %s', async (_label, multiplier) => {
+        // Both directions, the same shape as the blocksPerDay boundary checks:
+        // a clamp tested on one side is a clamp half tested.
+        const refused = await api('/api/availability/preferences/' + personIds['lecturer-other'], {
+            method: 'PUT',
+            cookie: cookies.reviewer,
+            body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: multiplier }),
+        });
+
+        expect(refused.status).toBe(400);
+    });
+
+    it('accept the exact clamp boundaries, which are legal values', async () => {
+        for (const multiplier of [0.5, 2]) {
+            const set = await api<{ weightMultiplier: number | null }>(
+                '/api/availability/preferences/' + personIds['lecturer-other'],
+                {
+                    method: 'PUT',
+                    cookie: cookies.reviewer,
+                    body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: multiplier }),
+                },
+            );
+
+            expect(set.status).toBe(200);
+            expect(set.body.weightMultiplier).toBe(multiplier);
+        }
+    });
+
+    it('CLEAR the override when the multiplier is omitted — true replace, not partial update', async () => {
+        const personId = personIds['lecturer-other'];
+
+        await api('/api/availability/preferences/' + personId, {
+            method: 'PUT',
+            cookie: cookies.reviewer,
+            body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: 1.5 }),
+        });
+
+        /*
+         * The same endpoint, the same person, no multiplier in the body. This is
+         * a PUT and replaces the whole preference state, so an absent key means
+         * `null` — NOT "leave it alone". That is why the staff page sends the
+         * multiplier on every save alongside both arrays: were it sent only when
+         * changed, clearing an override would depend on which fields the page
+         * happened to include, and the multiplier would be a partial-update side
+         * channel while everything around it was full-replace.
+         */
+        const replaced = await api<{ weightMultiplier: number | null }>(
+            '/api/availability/preferences/' + personId,
+            {
+                method: 'PUT',
+                cookie: cookies.reviewer,
+                body: JSON.stringify({ preferredDays: [1], preferredBlocks: [] }),
+            },
+        );
+
+        expect(replaced.status).toBe(200);
+        expect(replaced.body.weightMultiplier).toBeNull();
+
+        const stored = await ownerDb.personPreference.findFirstOrThrow({ where: { personId } });
+
+        expect(stored.weightMultiplier).toBeNull();
+    });
+
+    it('CLEAR the override on an explicit null, the way the control\'s "Use default" sends it', async () => {
+        const personId = personIds['lecturer-other'];
+
+        await api('/api/availability/preferences/' + personId, {
+            method: 'PUT',
+            cookie: cookies.reviewer,
+            body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: 2 }),
+        });
+
+        const cleared = await api<{ weightMultiplier: number | null }>(
+            '/api/availability/preferences/' + personId,
+            {
+                method: 'PUT',
+                cookie: cookies.reviewer,
+                body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: null }),
+            },
+        );
+
+        expect(cleared.status).toBe(200);
+        expect(cleared.body.weightMultiplier).toBeNull();
+    });
+
+    it('REACH the rendered staff page, so the value is visible without opening a row', async () => {
+        const personId = personIds['lecturer-other'];
+
+        await api('/api/availability/preferences/' + personId, {
+            method: 'PUT',
+            cookie: cookies.reviewer,
+            body: JSON.stringify({ preferredDays: [2], preferredBlocks: [], weightMultiplier: 1.5 }),
+        });
+
+        /*
+         * Server-rendered, so this proves the whole read path — GET select, the
+         * page's row type, and the summary label — not just that the column
+         * stores a number. The expanded editor cannot be reached over SSR (it
+         * renders behind a click), which is exactly why the override belongs in
+         * the collapsed summary as well as in the control.
+         */
+        const page = await fetch(`${BASE}/manage/availability/preferences`, {
+            headers: { cookie: cookies.reviewer },
+        });
+        const html = await page.text();
+
+        expect(page.status).toBe(200);
+        // Paired with a positive control: "the number is absent" also passes on
+        // a page that failed to render at all.
+        expect(html).toContain('Teaching preferences');
+        expect(html).toContain('counts 1.5×');
+    });
+
+    it('are refused by the DATABASE too, for writes that never reach a handler', async () => {
+        /*
+         * `provision-tenant.ts` and any backfill write with `createMany` and
+         * never pass through a route, so a clamp living only in zod is one a
+         * script can walk around — the same reason
+         * `constraint_weight_non_negative` exists as a CHECK as well as a
+         * refinement. Raw SQL here, deliberately around the application layer.
+         */
+        const personId = personIds['lecturer-other'];
+
+        // Set a KNOWN value first: asserting the row is unchanged afterwards is
+        // only meaningful against a value this test put there, and an earlier
+        // test in this block may have left a different one.
+        await api('/api/availability/preferences/' + personId, {
+            method: 'PUT',
+            cookie: cookies.reviewer,
+            body: JSON.stringify({ preferredDays: [1], preferredBlocks: [], weightMultiplier: 2 }),
+        });
+
+        // Matched by NAME, not merely "it threw": a bare rejects.toThrow() would
+        // pass on a typo in the SQL, on an RLS refusal, or on a missing column —
+        // none of which would prove the clamp is enforced.
+        await expect(ownerDb.$executeRawUnsafe(
+            'UPDATE person_preference SET weight_multiplier = 9 WHERE person_id = $1',
+            personId,
+        )).rejects.toThrow(/person_preference_weight_multiplier_range/);
+
+        // And the row is unchanged, so the CHECK rejected rather than partially applied.
+        const stored = await ownerDb.personPreference.findFirstOrThrow({ where: { personId } });
+
+        expect(stored.weightMultiplier).toBe(2);
     });
 
     it('list EVERY active person, not only those who set something', async () => {

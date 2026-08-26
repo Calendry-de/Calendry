@@ -17,7 +17,34 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * deliberate, temporary, and stated on the page where the data is entered.
  */
 export default defineEventHandler(async (event) => {
-    const body = await readValidatedBody(event, preferencesSchema.parse);
+    const raw = await readBody(event);
+
+    /*
+     * A PERSON MAY NOT SET THEIR OWN PREFERENCE WEIGHT.
+     *
+     * Refused by name, and refused BEFORE parsing, because zod strips unknown
+     * keys: left to the schema this would be accepted with a 200 and silently
+     * dropped, which is the worst of the three possible behaviours — the caller
+     * is told it worked. The administrator path
+     * (`PUT /api/availability/preferences/[personId]`) is where the override
+     * lives.
+     *
+     * This check is deliberately NOT shared with that path. It is the one place
+     * the two endpoints stop being the same operation with different subjects,
+     * and a shared code path with a comment explaining the difference is how
+     * that distinction gets refactored away by someone who reads the code and
+     * not the comment.
+     */
+    if (raw && typeof raw === 'object' && 'weightMultiplier' in raw) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: 'A preference weight can only be set by an administrator. '
+                + 'Send only preferredDays and preferredBlocks.',
+            data: { field: 'weightMultiplier' },
+        });
+    }
+
+    const body = preferencesSchema.parse(raw);
 
     return withRequestTenant(event, async (tx, identity) => {
         await requirePermission(event, tx, 'availability.manage_own');

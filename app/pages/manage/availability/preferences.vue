@@ -90,6 +90,15 @@
                         :readonly="!canEdit"
                     />
 
+                    <AvailabilityWeightMultiplier
+                        v-model="draftMultiplier"
+                        help="Most people should use the default. Raise it where somebody's
+                            constraints are genuinely harder than everyone else's, and remember
+                            it competes with the institution's other soft rules, not with them."
+                        label="How much this person's preference counts"
+                        :readonly="!canEdit"
+                    />
+
                     <div
                         v-if="canEdit"
                         class="people_actions"
@@ -119,6 +128,7 @@
 <script setup lang="ts">
 import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
+import AvailabilityWeightMultiplier from '~/components/availability/AvailabilityWeightMultiplier.vue';
 import ManageShell from '~/components/manage/ManageShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { describePreferences } from '~/utils/availabilityLabels';
@@ -150,7 +160,11 @@ interface PersonRow {
     givenName: string;
     familyName: string;
     roles: string[];
-    preference: { preferredDays: number[]; preferredBlocks: number[] } | null;
+    preference: {
+        preferredDays: number[];
+        preferredBlocks: number[];
+        weightMultiplier: number | null;
+    } | null;
 }
 
 const request = useRequestFetch();
@@ -168,6 +182,7 @@ const canEdit = useHasPermission('availability.manage_any');
 const open = ref<string | null>(null);
 const draftDays = ref<number[]>([]);
 const draftBlocks = ref<number[]>([]);
+const draftMultiplier = ref<number | null>(null);
 const busy = ref(false);
 const error = ref('');
 
@@ -181,6 +196,9 @@ watch(open, (personId) => {
 
     draftDays.value = [...(person?.preference?.preferredDays ?? [])];
     draftBlocks.value = [...(person?.preference?.preferredBlocks ?? [])];
+    // `null` is the real default state, and a person with no preference row at
+    // all is also on the default — both seed the same way.
+    draftMultiplier.value = person?.preference?.weightMultiplier ?? null;
     error.value = '';
 });
 
@@ -189,9 +207,20 @@ async function save(personId: string) {
     error.value = '';
 
     try {
+        /*
+         * The whole state, every time. This endpoint is a true replace — an
+         * absent `weightMultiplier` means `null`, not "leave it alone" — so
+         * sending it only when it changed would make it a partial-update side
+         * channel while the two arrays stay full-replace, and clearing an
+         * override would depend on which fields the page happened to include.
+         */
         await request(`/api/availability/preferences/${personId}`, {
             method: 'PUT',
-            body: { preferredDays: draftDays.value, preferredBlocks: draftBlocks.value },
+            body: {
+                preferredDays: draftDays.value,
+                preferredBlocks: draftBlocks.value,
+                weightMultiplier: draftMultiplier.value,
+            },
         });
 
         await refresh();
