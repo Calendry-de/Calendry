@@ -36,14 +36,17 @@ What exists today, verified against the code rather than the entry:
 | Shared types + labels | **built** | `shared/availability.ts`, `app/utils/availabilityLabels.ts` |
 | Self-service UI | **built** | `app/pages/my/preferences.vue` |
 | Staff UI | **built** | `app/pages/manage/availability/preferences.vue` |
-| Constraint catalogue entry | **absent** | no `person_preference_fit` in `shared/constraintTypes.ts` |
-| Wire field | **absent** | `Person` message has no preference field |
-| Solver evaluator | **absent** | no `preferred` anywhere in `crates/` |
+| Constraint catalogue entry | **built** (stage 2) | `person_preference_fit`, SOFT, off by default, `wireField` deliberately unset so it SKIPS |
+| Weight override column | **built** (stage 2) | `person_preference.weight_multiplier`, clamped `[0.5, 2.0]` by zod, a CHECK, and the staff UI |
+| Wire field | **on the wire, NOT populated** | `Person.preferred` (5), `Preference`, `PersonPreferenceFit` (27) exist as of proto `v0.7.0`. `assembleSolverInput` does not write them — that is stage 4 |
+| Solver evaluator | **compiles, explicitly REFUSES** | `convert.rs` returns `Status::unimplemented` for `PersonPreferenceFit`. Not a no-op: the exhaustive match made a silent omission impossible, so the branch is a deliberate refusal, matching `LockPolicy::MINIMIZE_MOVEMENT`. A real evaluator is stage 5 |
 
-So the remaining work is **exactly three artifacts**: a catalogue type, a proto
-field, and a solver evaluator. That is a much narrower problem than the backlog
-entry describes, and it is already scoped by the schema's own comment on
-`PersonPreference`:
+So the remaining work was **exactly three artifacts**: a catalogue type, a proto
+field, and a solver evaluator. Two of the three now exist — the catalogue entry
+(stage 2) and the wire field (stage 3, proto `v0.7.0`) — leaving the evaluator,
+plus the assembly step that populates the field. That was already a much
+narrower problem than the backlog entry described, and it was scoped by the
+schema's own comment on `PersonPreference`:
 
 > STORED BUT NOT YET SOLVER-EFFECTIVE. Nothing reads this into `SolverInput`,
 > because the wire has no field for it: `Person.preferred_days` /
@@ -804,14 +807,15 @@ normalise. Revisiting §4.2 therefore reopens §4, not just §6.
 Analogous to the solver's own Stage 1–7 plan, and deliberately marked proposed:
 this has had no build session.
 
-**Stage 1 is closed (2026-08-26).** Stages 2–7 have had no build session and
-stay proposed.
+**Stages 1–3 are closed (2026-08-26).** Stage 3's tag exists but is NOT yet
+published to GitHub Packages, so the app still resolves `0.5.0` — see the stage
+rows. Stages 4–7 have had no build session and stay proposed.
 
 | Stage | Scope | Gate |
 |---|---|---|
 | ~~1~~ | **DONE, 2026-08-26.** Decisions taken: §2 additive; §4 tenant default with a per-person multiplier clamped to `[0.5, 2.0]`; §4.1 lecturers only; §4.2 raw per-placement; §1 widen the row, with a room-type kind next. Two follow-ups fall out of it and belong to stage 2/3 rather than here: write the additive semantics into the `PersonPreference` schema comment, and decide keys-vs-join-table for the room-type kind. | passed |
-| 2 | App catalogue: `person_preference_fit`, SOFT, `evaluator: 'solver'`, off by default. Renders in `ManageConstraintGrid` as a soft row with a weight, inert until stage 5. **Plus** the `weight_multiplier` column, its CHECK, clamp validation on the staff write path only, and the additive-semantics schema comment. | Catalogue tests, constraint-defaults test, a test that the self-service path REFUSES a multiplier |
-| 3 | `calendry-proto` `0.7.0`: `Person.preferred` (field 5), `Preference` incl. `optional double weight_multiplier`, `PersonPreferenceFit` (field 27). Tag, publish, bump `package.json` to `^0.7.0`, move the solver submodule pin to the tag. | `buf breaking` green; old-peer encode/decode check like the `invert` bump |
+| ~~2~~ | **DONE, 2026-08-26.** Catalogue entry (SOFT, off by default, `wireField` unset so it skips), the `weight_multiplier` column + CHECK + staff-only clamp validation, the additive-semantics schema comment, and the staff UI control. Two tests falsified rather than trusted. | passed |
+| ~~3~~ | **DONE except publication, 2026-08-26.** `Person.preferred` (5), `Preference` with `optional double weight_multiplier`, `PersonPreferenceFit` (27); tagged `v0.7.0`; solver pin moved and its `convert.rs` given an explicit `Status::unimplemented` branch, because the exhaustive match made "present but unread" impossible. **NOT PUSHED / NOT PUBLISHED** — the app therefore still resolves `0.5.0`, and `package.json` is deliberately left at `^0.5.0` because `^0.7.0` fails `bun install` outright until the registry has it. | `buf lint` + `buf breaking` clean and falsified two ways; 12-assertion old-peer wire check; solver `cargo build`/`clippy`/`test` (102) green |
 | 4 | `assembleSolverInput` reads `person_preference` for the Persons it already sends, and **reports counts in its report** the way the equipment-quantity gap and the multi-room gap do. Two DISTINCT counts, not one: (a) preferences that cannot cross the wire, so nothing is silently dropped; (b) **placements with no preference signal at all** — empty counted-lecturer set, or every counted lecturer having no stated preference — so an enabled-but-inert rule is visible. See the gate note below. | Assembly test; a wire assertion that a preference reaches the request; **an assertion that both counts are reported, including a fixture where (b) is non-zero** |
 | 5 | Solver: `SoftParams::PersonPreferenceFit`, the `pref_cost[placement][day][block]` table, integration into `soft`, drift-assertion coverage. | `cargo test`; the incremental-objective drift assertion; **plus the mean-not-sum test below** |
 | 6 | **Prove it fires.** A falsification test (rule disabled ⇒ identical placements; enabled ⇒ different) plus a real solve showing placements move toward preferred blocks at the configured weight. | Follows the calendar-period precedent: a probe period, then a solve at the *original* weight |
