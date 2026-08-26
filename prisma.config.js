@@ -1,16 +1,9 @@
 import { existsSync } from "node:fs";
 import { defineConfig } from "prisma/config";
 
-// dotenv is a HOST convenience, not a runtime dependency, and this used to be a
-// static `import "dotenv/config"` — which meant the production image could not
-// boot at all. The runner stage carries no application node_modules, so
-// `prisma migrate deploy` died on the config's first line with "Cannot find
-// module 'dotenv/config'" before it ever reached the database.
-//
-// In a container the environment is injected by compose; on a host it comes from
-// .env and dotenv is present. Optional in exactly the shape that difference has.
-// Awaited here rather than at the top of the file so the static imports stay
-// first, and resolved before the config object below reads process.env.
+// Optional: the runtime image has no application node_modules, so a static
+// import here made `prisma migrate deploy` fail before reaching the database.
+// A container gets its environment from compose; a host has .env and dotenv.
 try {
   await import("dotenv/config");
 } catch {

@@ -1652,72 +1652,63 @@ The order matters, and each step depends on the one before it.
 4. start the app
 ```
 
-### The production image: verified, and the five things that blocked it
+### The production image: verified 2026-08-26, after five blockers
 
-**`ghcr.io/mindcollaps/calendry` had never been built or booted before
-2026-08-26.** `.config/Dockerfile` said so in its own comment. Building it turned
-up five separate blockers, in the order they fire — each one worth knowing
-because each was invisible until the one before it was fixed:
+`ghcr.io/mindcollaps/calendry` had never been built or booted before. Each
+blocker was invisible until the previous one was fixed:
 
 1. **`docker build` could not read its own context.** `docker-compose.dev.yml`
-   bind-mounts `./db/` as the PostgreSQL data directory, so the moment anyone
-   runs the dev stack the repo root holds a root-owned directory and every
-   subsequent build dies with `error from sender: open db: permission denied`.
-   `.dockerignore` now excludes it — along with `vendor/` (1.5 GB, of which
-   1.4 GB is the solver's Rust `target/`) and `.output`.
-2. **`COPY .config/wordlists` had no source.** A template leftover; nothing in
-   the repo references a wordlist. Removed.
+   bind-mounts `./db/` as the Postgres data directory, so once the dev stack has
+   run, the repo root holds a root-owned directory and every build dies with
+   `error from sender: open db: permission denied`. Now in `.dockerignore`, with
+   `vendor/` (1.5 GB, mostly the solver's Rust `target/`) and `.output`.
+2. **`COPY .config/wordlists` had no source** — a template leftover.
 3. **`prisma.config.js` imported `dotenv/config` unconditionally**, and the
-   runner stage has no application `node_modules`, so `migrate deploy` failed on
-   the config's first line. The import is now optional — a host has dotenv and a
-   `.env`; a container has its environment injected by compose.
-4. **`npm install -g prisma` cannot satisfy `prisma.config.js`.** The config
-   sits in `/app` and imports `prisma/config`, which a global install does not
-   resolve. Cherry-picking `node_modules/prisma` + `@prisma` out of the builder
-   fails too: `@prisma/config` needs `effect`, outside the `@prisma` scope. The
-   toolchain is now installed in the runner against a **generated minimal
-   manifest** carrying only `prisma`, `@prisma/client` and `@prisma/adapter-pg`
-   at the ranges `package.json` declares — installing against the real manifest
-   resolves the whole application graph and fails on a nitro/vite peer conflict.
-   Keep `type: module` in that generated manifest: `prisma.config.js` is ESM with
-   a top-level await, and node parses it as CommonJS without it.
-5. **`prisma db seed` runs `bun run prisma/seed.ts`, and the runner is a node
-   image.** The bun binary is copied in from `oven/bun:1-alpine`. The
-   alternative was a node-shaped seed command for the image only — a second
-   definition of the seed that could drift from the one every developer runs.
-   The seed also reaches outside `prisma/` (`shared/permissions`,
-   `scripts/lib/ownerDatabaseUrl`), so both are now in the image.
+   runner has no application `node_modules`, so `migrate deploy` failed on the
+   config's first line. Now optional.
+4. **`npm install -g prisma` cannot satisfy `prisma.config.js`'s
+   `import "prisma/config"`**, and cherry-picking `node_modules/@prisma` out of
+   the builder misses transitive deps (`effect`). The toolchain is installed in
+   the runner against a *generated minimal manifest* — installing against the
+   real `package.json` resolves the whole app graph and fails on a nitro/vite
+   peer conflict. Keep `type: module` in it, or node parses the ESM config as
+   CommonJS.
+5. **`prisma db seed` runs `bun`, and the runner is a node image.** The bun
+   binary is copied from `oven/bun:1-alpine`; the alternative was a second,
+   node-shaped seed command that could drift from the one developers run. The
+   seed also imports `shared/permissions` and `scripts/lib/ownerDatabaseUrl`,
+   so both ship in the image.
 
-**Verified end to end**, not reasoned about: against a throwaway Postgres with
-`.config/db-init` mounted, the container ran `migrate deploy`, seeded **56
-permission rows**, started Nitro, and answered `/health` 200 and `/` 200. Nothing
-resembling that had ever run before.
+Verified against a throwaway Postgres with `.config/db-init` mounted: migrations
+ran, **56 permission rows** seeded, `/health` 200 and `/` 200. The runner is
+`node:22-alpine` because a Prisma 7 dependency declares `node >=22`.
 
-The registry credential reaches the build as a **BuildKit secret** mounted at
-`/root/.bunfig.toml` — `HOME` really is `/root` in `oven/bun:1-alpine`, checked
-rather than assumed. `docker history` on the built image contains no token, and a
-filesystem scan of `/app`, `/root` and `/home` finds none.
+The registry credential reaches the build as a BuildKit secret at
+`/root/.bunfig.toml` (`HOME` is `/root` in `oven/bun:1-alpine`, checked). No
+token appears in `docker history` or the image filesystem.
 
-### CI: two workflows, one per image
+### CI
 
-`.github/workflows/docker.yml` here builds and publishes the app image; the
-solver repo has its own for `ghcr.io/mindcollaps/calendry-solver`. Both publish
-`latest` **only from a semver tag**, never from `main` — `docker-compose.yml`
-pins `:latest`, so a branch-tracking `latest` would put an unreviewed commit into
-a production `docker compose pull`.
+Both workflows follow the pattern already used in `MindCollaps/KIK`:
+`REGISTRY`/`IMAGE_NAME` from `github.repository`, `push` gated on
+`event_name != 'pull_request'`, `latest` on the default branch, GHA cache. The
+solver repo has its own for `ghcr.io/mindcollaps/calendry-solver` and checks out
+`submodules: recursive` — `crates/proto/build.rs` compiles
+`vendor/calendry-proto/proto`, a submodule of a submodule.
 
-The app workflow's smoke job brings up the real `docker-compose.yml` and asserts
-`/health` **and** that the `permission` table is non-empty. The healthcheck alone
-cannot see the seed step, and a migrated-but-unseeded database is deliberately
-unusable — so a green healthcheck over an empty catalogue is exactly the silent
-half-success this file keeps warning about. It names `db` and `calendry-app`
-rather than running a bare `up`, because the solver service pulls a separately
-published image whose absence would fail a job that is testing the app.
+Two things worth not rediscovering:
 
-**`PACKAGES_READ_TOKEN` must be a CLASSIC PAT with `read:packages`.** GitHub
-Packages' npm registry refuses fine-grained tokens — see "Installing the proto
-package: three traps". `GITHUB_TOKEN` is the fallback and works only if the proto
-package grants the calendry repository read access.
+- **`secret-files`, not `secrets`.** `secrets` takes `<id>=<inline value>`, so
+  `id=bunfig,src=/path` was passed through as an id literally named `id`. The
+  mount resolved to nothing and `bun install` failed with an opaque 401 six
+  layers in.
+- **`PACKAGES_READ_TOKEN` must be a classic PAT** with `read:packages`; the
+  registry refuses fine-grained tokens. The workflow probes the registry before
+  building so a bad token fails by name.
+
+The app workflow's smoke step brings up the real `docker-compose.yml` and asserts
+both `/health` and a non-empty `permission` table — the healthcheck cannot see
+the seed step, and a migrated-but-unseeded database is deliberately unusable.
 
 - **Local:** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db`,
   then `bun run db-seed`, then `bun run provision:tenant -- --slug … --name … --admin-email … --admin-name …`.

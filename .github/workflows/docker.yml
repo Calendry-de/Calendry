@@ -1,52 +1,15 @@
-name: docker
+name: Build Docker image
 
-# Builds the production application image and publishes it to GHCR under the
-# name `docker-compose.yml` already expects: ghcr.io/mindcollaps/calendry.
-#
-# WHAT THIS WORKFLOW HAS TO GET RIGHT, and none of it is incidental:
-#
-#   1. THE REGISTRY TOKEN NEVER TOUCHES A LAYER. `bun install` needs a
-#      GitHub Packages credential to fetch @mindcollaps/calendry-proto, and an
-#      ARG would be recorded in the image history where `docker history` prints
-#      it — on an image published to a registry. It arrives as a BuildKit
-#      secret mounted at /root/.bunfig.toml, which leaves nothing behind.
-#
-#   2. A PUSHED IMAGE IS PROVEN TO BOOT. Compiling is not the same as running:
-#      this image's entrypoint runs `prisma migrate deploy` and `prisma db seed`
-#      before starting Nitro, and a freshly migrated database is deliberately
-#      unusable until the seed lands (CLAUDE.md, "Migrations are schema-only").
-#      So the smoke job brings the real docker-compose.yml up against the built
-#      image and waits for /health. A green build with a broken entrypoint is
-#      exactly the failure this repo keeps writing rules against.
-#
-#   3. PULL REQUESTS BUILD BUT DO NOT PUBLISH. A fork's PR cannot be handed
-#      package-write scope, and a PR image nobody deploys is noise in the
-#      registry.
 on:
   push:
     branches: [main]
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    tags: ["v*"]
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      push_image:
-        description: 'Publish the image to GHCR (off = build and smoke-test only)'
-        type: boolean
-        default: false
-
-# Least privilege by default; the publish job widens `packages` for itself.
-permissions:
-  contents: read
-
-concurrency:
-  # One run per ref. A superseded push has nothing worth finishing, EXCEPT on a
-  # tag: cancelling a release build half way leaves a tag with no image.
-  group: docker-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
-  IMAGE: ghcr.io/mindcollaps/calendry
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build:
@@ -55,170 +18,86 @@ jobs:
       contents: read
       packages: write
 
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-      pushed: ${{ steps.mode.outputs.push }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Decide whether this run publishes
-        id: mode
-        run: |
-          set -euo pipefail
-
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            PUSH=false
-          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            PUSH="${{ inputs.push_image }}"
-          else
-            PUSH=true
-          fi
-
-          echo "push=$PUSH" >> "$GITHUB_OUTPUT"
-          echo "::notice::event=${GITHUB_EVENT_NAME} push=$PUSH"
-
-      # The credential is assembled here rather than committed, and written to a
-      # path outside the build context so `COPY . .` in the builder cannot
-      # capture it even if .dockerignore were edited.
-      #
-      # PACKAGES_READ_TOKEN must be a CLASSIC PAT with `read:packages`. This is
-      # not a preference: GitHub Packages' npm registry REFUSES fine-grained
-      # (`github_pat_…`) tokens with `permission_denied: does not match expected
-      # scopes`, while the same token authenticates fine against api.github.com
-      # — see CLAUDE.md, "Installing the proto package: three traps".
-      #
-      # GITHUB_TOKEN is the fallback and works only if the proto package grants
-      # this repository read access; a user-scoped package published from
-      # another repo does not by default, which is why the secret exists.
-      - name: Write the registry credential
+      # bun install fetches @mindcollaps/calendry-proto from GitHub Packages.https://github.com/MindCollaps/KIK
+      # PACKAGES_READ_TOKEN must be a CLASSIC PAT with read:packages — the
+      # registry refuses fine-grained tokens. Written outside the build context
+      # and passed as a BuildKit secret so it never lands in a layer.
+      - name: Write registry credential
         env:
           PACKAGES_TOKEN: ${{ secrets.PACKAGES_READ_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           umask 077
+          install -d "${RUNNER_TEMP}/registry"
+          printf '[install.scopes]\n"@mindcollaps" = { token = "%s", url = "https://npm.pkg.github.com/" }\n' \
+            "${PACKAGES_TOKEN}" > "${RUNNER_TEMP}/registry/bunfig.toml"
 
-          if [ -z "${PACKAGES_TOKEN}" ]; then
-            echo "::error::no token available for GitHub Packages — set the PACKAGES_READ_TOKEN secret (classic PAT, read:packages)"
+          STATUS="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
+            https://npm.pkg.github.com/@mindcollaps%2fcalendry-proto || echo 000)"
+
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::registry rejected the token (HTTP ${STATUS}). Set PACKAGES_READ_TOKEN to a classic PAT with read:packages."
             exit 1
           fi
 
-          # A scope token is only sent when the SAME entry declares `url`.
-          # `{ token = "…" }` alone is silently ignored and produces an opaque
-          # 401 — the first of the three traps in CLAUDE.md.
-          install -d "${RUNNER_TEMP}/registry"
-          cat > "${RUNNER_TEMP}/registry/bunfig.toml" <<'BUNFIG'
-          [install.scopes]
-          "@mindcollaps" = { token = "$PACKAGES_TOKEN", url = "https://npm.pkg.github.com/" }
-          BUNFIG
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          # Written with the literal placeholder above, then substituted, so the
-          # token is never a shell word that could land in a trace.
-          python3 - "$RUNNER_TEMP/registry/bunfig.toml" <<'PY'
-          import os, sys, pathlib
-          p = pathlib.Path(sys.argv[1])
-          p.write_text(p.read_text().replace('$PACKAGES_TOKEN', os.environ['PACKAGES_TOKEN']))
-          PY
-
-          echo "::add-mask::${PACKAGES_TOKEN}"
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        if: steps.mode.outputs.push == 'true'
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # `latest` follows semver TAGS only, never main. A moving `latest` that
-      # tracks a branch is how an unreviewed commit reaches a production
-      # `docker compose pull`, and docker-compose.yml pins `:latest`.
-      - name: Derive image tags
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=ref,event=branch
             type=ref,event=pr
-            type=sha,format=long
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
-          labels: |
-            org.opencontainers.image.title=Calendry
-            org.opencontainers.image.description=Multi-tenant calendar/timetabling platform for schools and universities
+            type=semver,pattern={{version}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           file: .config/Dockerfile
-          # amd64 only, deliberately. Nothing in this stack needs arm64, and
-          # cross-building a Nuxt bundle under QEMU roughly triples the job for
-          # an artifact nobody pulls. Add `linux/arm64` here when a deploy
-          # target actually needs it — the Dockerfile is architecture-neutral.
-          platforms: linux/amd64
-          push: ${{ steps.mode.outputs.push == 'true' }}
-          # `load` so the smoke job can run the exact image that was built,
-          # rather than a rebuild that might differ.
-          load: ${{ steps.mode.outputs.push != 'true' }}
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          secrets: |
-            id=bunfig,src=${{ runner.temp }}/registry/bunfig.toml
+          # secret-files, not secrets: the latter takes inline values, so a
+          # path there is passed through as a literal string.
+          secret-files: |
+            bunfig=${{ runner.temp }}/registry/bunfig.toml
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: true
-          sbom: true
 
-      - name: Save the image for the smoke job
+      # The entrypoint runs migrate deploy + db seed before Nitro starts, and a
+      # migrated-but-unseeded database is unusable. The healthcheck cannot see
+      # the seed, so the permission count is asserted separately.
+      - name: Smoke test via docker-compose
         run: |
           set -euo pipefail
           FIRST_TAG="$(printf '%s\n' '${{ steps.meta.outputs.tags }}' | head -n1)"
 
-          if [ "${{ steps.mode.outputs.push }}" = "true" ]; then
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
             docker pull "$FIRST_TAG"
           fi
 
-          docker tag "$FIRST_TAG" calendry:ci
-          docker save calendry:ci -o "${RUNNER_TEMP}/calendry-ci.tar"
+          docker tag "$FIRST_TAG" ghcr.io/mindcollaps/calendry:latest
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: calendry-image
-          path: ${{ runner.temp }}/calendry-ci.tar
-          retention-days: 1
-
-  # Does the thing actually run? Brought up through the real
-  # docker-compose.yml, so the file that ships is the file that is tested.
-  smoke:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: calendry-image
-          path: ${{ runner.temp }}
-
-      - name: Load the built image under the name compose expects
-        run: |
-          set -euo pipefail
-          docker load -i "${RUNNER_TEMP}/calendry-ci.tar"
-          docker tag calendry:ci ghcr.io/mindcollaps/calendry:latest
-
-      # Compose reads .env for both the database role passwords and the app's
-      # connection strings. Generated rather than committed: these are throwaway
-      # credentials for one job, and .env is gitignored for good reason.
-      - name: Generate a throwaway .env
-        run: |
-          set -euo pipefail
           OWNER_PW="$(openssl rand -hex 16)"
           APP_PW="$(openssl rand -hex 16)"
 
@@ -235,56 +114,23 @@ jobs:
           CALENDRY_SESSION_SWEEP=off
           ENV
 
-      # `db` and `calendry-app` by name, NOT a bare `up`: the solver service
-      # pulls a separately published image, and a missing or stale solver tag
-      # would fail a job that is testing the application image. The app does not
-      # need the solver to boot or to answer /health — the poller is off, and an
-      # unreachable solver is a handled state (Stage 4: a poll failure is
-      # deliberately not a run failure).
-      - name: Bring up the database and the app
-        run: docker compose -f docker-compose.yml up -d db calendry-app
+          # db and calendry-app by name: the solver service pulls a separately
+          # published image and is not needed for the app to boot.
+          docker compose -f docker-compose.yml up -d db calendry-app
 
-      - name: Wait for the app to report healthy
-        run: |
-          set -euo pipefail
-
-          for attempt in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             STATE="$(docker inspect -f '{{ .State.Health.Status }}' calendry-app 2>/dev/null || echo starting)"
-
-            if [ "$STATE" = "healthy" ]; then
-              echo "::notice::healthy after ${attempt}0s at most"
-              exit 0
-            fi
-
-            if [ "$STATE" = "unhealthy" ]; then
-              echo "::error::container reported unhealthy"
-              exit 1
-            fi
-
+            [ "$STATE" = "healthy" ] && break
+            [ "$STATE" = "unhealthy" ] && { echo "::error::container unhealthy"; exit 1; }
             sleep 5
           done
 
-          echo "::error::app never became healthy"
-          exit 1
+          [ "$STATE" = "healthy" ] || { echo "::error::app never became healthy"; exit 1; }
 
-      # The healthcheck runs INSIDE the container, so it proves Nitro answers on
-      # loopback. This proves the migration and seed steps in the entrypoint
-      # actually completed, which is the part a healthcheck cannot see: the
-      # permission catalogue is seeded by `prisma db seed`, and an empty
-      # `permission` table is the documented, deliberate failure mode of a
-      # migrated-but-unseeded database.
-      - name: Assert the reference data was seeded
-        run: |
-          set -euo pipefail
           COUNT="$(docker compose -f docker-compose.yml exec -T db \
             psql -U calendry -d calendrydb -tAc 'select count(*) from permission')"
-
           echo "permission rows: ${COUNT}"
-
-          if [ "${COUNT}" -lt 1 ]; then
-            echo "::error::the permission catalogue is empty — migrate deploy ran but db seed did not"
-            exit 1
-          fi
+          [ "${COUNT}" -ge 1 ] || { echo "::error::permission catalogue empty — db seed did not run"; exit 1; }
 
       - name: Logs on failure
         if: failure()
