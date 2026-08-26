@@ -200,7 +200,7 @@ const slotLabel = (placement: Placement) => (
     + `${blockTime(props.grid, placement.blockIndex, placement.dayOfWeek).start}`
 );
 
-const { rows, rowSpan, dayDiffers, cssVars } = useGridGeometry(
+const { rows, rowSpan, bandWithin, dayDiffers, cssVars } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );
@@ -257,7 +257,12 @@ const slots = computed(() => {
     return props.grid.activeDays.flatMap((day, index) => clusterSlots(
         entries.filter((entry) => entry.at.dayOfWeek === day),
         (entry) => ({ key: entry.key, start: entry.at.blockIndex, span: entry.at.durationBlocks }),
-        { column: String(index + 2), rowSpan, dayKey: day },
+        {
+        column: String(index + 2),
+        rowSpan,
+        band: (start, span) => bandWithin(day, start, span),
+        dayKey: day,
+    },
     ).map((slot) => ({
         ...slot,
         items: slot.items.map((entry) => views.get(entry.key)!),

@@ -1,7 +1,7 @@
 import type { Ref } from 'vue';
 import { blockTime, packSpans } from '~/composables/schedule';
 import type { TimeGrid } from '~/composables/schedule';
-import { blockBoundaries, gapsOfDay } from '#shared/timeGrid';
+import { blockBoundaries, blockSpan, gapsOfDay } from '#shared/timeGrid';
 
 /**
  * The row structure a week grid is drawn on: one row per block, one per break.
@@ -42,8 +42,25 @@ import { blockBoundaries, gapsOfDay } from '#shared/timeGrid';
  */
 
 export type GridRow =
-    | { kind: 'block'; index: number; line: number; start: string; end: string }
-    | { kind: 'gap'; index: number; line: number; minutes: number; label: string | null };
+    | {
+        kind: 'block';
+        index: number;
+        line: number;
+        start: string;
+        end: string;
+        /** True duration, so the row's minimum height is proportional to it. */
+        minutes: number;
+        /** Minute-since-midnight this row opens at, on the shared timeline. */
+        from: number;
+    }
+    | {
+        kind: 'gap';
+        index: number;
+        line: number;
+        minutes: number;
+        label: string | null;
+        from: number;
+    };
 
 export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     /**
@@ -60,12 +77,28 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         let line = 2;
 
         for (let index = 0; index < grid.value.blocksPerDay; index++) {
-            out.push({ kind: 'block', index, line: line++, ...blockTime(grid.value, index, null) });
+            const span = blockSpan(grid.value, index, null);
+
+            out.push({
+                kind: 'block',
+                index,
+                line: line++,
+                minutes: span.end - span.start,
+                from: span.start,
+                ...blockTime(grid.value, index, null),
+            });
 
             const gap = gapAfter.get(index);
 
             if (gap) {
-                out.push({ kind: 'gap', index, line: line++, minutes: gap.minutes, label: gap.label });
+                out.push({
+                    kind: 'gap',
+                    index,
+                    line: line++,
+                    minutes: gap.minutes,
+                    label: gap.label,
+                    from: span.end,
+                });
             }
         }
 
@@ -87,13 +120,29 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     const lineOf = (blockIndex: number) => blockLines.value.get(blockIndex) ?? 2;
 
     /**
-     * A block row is AT LEAST the density the reader chose and grows past it
-     * when its fullest day needs more. A break row is sized to its own label.
-     * Emitted as an inline style because the row count is data: `blocksPerDay`
-     * and the tenant's break rows decide it.
+     * Pixels per minute, anchored so a BLOCK is exactly the height the density
+     * control asks for. Everything else — breaks, and the position of anything
+     * inside a row — is measured against the same scale.
+     */
+    const perMinute = computed(() => rowHeight.value / Math.max(1, grid.value.blockLengthMinutes));
+
+    /**
+     * EVERY ROW'S MINIMUM IS ITS TRUE DURATION; every row may grow past it.
+     *
+     * `minmax(<true minutes>, auto)` is the whole compromise in one line. The
+     * minimum keeps the picture proportional — a 45-minute break is 45 minutes
+     * tall next to a 195-minute block — and `auto` lets a row that cannot fit
+     * its contents at that size take what it needs, which is what stopped
+     * crowded slots overflowing into the row below.
+     *
+     * The rows previously read `minmax(var(--row-height), auto)` for blocks and
+     * `min-content` for breaks, which was correct only because every block on
+     * this grid is the same length. It stated the density setting, not a
+     * duration, so a break was as tall as its label rather than as long as it
+     * lasts, and a grid whose blocks ever differed would have drawn them equal.
      */
     const gridTemplateRows = computed(() => ['auto', ...rows.value.map((row) => (
-        row.kind === 'block' ? 'minmax(var(--row-height), auto)' : 'min-content'
+        `minmax(${(row.minutes * perMinute.value).toFixed(2)}px, auto)`
     ))].join(' '));
 
     /** The grid rows something occupies, counting any break rows it spans. */
@@ -122,13 +171,54 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         ));
     }
 
+    /**
+     * Where something sits inside the rows it spans, in PIXELS at a constant
+     * minute scale.
+     *
+     * WHY PIXELS AND NOT PERCENTAGES OF THE ROW
+     * -----------------------------------------
+     * A percentage resolves against the row's real height, so when one column's
+     * cluster made a row taller, every band in every OTHER column stretched with
+     * it — a lone session in a quiet day rendered as tall as the crowded day
+     * beside it, filling its whole block with one line of text in it. Worse, it
+     * meant a minute was worth more pixels in a busy row than a quiet one, which
+     * is the opposite of minute-accurate.
+     *
+     * At a constant `perMinute`, an hour is the same height everywhere on the
+     * grid. A row that grew simply has empty space under its shorter columns, which
+     * is the honest picture: that time is free.
+     *
+     * The unit is MINUTES, not block indices, so an off-block start needs no
+     * layout change — only a model that can express it. Today `blockSpan()` puts
+     * every Session on a boundary and this returns an offset of 0.
+     */
+    function bandWithin(
+        day: number | null,
+        start: number,
+        span: number,
+        fromMinute?: number,
+        toMinute?: number,
+    ): { marginTop: string; minHeight: string } {
+        const first = blockSpan(grid.value, start, day);
+        const last = blockSpan(grid.value, start + Math.max(1, span) - 1, day);
+        const from = fromMinute ?? first.start;
+        const to = toMinute ?? last.end;
+        const ppm = perMinute.value;
+
+        return {
+            marginTop: `${Math.max(0, (from - first.start) * ppm).toFixed(2)}px`,
+            minHeight: `${Math.max(0, (to - from) * ppm).toFixed(2)}px`,
+        };
+    }
+
     const cssVars = computed(() => ({
         '--day-count': String(grid.value.activeDays.length),
         '--row-height': `${rowHeight.value}px`,
+        '--per-minute': String(perMinute.value),
         gridTemplateRows: gridTemplateRows.value,
     }));
 
-    return { rows, lineOf, rowSpan, gridTemplateRows, dayDiffers, cssVars };
+    return { rows, lineOf, rowSpan, bandWithin, gridTemplateRows, dayDiffers, cssVars, perMinute };
 }
 
 export interface GridSlot<T> {
@@ -137,6 +227,14 @@ export interface GridSlot<T> {
     /** Crowded: one full-width slot, every member on a single compact line. */
     compact: boolean;
     style: Record<string, string>;
+}
+
+export interface SlotPlacement {
+    column: string;
+    rowSpan: (start: number, span: number) => string;
+    /** Minute-true offset and minimum extent within the spanned rows. */
+    band: (start: number, span: number) => { marginTop: string; minHeight: string };
+    dayKey: string | number;
 }
 
 /**
@@ -171,7 +269,7 @@ export const FAN_LIMIT = 3;
 export function clusterSlots<T>(
     items: T[],
     read: (item: T) => { key: string; start: number; span: number },
-    place: { column: string; rowSpan: (start: number, span: number) => string; dayKey: string | number },
+    place: SlotPlacement,
     fanLimit: number = FAN_LIMIT,
 ): GridSlot<T>[] {
     const packed = packSpans(items, read);
@@ -202,6 +300,7 @@ export function clusterSlots<T>(
                     style: {
                         gridRow: place.rowSpan(span.start, span.span),
                         gridColumn: place.column,
+                        ...place.band(span.start, span.span),
                         width: `${width}%`,
                         marginLeft: `${column * width}%`,
                     },
@@ -233,6 +332,7 @@ export function clusterSlots<T>(
             style: {
                 gridRow: place.rowSpan(first.start, end - first.start),
                 gridColumn: place.column,
+                ...place.band(first.start, end - first.start),
                 width: '100%',
                 marginLeft: '0%',
             },

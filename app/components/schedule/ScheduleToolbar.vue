@@ -1,5 +1,8 @@
 <template>
-    <header class="bar">
+    <section
+        class="bar"
+        aria-label="Filters and schedule actions"
+    >
         <div class="bar_group">
             <label class="bar_field">
                 <span>Term</span>
@@ -7,10 +10,22 @@
                     v-model="termIdModel"
                     class="bar_select"
                 >
+                    <!--
+                        `:selected` explicitly, and not for symmetry.
+
+                        `filters.termId` is `ref('')` seeded by a watchEffect
+                        that Vue never flushes during SSR, so this select emitted
+                        no `selected` attribute at all and the browser fell back
+                        to option 1. That is the right term TODAY only because
+                        `resolvedTermId` also falls back to `terms[0]` — the
+                        displayed term and the fetched term agree by coincidence
+                        of ordering rather than by binding.
+                    -->
                     <option
                         v-for="term in terms"
                         :key="term.id"
                         :value="term.id"
+                        :selected="term.id === (termIdModel || terms[0]?.id)"
                     >{{ term.name }}</option>
                 </select>
             </label>
@@ -171,7 +186,7 @@
                 {{ violationCount }} violation{{ violationCount === 1 ? '' : 's' }}
             </button>
         </div>
-    </header>
+    </section>
 </template>
 
 <script setup lang="ts">
@@ -241,9 +256,9 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         > span {
             font-size: var(--font-size-xs);
             font-weight: 600;
-            letter-spacing: 0.05em;
-            color: $surface7;
+            color: $content7;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
     }
 
@@ -277,6 +292,12 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         input { accent-color: $primary500; }
     }
 
+    // 44px: the week stepper is the most-repeated control on the screen.
+    &_week button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
     &_week {
         display: flex;
         gap: var(--space-1);
@@ -292,6 +313,7 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
             cursor: pointer;
 
             display: flex;
+
             padding: var(--space-2);
             border: 0;
             border-radius: var(--radius-sm);
@@ -317,7 +339,7 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         }
     }
 
-    &_muted { color: $surface7; }
+    &_muted { color: $content7; }
 
     &_violations-toggle {
         cursor: pointer;
@@ -347,7 +369,7 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         &--active {
             border-color: $primary500;
             color: $content2;
-            background: rgba(124, 89, 188, 0.16);
+            background: varToRgba('primary500', 0.16);
         }
     }
 }

@@ -13,7 +13,7 @@
                 class="inspector_empty-icon"
                 aria-hidden="true"
             />
-            <p>Select a session to see its details and edit it.</p>
+            <p>{{ canMove || canUpdate ? 'Select a session to see its details and edit it' : 'Select a session to see its details' }}.</p>
         </div>
 
         <template v-else>
@@ -488,7 +488,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         min-height: 160px;
 
         font-size: 13px;
-        color: $surface7;
+        color: $content7;
         text-align: center;
 
         &-icon {
@@ -517,7 +517,7 @@ const attendees = computed(() => (props.session?.people ?? [])
     &_sub {
         margin: 4px 0 0;
         font-size: 12px;
-        color: $surface7;
+        color: $content7;
     }
 
     &_close {
@@ -533,7 +533,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         border: 0;
         border-radius: 6px;
 
-        color: $surface7;
+        color: $content7;
 
         background: none;
 
@@ -555,7 +555,7 @@ const attendees = computed(() => (props.session?.people ?? [])
 
             font-size: 11px;
             font-weight: 600;
-            color: $surface7;
+            color: $content7;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -568,7 +568,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         }
     }
 
-    &_muted { color: $surface7; }
+    &_muted { color: $content7; }
 
     /* Editable fields on an Event. Read-only Sessions render text instead, so
        these never appear where nothing may change. */
@@ -618,7 +618,7 @@ const attendees = computed(() => (props.session?.people ?? [])
 
             font-size: 12px;
             font-weight: 650;
-            color: $warning300;
+            color: $warning700;
             text-transform: uppercase;
             letter-spacing: 0.03em;
 
@@ -641,7 +641,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         &--hard {
             background: rgb(169, 45, 70, 0.16);
 
-            h3 { color: $error300; }
+            h3 { color: $error700; }
         }
     }
 
@@ -649,7 +649,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         margin: 8px 0 0;
         font-size: 11.5px;
         line-height: 1.4;
-        color: $surface7;
+        color: $content7;
     }
 
     &_actions {
@@ -663,7 +663,7 @@ const attendees = computed(() => (props.session?.people ?? [])
         margin: 0;
         font-size: 11.5px;
         line-height: 1.4;
-        color: $surface7;
+        color: $content7;
     }
 }
 </style>

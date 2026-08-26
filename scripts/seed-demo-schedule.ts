@@ -97,7 +97,7 @@ async function main() {
 
         const kind = await prisma.sessionKind.upsert({
             where: { tenantId_key: { tenantId: t, key: 'lecture' } },
-            create: { tenantId: t, key: 'lecture', name: 'Lecture', color: '#7c59bc' },
+            create: { tenantId: t, key: 'lecture', name: 'Lecture', color: '#3389C6' },
             update: {},
         });
 

@@ -3,6 +3,8 @@
         class="grid"
         :class="{ 'grid--placing': placing, 'grid--swapping': swapping }"
         :style="cssVars"
+        role="grid"
+        aria-label="Week"
     >
         <div
             class="grid_corner"
@@ -13,6 +15,7 @@
             v-for="(day, index) in grid.activeDays"
             :key="`head-${day}`"
             class="grid_day"
+            role="columnheader"
             :style="{ gridRow: 1, gridColumn: index + 2 }"
         >
             <span class="grid_day-long">{{ weekdayName(day, locale) }}</span>
@@ -55,6 +58,7 @@
             <div
                 v-if="row.kind === 'block'"
                 class="grid_time"
+                role="rowheader"
                 :style="{ gridRow: row.line, gridColumn: 1 }"
             >
                 <span class="grid_time-start">{{ row.start }}</span>
@@ -109,6 +113,8 @@
             <ScheduleSessionChip
                 v-for="session in slot.items"
                 :key="session.id"
+                :grid="grid"
+                :room-name="roomName"
                 :session="session"
                 :violations="violations.get(session.id) ?? []"
                 :selected="session.id === selectedId"
@@ -177,6 +183,8 @@ const props = defineProps<{
     termWeek: number;
     /** Resolves a slot to a calendar date; null before a term is chosen. */
     slotDateOf: (termWeek: number, dayOfWeek: number) => Date | null;
+    /** Resolves a room id to its name, for the chip's room label. */
+    roomName?: (id: string) => string;
     /**
      * What choosing a cell will DO, for the slot's accessible name. `place` and
      * `create` both make cells the targets, and a blind user pressing one
@@ -196,7 +204,7 @@ const locale = useViewerLocale();
 /** This column's calendar date, in the week currently shown. */
 const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
 
-const { rows, rowSpan, dayDiffers, cssVars } = useGridGeometry(
+const { rows, rowSpan, bandWithin, dayDiffers, cssVars } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );
@@ -237,7 +245,12 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         start: session.blockIndex,
         span: session.durationBlocks,
     }),
-    { column: String(index + 2), rowSpan, dayKey: day },
+    {
+        column: String(index + 2),
+        rowSpan,
+        band: (start, span) => bandWithin(day, start, span),
+        dayKey: day,
+    },
 )));
 </script>
 <style scoped lang="scss">
@@ -294,7 +307,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
             font-size: 11px;
             font-weight: 500;
             font-variant-numeric: tabular-nums;
-            color: $surface7;
+            color: $content7;
         }
 
         &-note {
@@ -306,7 +319,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
             color: $content6;
             letter-spacing: 0.04em;
 
-            background: rgb(124, 89, 188, 0.18);
+            background: varToRgba('primary500', 0.18);
         }
 
         @include mobile() {
@@ -347,7 +360,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         &-end {
             font-size: 11px;
-            color: $surface7;
+            color: $content7;
         }
     }
 
@@ -361,7 +374,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         font-size: 10px;
         font-variant-numeric: tabular-nums;
-        color: $surface7;
+        color: $content7;
     }
 
     &_cell {
@@ -382,7 +395,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
                 width: 100%;
                 height: 100%;
-                border: 1px dashed rgb(124 89 188 / 55%);
+                border: 1px dashed varToRgba('primary600', 0.55);
                 border-radius: 6px;
 
                 opacity: 0;
@@ -392,14 +405,14 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
             @include hover() {
                 &:hover {
-                    background: rgb(124 89 188 / 14%);
+                    background: varToRgba('primary500', 0.14);
 
                     &::after { opacity: 1; }
                 }
             }
 
             &:focus-visible {
-                background: rgb(124 89 188 / 14%);
+                background: varToRgba('primary500', 0.14);
                 outline: 2px solid $primary400;
                 outline-offset: -2px;
 
@@ -421,7 +434,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         justify-content: center;
 
         font-size: 10px;
-        color: $surface7;
+        color: $content7;
         letter-spacing: 0.02em;
         white-space: nowrap;
 
@@ -445,6 +458,31 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         display: flex;
         gap: 2px;
+
+        /*
+         * IN FLOW, and that is load-bearing.
+         *
+         * Offset and extent come from `bandWithin` as a `margin-top` and a
+         * `min-height` in pixels at a constant minute scale — so an hour is the
+         * same height everywhere on the grid, and a slot is exactly as tall as
+         * its session lasts.
+         *
+         * WHAT HAPPENS WHEN A BLOCK CANNOT FIT ITS SESSIONS: the row grows.
+         * `min-height` is a floor, not a ceiling, and the row is
+         * `minmax(<true minutes>, auto)` — so a stack that needs more than its
+         * block lasts takes the space and the row takes it with it. Nothing is
+         * hidden, nothing scrolls, nothing overlaps, and the time column moves
+         * with it because it shares the row. It was briefly `position: absolute`,
+         * which broke exactly this: an out-of-flow slot contributes nothing to
+         * its row's height, so a crowded block silently overflowed instead.
+         *
+         * `align-self: start` is the other half. A grid item stretches to its
+         * area by default, so a slot in a row that some OTHER column made tall
+         * was stretched to match — a single session rendered as a chip the full
+         * height of the container with one line of text in it. Starting at the
+         * top leaves the unused time visibly empty, which is what it is.
+         */
+        align-self: start;
 
         min-width: 0;
         padding: 2px;
@@ -490,6 +528,10 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
                 flex: 0 1 auto;
                 white-space: nowrap;
             }
+
+            // The stack has no position to read a time off, so the chip states
+            // it. This is the whole reason the stacked form is not lossy.
+            :deep(.chip_time) { display: inline; }
         }
 
         /*

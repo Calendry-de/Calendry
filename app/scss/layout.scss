@@ -31,7 +31,7 @@ html, body {
 // which belongs to no design system.
 ::selection {
     color: $content0;
-    background: rgba(124, 89, 188, 0.45);
+    background: varToRgba('primary500', 0.45);
 }
 
 /*

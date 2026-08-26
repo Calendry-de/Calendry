@@ -23,9 +23,9 @@
 
         font-size: var(--font-size-sm);
         font-weight: 650;
-        letter-spacing: 0.04em;
-        color: $warning300;
+        color: $content6;
         text-transform: uppercase;
+        letter-spacing: 0.04em;
 
         svg { width: 15px; height: 15px; }
     }
@@ -34,8 +34,10 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-4);
+
         margin: 0;
         padding: 0;
+
         list-style: none;
     }
 
@@ -46,7 +48,7 @@
         align-items: baseline;
 
         font-size: var(--font-size-sm);
-        color: $surface7;
+        color: $content7;
     }
 
     button {
@@ -69,11 +71,11 @@
 
         svg { width: 14px; height: 14px; }
 
-        .is-hard { color: $error300; }
-        .is-soft { color: $warning400; }
+        .is-hard { color: $error700; }
+        .is-soft { color: $warning700; }
 
         @include hover() {
-            &:hover { color: $primary300; text-decoration: underline; }
+            &:hover { color: $primary700; text-decoration: underline; }
         }
 
         &:focus-visible { outline: 2px solid $primary400; outline-offset: var(--space-1); }

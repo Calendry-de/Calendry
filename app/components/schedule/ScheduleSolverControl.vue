@@ -119,7 +119,7 @@
             >
                 <span
                     class="solver_budget-fill"
-                    :style="{ width: `${Math.min(100, budgetFraction * 100)}%` }"
+                    :style="{ width: '100%', transform: `scaleX(${Math.min(1, budgetFraction)})` }"
                 />
             </div>
             <p class="solver_hint">move budget {{ Math.round(budgetFraction * 100) }}% used — {{ budgetCaption }}</p>
@@ -466,10 +466,17 @@ const failedSummary = computed(() => {
     }
 
     &_budget-fill {
+        // `transform`, not `width`: this bar updates on every poll tick, and
+        // animating a layout property re-lays the toolbar each time.
+        transform-origin: left;
+
         display: block;
+
         height: 100%;
+
         background: $content5;
-        transition: width 0.4s ease;
+
+        transition: transform 0.4s ease;
     }
 
     &_hint {

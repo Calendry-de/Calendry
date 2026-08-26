@@ -19,7 +19,16 @@
     finish review, the verdict, and DESIGN.md.
 -->
 <template>
-    <div class="schedule">
+    <main class="schedule">
+        <!--
+            The served document had no heading of any level and no `main`.
+            Visually hidden because the week itself is the title — a rendered
+            "Schedule" above a screen whose nav already says Schedule is noise
+            for the sighted reader and the only orientation there is for anyone
+            navigating by heading.
+        -->
+        <h1 class="schedule_sr">Schedule</h1>
+
         <ScheduleToolbar
             v-model:term-id="filters.termId.value"
             v-model:week="filters.week.value"
@@ -110,6 +119,7 @@
                     :placing="editing.placing.value || editing.creating.value"
                     :swapping="editing.swapping.value"
                     :row-height="rowHeight"
+                    :room-name="data.lookup.room"
                     :term-week="filters.week.value"
                     :slot-date-of="data.slotDateOf"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
@@ -135,7 +145,11 @@
                     :sessions="data.onGridSessions.value"
                     :violations="data.violationsBySessionId.value"
                     :selected-id="editing.selectedId.value"
+                    :placing="editing.placing.value || editing.creating.value"
+                    :room-name="data.lookup.room"
+                    :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @select="editing.select"
+                    @place="placeAt"
                 />
 
                 <ScheduleOffGridTray
@@ -185,7 +199,7 @@
                 @set-details="saveEventDetails"
             />
         </div>
-    </div>
+    </main>
 </template>
 
 <script setup lang="ts">
@@ -359,6 +373,19 @@ const showViolations = ref(false);
 
     @include mobile() { padding: 14px; }
 
+    &_sr {
+        position: absolute;
+
+        overflow: hidden;
+
+        width: 1px;
+        height: 1px;
+
+        white-space: nowrap;
+
+        clip-path: inset(50%);
+    }
+
     &_placing {
         display: flex;
         gap: var(--space-4);
@@ -371,9 +398,9 @@ const showViolations = ref(false);
         font-size: var(--font-size-md);
         color: $content4;
 
-        background: rgba(124, 89, 188, 0.16);
+        background: varToRgba('primary500', 0.16);
 
-        svg { width: var(--space-6); height: var(--space-6); flex: none; }
+        svg { flex: none; width: var(--space-6); height: var(--space-6); }
 
         strong { font-weight: 650; }
     }
@@ -384,9 +411,9 @@ const showViolations = ref(false);
         border-radius: var(--radius-lg);
 
         font-size: var(--font-size-md);
-        color: $error300;
+        color: $error700;
 
-        background: rgba(169, 45, 70, 0.16);
+        background: rgb(169, 45, 70, 0.16);
     }
 
     &_body {
@@ -402,6 +429,7 @@ const showViolations = ref(false);
         flex: 1;
         flex-direction: column;
         gap: 14px;
+
         min-width: 0;
     }
 
