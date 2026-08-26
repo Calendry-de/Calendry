@@ -1652,6 +1652,73 @@ The order matters, and each step depends on the one before it.
 4. start the app
 ```
 
+### The production image: verified, and the five things that blocked it
+
+**`ghcr.io/mindcollaps/calendry` had never been built or booted before
+2026-08-26.** `.config/Dockerfile` said so in its own comment. Building it turned
+up five separate blockers, in the order they fire — each one worth knowing
+because each was invisible until the one before it was fixed:
+
+1. **`docker build` could not read its own context.** `docker-compose.dev.yml`
+   bind-mounts `./db/` as the PostgreSQL data directory, so the moment anyone
+   runs the dev stack the repo root holds a root-owned directory and every
+   subsequent build dies with `error from sender: open db: permission denied`.
+   `.dockerignore` now excludes it — along with `vendor/` (1.5 GB, of which
+   1.4 GB is the solver's Rust `target/`) and `.output`.
+2. **`COPY .config/wordlists` had no source.** A template leftover; nothing in
+   the repo references a wordlist. Removed.
+3. **`prisma.config.js` imported `dotenv/config` unconditionally**, and the
+   runner stage has no application `node_modules`, so `migrate deploy` failed on
+   the config's first line. The import is now optional — a host has dotenv and a
+   `.env`; a container has its environment injected by compose.
+4. **`npm install -g prisma` cannot satisfy `prisma.config.js`.** The config
+   sits in `/app` and imports `prisma/config`, which a global install does not
+   resolve. Cherry-picking `node_modules/prisma` + `@prisma` out of the builder
+   fails too: `@prisma/config` needs `effect`, outside the `@prisma` scope. The
+   toolchain is now installed in the runner against a **generated minimal
+   manifest** carrying only `prisma`, `@prisma/client` and `@prisma/adapter-pg`
+   at the ranges `package.json` declares — installing against the real manifest
+   resolves the whole application graph and fails on a nitro/vite peer conflict.
+   Keep `type: module` in that generated manifest: `prisma.config.js` is ESM with
+   a top-level await, and node parses it as CommonJS without it.
+5. **`prisma db seed` runs `bun run prisma/seed.ts`, and the runner is a node
+   image.** The bun binary is copied in from `oven/bun:1-alpine`. The
+   alternative was a node-shaped seed command for the image only — a second
+   definition of the seed that could drift from the one every developer runs.
+   The seed also reaches outside `prisma/` (`shared/permissions`,
+   `scripts/lib/ownerDatabaseUrl`), so both are now in the image.
+
+**Verified end to end**, not reasoned about: against a throwaway Postgres with
+`.config/db-init` mounted, the container ran `migrate deploy`, seeded **56
+permission rows**, started Nitro, and answered `/health` 200 and `/` 200. Nothing
+resembling that had ever run before.
+
+The registry credential reaches the build as a **BuildKit secret** mounted at
+`/root/.bunfig.toml` — `HOME` really is `/root` in `oven/bun:1-alpine`, checked
+rather than assumed. `docker history` on the built image contains no token, and a
+filesystem scan of `/app`, `/root` and `/home` finds none.
+
+### CI: two workflows, one per image
+
+`.github/workflows/docker.yml` here builds and publishes the app image; the
+solver repo has its own for `ghcr.io/mindcollaps/calendry-solver`. Both publish
+`latest` **only from a semver tag**, never from `main` — `docker-compose.yml`
+pins `:latest`, so a branch-tracking `latest` would put an unreviewed commit into
+a production `docker compose pull`.
+
+The app workflow's smoke job brings up the real `docker-compose.yml` and asserts
+`/health` **and** that the `permission` table is non-empty. The healthcheck alone
+cannot see the seed step, and a migrated-but-unseeded database is deliberately
+unusable — so a green healthcheck over an empty catalogue is exactly the silent
+half-success this file keeps warning about. It names `db` and `calendry-app`
+rather than running a bare `up`, because the solver service pulls a separately
+published image whose absence would fail a job that is testing the app.
+
+**`PACKAGES_READ_TOKEN` must be a CLASSIC PAT with `read:packages`.** GitHub
+Packages' npm registry refuses fine-grained tokens — see "Installing the proto
+package: three traps". `GITHUB_TOKEN` is the fallback and works only if the proto
+package grants the calendry repository read access.
+
 - **Local:** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db`,
   then `bun run db-seed`, then `bun run provision:tenant -- --slug … --name … --admin-email … --admin-name …`.
   Migrations are applied by the dev entrypoint, or run `prisma migrate deploy`
@@ -1732,9 +1799,23 @@ session settings are a different namespace from schemas and were not renamed.
 
 `docker compose up` now brings up app, database AND solver. The solver is a
 vendored git submodule at `vendor/calendry-solver`, built by
-`.config/Dockerfile.solver` — the Dockerfile lives HERE rather than in the solver
-repo so the whole stack is described in one place, and nobody needs a second
-checkout to get a working environment.
+`vendor/calendry-solver/Dockerfile`.
+
+**That Dockerfile used to live here as `.config/Dockerfile.solver`, and moving it
+was a deliberate reversal.** The original reasoning — one place describing the
+whole stack — held for exactly as long as this repo's dev compose was its only
+consumer. It stopped holding when the solver repo needed to publish its own
+image: a workflow in that repository cannot reach into this one for a build
+definition, so the alternative was a second copy, i.e. two build definitions for
+one binary. That is the "two implementations of one concept" drift this file has
+already recorded three times (`paramField()`, `weekCountOf`/`weeksInTerm`,
+`blockTime()`/`blockOfMinute()`), and a Dockerfile is a particularly bad place
+for it: the copies diverge silently and the symptom is "works in dev, broken in
+production".
+
+The one-place property survives anyway, because the solver is vendored here as a
+submodule — `docker-compose.dev.yml` builds `./vendor/calendry-solver` with that
+repo's own `Dockerfile`, so a single checkout still brings up the whole stack.
 
 **It has its own nested submodule.** `calendry-proto` sits at
 `vendor/calendry-solver/vendor/calendry-proto`, so a plain `git submodule update

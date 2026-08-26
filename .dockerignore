@@ -12,3 +12,41 @@ bun-debug.log*
 # A local bunfig.toml carries the registry token; keep it out of the build
 # context entirely so `COPY . .` in the builder stage cannot capture it.
 bunfig.toml
+
+# ---------------------------------------------------------------------------
+# EVERYTHING BELOW EXISTS BECAUSE THE PRODUCTION BUILD COULD NOT RUN AT ALL.
+#
+# `docker build -f .config/Dockerfile .` failed on a dev machine with
+#
+#     ERROR: failed to solve: error from sender: open db: permission denied
+#
+# because docker-compose.dev.yml bind-mounts `./db/` as the PostgreSQL data
+# directory (`- ./db/:/var/lib/postgresql/18/docker:rw`), so the moment anyone
+# runs the dev stack the repo root contains a root-owned directory the build
+# context sender cannot read. Not a warning, not a slow build — a hard failure
+# on every subsequent `docker build`, which is why the Dockerfile's own comment
+# said no Docker build had been run since Stage 1.
+db
+
+# The vendored solver, 1.5 GB of it — 1.4 GB is its Rust `target/`. The Nuxt
+# build needs nothing from here: the proto contract arrives as an npm package,
+# and the solver is a separate image built from its own repository.
+vendor
+target
+
+# Build output and caches. `.output` alone is 61 MB of the previous build being
+# uploaded to produce the next one.
+.output
+.nuxt
+.cache
+.bun
+
+# Not part of the runtime image: the test suite drives a server over HTTP, and
+# CI configuration is read by GitHub, not by the build.
+tests
+.github
+.devcontainer
+.claude
+.cursor
+.agents
+.impeccable

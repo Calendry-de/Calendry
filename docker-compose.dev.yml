@@ -69,8 +69,14 @@ services:
   solver:
     build:
       # The vendored submodule, so `docker compose up` needs no second checkout.
+      #
+      # The Dockerfile now lives IN the solver repo rather than in `.config/`,
+      # because that repo publishes its own image and a workflow there cannot
+      # reach into this one for a build definition. Keeping a second copy here
+      # would mean two Dockerfiles for one binary. Path is relative to the
+      # context, so there is nothing to keep in sync.
       context: ./vendor/calendry-solver
-      dockerfile: ../../.config/Dockerfile.solver
+      dockerfile: Dockerfile
     container_name: calendry-solver
     environment:
       # Bind on all interfaces INSIDE the container. Its own default is
