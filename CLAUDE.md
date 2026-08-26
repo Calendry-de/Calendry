@@ -1,2113 +1,516 @@
 # CLAUDE.md — Calendry
 
-Read this file at the start of every session. It's the persistent context —
-TAXONOMY.md is the taxonomy source of truth; this file is everything else you
-need to work in this repo consistently across sessions.
+Read this file at the start of every session. TAXONOMY.md is the taxonomy
+source of truth; this file is everything else needed to work in this repo
+consistently across sessions.
 
 ## What this project is
 
-Calendry is a multi-tenant calendar/timetabling platform for schools and
-universities. It has two major parts, built in sequence:
+Multi-tenant calendar/timetabling platform for schools and universities, two
+parts built in sequence:
 
 1. **Calendar management app** (this repo, Nuxt) — entities, database, CRUD
-   and editing routes (move/swap/lock Sessions), multi-tenant auth, import/
-   export. Built first.
-2. **Solver** (separate repo/service, Rust) — takes Offerings + Constraints,
-   searches for a near-optimal Session placement via hybrid constructive +
-   local-search optimization. Built second, called via a service contract
-   from this app. **Not implemented in this repo** — only the interface
-   boundary lives here.
+   and editing routes, multi-tenant auth, import/export.
+2. **Solver** (`calendry-solver`, Rust) — Offerings + Constraints →
+   near-optimal Session placement via hybrid constructive + local-search
+   optimization, called via a service contract (gRPC). Its own repo is the
+   source of truth; a checkout is vendored into THIS repo as a git
+   submodule at `vendor/calendry-solver` (with `calendry-proto` nested one
+   level deeper, at `vendor/calendry-solver/vendor/calendry-proto`) purely
+   so `docker compose up` can build the whole stack from one checkout.
+   **Do not author solver logic here** — changes to solver behavior belong
+   in `calendry-solver`, then get vendored back via the submodule pointer.
 
-If you're not sure whether something belongs in this repo, ask: does it
-generate/optimize a schedule (solver's job, elsewhere) or manage/store/
-present one (this repo's job)?
+Rule of thumb: does it generate/optimize a schedule (solver's job) or
+manage/store/present one (this repo's job)?
 
 ## Source of truth documents
 
-- `TAXONOMY.md` — the fixed entity model and terminology. Authoritative.
-  Do not add, rename, or restructure core entities without flagging it and
-  getting explicit confirmation first — this is intentionally "carved in
-  stone" and changes here are migrations, not config edits.
-- This file (`CLAUDE.md`) — the **durable** half: architecture rules, RLS
-  boundaries, standing conventions, and the reasoning behind decisions someone
-  could otherwise undo. Update it when a real convention changes; don't let it
-  drift from reality.
-- `BACKLOG.md` — the **transient** half: open bugs, deferred work, undecided
-  questions, the phase checklist. Split out on 2026-08-23 so this file stops
-  absorbing both categories.
+- `TAXONOMY.md` — the fixed entity model. Authoritative; don't
+  add/rename/restructure core entities without explicit confirmation —
+  "carved in stone," changes here are migrations, not config edits.
+- `CLAUDE.md` (this file) — **durable**: architecture rules, RLS
+  boundaries, standing conventions, live facts a session would break
+  something by not knowing. Anthropic's own guidance targets ~200–300
+  lines; keep trimming toward that — state a fact/rule/number once, link
+  reasoning to `DECISIONS.md`, never re-narrate an investigation inline.
+- `DECISIONS.md` — **archive**: the story behind resolved incidents (how a
+  bug was found, what was measured). Split out 2026-08-26.
+- `BACKLOG.md` — **transient**: open bugs, deferred work, undecided
+  questions, the phase checklist. Split out 2026-08-23.
 
-  The dividing question is *does this tell someone what not to undo, or what
-  they might still do?* A resolved bug whose fix encodes a real decision stays
-  HERE, under "Resolved, with the reasoning kept" — deleting it would delete the
-  argument, not the bug. Anything actionable goes to BACKLOG.md.
+Dividing question: what not to undo (→ CLAUDE.md), the no-longer-live story
+behind a decision (→ DECISIONS.md), or what someone might still do (→
+BACKLOG.md)?
 
-## Fixed vs. open taxonomy (quick reference)
+## Fixed vs. open taxonomy
 
 **Fixed** (schema-level, changing = migration): Federation, Tenant, Person,
 Group (nestable), Room, Offering, Session, TimeGrid, Term, Constraint,
 Membership, Assignment.
 
-**Open** (tenant-managed vocabulary, changing = data): Role names, Equipment/
-Feature tags, Offering/Session `kind` values, Constraint parameter values.
-
-Never hardcode an "open" value into application logic (e.g. never assume a
-Role called "Student" exists, never assume a `kind` called "lecture" exists)
-— always resolve against tenant configuration.
+**Open** (tenant-managed vocabulary, changing = data): Role names,
+Equipment/Feature tags, Offering/Session `kind` values, Constraint parameter
+values. Never hardcode an open value into logic (never assume a Role called
+"Student," never assume a `kind` called "lecture") — always resolve against
+tenant config.
 
 ## Architecture rules
 
 - **Multi-tenant, isolated by default.** Every tenant-scoped table carries
-  `tenant_id`; isolation is enforced at the DB layer (row-level security),
-  not just in application code.
-- **The runtime must connect as the non-owner role.** `DATABASE_URL` uses
-  `calendry_app`, which owns nothing and is subject to `FORCE ROW LEVEL
-  SECURITY`. `MIGRATION_DATABASE_URL` (the owner) is for the Prisma CLI and
-  the provisioning script only. Pointing the app at the owner would silently
-  disable every policy in the system — the owner is a superuser and bypasses
-  RLS entirely — and *every test would still pass*. Never do it.
-- **Migrations are schema-only; data population is seed-only.** A migration may
-  create tables, policies, triggers and indexes — never rows. Reference data
-  lives in `prisma/seeds/` and is applied by `prisma db seed`. This keeps DDL
-  history a record of structure, and lets reference data be corrected without
-  inventing a migration whose only content is an `UPDATE`. It also means **a
-  freshly migrated database is not yet usable**: the `permission` table is
-  empty, and provisioning a tenant against it fails on the
-  `access_role_permission` foreign key. That failure is deliberate and loud.
-- **Never regenerate `prisma/migrations/`.** The RLS/trigger migration is
-  hand-written and cannot be reproduced from `schema.prisma` — the schema
-  language cannot express row-level security, triggers, `SECURITY DEFINER`
-  functions or partial indexes. `prisma migrate dev` will cheerfully emit an
-  "equivalent" migration containing none of it, producing a database where every
-  table exists and tenant isolation is silently absent, with every test still
-  passing. Rebuild with `prisma migrate reset`, which *replays* the committed
-  files.
-
-  **`db-reset` ran `migrate dev` until 2026-08-23, and that — not the old
-  `rm -rf prisma/migrations` — is what actually caused the damage this rule
-  exists to prevent.** The script was
-  `migrate reset --force && migrate dev --name init && generate`. `reset`
-  replays correctly; `migrate dev` then diffs `schema.prisma` against the
-  rebuilt database, sees hand-written objects the schema language cannot
-  declare, and emits a migration to DROP them. That is the exact provenance of
-  `20260813190131_init`, which contains nothing but three `DROP INDEX`
-  statements and is applied. This entry previously said "`db-reset` used to
-  `rm -rf prisma/migrations`; it no longer does" — true, and misleading, because
-  the removed half was never the dangerous one.
-
-  `migrate dev` is now gone from the script (`migrate reset --force && generate`).
-  The consequence worth holding onto: **any hand-written index, policy, trigger
-  or function is invisible to `schema.prisma` and was therefore a standing
-  candidate for deletion on every developer's next rebuild.** If those three
-  indexes had been recreated rather than measured and declined, the next
-  `db-reset` would have dropped them again.
-
-  `db-drop` (`prisma db push --force-reset`) is the same hazard in sharper form
-  and is deliberately left in place as an explicit escape hatch: `db push`
-  applies `schema.prisma` DIRECTLY, so it produces a database with every table
-  and **no RLS, no triggers, no `SECURITY DEFINER` functions** — tenant
-  isolation silently absent, every test passing. Never use it to rebuild a
-  working database; `db-reset` is the rebuild path.
+  `tenant_id`; RLS enforces it at the DB layer, not just in app code.
+- **Runtime connects as the non-owner role.** `DATABASE_URL` uses
+  `calendry_app` (owns nothing, `FORCE ROW LEVEL SECURITY`).
+  `MIGRATION_DATABASE_URL` (the owner) is for Prisma CLI/provisioning only.
+  Pointing the app at the owner silently disables every RLS policy and every
+  test would still pass. Never do it.
+- **Migrations are schema-only; seed populates data.** A freshly migrated
+  database is deliberately unusable — `permission` is empty, provisioning
+  fails loudly on the `access_role_permission` FK.
+- **Never regenerate `prisma/migrations/`.** Hand-written RLS/triggers can't
+  be expressed in `schema.prisma`; `prisma migrate dev` diffs against it and
+  emits a migration that silently DROPS them (every table exists, isolation
+  silently gone, tests still pass). Rebuild with `prisma migrate reset`
+  (`db-reset` = `migrate reset --force && generate`, `migrate dev` removed
+  2026-08-23 after it dropped three indexes this way — DECISIONS.md §
+  "Database & migrations"). Any hand-written index/policy/trigger/function
+  is invisible to `schema.prisma` and a standing deletion candidate.
+  `db-drop` (`db push --force-reset`) is the same hazard, kept as an
+  explicit escape hatch — never use it to rebuild a working database.
 - **Never query outside `withTenant()`.** Route handlers go through
-  `withRequestTenant`, which opens a transaction and sets
-  `calendry.tenant_id`. A query issued outside it sees zero rows rather than
-  all rows; that failure mode is deliberate. The sole exception is
-  `server/utils/authDb.ts` — see below.
+  `withRequestTenant`. A query outside it sees zero rows, not all rows —
+  deliberate. Sole exception: `server/utils/authDb.ts`.
 
-### The two deliberate exceptions to tenant isolation
+### The three deliberate exceptions to tenant isolation
 
-Both are conscious boundaries, not oversights. Anything that looks like a
-third exception is a bug.
+Conscious boundaries, not oversights — a fourth is a bug.
 
-1. **Federation-owned resources.** `room`, `equipment`, `offering` and
-   `session` may be owned by a Federation instead of a Tenant (a consortium's
-   shared lecture hall, a cross-enrolled elective, a genuinely shared event
-   both member tenants see). A CHECK constraint enforces exactly one owner,
-   and the RLS read policy widens to the caller's federation while the write
-   policy stays tenant-only. See "Group↔Term scoping" and the Federation
-   sections below for the reasoning behind extending this to `session`
-   specifically, and why it deliberately did NOT extend to `group`/`person`.
-
-2. **The pre-tenant auth plane.** `account`, `account_person` and
-   `auth_session` carry **no RLS at all**. This is structural, not a
-   shortcut: a session must be read *before* the tenant is known, because the
-   session is what determines the tenant — any policy on these tables would
-   compare against a context that does not exist yet and would reject every
-   login. What replaces RLS is access shape: they are only ever read by
-   primary key or unique token hash from a verified cookie, never by tenant
-   filter, and no route exposes them. `server/utils/authDb.ts` is the only
-   module permitted to query without tenant context.
-
-   Where auth genuinely needs tenant-scoped data (resolving a session's
-   Person to its Tenant), it goes through the two `SECURITY DEFINER`
-   functions `calendry_internal.session_identity()` and
-   `calendry_internal.account_identities()`. Both are parameterised solely by a
-   secret the caller already holds and neither accepts a tenant id, so neither
-   can be coaxed into enumerating another tenant.
-
+1. **Federation-owned resources.** `room`/`equipment`/`offering`/`session`
+   may be Federation- instead of Tenant-owned (shared lecture hall,
+   cross-enrolled elective). CHECK enforces exactly one owner; RLS read
+   widens to the federation, write stays tenant-only. See "Group↔Term
+   scoping" for why this extends to `session` but not `group`/`person`.
+2. **The pre-tenant auth plane.** `account`/`account_person`/`auth_session`
+   carry **no RLS** — a session must be read before the tenant is known.
+   Replaced by access shape: read only by PK or unique token hash from a
+   verified cookie, never by tenant filter; `authDb.ts` is the only module
+   permitted to query without tenant context. Tenant-scoped auth lookups go
+   through `SECURITY DEFINER` functions `calendry_internal.session_identity()`
+   / `account_identities()`, parameterised solely by a secret, never a
+   tenant id.
 3. **The background solver poller.** `calendry_internal.tenants_with_due_solver_runs()`
-   (Stage 4). Added under the same rule as the two above, for the same reason:
-   the operation structurally sits OUTSIDE the tenant-request model rather than
-   being made easier by skipping it. Auth must read a session *before the tenant
-   is known*; the poller runs *when nobody is logged in at all*, so
-   `current_tenant_id()` is NULL and the app role sees zero rows in both
-   `solver_run` and `tenant` — fail-closed working exactly as designed, and
-   leaving a cross-tenant job unable to see the work it exists to do.
+   runs when nobody is logged in, so `current_tenant_id()` is NULL —
+   structurally outside the tenant-request model. Returns **tenant ids
+   only**, no parameters; every actual write happens inside an ordinary
+   `withTenant()` transaction.
 
-   What keeps it narrow: it returns **tenant ids only** — no run rows, no
-   scopes, no inputs, no results — and takes **no parameters**, so it cannot be
-   steered at a chosen tenant. Everything the poller then does happens inside an
-   ordinary `withTenant()` transaction under RLS, including the claim and every
-   write. Widening it to return the runs themselves was considered and rejected:
-   it would move the atomic claim into SQL and carry run data across the
-   boundary to save one round trip per tenant per tick.
+Do not add a fourth exception without a comparably strong reason.
 
-These three are the **only** RLS-bypassing code paths in the system. Do not add
-a fourth without a comparably strong reason — and "the query is awkward
-otherwise" is not one.
-- **Nested Groups propagate conflicts.** A booking conflict on a parent
-  Group blocks its descendants and vice versa. Availability checks must
-  walk the ancestor/descendant closure, not do a flat lookup. See
-  TAXONOMY.md §6 before touching any conflict-check or notification
-  fan-out code — there's a known perf trap here (don't walk the tree live
-  in hot paths; use a precomputed closure structure).
-- **`group_term` is a visibility scope, never a scheduling input.** A Group
-  can be many-to-many linked to the Terms it's relevant to; an unlinked Group
-  is visible in every Term (fail-open). The solver's own Group filter never
-  reads this table — see "Group↔Term scoping" below for why that's load-bearing,
-  not incidental.
+- **Nested Groups propagate conflicts** both directions (ancestor ↔
+  descendant). TAXONOMY.md §6 before touching conflict-check code — don't
+  walk the tree live in hot paths, use a precomputed closure.
+- **`group_term` is a visibility scope, never a scheduling input.** Unlinked
+  Group = visible in every Term (fail-open). Solver's Group filter never
+  reads this table — see "Group↔Term scoping."
 - **TimeGrid is per-tenant, not global.** Never hardcode block/timeslot
-  arithmetic (e.g. `timeslot % 3`, `timeslot > 14` for "Saturday"). Always
-  resolve against the tenant's TimeGrid and Term/academic-calendar config.
+  arithmetic — always resolve against the tenant's TimeGrid/Term config.
 - **History is event-sourced.** Manual edits are append-only events
-  (`create`/`move`/`swap`/`delete`/`lock`) applied on top of a versioned
-  Generation snapshot (solver output or manual baseline). Never mutate a
-  Session in place without emitting the corresponding event — rollback and
-  audit depend on the log being complete.
-- **Locked Sessions are solver-exempt.** A solver re-run must skip locked
-  Sessions entirely, not just deprioritize them.
-- **Hard-constraint violations from manual edits: warn, don't block.** The
-  UI/API must surface current violations as a queryable state, not just a
-  one-time toast at edit time.
-- **Timezone is per-Person and display-only.** It must never affect grid
-  resolution, constraint evaluation, or "same day" logic — those all run in
-  tenant-local time.
+  (`create`/`move`/`swap`/`delete`/`lock`) on a versioned Generation
+  snapshot. Never mutate a Session without emitting the event. The
+  append-only trigger on `session_event` permits exactly one exception (a
+  Stage 5 addition): an UPDATE nulling `session_id`/`counterpart_session_id`
+  and nothing else, so a Session can be deleted without destroying its
+  audit trail.
+- **Locked Sessions are solver-exempt** — a re-run skips them entirely.
+- **Hard-constraint violations from manual edits: warn, don't block** —
+  surfaced as queryable state, not a one-time toast.
+- **Timezone is per-Person, display-only** — never affects grid resolution,
+  constraint evaluation, or "same day" logic (all tenant-local time).
 
 ## Conventions
 
-- **Naming**: `Offering` = recurring definition/demand; `Session` = one
-  atomic placed occurrence. Don't use "Lecture," "Event," or "Class" as
-  entity names in code — those are tenant-facing `kind` values, not schema
-  concepts.
-- **Routes**: CRUD follows standard REST conventions per entity. Editing
-  operations (`move`, `swap`, `lock`, `apply-generation`) are explicit verbs
-  on the Session resource, not generic PATCHes, so the event log can record
-  intent, not just a diff.
-- **`/` is the PUBLIC landing page; the signed-in home is `/dashboard`.** The
-  root is a marketing page for calendry.de, readable with no session; the page
-  that used to be there — session overview plus the permission-filtered list of
-  destinations — moved unchanged to `/dashboard`.
+### TypeScript / type safety
 
-  Two things this touched that are easy to get wrong again:
+- **No `any`, no unnarrowed `unknown`.** Every signature/boundary/return
+  type concrete enough that `nuxt build`'s typecheck means something. A
+  genuinely-unknown boundary value (webhook body, JSON column, external
+  API) gets typed `unknown` and narrowed immediately (Zod schema, type
+  guard) before use. `strict: true` is a floor — a wrong rule at one call
+  site gets a scoped `eslint-disable-next-line` with a reason, never a
+  blanket loosen.
+- `tsconfig.json` extends `./.nuxt/tsconfig.json` plus `noUnusedLocals`,
+  `noUnusedParameters`, `noFallthroughCasesInSwitch`. Prefer `satisfies`
+  over an annotation when a literal needs both inference and a shape
+  check; prefer a discriminated union over optional-field soup for real
+  variants, so `switch`/`if` chains exhaustiveness-check.
 
-  - **`auth.global.ts` now has TWO exemption lists, and they are not
-    interchangeable.** `PUBLIC_ROUTES` (`/login`, `/change-password`) are the
-    AUTH pages: they need no session *and* bounce a signed-in visitor into the
-    app, because a sign-in form is meaningless once you are signed in.
-    `ANONYMOUS_ROUTES` (`/`) needs no session and bounces nobody — the landing
-    page is exactly as useful to someone holding a cookie, and it returns
-    before any session fetch, so the root renders identically for everyone.
-    Putting `/` in the first list would make the roadmap unreadable to every
-    signed-in user.
-  - **`HOME_ROUTE` in `app/utils/routes.ts` is the only place "where a signed-in
-    session belongs" is written.** It was `'/'` in four: the guard's two redirect
-    fallbacks, its no-redirect-query special case, and the login page's
-    destination resolver. Four literals that must move together is how a
-    post-login redirect ends up landing on a marketing page.
+### Design work
 
-  Note what this does NOT do: it is one anonymous **marketing** route, not the
-  public data access described in BACKLOG.md § "Public, unauthenticated access
-  patterns". It reads no session, calls no API and exposes no tenant data, which
-  is why it needed no new RLS boundary — the shareable student schedule and the
-  kiosk display are still unbuilt and still need a real design pass.
+- Use the **`design-taste-frontend`** skill (`.claude/skills/`, source
+  `Leonxlnx/taste-skill`) for visual/UI work; pair with **`frontend-design`**
+  (`anthropics/skills`, fetch via `skills use ... --skill frontend-design`)
+  for greenfield/reshaped UI — distinctive choices over the three
+  AI-generated-design defaults (warm-cream serif / near-black-accent /
+  broadsheet-hairline).
+- Tokens (`app/scss/tokens-root.scss` / `tokens.scss`) remain the
+  implementation layer regardless — see design-tokens rule below.
 
-  Two consequences a test caught rather than a person: `tests/login-flow.test.ts`
-  had pinned `/` as a protected page (that assertion now names `/dashboard`, and
-  a new one asserts the root serves publicly), and the header-nav check in
-  `tests/page-renders-per-role.test.ts` fetched `/` purely as "a page with the
-  default layout" — against the `empty`-layout landing page it found no nav and
-  would have reported every role as correctly not offered the `/my` section.
-- **The landing page's claims are checked against BACKLOG.md by a test.** Copy
-  lives in `app/utils/landingContent.ts` rather than in nine templates, for the
-  reason this file keeps rediscovering: prose is checked by nobody. So
-  `tests/landing-page.test.ts` parses the § "Current phase" checklist out of
-  `BACKLOG.md` and asserts the unchecked entries are exactly the ones the page
-  presents as not built — with a guard that the parse found something, since a
-  renamed heading would otherwise make every assertion pass over an empty list.
-  Tick a box in BACKLOG.md without touching the page and it fails, naming the
-  mismatch. Falsified deliberately: ticking `Import (CSV/Excel)` fails it.
-
-  The contact CTA is a `mailto:` draft, not a POST. An endpoint could only log
-  the enquiry and return 200 — a success message over a write nobody receives —
-  and persisting it would mean a public unauthenticated write into a
-  tenant-scoped table, i.e. a fourth RLS exception for a contact form. The
-  address is one constant (`CONTACT_EMAIL`), and the composer takes the mailbox
-  as an argument so its tests cannot pass by hardcoding.
-- **Guards and detection conditions must fail loudly or match exactly.** Never
-  write a check whose failure mode is a silent no-op indistinguishable from the
-  correct case. If a condition can both "correctly find nothing" *and*
-  "incorrectly match nothing because of a bug", those two states must be
-  distinguishable — by anchored/exact matching, by asserting the expected shape,
-  or by reporting what it did.
-
-  - **A page existing and a page being REACHABLE are different claims, and a
-  test suite can assert the first while never checking the second.** Building
-  the `/my` self-service section, both new pages worked perfectly — routes
-  resolved, middleware gated correctly, content rendered — and every one of
-  501 passing tests fetched them by URL directly. None asserted the section
-  was actually reachable by navigating there, because the header hub entry
-  for the section was never added (`useHeaderNav()` renders from entries
-  carrying `inHeader: true`; the two page entries were added, the section's
-  own hub entry was not). The result: a fully working, fully tested feature
-  with **no click path to it from anywhere in the UI** — a green suite over
-  an unreachable feature, discovered only by a person actually trying to use
-  it.
-
-  Fixed by adding the missing hub entry, gated on the same permission the
-  pages themselves require, and pinned by a test asserting the header
-  **in both directions** — present for a role that holds the gating
-  permission, absent for one that doesn't, with a control entry (`Home`)
-  asserted present in both cases so an empty/broken header can't pass by
-  looking like "correctly hidden."
-
-  The general form, worth checking on any new section: **route tests prove
-  a page can be fetched; they do not prove a person can get there.** A new
-  top-level section needs its own reachability assertion — a header/nav
-  entry existing and gated correctly — as a first-class check, not an
-  assumption that follows automatically from the routes and middleware being
-  correct.
-
-  This has bitten repeatedly, in different disguises:
-
-  - An unauthenticated SSR fetch rendered the schedule's *empty state*, so a
-    broken request looked exactly like a legitimately unconfigured tenant.
-  - `'DATABASE_URL_HOST=' in text` matched `MIGRATION_DATABASE_URL_HOST`, so an
-    idempotency guard skipped the write it was protecting and reported success.
-    Fixed with an anchored `^\s*DATABASE_URL_HOST=`.
-  - `concept-seed.mjs` exits 0 printing nothing when its state directory is
-    wrong, which reads identically to "no findings".
-  - **Array truthiness (Stage 6b).** `GET /api/solver/runs` returns `active` as
-    an ARRAY, and `[]` is truthy, so `list.active ?? list.runs[0]` always
-    yielded the empty array. Run adoption therefore never fired and the toolbar
-    reported "no run in progress" — which is exactly what it says when there
-    genuinely is none. Fixed with `active?.[0]`. In JS the empty-collection case
-    needs `.length` or an index, never a bare truthiness test.
-  - **Absence that only proves the page failed (Stage 6b).** The first
-    permission check asserted the solver control was missing for a viewer — and
-    it was also missing for the admin, because of the SSR bug below. A test for
-    "affordance absent" must also assert the surrounding page RENDERED, or it
-    passes for the wrong reason. The fixed check reports
-    `schedule rendered=True solver control=False`.
-  - **A constraint tracked against a query shape that never existed (indexes,
-    below).** Two of three "missing" indexes were tracked as backing a
-    `refreshViolations()` collision lookup that has never driven off room/person
-    columns. The description was accurate to an intention, not to the code.
-
-  The counter-example to copy: provisioning against an unseeded database fails
-  on a foreign key and writes nothing. Loud, specific, unmistakable.
-
-- **A tracked-gap entry written from design INTENT can drift from the code
-  silently — re-verify before acting on one.** Everything else in this repo is
-  checked by something: types, tests, the database, the build. Prose is checked
-  by nobody. So an entry describing what a thing is *for* stays confidently
-  worded long after the implementation went somewhere else, and the next session
-  reads it as fact because it is written like fact.
-
-  The instance that proved it: the three missing indexes below were tracked as
-  backing "the room/person collision lookups in `refreshViolations()`", copied
-  from the migration comment that created them. `refreshViolations()` has
-  never looked up by room or person — it drives off `session_id` throughout, and
-  the primary keys already served it. The description was accurate to an
-  intention the code never took, and reading it as a to-do would have added two
-  indexes with `idx_scan = 0` at 27,000 sessions.
-
-  Practical form: when a tracked entry is the reason you are about to change
-  something, **confirm its claim against the code first, and measure if the claim
-  is about performance.** Then correct the entry with what you found, whichever
-  way it went — that is how the entry stops being wrong, and the correction is
-  worth more than the change you were going to make. A periodic pass over the
-  older entries is tracked in `BACKLOG.md`; until then, verification is
-  per-entry and happens when the entry is used.
-
-  **This applies with more force to `BACKLOG.md` than to this file.** Nothing in
-  the repo references a backlog entry, so nothing ever contradicts one when it
-  goes stale — no test fails, no build breaks, no reader trips over it in the
-  course of other work. CLAUDE.md at least gets read every session. Treat an
-  entry there as a lead, never as a finding.
-
-- **Split a component when it mixes more than ~3 distinct responsibilities, or
-  exceeds ~250 lines.** Line count is the trigger to *look*, not the rule: a
-  single-concern component that is large because of cohesive SCSS
-  (`CommonButton`, 303 lines) is fine, while a 300-line file juggling fetching,
-  filter state and four presentational blocks is not. **Pages compose; they do
-  not implement.** State moves to a composable when more than one component
-  needs it, or when it forms a machine with its own rules (selection and
-  placement mode constrain each other, so they live together). Give each
-  composable one ownership boundary and say what it is — `useScheduleFilters`
-  owns exactly what changes the API query, and view state like density stays out
-  of it precisely because it does not.
-
-  One Nuxt-specific trap this ran into: **a composable that calls `useAsyncData`
-  or `useRequestFetch` must stay synchronous.** An `await` inside it detaches
-  everything after that point from the Nuxt instance and fails at runtime with
-  "a composable ... was called outside of a Vue setup function". Return the
-  async-data handle and let the page hold the single top-level `await`.
-
-- **New style work uses design tokens, never literals.** Colour, font size,
-  border radius and spacing come from CSS custom properties: colours from the
-  generated `--<colorName>` set (emitted per-theme by `useLayout()`), sizing from
-  `--font-size-*`, `--radius-*` and `--space-*` (declared once in
-  `app/scss/tokens-root.scss`, with SCSS aliases in `app/scss/tokens.scss`).
-  Either form works — `$fontSizeMd` and `var(--font-size-md)` are the same
-  property. This applies to **new** components and styles from Step 10 onward;
-  existing hardcoded literals are backlog and no step needs to hunt them down as
-  a side effect. If a value genuinely has no token, add one to the scale
-  deliberately rather than reaching for a literal.
-
-- **SSR data fetches must use `useRequestFetch()`, never bare `$fetch`.** Inside
-  `useAsyncData` (or any server-side render path), `$fetch` does not carry the
-  browser's cookie, so every authenticated call 401s on the server. The damage
-  is that this does not look like an error: the page renders its *empty state*
-  and hydrates from that, so a broken fetch is indistinguishable from a
-  legitimately unconfigured tenant. `useRequestFetch()` forwards the incoming
-  request's headers. Corollary when designing empty states: if "no data" and
-  "the fetch failed" render the same way, the bug is invisible — distinguish
-  them.
-
-- **`--fix` tooling can rewrite files outside the current change's scope —
-  review the full diff for unexpectedly-touched files, not just the ones you
-  meant to change.** `stylelint --fix` and `eslint --fix` operate on whatever
-  their config globs match, which is the whole project, not your working set.
-
-  Concrete instance, Step 13: `bun run stylelint:fix` was run to clean up new
-  components and silently modified **8 files the step never touched** — five
-  schedule components, `schedule.vue`, `layout.scss` and `schedule-panel.scss`.
-  Most of it was harmless property reordering, but it also rewrote
-  `rgba(124, 89, 188, 0.55)` → `rgb(124, 89, 188, 0.55)` in `ScheduleGrid.vue`,
-  a *value* change inside the file whose grid placement had just been debugged.
-  It was caught by reading `git diff --name-only`, not by any check — build,
-  typecheck, eslint and all 45 tests passed with it in place.
-
-  Practical form: scope the fixer to your own paths
-  (`stylelint --fix 'app/components/manage/**/*.vue'`), and when you do run it
-  project-wide, `git checkout --` the files outside your scope afterwards.
-  Bulk-fixing pre-existing lint debt is a deliberate standalone task, never a
-  side effect of another step.
-
-- **`export { x } from './y'` re-exports WITHOUT binding `x` locally.** The
-  module can hand `x` to its importers and still throw `ReferenceError: x is not
-  defined` when its own code calls it — and `nuxt build` typechecks it clean,
-  because the export is genuinely valid. Moving `isoWeekday` into
-  `shared/academicCalendar.ts` and re-exporting it from `solverCalendar.ts` broke
-  `computeReferenceSlot()` exactly this way; three tests caught it, the build did
-  not. When extracting a helper that the same file still uses, `import` it as
-  well as re-exporting it.
-
-- **Vue does not flush watchers during SSR, so nothing that must be true at
-  first render may depend on one.** A `watch(data, seed, { immediate: true })`
-  runs exactly once on the server — at setup, before the fetch resolves — and
-  never again. In Step 13 that rendered every management edit form with *empty
-  inputs* over records that had data; the client re-seeded on hydration, so it
-  showed as a flash and a hydration mismatch rather than an error. Drive
-  first-render state from the awaited promise instead
-  (`const ready = (async () => { await asyncData; seed(); })()`), and keep the
-  watcher only for later client-side refreshes.
-
-  It survived a whole phase because the check counted `<input>` elements rather
-  than reading their `value`. **Verify the content, not the presence.**
-
-  **Second instance, Stage 6b — same shape, different symptom.** `filters.termId`
-  is seeded by a `watchEffect` in `useScheduleData`, so during SSR it is still
-  `''` while the page renders. The solver control gated on it
-  (`v-if="canTriggerSolver && termIdModel"`) and was therefore absent from the
-  server-rendered page for a user who had every permission for it, appearing only
-  after hydration. Fixed by exposing `resolvedTermId` — which falls back to the
-  term the fetch actually used — and gating on that instead.
-
-  The generalisation, now that this has happened three times (edit forms,
-  `<select>`, this): **anything a watcher seeds is `undefined` at first render on
-  the server.** If a template branches on it, the server renders the wrong branch.
-  Prefer a `computed` derived from the awaited data over a watcher-assigned `ref`
-  whenever first render depends on the value.
-
-- **`<select>` needs `:selected` on its options, not just `:value` on the
-  select.** `value` is a *property* of a select element, not an attribute, so
-  server rendering drops it and the browser falls back to the first option. A
-  Term that had a TimeGrid rendered as "— None —" until hydration corrected it:
-  the page stating the opposite of the truth. Every `<select>` in
-  `app/components/manage/` binds `:selected` on its `<option>`s for this reason.
-
+- **Naming**: `Offering` = recurring definition; `Session` = one placed
+  occurrence. No "Lecture"/"Event"/"Class" as entity names — those are
+  tenant-facing `kind` values.
+- **Routes**: standard REST per entity; editing ops (`move`/`swap`/`lock`/
+  `apply-generation`) are explicit verbs on Session, not generic PATCHes,
+  so the event log records intent.
+- **`/` is the PUBLIC landing page; `/dashboard` is the signed-in home.**
+  `auth.global.ts` has two exemption lists that aren't interchangeable:
+  `PUBLIC_ROUTES` (auth pages — need no session AND bounce a signed-in
+  visitor) vs. `ANONYMOUS_ROUTES` (`/` — needs no session, bounces nobody).
+  `HOME_ROUTE` in `app/utils/routes.ts` is the **only** place "where a
+  signed-in session belongs" is written — it was `'/'` in four separate
+  literals before, which is how a post-login redirect once landed on the
+  marketing page. `/` reads no session, calls no API, exposes no tenant
+  data (not the same as BACKLOG.md's unauthenticated-access items).
+  Verification detail: DECISIONS.md § "Landing page / routing".
+- **The landing page's claims are checked against BACKLOG.md by a test** —
+  `tests/landing-page.test.ts` parses § "Current phase" and asserts
+  unchecked entries match what the page presents as not built. Contact CTA
+  is `mailto:`, not a POST (persisting it would be a 4th RLS exception for
+  a public write).
+- **Guards/detection conditions must fail loudly or match exactly.** A
+  condition that can both "correctly find nothing" and "incorrectly match
+  nothing from a bug" must be distinguishable — anchored matching, asserted
+  shape, or reported action. Bitten repeatedly in different disguises —
+  case log: DECISIONS.md § "Guards must fail loudly." Counter-example to
+  copy: an unseeded-database provision fails on a FK and writes nothing.
+- **A tracked-gap entry from design INTENT can drift from the code
+  silently.** Prose is checked by nobody. Before acting on a tracked entry
+  (here or in BACKLOG.md), confirm its claim against the code, measure if
+  it's about performance. Applies with more force to BACKLOG.md — nothing
+  references it, so nothing contradicts it when stale. Established by:
+  DECISIONS.md § "Database & migrations" (three "missing" indexes).
+- **Split a component past ~3 responsibilities or ~250 lines** (line count
+  is the trigger to *look*, not the rule — cohesive SCSS bulk is fine).
+  Pages compose, don't implement; a composable gets one ownership boundary.
+  A composable calling `useAsyncData`/`useRequestFetch` must stay
+  synchronous — an `await` inside detaches it from the Nuxt instance
+  ("called outside a Vue setup function"); return the async-data handle,
+  hold the top-level `await` in the page.
+- **New style work uses design tokens, never literals** — colours from
+  `--<colorName>` (per-theme via `useLayout()`), sizing from
+  `--font-size-*`/`--radius-*`/`--space-*` (`app/scss/tokens-root.scss`).
+  Applies to new work from Step 10 on; add a token deliberately if one is
+  genuinely missing.
+- **SSR fetches must use `useRequestFetch()`, never bare `$fetch`** —
+  `$fetch` drops the browser cookie server-side, so an authenticated call
+  401s and the page silently renders its empty state, indistinguishable
+  from a legitimately unconfigured tenant. If "no data" and "fetch failed"
+  render identically, the bug is invisible.
+- **`--fix` tooling can rewrite files outside your change's scope** —
+  `stylelint`/`eslint --fix` match the whole project, not your working set
+  (once silently rewrote a debugged CSS value elsewhere — DECISIONS.md §
+  "`--fix` tooling"). Scope the fixer to your paths; `git checkout --`
+  anything outside scope afterward.
+- **`export { x } from './y'` doesn't bind `x` locally** — throws
+  `ReferenceError` if the same file also calls `x`, and `nuxt build`
+  typechecks it clean. Import what you re-export if you still use it.
+- **Vue doesn't flush watchers during SSR** — `watch(data, seed, {
+  immediate: true })` runs once, before the fetch resolves, and never
+  again. First-render state must come from the awaited promise
+  (`const ready = (async () => { await asyncData; seed(); })()`), watcher
+  only for later client refreshes. Bitten three times in different shapes
+  — case log: DECISIONS.md § "SSR/watcher bugs." Generalisation: anything a
+  watcher seeds is `undefined` at first render server-side; prefer
+  `computed` over a watcher-assigned `ref` when first render depends on it.
+  Verify rendered *content*, not element presence.
+- **`<select>` needs `:selected` on `<option>`, not just `:value` on the
+  select** — `value` is a property, dropped by SSR; browser falls back to
+  the first option.
 - **Permissions**: per-tenant, tenant-configured roles — never a hardcoded
-  global role enum in application logic.
-- **`Role` and `AccessRole` are different things that share a word.** `Role`
-  (TAXONOMY.md §2) is scheduling *vocabulary* — Lecturer, Student, Auditor —
-  and carries domain meaning: `offering.required_role_id` means "this Offering
-  needs a Lecturer". `AccessRole` (§4) is *authorization*: a tenant-defined
-  bundle of fixed Permissions. Keeping them separate is what stops the schema
-  accepting an Offering that requires a lecturer holding the role "Billing
-  Admin". Never merge them, and never grant permissions via `Role`.
-- **Permissions are fixed, roles are not.** The `permission` catalogue is code
-  (`server/utils/permissions.ts`, mirrored into the table by migration).
-  Tenants bundle permissions into AccessRoles; they cannot invent permissions,
-  because a permission with no corresponding code path is meaningless. Adding
-  one means editing both the constant and the migration.
+  global role enum.
+- **`Role` (TAXONOMY.md §2, scheduling vocabulary — Lecturer/Student) and
+  `AccessRole` (§4, authorization) share a word but are different things.**
+  Never merge them; never grant permissions via `Role`.
+- **Permissions are fixed, roles are not** — catalogue is code
+  (`server/utils/permissions.ts`, mirrored by migration); tenants bundle
+  into AccessRoles but can't invent permissions. Adding one = editing both
+  the constant and the migration.
+- **A page must not depend on permissions its own gate doesn't imply** —
+  enumerate every endpoint a page calls; one missing permission inside a
+  `Promise.all` blanks the whole page with no error, the least diagnosable
+  failure a UI has.
 
 ## Current phase
 
-Tracked in **[BACKLOG.md](BACKLOG.md) § Current phase**, together with the
-staged solver plan. Kept out of this file because a checklist is a task list,
-not a decision someone could undo.
-
+Tracked in **[BACKLOG.md](BACKLOG.md) § Current phase**, with the staged
+solver plan — a checklist, not a decision to preserve.
 
 ## Solver integration (calendry-solver)
 
-Three repos, one system. Neither of the other two is checked out as part of
-this one:
+Three repos: `calendry` (this app, owns Postgres) ↔ `calendry-solver` (Rust
+gRPC optimizer, **stateless**, vendored at `vendor/calendry-solver` — see
+"What this project is" above) ↔ `calendry-proto` (shared schema; consumed
+*here* as the npm package `@mindcollaps/calendry-proto`, **GitHub Packages
+not npmjs.org**; consumed by the Rust side as its own nested submodule
+inside `vendor/calendry-solver`, not checked out separately in this repo).
+Solver is
+functionally complete: 14 constraint types, LNS + simulated annealing,
+`StartRun`/`GetStatus`/`CancelRun`. 27,000-Session instance solves in ~349ms.
 
-| Repo | What it is | How this app consumes it |
-|---|---|---|
-| `calendry` | this app — owns Postgres, all state | — |
-| `calendry-solver` | Rust gRPC optimizer, **stateless** | over gRPC |
-| `calendry-proto` | the shared Protobuf schema | npm package `@mindcollaps/calendry-proto` |
-
-The solver is functionally complete: all 14 constraint types from the §7
-catalogue, LNS with simulated annealing, and a `StartRun`/`GetStatus`/`CancelRun`
-job API. A 27,000-Session large-university instance solves in ~349ms.
-
-**The solver never touches Postgres.** This app assembles a complete
-`SolverInput` snapshot and sends it; the solver is input/output only and
-persists nothing beyond an in-flight run. Everything the solver knows, this app
-put in the request — which means every gap in the snapshot is a wrong answer the
+**The solver never touches Postgres** — this app assembles a complete
+`SolverInput` and sends it; every gap in the snapshot is a wrong answer the
 solver has no way to detect.
 
-`calendry-proto` is consumed here as a normal npm dependency and by the Rust
-side as a pinned git submodule. It is published to **GitHub Packages, not
-npmjs.org**, which requires authentication to install even though it is public.
-
-## `MinimizeRoomRank` gains a direction: `invert`
-
-"Spare the best rooms" only ever penalized `room.rank >= rank_threshold`.
-When asked for the opposite ("prefer higher-ranked rooms for lessons"), a
-**parameter was chosen over a new catalogue type** — deliberately, and for a
-reason worth keeping: two separate types (`MinimizeRoomRank` /
-`MaximizeRoomRank`) could both be enabled simultaneously, penalizing high and
-low ranks at once, a contradictory configuration nothing would prevent, since
-each type gets its own default row and the one-default-per-type index only
-governs within a single type. A direction parameter makes that
-unrepresentable. Same trajectory as `MinimizeBlockUsage` absorbing
-`MinimizeFirstBlock`/`MinimizeLastBlock`, and `MinimizeDayUsage` absorbing
-"minimize Saturday" — this codebase merges directions into one parameterised
-type rather than multiplying types per direction.
-
-**Wire:** `MinimizeRoomRank` gains `bool invert = 2` (field 1,
-`rank_threshold`, unchanged). `false` (default, and what every existing row
-means when the field is absent) = penalize `rank >= threshold` — spare the
-best rooms. `true` = penalize `rank <= threshold` — prefer them. Confirmed
-old peers keep their exact meaning: encoding `{rank_threshold: 2}` with no
-`invert` produces `ba01 02 0802` under both 0.4.0 and 0.5.0, decoding to
-`invert: false` either way.
-
-Published as `calendry-proto@0.5.0`. **Correction to this file's own
-history**: the `MinimizeBlockUsage` entry previously recorded that version as
-`0.3.0`; it actually shipped in `0.4.0`. Nothing was published between
-0.2.0 and 0.3.2 — those three tags point at the same commit
-(`7856748`, byte-identical proto trees), evidently re-tag attempts carrying
-no schema change. `0.4.0` (`506dacd`) is the commit that actually added
-`MinimizeBlockUsage`. Corrected here since `package.json`'s `^0.4.0` and the
-vendored submodule had been correct all along — only this file's prose was
-stale, which is exactly the drift risk this file's own "tracked entries need
-re-verification" rule describes.
-
-**Solver-side grading, not just a boolean branch.** Implementing `invert`
-surfaced that `MinimizeRoomRank` was the first constraint type to need a
-*graded* penalty rather than a flat per-instance weight: a room 8 ranks past
-the threshold should cost more than one 1 rank past it, or the search has no
-gradient to descend. A new `severity()` function (0.0..=1.0, normalized
-against the room set's own rank span) scales this rule's contribution;
-every other constraint type still returns `1.0` and costs exactly its
-configured weight per instance, unchanged.
-
-**The 0.0..=1.0 cap is load-bearing, not cosmetic.** `hard_penalty =
-sum(all soft weights) × placements + 1` depends on that sum bounding what any
-achievable soft configuration can cost — see the negative-weight incident
-already in this file ("RESOLVED: constraint shape is now validated at the
-write boundary") for what happens when that bound is violated. A raw
-distance multiplier (rank 10 costing 10× rank 1, unbounded) would break the
-same guarantee from the other direction. Normalizing against the rank span
-keeps a gradient for the search to use while keeping this rule's maximum
-contribution identical to every other soft rule's.
-
-The objective breakdown (previously `count × weight`) was updated to match —
-left alone, it would have reported a number the actual objective no longer
-contains, the same "search and reporting disagree" failure class already
-guarded against elsewhere in this file. `raw_count` (a plain count of
-sessions in discouraged rooms) is kept separate and unscaled, since that is
-the actual question a human asks when reading this number.
-
-Measured, before → after, same inputs (ranks 0,1,2,3,10, threshold 2, 6
-lessons): `[0,0,1,1,10,10]` → `[0,0,1,1,2,2]` — the search now fills outward
-from the least-bad room and leaves the extreme one empty, rather than being
-indifferent to how far past the threshold it reaches.
-
-**New tenants are now provisioned with `invert: true`** in
-`minimize_high_ranking_rooms`'s seeded params — i.e. the default going
-forward, when this rule IS enabled, is "prefer higher-ranked rooms," not
-"spare them." **`enabledByDefault` itself stays `false`**, unchanged from
-every other non-structural type — flipping a rule's direction for a tenant
-that already has it configured is safe; enabling a previously-off rule for
-everyone is not, per this file's existing reasoning for why
-`defaultConstraintRow` only auto-enables the four structural types.
-
-Catalogue label renamed from "Spare the best rooms" to **"Steer room choice
-by rank"**, since the old name was only accurate for one setting of the new
-parameter.
-
-### Installing the proto package: three traps, all hit for real
-
-The credential lives in `~/.bunfig.toml` (or the gitignored `./bunfig.toml`),
-never in a committed file. `bun run check:registry-auth` diagnoses all of this
-offline; `bunfig.toml.example` is the template. Each rule below cost a round
-trip to discover, and all three produce the *same* opaque 401:
-
-1. **A bunfig scope token is only sent when the SAME entry declares `url`.**
-   `{ token = "…" }` alone is silently ignored — even with the scope mapped to
-   the right registry in `.npmrc`. Verified against a local probe registry that
-   logged the `Authorization` header.
-2. **An `.npmrc` auth line OVERRIDES a bunfig scope token.** A stale, invalid
-   token left in `~/.npmrc` kept beating a perfectly good `bunfig.toml` entry;
-   `curl` with the same good token succeeded the whole time. If bun 401s while
-   curl works, look for a second credential before doubting the first.
-3. **GitHub Packages rejects fine-grained PATs for the npm registry.** A
-   `github_pat_…` token authenticates fine against `api.github.com` (200) and is
-   then refused by the registry with `permission_denied: does not match expected
-   scopes`, and by the packages REST API with `Resource not accessible by
-   personal access token`. Use a **classic** PAT (`ghp_` + 36 chars) with
-   `read:packages`. The guard now catches this by prefix.
-
-Scope entries resolve nearest-first and the nearest wins **wholesale** — a
-project-level entry replaces a home entry rather than merging with it — which is
-why nothing scope-related is committed.
-
-### Decision: warn-and-allow parity for solver output
-
-A run that reaches `RUN_STATUS_SUCCEEDED` but still carries residual hard
-violations **is still offered as an applicable Generation.** Its violations are
-surfaced through the same `constraint_violation` mechanism manual edits already
-use. Not silently discarded, not auto-applied.
-
-`Generation.apply` still requires an explicit human action regardless of
-violation state — unchanged from existing behaviour.
-
-**A consequence, realised in Stage 5: `GenerationStatus.INFEASIBLE` is now
-effectively unused for solver output, and that is not an oversight.** Warn-and-
-allow means a SUCCEEDED run carrying residual hard violations is still `READY`
-and still applicable, and a run that never succeeded produces no Generation at
-all (`shouldCreateGeneration()` admits only SUCCEEDED — a Generation nobody can
-apply is noise in a list whose entire job is "what could I apply?", and
-`solver_run` already records what happened). The status stays in the enum for
-import and for a future solver that reports infeasibility as a first-class
-outcome. Nothing setting it is the design working, not a missing branch.
-
-This is parity with §3's manual-edit rule (hard-constraint violations warn, they
-do not block), and it matches what the wire protocol already says: `RunStatus`
-deliberately describes **the run's lifecycle, not the solution's quality**. The
-solver accepts possibly-infeasible input and degrades gracefully rather than
-rejecting it, exactly as `ExactFrequency` (unplaced Sessions) and
-`MaxOnlineShare` (share breaches) already do. A `SUCCEEDED` run with violations
-is a normal outcome, not an error case.
-
-### Decision: single-tenant, non-federated scope for Stages 1–6
-
-**Superseded by Stage 7 for two of the two mechanisms below — both are now
-implemented.** Kept here for the reasoning; see "Federation-shared room
-occupancy" and "Federation-shareable Sessions" further down for what actually
-shipped.
-
-Two Federation mechanisms were decided in principle and deliberately NOT
-implemented before Stage 7:
-
-- **`ExternalOccupancy`** — occupancy of Federation-shared Rooms by other
-  tenants. Resolved in Stage 7b (below): a parameterless `SECURITY DEFINER`
-  function, not a cross-tenant ledger.
-- **`Session` becoming federation-shareable** — resolved in Stage 7c (below):
-  the Session row is shared, but participant links (`session_group`,
-  `session_person`) stay tenant-private — a deliberate narrowing of the
-  TAXONOMY.md amendment's literal wording.
-
-### Determinism: only the move budget is reproducible
-
-`Budget` carries both `max_wall_millis` and `max_moves`, and **whichever is hit
-first ends the run**. The guarantee is that the same `(input, seed, move budget)`
-produces byte-identical output — but that holds **only when termination was by
-move budget**. A wall-clock-terminated run is not reproducible, because how many
-moves fit in a second is not a property of the input.
-
-`SolveStats.termination_reason` reports which one ended it (`"move_budget"`,
-`"time_budget"`, `"converged"`, `"cancelled"`). Anything that claims to explain,
-replay or diff a run must read that field first; treating a `time_budget` run as
-replayable produces a different answer and blames the wrong thing.
-
-`StartRunResponse.seed` echoes the seed actually used (0 = solver picks one), so
-a run is reproducible even when the caller did not choose the seed.
-
-### Default `maxMoves` raised: 50,000 → 30,000,000
-
-The old default was stopping most real solves at roughly 21% of the distance
-to convergence. Measured serially at seed 42 (solver restarted between runs,
-to avoid the idempotency-key trap below):
-
-| `maxMoves` | termination | moves | elapsed | objective |
-|---|---|---|---|---|
-| 5,000,000 | move_budget | 5,002,752 | 886 ms | 441.9 |
-| 10,000,000 | move_budget | 10,000,384 | 1,773 ms | 431.6 |
-| 20,000,000 | move_budget | 20,000,256 | 3,603 ms | 430.0 |
-| 30,000,000 | **converged** | 23,791,104 | 4,293 ms | 430.0 |
-| 50,000,000 | converged | 23,791,104 | 4,283 ms | 430.0 |
-
-The real term converges at 23.79M moves in ~4.3s. `maxMoves` default is now
-**30,000,000** — enough headroom to reach convergence on this instance, with
-50M shown to buy nothing further once converged (same moves, same objective)
-while costing ~9s on anything that doesn't converge.
-
-**Wall-clock cap raised alongside it, 10s → 30s, and this is the more
-important number to remember why.** Only `move_budget` and `converged`
-terminations are reproducible (see the Determinism section above) —
-`time_budget` is not. At ~5.5M moves/s, a non-converging instance reaches
-30M moves in ~5.4s, which left only 1.85× headroom against the old 10s cap:
-hardware roughly twice as slow would hit the wall-clock cap first and lose
-reproducibility on exactly the runs that most need it. The wall cap exists
-as a safety net, not as the intended terminator — raising it doesn't make
-runs slower, it just keeps the move budget as the one that actually binds.
-
-**Correction to a stale comment removed in the same change:** the old code
-comment claimed small instances "converge out long before five million
-moves," reasoning from a *stagnation limit* (which counts iterations) as if
-it were comparable to the move budget (which counts moves) — they are not
-the same quantity, and this tenant's real term needs 23.79M moves to
-converge, not under 5M.
-
-**Reminder for anyone re-measuring this**: the idempotency key is
-`<inputHash>:<seed>` and does **not** include the budget — see "Idempotency:
-the key is `<inputHash>:<seed>`" above. Two calls with the same input/seed
-but different `maxMoves` return the *same* run. The solver must be
-genuinely restarted between measurements, or every "new" run silently
-replays the first one.
-
-### Idempotency: the key is `<inputHash>:<seed>`
-
-`POST /api/solver/runs` sends a SHA-256 of the ENCODED `SolverInput` plus the
-seed as `StartRunRequest.idempotency_key`, so **a repeated start against
-unchanged data returns the SAME run rather than launching a second one.**
-Observed accidentally and then confirmed deliberately: two consecutive
-assemblies of the demo tenant produced an identical hash and the solver handed
-back the same `run_id`.
-
-Two things to know before changing it:
-
-- The hash is over the encoded protobuf, not a JSON rendering. Two inputs that
-  encode identically are the same problem to the solver, which is exactly the
-  question being asked; a JSON hash would also move with key order and with how
-  BigInt happened to stringify.
-- Anything that deliberately changes the problem MUST change the key, or the
-  solver returns the earlier run and the new one is never observed. This bit
-  during Stage 3 verification: a stress variant reused the key and silently got
-  the previous, easy run back.
-
-### Both of the above are now CONFIRMED, not just designed
-
-Measured in Stage 1 against a live `calendry-solver`, not inferred from the
-proto:
-
-- **Determinism.** Two runs of an identical snapshot at seed 42 produced
-  byte-identical placements, objective and termination reason. Note a third
-  terminal reason beyond the two in the guarantee: `converged`, when the
-  constructive heuristic lands a zero-objective solution in 0 moves. It is as
-  reproducible as `move_budget`; `time_budget` remains the one that is not.
-- **Warn-and-allow is the solver's actual behaviour.** An over-constrained
-  snapshot (60 sessions demanded into a 40-slot grid) returned
-  `RUN_STATUS_SUCCEEDED`, `termination_reason=move_budget`, objective 21, **40
-  placements and 2 `ExactFrequency` hard violations** — rather than failing the
-  run. Stage 5 can rely on this: a SUCCEEDED run carrying violations is normal,
-  and the residuals arrive in `SolverOutput.hard_violations` ready to be mapped
-  onto `constraint_violation`.
-
-### Staged plan
-
-All seven stages are complete; the table has moved to
-**[BACKLOG.md](BACKLOG.md) § Staged plan** as a changelog. What each stage
-*established* — the behaviours and decisions that outlive it — stays in the
-sections below.
-
-
-### What Stage 2 established, and the one path it could not test
-
-Three behaviours were verified against a live solver rather than reasoned about:
-
-- **Concurrency is enforced by the database.** Three simultaneous POSTs to the
-  same term returned one 201 and two 409s naming the winner. The rule is the
-  partial unique index, not a `findFirst` — two parallel requests would both
-  pass an application check and both insert.
-- **A failed StartRun resolves its own row.** Solver down → 502, row `FAILED`,
-  **zero** active runs. The row is written as `PENDING` *before* StartRun so the
-  index can reject a concurrent second attempt during the call, which creates
-  the obligation to resolve it; otherwise a solver outage blocks that term until
-  someone edits the database by hand.
-- **A poll failure is deliberately NOT a run failure.** `GET /runs/:id` with the
-  solver down leaves the status untouched and returns `stale: true`. Marking it
-  `FAILED` would destroy a live run's record *and* free the index for a second
-  concurrent run.
-
-Two traps found while building it, both worth not rediscovering:
-
-- **A 23505 aborts the Postgres transaction.** Nothing may query it afterwards.
-  Looking up the conflicting row inside the same transaction returned
-  `500 current transaction is aborted` instead of a clean 409 — and only a
-  genuinely *parallel* test surfaced it; a sequential one passed.
-- **ts-proto emits `uint64` as `string`, not bigint.** `toWireU64` /
-  `fromWireU64` in `solverClient.ts` are the only place that conversion happens.
-
-**`RUNNING → CANCELLED` — RESOLVED in Stage 3b/3e.** It was tracked here through
-Stage 2 because `CancelRun`'s already-terminal and never-acknowledged paths both
-passed, so cancel *appeared* to work from every route tested, while the run that
-matters — a genuinely in-flight one — had never been interrupted.
-
-Now verified twice: directly against the solver, and through
-`POST /api/solver/runs/:id/cancel` (`RUNNING`, 6.2M moves, objective 1095 →
-`cancelled=true` → `CANCELLED`).
-
-Note what it took, because it will recur: the demo tenant's REAL data still
-converges in ZERO moves — 48 sessions into 760 slots is not a search problem —
-so the transition only became observable after demand was raised far above
-capacity. Anything that needs to watch a run in flight must construct that
-deliberately.
-
-### Stage 4: how polling actually works, and three things worth not relearning
-
-**The background poller owns correctness; on-demand polling owns latency.**
-`GET /api/solver/runs/:id` exists so someone watching gets a fast answer, but
-nothing about a run reaching a terminal state may depend on a human keeping a
-tab open. Both call the same `pollSolverRun()`, so they cannot disagree about
-what a status means.
-
-**Results are captured the moment a run goes terminal**, not when someone asks
-to apply them. The solver's run registry is an in-memory map with no persistence
-and no eviction, so "I'll fetch it later" is a promise a restart breaks.
-`solver_run.result` makes Stage 5 a database→database transform that cannot fail
-because a service bounced.
-
-**NOT_FOUND and UNAVAILABLE mean opposite things** and the distinction is the
-sharpest edge in Stage 4:
-
-- `NOT_FOUND` (gRPC 5) — the solver restarted and lost the run. Terminal and
-  unrecoverable: the row is marked `FAILED` with that reason, which also frees
-  the one-active-run index for that term.
-- anything else, including `UNAVAILABLE` (14) — transient. The row is left
-  **completely untouched** and the caller is told `stale: true`. Marking it
-  failed would destroy a live run's record on a blip *and* let a second
-  concurrent run start against the same term.
-
-`classifyPollFailure()` errs toward `unreachable` for unrecognised codes: the
-cost of being wrong that way is a stale row, the other way is a destroyed one.
-
-**Claiming is a lease, not a lock.** The original design used a session-scoped
-`pg_try_advisory_lock` to elect a single poller. That was wrong twice over and
-was caught before building: session locks belong to a CONNECTION and Prisma
-pools connections, so the "leader" would not reliably hold anything; and holding
-it across the gRPC calls would keep a transaction open across a network call —
-exactly what Stage 2 refused to do for StartRun.
-
-What actually works: a short transaction pushes `next_poll_at` into the future
-for the rows it takes, using `FOR UPDATE SKIP LOCKED`, so concurrent instances
-take **disjoint** sets rather than serialising. `pg_try_advisory_xact_lock`
-remains, scoped tightly around the claim and released at COMMIT before any
-network call, purely to stop a same-tenant stampede. Verified: four concurrent
-claimers, six due runs, zero duplicate claims, and the work becomes claimable
-again once the lease expires — so an instance dying mid-poll strands nothing.
-
-**One consequence to expect:** during a solver outage the effective retry
-interval is the 30s claim lease, not the adaptive cadence, because a failed poll
-deliberately writes nothing at all. A run therefore takes up to ~30s after the
-solver returns to resolve. That is backoff, not a bug, but it surprised me while
-testing and will surprise the next person.
-
-### Tracked gaps in the wire format
-
-Three open expressiveness limits between this app and `calendry-proto`, all in
-**[BACKLOG.md](BACKLOG.md) § Solver**: equipment QUANTITY cannot cross the wire,
-a Session with more than one Room cannot be represented, and the solver's run
-registry grows without bound. Each reports rather than narrows silently
-(`assembleSolverInput`'s report, `multiRoomSessionIds()`), which is the property
-to preserve — **do not "fix" any of them by quietly picking a value.**
-
-
-### RESOLVED (cross-repo): the solver treated a VIRTUAL room as capacity-1
-
-Both halves are now exempt, and the two sides agree. Fixed in `calendry-solver`
-at `99b41e3`; `vendor/calendry-solver` points at it.
-
-`Occupancy` (`solution.rs`) held a binary `BitMatrix` over (rooms × slots) with
-no capacity dimension, and `check_pair`'s `RoomDoubleBooking` branch reported on
-`rx == ry` — neither consulting `is_virtual`. The solver's half was the damaging
-one because it constrained the SEARCH: one online Session per slot, tenant-wide,
-during construction and LNS both.
-
-The fix keys on the FLAG, via a single `Room::is_exclusive()` predicate that both
-layers consult, so the search cannot refuse a placement it then declines to
-report. `capacity` still gates eligibility and was deliberately left alone — a
-virtual room with a genuine concurrency limit still cannot be expressed, and
-needs an explicit `concurrentCapacity` rather than an overload of `capacity`.
-
-**It exposed a real gap in the solver, which is now tracked there rather than
-here.** The bug had been enforcing `MaxOnlineShare` by accident: virtual rooms
-are the overflow valve when physical rooms are full, and capacity-1 held that
-valve nearly shut. Removing it more than doubled share violations at
-large-university (180 → 455) with structural violations unchanged at exactly 80
-and `unplaced` still 0 — so the model is now correct and the search is visibly
-worse at respecting a cap it was never actually respecting on its own. That is
-solver-side work; nothing in this app changes because of it. See
-BACKLOG.md § "Needs a decision, not a design pass" for the candidate fixes.
-
-What this app should expect in the meantime: a SUCCEEDED run may carry more
-`MaxOnlineShare` violations than it used to. That is warn-and-allow behaving as
-designed — they arrive in `SolverOutput.hard_violations` like any other residual
-— but a run against a tenant with heavy online delivery will look noisier than
-the Stage 5 measurements recorded above.
-
-### Why `violations.ts` expands membership DOWN but conflicts BOTH ways
-
-Two opposite failure directions were found in the same function, and the fix for
-each is why the two directions are now deliberately different. Both are closed —
-this is the reasoning, not a gap.
-
-**Under-reporting (closed by Stage 7a).** `no_double_booking_lecturer` intersects
-`session_person` rows, so it catches a person assigned to two overlapping
-Sessions directly — and misses one clashed in via membership of two *unrelated*
-Groups, where `conflictGroupIds()` connects nothing. `no_double_booking_person`
-closes it by expanding both sides to their attendee sets (direct participants
-plus every DESCENDANT group's members) and intersecting by identity.
-
-**Over-reporting (closed in Stage 5).** The group check expanded the conflict
-closure of BOTH sides, so any two Groups sharing an ancestor always intersected
-at that ancestor — see the Stage 5 section below for the measured scale.
-
-The rule that falls out, and the thing not to "simplify" back: **membership flows
-DOWN, conflict flows BOTH WAYS.** Being in Seminar A1 makes you part of Class A's
-cohort; being in Class A does not put you in Seminar A1. So `attendeeSets` uses
-`descendantGroupIds` while `conflictSets` uses `conflictGroupIds`, and swapping
-either for the other reintroduces one of the two bugs above.
-
-### Stage 5: two pre-existing bugs it uncovered, both fixed
-
-Neither was introduced by Stage 5. Both had gone unnoticed for the same reason —
-nothing had ever exercised the code path — and both are the kind of thing
-CLAUDE.md's "guards must fail loudly or match exactly" rule exists to catch.
-
-**1. A Session with history could not be deleted at all.**
-
-`session_event.session_id` is `ON DELETE SET NULL`, chosen so an audit row
-outlives the Session it describes (the schema says exactly that in a comment).
-But `deny_mutation()` refused every `UPDATE OR DELETE` on `session_event` — and
-the FK's SET NULL *is* an UPDATE. So the schema's own referential action was
-rejected by the trigger guarding the same table:
-
-    DELETE FROM session WHERE id = <a session that has any event>;
-    ERROR: session_event is append-only; UPDATE is not permitted
-    CONTEXT: SQL statement "UPDATE ONLY public.session_event SET session_id = NULL ..."
-
-It survived because until Stage 5 **nothing in the codebase deleted a Session** —
-there is no `DELETE /api/sessions/:id`, and `materializeGeneration()` removing
-solver-rejected placements is the only such call. The first Stage 5 verification
-passed only because it happened to have `deleted: 0`.
-
-Fixed by `20260816180000_session_event_detach_on_session_delete`, which narrows
-the trigger to permit **exactly one shape**: an UPDATE that sets `session_id`
-and/or `counterpart_session_id` from a value to NULL with every other column
-byte-identical. Repointing either column at a *different* Session, changing any
-other column, a detach smuggled in alongside another column, a no-op UPDATE, and
-DELETE are all still refused — pinned by 11 tests in
-`tests/session-event-append-only.test.ts`. Event CONTENT stays immutable, which
-is the property §3 actually needs; only the pointer to a row that no longer
-exists may be cleared.
-
-`ON DELETE CASCADE` was rejected (it destroys the audit trail the log exists
-for) and so was `RESTRICT` (it contradicts the decision that unplaceable
-Sessions are removed rather than left at placements the solver refused).
-
-**2. `no_double_booking_group` flagged any two Groups under a shared root.**
-
-`describeCollision()` intersected the EXPANDED conflict closure of *both* Sessions.
-Every group expands to include its ancestors, so two groups sharing any common
-ancestor always intersected at that ancestor — however unrelated they were:
-
-    Seminar A1 → {Seminar A1, Class A, Informatics 2026}
-    Class B    → {Class B,            Informatics 2026}
-    ∩          = {Informatics 2026}   ← a false positive
-
-Class B is neither an ancestor nor a descendant of Seminar A1 (0 rows in
-`group_closure` either way) and no person is in both, so booking them
-concurrently is legitimate. TAXONOMY.md §6 propagation is ancestors *and*
-descendants — not "shares a root".
-
-Fixed by expanding **one** side and intersecting against the other side's
-DIRECTLY assigned groups by identity, mirroring the solver's own implementation.
-Detection stays symmetric; only the reported ids differ, and reporting `b`'s own
-Groups is what a human needs to see.
-
-Scale of the bug, measured on the over-constrained Stage 5 schedule: the old code
-would have flagged **390** sibling-only pairs on top of the 18 genuine ones. On
-the ordinary 48-Session demo schedule it produced **24 phantom violations** where
-the correct answer — and the solver's — is zero.
-
-Three independent sources now agree on the same timetable: a closure query
-computed directly in SQL (18 colliding pairs / 36 sessions), the app evaluator
-(36 rows), and the solver (18 `GroupDoubleBooking` violations). Regression
-pinned by `tests/violations-group-conflict.test.ts`, which fails 6 of its 8 cases
-against the old logic.
-
-### RESOLVED: a terminal run whose result was never captured
-
-Found in Stage 6b verification. One run ended like this:
-
-    status=SUCCEEDED  generation_id=NULL  termination_reason=NULL  has_result=f
-
-A SUCCEEDED run is supposed to always produce a Generation (Stage 5). This one
-produced none, because `result` was never captured — and `createGenerationForRun()`
-correctly returns null when there is no result to propose.
-
-**What happens is confirmed; the root cause is not.** It coincided with cancelling
-a run that had *just* completed, so the `CancelRun` and the terminal
-`GetStatus(include_result=true)` overlapped. The plausible mechanism is that the
-cancel caused the solver to drop the finished run's result before the app asked
-for it, but that has not been proven and should not be assumed.
-
-**What IS proven is the recovery gap, which is the part that matters:**
-
-- `pollSolverRun()` deliberately records the terminal status even when the result
-  fetch throws (losing the transition would be worse — the run would look active
-  against a solver that has finished it, and the one-active-run index would block
-  that term).
-- **Nothing ever retries.** The background poller claims only
-  `PENDING/QUEUED/RUNNING`, and `GET /api/solver/runs/:id` short-circuits on
-  `isTerminal(run.status)` before polling. So a terminal row with no result is
-  never looked at again.
-
-The run is therefore permanently unusable: no result, no Generation, no way to
-get one, and the work the solver did is gone.
-
-Stage 6b surfaces this honestly rather than making it worse — `deriveState()` maps
-SUCCEEDED-without-a-Generation to the `failed` branch, so the UI says "The run
-failed" instead of hanging on a spinner or offering a Review link to nothing, and
-that case is unit-tested. But 6b does make the race *reachable from a button*,
-since a user can now press Cancel at exactly the wrong moment.
-
-**FIXED** by `20260817120000_solver_run_result_recovery` and `recoverRunResult()`.
-Four things are worth keeping:
-
-- **Discovery needed THREE gates widened, not one.** Besides the claim, the
-  `SECURITY DEFINER` `tenants_with_due_solver_runs()` also filtered on active
-  statuses — and the poller never visits a tenant that function does not name, so
-  widening only the claim would have looked correct while doing nothing. Proven
-  rather than assumed: with a recovery due, the widened function returns 1 tenant
-  where the old active-only predicate returns 0. (`GET /runs/:id` was left
-  short-circuiting on `isTerminal`, per Stage 4's on-demand-is-latency-only rule.)
-- **The predicate names SUCCEEDED explicitly.** "Terminal and missing a result"
-  would have chased 16 FAILED and 4 CANCELLED rows that correctly have none. Only
-  SUCCEEDED promises a result.
-- **`status` is never rewritten.** The run DID succeed and this row is the only
-  record of it; the capture failure is a separate axis, so it gets
-  `result_lost_at` and `result_recovery_attempts` rather than a new status value.
-  "Result lost" is `status = 'SUCCEEDED' AND result_lost_at IS NOT NULL`. This is
-  also what leaves the one-active-run index untouched — that index is partial on
-  PENDING/QUEUED/RUNNING, so a SUCCEEDED run already frees its term either way.
-- **NOT_FOUND short-circuits the budget.** `classifyPollFailure()` already knew
-  the difference: a solver that has forgotten the run restarted, and the result is
-  gone, so it is marked lost on attempt 1 rather than after five. Only
-  `unreachable` consumes the 5-attempt budget (5s/15s/60s/300s backoff, written on
-  the FIRST attempt — a terminal row has `next_poll_at = NULL`, which the claim
-  reads as due, so without that the stuck rows would be re-claimed every tick).
-
-Verified against a real corpus, not a fixture: the four genuinely stuck rows that
-had accumulated in the dev database were all resolved to `result_lost` at exactly
-attempt 5 with the specific message. A separately seeded run was recovered
-end-to-end — result recaptured, `termination_reason` restored, Generation created
-through the existing `createGenerationForRun()` — and a new run started normally
-on a term holding four result-lost runs.
-
-### Stage 6c: why the review screen shows two panels and no delta
-
-The obvious design — "0 issues → 23 issues" — is wrong, and the screen
-deliberately refuses to draw it.
-
-`violations.current` comes from `constraint_violation`, which this app's
-evaluator fills using **only the structural double-booking rules** —
-`STRUCTURAL_CONSTRAINT_TYPES`, currently four. `violations.proposed` is the
-solver reporting on **all 14 constraint types**. They are different measurements
-of different things.
-
-Measured, not assumed: on the same over-constrained timetable the solver reported
-**23** hard violations, and after applying, `refreshViolations()` recorded **36
-session-scoped rows plus 5 offering-scoped** — because the two evaluate different
-rule sets. An arrow between those numbers would invent a comparison that does not
-exist.
-
-So the screen renders two labelled panels, each naming its own source ("checked
-by Calendry — N structural rules" / "reported by the solver — 14 constraint
-types") and an explicit line saying they are not a like-for-like difference.
-
-**That N is derived from `STRUCTURAL_CONSTRAINT_TYPES.length`, not written out**,
-and the reason is a bug this file's own drift rule predicted: the label said
-"3 structural rules" for the whole of Stage 7 after `no_double_booking_person`
-made it four. A user-facing count stating the wrong number, that nothing checks.
-Do not replace it with a literal to save an import.
-
-**A true delta needs a dry-run evaluator** — running the app's own evaluator over
-the proposed placements without writing them, so both sides are measured the same
-way. That is real future scope, deliberately not built: it is a genuine feature,
-not a tweak, and faking it with the numbers available would be worse than saying
-so.
-
-### Rule: a page must not depend on permissions its own gate does not imply
-
-**Not a tracked gap — the bug is fixed and this is the standing rule it left.**
-Found in 6c verification. `/schedule/review/[id]` is gated on `session.read` (the
-preview endpoint's permission), but its reference fetch called `/api/offerings`,
-which requires `offering.read`. The `viewer` role has the former and not the
-latter, so one 403 inside a `Promise.all` rejected the whole handler and rendered
-a **completely blank page** — not an error, not a partial view, nothing.
-
-Fixed twice over: offering names now travel with the preview response, under that
-route's own gate; and the remaining reference fetches are individually tolerant,
-degrading to showing ids rather than blanking the page.
-
-The general rule, worth applying to any new page: **enumerate every endpoint a
-page calls and confirm each is covered by the permission the page is gated on.**
-A `Promise.all` of reference fetches turns one missing permission into a blank
-screen, which is the least diagnosable failure a UI has. This bit again in the
-schedule inspector's lecturer/group display (routes fetching `/api/roles` would
-have blanked the schedule for the `viewer` role, which lacks `role.read`) —
-caught before shipping by checking the live grant first.
-
-### Tracked gap: solver violations naming Sessions the solver invented
-
-A violation can name a Session the solver INVENTED, using a synthetic key that
-appears in no placement, so there is no join key and the violation cannot be
-attached to the row just created. `materializeGeneration()` counts these in
-`violationsUnmapped` rather than dropping them silently. Full measurement and
-the cross-repo fix shape are in **[BACKLOG.md](BACKLOG.md) § Solver**.
-**Do not "fix" it here by guessing a mapping from offering + slot.**
-
-
-### `bun run create:account` — adding an account to an EXISTING tenant
-
-`provision:tenant` creates a tenant and its first admin. Nothing could add a
-SECOND account to a tenant that already exists, which is why `vic@demo.local`
-became a hand-inserted SQL artifact and why verification work kept borrowing —
-and resetting — the real admin's credential twice over.
-
-    bun run create:account -- --tenant test --email someone@example.edu \
-        --name "Given Family" [--role tenant-admin] [--password …]
-
-Owner connection, audited to stdout, same CLI-not-endpoint reasoning as
-`provision:tenant` and `reset:password`. An email that already has an Account is
-REUSED rather than duplicated — one credential acting in several tenants through
-`account_person` is the point of a tenant-independent login — and its password is
-left untouched.
-
-`verify@calendry.local` in the `test` tenant is the dedicated HTTP-verification
-account. Use it for route testing rather than a human's credential. **Its current
-password lives in the gitignored `.env` as `VERIFY_ACCOUNT_PASSWORD`** — recorded
-there rather than here because `.env` is not committed and this file is. Assume no
-fixed value: it is rotated with `bun run reset:password -- --email
-verify@calendry.local`, which prints a one-time password that must then be changed
-through `POST /api/auth/change-password`. Update `.env` when you rotate it, or the
-next session rediscovers the same dead end.
-
-`vic@demo.local` and `viewer6b@calendry.local` are the two **under-privileged**
-accounts, both holding the `viewer` role (six read permissions, deliberately
-neither `solver.trigger` nor `generation.apply`). Use one of them whenever a
-check is about an affordance being ABSENT — and remember the rule that goes with
-it: assert the surrounding page rendered too, or the test passes for the wrong
-reason. Their passwords are in `.env` as `VIC_ACCOUNT_PASSWORD` and
-`VIEWER_ACCOUNT_PASSWORD`. Recreate the whole set on a rebuilt database with
-`create:role` followed by two `create:account` calls.
-
-### RESOLVED: constraint shape is now validated at the write boundary
-
-Two gaps, one category — the rule builder honoured a rule the **generic CRUD
-API did not**, so anything not going through the form wrote whatever it liked:
-
-- **Severity contradicting the catalogue.** `no_double_booking_room` stored as
-  SOFT with a weight was creatable through `POST /api/constraints`.
-- **Negative weight.** Found later, and worse. `weight: -5` returned **201**.
-  Every soft type declares "minimize", so a negative weight inverts a rule into
-  a maximize it never declared — and because the solver derives
-  `hard_penalty = sum(all soft weights) * placements + 1`, it also SUBTRACTS
-  from the margin that keeps hard constraints outranking every soft
-  configuration, for every rule in the tenant rather than just the mis-typed
-  one. With enough negative weight the penalty goes negative and the search is
-  rewarded for breaking hard rules.
-
-Both now go through `validateConstraintShape()` in `shared/constraintTypes.ts`,
-reusing the existing `severityMismatch()` so the write-boundary guard and
-`assembleSolverInput`'s solve-time reporting cannot disagree. Four things worth
-keeping:
-
-- **It could not be one refinement, and the split is create-vs-update, not
-  severity-vs-weight.** CREATE has `type` in the payload, so a zod
-  `superRefine` sees everything. UPDATE has **no `type` at all** — verified: a
-  PATCH carrying one returns 200 and leaves the stored type unchanged, because
-  zod strips unknown keys. So the stored type is authoritative and must be
-  READ, which a synchronous refinement cannot do. Hence `beforeUpdate`. Both
-  rules live in one function called from both paths.
-- **`beforeUpdate` validates ONLY the fields the patch touches**, and that is
-  the whole design. Validating the merged row would make an existing bad row
-  permanently uneditable — someone trying to DISABLE the row the guard objects
-  to would be refused by the guard, exactly the trap the mislabelled constraint
-  below already demonstrated once. Proven by falsification: switching to
-  merged-row validation makes four tests fail (a legacy row can then no longer
-  be disabled, renamed, or given a valid weight).
-- **The floor is `>= 0`, not `>= 1`.** calendry-solver's own check is
-  `weight < 0.0`, with "Zero is fine and means report the count, do not steer".
-  The builder's `min: 1` was **stricter than the solver** and was relaxed to 0 —
-  a control refusing a legal value is the same builder-versus-API divergence,
-  pointing the other way. Still no ceiling: weight is relative and
-  `hard_penalty` scales with the sum, so no magnitude lets a soft rule outrank a
-  hard one. A per-field help note now says so explicitly, since a low weight
-  being dominated by other configured rules looks identical to "the constraint
-  is being ignored" — it isn't, it's just small relative to whatever else is
-  enabled.
-- **A database CHECK backs it up.** `constraint_weight_non_negative`
-  (`weight IS NULL OR weight >= 0`) covers what the resource schema cannot:
-  `provision-tenant.ts` writes baseline constraints with
-  `tx.constraint.createMany` and never passes through `RESOURCES`. Refused even
-  for the owner role over raw SQL. The severity rule cannot have a CHECK — the
-  catalogue is code, not data — so it is refinement-only.
-
-`report.severityMismatches` stays as a safety net for rows written before this.
-
-**Still open, same family:** `params` accepts arbitrary JSON through the same
-generic API — see BACKLOG.md § Undecided.
-
-### The duplicate constraint: RESOLVED, and what it revealed
-
-The `test` tenant had two enabled `minimize_exam_week_sessions` rows (weights 5
-and 10). It was neither a deliberate duplicate nor kind-scoping: one of them was
-named **"Cap online share per group"** — the catalogue label of a DIFFERENT type
-— and the two were created eighteen seconds apart while exercising the Step 13
-builder.
-
-That mismatch was a real bug in `ManageConstraintBuilder.selectType()`, which
-auto-filled the name only when it was blank. Choosing a type, then changing your
-mind, updated the type and left the first type's label behind. Because `type` is
-`createOnly`, the resulting row could never be corrected by editing — only
-deleted and recreated. Fixed: the name now follows the type whenever it is still
-an untouched auto-fill, and is never overwritten once someone types their own.
-The mislabelled row was deleted through the API.
-
-### `bun run create:role` — creating an AccessRole in an EXISTING tenant
-
-Found while rebuilding the dev database after it was wiped: `provision:tenant`
-mints exactly one role (`tenant-admin`, at creation) and `grant:permissions` only
-widens a role that already exists, so nothing could create a new one and
-`create:account --role viewer` failed outright. Permission-gated regression
-checks — the 6b solver-control gate, the 6c viewer check — could not run at all.
-
-    bun run create:role -- --tenant test --key viewer --name "Schedule Viewer" \
-        --permissions session.read,group.read,room.read [--description …] \
-        [--dry-run] [--yes]
-
-**This is the one operator CLI whose writes do not need ownership**, and that was
-verified against the live database rather than assumed. `access_role`,
-`access_role_permission` and `person_access_role` are ordinary tenant-scoped
-tables carrying `tenant_isolation` with both USING and WITH CHECK, so the app
-role writes them happily once `calendry.tenant_id` is set — and is refused with a
-foreign `tenant_id` in the payload, or with no context at all.
-
-What the app role *cannot* do is resolve `--tenant <slug>` to an id: `tenant`'s
-policy is `id = current_tenant_id() OR federation_id = current_federation_id()`,
-so finding a tenant by slug requires already knowing which tenant you are. A
-fifth `SECURITY DEFINER` lookup would fix that and was deliberately declined —
-"an operator CLI would like a nicer argument" is not the comparably strong reason
-the four existing exceptions each have.
-
-So the owner connection resolves the slug, and the transaction then drops to
-`SET LOCAL ROLE calendry_app` with tenant context before writing anything. That
-narrows the write PATH, not the credential. What it buys is that a **mismatched
-pair cannot be written**: `access_role.tenant_id` and
-`access_role_permission.tenant_id` must both equal the context, so a bug
-resolving the wrong tenant is refused by the database instead of quietly landing
-a role in it. Pinned by `tests/access-role-writability.test.ts`, whose negative
-cases are the point — a suite asserting only "the app role can write a role"
-passes just as well against a build with `tenant_isolation` dropped entirely.
-
-**There is deliberately no `--all`.** `provision:tenant` already mints a
-full-catalogue `tenant-admin`, so a second one is an unaudited second superuser
-role per tenant; more to the point, a role granted "everything" once silently
-stops being everything the next time a permission is added — the same drift
-`grant:permissions --all-missing` exists to repair. Compose it from two audited
-steps instead.
-
-Duplicates fail loudly and are never upserted (a second row that looks like the
-first is worse than an error — see § "The duplicate constraint"), and a role
-whose *display name* collides with an existing one warns without blocking, since
-`name` is not unique but silence is how "Cap online share per group" came to
-label a `minimize_exam_week_sessions` row.
-
-Assignment stays with `create:account --role <key>`; granting a role to a person
-who already exists is still Step 14.
-
-### Step 14: AccessRole management has no UI and no API
-
-Scope and current state in **[BACKLOG.md](BACKLOG.md) § Features not built**.
-The durable part: `access_role`, `access_role_permission` and
-`person_access_role` are deliberately absent from `RESOURCES`/`RELATIONS`, and
-the editor this needs is a **picker over the fixed permission catalogue**, not a
-generic form — AccessRole is tenant data, but the permissions it bundles are
-code. Closer to the constraint rule builder than to the generic scaffold.
-
-
-### Open items on auth (tracked, deliberately not built)
-
-- **`must_change_password` — BUILT (operator reset), with gaps.** An operator
-  can force a reset with `bun run reset:password -- --email …`, which revokes
-  every session across every tenant, sets the flag, and prints an audit line;
-  login then returns `requiresPasswordChange` and issues no session until
-  `POST /api/auth/change-password` clears it. The remaining gaps — no rotation
-  flag on the provisioned password, no expiry, no complexity rule beyond the
-  12-character floor, no rate limiting, no email delivery — are listed in
-  **[BACKLOG.md](BACKLOG.md) § Password policy gaps**.
-- ~~**`WebUser` / `isAdmin` in `types/user.ts` is the template stub.**~~ **DONE.**
-  `types/user.ts` and the store's `me` field are deleted rather than left as a
-  second, wrong idea of who the user is; navigation gates on the real permission
-  catalogue. Verified: `types/` holds only `index.ts` and `toast.ts`. The
-  surviving mentions in `ViewMenu.vue`, `ViewLogin.vue`, `navigation.ts` and
-  `store/index.ts` are comments recording the removal — do not read them as the
-  stub still existing.
-- **Federation-level permissions** are out of scope per TAXONOMY.md §9.4.
-  Permissions are per-tenant only; administering federation-owned resources has
-  no model yet.
-- ~~**Session cleanup**~~ **DONE.** `server/plugins/sessionSweeper.ts` deletes
-  `auth_session` rows whose `expires_at` passed more than 30 days ago — first
-  sweep 60s after boot, then every 6h, opt out with `CALENDRY_SESSION_SWEEP=off`.
-  `expires_at` alone is the whole predicate: such a row can never authenticate
-  again, and the 12-hour TTL means a revoked row expires within half a day and is
-  caught by the same test, so no `LEAST(expires_at, COALESCE(revoked_at, …))` is
-  needed. The 30 days are not about the session — an expired one is already dead
-  — but about `user_agent` and `ip_address`, which answer "where was this account
-  used from" and are worth nothing if deleted the moment they matter.
-
-  It deliberately has **none of the solver poller's claim machinery**: the work
-  is one idempotent DELETE, so two instances racing means the loser deletes zero
-  rows and both are correct. And it needs **no new RLS exception** — `auth_session`
-  carries no RLS (exception 2 above) and `calendry_app` already holds DELETE, so
-  it is an ordinary statement on the runtime connection from `authDb.ts`.
+**`MinimizeRoomRank` has a direction parameter, `invert`** (`calendry-proto@0.5.0`):
+`false` (default) penalizes `rank >= threshold` (spare best rooms); `true`
+penalizes `rank <= threshold` (prefer them). New tenants seed `invert: true`
+(direction, not enablement — `enabledByDefault` stays `false`). Full
+reasoning: DECISIONS.md § "`MinimizeRoomRank` gains `invert`".
+
+**Installing the proto package**: credential in `~/.bunfig.toml`/gitignored
+`./bunfig.toml`, never committed (`bun run check:registry-auth` diagnoses
+offline). Three things producing the same opaque 401: a bunfig scope token
+needs that entry's own `url`; an `.npmrc` auth line overrides a bunfig
+token; GitHub Packages needs a **classic** PAT (`ghp_`), rejects
+fine-grained. Scope entries resolve nearest-first, wholesale not merged.
+
+**Warn-and-allow parity**: a `SUCCEEDED` run with residual hard violations
+is still an applicable Generation (same `constraint_violation` mechanism as
+manual edits) — not discarded, not auto-applied. `GenerationStatus.INFEASIBLE`
+is consequently unused for solver output by design. DECISIONS.md § "Solver:
+warn-and-allow".
+
+**Determinism: only the move budget is reproducible.** `(input, seed, move
+budget)` → byte-identical output, but only when termination was
+`move_budget` or `converged` — `time_budget` is not reproducible.
+`termination_reason` says which. `maxMoves` default **30,000,000** (was
+50,000, stopped ~21% short of convergence); wall-clock cap **30s** (was
+10s, keeps move-budget the binding one). `StartRunResponse.seed` echoes the
+seed used. Measurement: DECISIONS.md § "Solver: determinism & `maxMoves`".
+
+**Idempotency key is `<inputHash>:<seed>`** — SHA-256 of the *encoded*
+`SolverInput` (not JSON), so a repeat start against unchanged data returns
+the same run. Budget is NOT part of the key — restart the solver between
+measurements at different budgets, or you'll replay the first run.
+
+**Staged plan**: all seven stages complete, changelog in
+**[BACKLOG.md](BACKLOG.md) § Staged plan**. What's still live:
+
+- **Stage 2**: concurrency enforced by a partial unique index (not
+  `findFirst`); a failed StartRun resolves its own row to `FAILED`; a poll
+  failure is NOT a run failure (`stale: true`, status untouched). Full
+  verification: DECISIONS.md § "Solver: Stage 2 established".
+- **Stage 4 polling**: background poller owns correctness, on-demand owns
+  latency (both call `pollSolverRun()`). Results captured the moment a run
+  goes terminal — the solver's registry is in-memory, no persistence.
+  `NOT_FOUND` (gRPC 5) = solver lost the run, terminal, row → `FAILED`.
+  Anything else including `UNAVAILABLE` = transient, row untouched. Claim
+  is a **lease** (`FOR UPDATE SKIP LOCKED` + a per-tenant advisory xact
+  lock), not a session lock — reasoning: DECISIONS.md § "Solver: Stage 4
+  polling". During a solver outage, effective retry interval is the 30s
+  claim lease, not adaptive cadence.
+- **Virtual room capacity-1, RESOLVED cross-repo** (`calendry-solver`
+  `99b41e3`). `capacity` still gates eligibility (no `concurrentCapacity`
+  yet). The fix had been accidentally enforcing `MaxOnlineShare` — expect
+  more `MaxOnlineShare` violations post-fix on heavy-online tenants (warn-
+  and-allow working as designed). DECISIONS.md + BACKLOG.md § "Needs a
+  decision, not a design pass".
+- **`violations.ts`: membership flows DOWN, conflict flows BOTH WAYS.**
+  `attendeeSets` uses `descendantGroupIds`, `conflictSets` uses
+  `conflictGroupIds` — swapping either reintroduces an under- or
+  over-reporting bug. DECISIONS.md § "`violations.ts`".
+
+**Tracked wire-format gaps** (all in **[BACKLOG.md](BACKLOG.md) § Solver**,
+each reports rather than narrows silently — don't "fix" by picking a
+value): equipment quantity, multi-room Sessions, the solver's unbounded run
+registry, violations naming solver-invented Sessions with no join key.
+
+**Operator CLIs** — `create:account`/`create:role` for an existing tenant:
+
+    bun run create:account -- --tenant test --email x@y.edu --name "…" [--role tenant-admin]
+    bun run create:role -- --tenant test --key viewer --name "…" --permissions a.read,b.read [--dry-run]
+
+Owner connection, audited to stdout. Existing email REUSED not duplicated;
+duplicates fail loudly, never upserted; **no `--all`** for `create:role`
+(compose from audited grants, don't mint an unaudited superuser role). Why
+these exist: DECISIONS.md § "Accounts & roles".
+
+Test accounts: `verify@calendry.local` (HTTP verification,
+`VERIFY_ACCOUNT_PASSWORD` in `.env`); `vic@demo.local` /
+`viewer6b@calendry.local` / `cviewer@calendry.local` hold `viewer` (six
+reads, no `solver.trigger`/`generation.apply`) — use for asserting an
+affordance is ABSENT, and also assert the page rendered. A rebuilt dev DB
+has one role/account — recreate with one `create:role` + `create:account`
+per test account.
+
+**Constraint shape validated at the write boundary** — severity (must
+match catalogue HARD/SOFT) and weight (`>= 0`, no ceiling) enforced via
+`validateConstraintShape()` on CREATE and UPDATE (`beforeUpdate` validates
+only touched fields, deliberately — merged-row validation would make a bad
+row permanently uneditable). DB CHECK backs the weight floor. Why it
+mattered: negative weight erodes `hard_penalty`'s margin for every rule in
+the tenant. `params` still accepts arbitrary JSON — BACKLOG.md § Undecided.
+
+**Step 14 — AccessRole management has no UI/API.** `access_role`/
+`access_role_permission`/`person_access_role` deliberately absent from
+`RESOURCES`/`RELATIONS` — needs a picker over the fixed catalogue, not a
+generic form. Scope: BACKLOG.md § "Features not built".
+
+**Auth**: `must_change_password` built (operator `reset:password` — revokes
+sessions, sets flag, audits; login blocks until `POST
+/api/auth/change-password`), gaps in BACKLOG.md § "Password policy gaps".
+Federation-level permissions out of scope (TAXONOMY.md §9.4). Session
+cleanup done — `sessionSweeper.ts` deletes `auth_session` past 30 days,
+needs no RLS exception (none exists) and no claim machinery (idempotent
+DELETE).
 
 ## The management area (Step 13)
 
-### The constraint page is now three components, not one
+`/manage` is one scaffold: three route files render every entity from
+`app/utils/manageRegistry.ts`, which is also the nav source — sidebar,
+index, header, palette can't drift from each other or the entity list.
 
-`ManageConstraintBuilder` used to be the whole constraint-management surface
-— an add-rows scaffold where creating a constraint meant picking a type from
-a dropdown and getting a new row. It is now **`ManageConstraintGrid.vue`**
-(the `listComponent`): a fixed catalogue, always fully rendered — every
-current type, including deprecated ones, is a row from the start, not
-something a tenant "adds." Each row toggles on/off in place, and expands
-inline for weight, params and scope — no separate edit navigation.
+- **Permission rule, uniform**: no `.read` → hidden entirely; `.read`
+  without write → visible read-only, rendered as **static text, not
+  disabled inputs**; unknown section → 404 (typo distinguishable from
+  permission problem).
+- **Bespoke means one slot** (`detailComponent`/`listComponent`), never a
+  page — shell/header/permissions/save stay shared. Qualifying: GroupTree,
+  TimeGridEditor, ConstraintBuilder, CalendarPeriodEditor. Offering is
+  deliberately NOT bespoke — its complexity is registry data, not
+  different code.
+- **`custom: true`** keeps a field in draft/dirty-tracking/payload with a
+  bespoke control; omitting it drops the field from saves silently.
+- **Relations are PUT-set sub-resources**, saved immediately per change,
+  not part of the entity's Save transaction. `warnAfterWrite` relations
+  return `{ rows, warnings }`; every other relation returns a bare array.
+- **The Ctrl+K palette holds no permission logic** — input is the
+  already-filtered nav source.
+- **Overlays claim the keyboard** via `useOverlay()`, following open
+  *state* not the function that opened it.
+- **Structural constraint types** (`RoomDoubleBooking` etc.) are
+  tenant-toggleable at all three layers (app evaluator, solver input,
+  solver's `convert.rs`) — not "always-on" despite some prose elsewhere
+  claiming so.
 
-**Split into three, each with one job:**
-- `ManageConstraintGrid.vue` — fetching, grouping, catalogue-drift reporting,
-  the single `patch()` path.
-- `ManageConstraintRow.vue` — one catalogue entry: toggle, severity marker,
-  weight, params disclosure, scope line. Emits intents
-  (`update:enabled`/`update:weight`/`update:param`/`update:scopes`); no
-  fetching, no permission logic — `canUpdate` is passed down from the grid.
-- `ManageConstraintBuilder.vue` — unchanged in role. Still the only path to
-  create a **variant** (a second, differently-tuned instance of a type,
-  scoped differently from the default) — needed because `type` is
-  `createOnly`, so only a dedicated create flow can pick one.
+Verification detail (the `paramField()` divergence, invisible-deprecated-
+types bug, ten-file `vartorgba` styling bug, read-only-path test):
+DECISIONS.md § "Management area (Step 13)".
 
-**Inline scoping is not the same question as a variant, and the UI keeps
-them separate on purpose.** A row's scope line ("Every session kind" /
-"Lecture, Seminar") opens the same single disclosure the params already use
-and PATCHes immediately — no schema or API change was needed;
-`constraintBeforeUpdate` already permitted scoping a default row, verified
-against the live API both narrowing and clearing back to universal. This
-answers "who does the DEFAULT rule apply to?" A variant answers "I want a
-SECOND copy of this rule, tuned differently" — collapsing the two would
-undermine the duplicate-constraint guard that already exists for exactly
-this confusion (see "The duplicate constraint: RESOLVED" above).
+## Academic calendar periods
 
-**`paramField()` existed in two places and had already diverged** — the
-grid's copy silently dropped `required`/`min`/`max` and the `(%)`
-relabeling the builder's copy kept. Unified into
-`app/utils/constraintFields.ts`, one definition, same discipline as
-`shared/timeGrid.ts`. One visible consequence: required parameters now show
-their asterisk in the grid, where they previously didn't — a byproduct of
-adopting the correct version, not new validation logic.
-
-**Deprecated types were invisible, not merely unmarked — a real bug, not a
-missing label.** `entriesFor()` and `missingTypes` both iterated
-`defaultConstraintTypes()`, which filters out anything with `deprecatedBy` —
-correct for *seeding* a new tenant's baseline, wrong for *rendering* the
-catalogue, and nothing distinguished the two uses of one predicate. Proven
-by inserting a legacy `minimize_first_block` row into a live tenant: the API
-returned 14 rows, the page rendered 13, and the label appeared nowhere
-except the hydration payload. Fixed — deprecated rows now render, toggle,
-and persist correctly while disabled, grouped into a **"Superseded rules"**
-subsection at the foot of their severity group, naming their replacement by
-catalogue label, and only shown at all when a tenant actually holds one.
-
-**Hard/soft separation is expressed by the weight control's presence, not
-just a badge.** Hard rows render no weight cell at all; soft rows get one
-in a fixed, aligned column on every row — an absent control can't be
-misread the way the earlier weight/severity mislabeling incident showed a
-badge can be. Section headers state the operative rule in words ("Must not
-be broken — a breach is a defect, and manual edits are warned rather than
-blocked" / "Weighed against each other — only the ratio between enabled
-rules means anything"), not just a category name.
-
-**Structural types (`RoomDoubleBooking`, `LecturerDoubleBooking`,
-`GroupDoubleBooking`, `PersonDoubleBooking`) are tenant-toggleable, at all
-three layers, and the grid reflects that rather than implying otherwise.**
-Traced end to end: `violations.ts` filters `isEnabled`, `solverInput.ts`
-queries `isEnabled: true`, and the solver's `convert.rs` only constructs the
-structural instance when the config is present — disabling one genuinely
-disables it in both evaluators. (`calendry-constraints-backlog.md` describes
-these as "always-on"; that document is prose nothing checks and was wrong
-here — this file is the corrected record.) The grid labels each structural
-row by which evaluator owns it ("checked by Calendry as you edit" vs.
-solver-owned) rather than asserting a guarantee the system doesn't actually
-enforce.
-
-**A pre-existing, wider styling bug was found and fixed while verifying the
-badge specifically: `vartorgba` is not a real Sass function.** The generated
-helper is `varToRgba` (case-sensitive lookup); the misspelling silently
-fails to resolve, so any declaration using it computes to unset. Found via
-the SOFT badge (white text, no background), but the same dead spelling was
-present in **ten files**: `ManageWeekdayPicker`, `ManageRelationPicker`,
-`ManageConstraintBuilder`, `ManageEntityForm`, `ManageGroupTree`,
-`ManageList`, `ManageDeleteDialog`, `ManageTimeGridBreaks`,
-`CommonCommandPalette`, and `CommonInputText`. Consequences beyond the
-constraint badge: the delete-confirmation modal's scrim/shadow, the Ctrl+K
-palette's scrim and active-row hint colour, the weekday picker's
-selected-day chip, list badge tints and error states, relation-picker error
-banners, and the input placeholder colour were all silently inert. Fixed in
-all ten, verified against the actual served CSS per component (not just a
-clean Sass compile) — 25 distinct `(token, alpha)` pairs checked, zero
-mismatches. The three occurrences inside `ManageConstraintGrid.vue`'s own
-code comment (quoting the wrong spelling to contrast it with the right one,
-explaining this exact bug) were deliberately left as-is.
-
-**The read-only render path is now pinned by a test, not a one-off manual
-check.** No seeded role previously held `constraint.read` without
-`constraint.update`, so nobody had ever exercised the Step 13 convention
-("`.read` without update/create/delete → visible, read-only, rendered as
-static text, not disabled inputs") for this specific page. A test-only
-account, `cviewer@calendry.local` (mirroring the existing
-`vic@demo.local`/`viewer6b@calendry.local` pattern, password in `.env` as
-`CVIEWER_ACCOUNT_PASSWORD`), was created to verify it manually, and
-`tests/page-renders-per-role.test.ts` gained a proper row asserting: every
-catalogue rule renders, zero editable toggles, zero weight inputs, no
-`disabled` attribute anywhere, create affordances absent — using the file's
-existing fixture-tenant pattern rather than depending on the real dev
-account. Falsified deliberately: re-rendering the row with a disabled
-checkbox instead of static text fails three of the four assertions.
-
-`/manage` is one scaffold, not eleven pages. Three route files
-(`[entity]/index`, `[entity]/new`, `[entity]/[id]`) render every entity from
-`app/utils/manageRegistry.ts`, which is also the **navigation source** —
-`useNavEntries()` projects the manage section straight out of it, so the
-sidebar, the `/manage` index, the header and the Ctrl+K palette cannot drift
-from each other or from the entity list.
-
-- **Permission rule, uniform across every entity.** No `.read` → the section is
-  *hidden entirely* (nav, index, palette; direct URL redirects to `/manage`).
-  `.read` without `.create`/`.update`/`.delete` → *visible, read-only*, and
-  read-only renders as **static text, not disabled inputs** — a disabled control
-  reads as "unavailable right now" rather than "not yours". An unknown section
-  is a 404, which keeps a typo distinguishable from a permission problem.
-- **Bespoke means one slot, never a page.** `detailComponent` / `listComponent`
-  replace the fields area or the rows; the shell, header, permission handling,
-  save/error plumbing and delete confirmation stay shared. Qualifying cases:
-  `GroupTree` + `GroupForm` (a hierarchy, and a parent picker whose options
-  depend on the row being edited), `TimeGridEditor` (an ISO-weekday array plus a
-  live preview built from the schedule's own `blockTime()`, and its own break
-  editor — see "TimeGrid breaks" below), `ConstraintBuilder` (type, severity,
-  weight and params constrain each other), and `CalendarPeriodEditor` (a
-  bespoke week-reclassification preview — see "Academic calendar periods"
-  below). **Offering is deliberately not one** — the hub of the model renders
-  on the generic scaffold because its complexity is registry data (`fields`,
-  `relations`), not different code.
-- **`custom: true` on a field** keeps it in the draft, dirty tracking, payload
-  and error mapping while a bespoke component supplies only its control. Leaving
-  a field out of the registry instead drops it from the draft and silently from
-  saves.
-- **Relations are PUT-set sub-resources** (`server/utils/relations.ts`), edited
-  as a whole collection and saved immediately, one request per change. They are
-  not part of the form's Save button: the entity and each relation are separate
-  endpoints with no shared transaction, so one button spanning them could
-  half-succeed with a single error message covering both. A relation can
-  optionally declare `warnAfterWrite` to return `{ rows, warnings }` instead of
-  the bare array every other relation returns — see "Group↔Term scoping" below
-  for the one relation that uses it, and why the response shape is conditional
-  rather than changed for all of them.
-- **The Ctrl+K palette holds no permission logic at all.** Its entire input is
-  the already-filtered `useNavEntries()`, so there is no check to forget.
-- **Overlays claim the keyboard through `useOverlay()`.** Page-level global
-  Escape handlers (`useScheduleEditing`) stand down while a claim is held,
-  which is what stops closing the palette from also cancelling a placement. The
-  claim follows the open *state*, not the function that changed it — hanging it
-  off `openPalette()` left the header's search button unclaimed.
-
-## Academic calendar periods, and the exam-week dead end they closed
-
-`calendar_period` had a table, a Prisma model, an RLS policy, a mapper and a
-wire field since the initial schema — and **no way to write a row**, in any
-tenant. It was absent from both `RESOURCES` and `manageRegistry`. Consequence:
-no week was ever classified `EXAM` anywhere, so `minimize_exam_week_sessions`
-reported zero violations while looking enabled and healthy, indistinguishable
-from "working and satisfied." Raising its weight from 5 to 1000 (a workaround
-tried before the real cause was found) multiplied zero by two hundred and
-changed nothing — proven directly: a probe exam period inserted, then a solve
-at weight 5 and at weight 1000, produced **byte-identical placements**. The
-weight was never the problem.
-
-**`calendar_period` is now a managed resource on the generic scaffold**, with
-one bespoke field: a live week-reclassification preview. `kind` (a fixed
-3-value enum), `name` and two dates are the whole row — none of what earned the
-three bespoke editors their slot (a hierarchy, arithmetic no form field
-expresses, fields that constrain each other) applies here. `Offering` is the
-precedent for "complex entity, generic scaffold anyway."
-
-**Permission: `term.update`, not a new one.** A calendar period is a child of
-Term with a mandatory `term_id`, exactly like `time_grid_break` is a child of
-TimeGrid — "changing when a term's exam period falls IS editing the term."
-Adding `calendar_period.manage` would mean editing the catalogue and seed, a
-backfill on every existing tenant, and authority over a table rather than a
-capability (the shape CLAUDE.md already warns against for `offering_equipment.
-update`).
-
-**Validation: two rules enforced, one deliberately not.**
-
-- A period fully outside the Term's date range → rejected (400). Such a row
-  would classify no week at all — silently inert, exactly the failure this
-  feature exists to end.
-- A period partially overlapping the Term's end → allowed. Only the in-range
-  part matters; clipping is the natural reading.
-- **Overlapping periods within a Term → allowed, and not checked at all.** A
-  holiday inside an exam period is completely ordinary, and the week-kind
-  precedence rule (EXAM wins if any exam period touches the week, else
-  whole-week BREAK, else whole-week HOLIDAY, else TEACHING) only has meaning
-  *because* periods can overlap. Rejecting overlaps would contradict the
-  resolver already shipped.
-
-**Why the preview earns its place, not just its cost.** The mapping from two
-dates to week kinds is genuinely unpredictable, and this is not hypothetical —
-a real probe period (2027-09-27 → 2027-10-18) marked **four** weeks `EXAM`, not
-three, because `EXAM` uses a "touches" rule (the week beginning 2027-10-18
-counts on its Monday alone) while `BREAK`/`HOLIDAY` use "covers the entire
-week" instead — so the *same dates* give a *different* answer depending on the
-`kind` chosen. Nobody reading two dates predicts that. The preview renders each
-week's new classification next to its old one.
-
-**Week classification lives in `shared/academicCalendar.ts` as `classifyWeeks`,
-and both the preview and the solver's own input call it** — the same
-one-definition discipline as `shared/timeGrid.ts`'s block-boundary walk. A
-locally-computed preview would eventually disagree with the wire and then state
-the opposite of the truth while looking authoritative, which is the exact
-failure class the `<select>`/`:selected` bug produced elsewhere.
-
-**Verified end to end, closing the loop.** An exam period created *through the
-API* for the first time returned the week kinds on the wire as
-`…10:TEACHING 11:EXAM 12:EXAM`, and a solve at the ORIGINAL weight of 5 placed
-**zero** sessions in weeks 11 and 12, redistributing all 65 into the earlier
-weeks. Before this, the same term spread evenly across all 13 weeks including
-those two. The constraint is reachable and effective, at the weight it always
-had.
+`calendar_period` is a managed resource on the generic scaffold, gated on
+`term.update` (child-of-Term, not a new permission), with one bespoke
+field: a live week-reclassification preview. A period fully outside the
+Term's range is rejected (400); overlapping periods within a Term are
+allowed and unchecked (the EXAM-wins precedence rule needs overlap to have
+meaning). Classification lives once, in `shared/academicCalendar.ts`'s
+`classifyWeeks`, called by both the preview and the solver's input — `EXAM`
+uses "touches the week," `BREAK`/`HOLIDAY` use "covers the entire week," so
+identical dates can classify differently by `kind`. Closed a dead end: no
+tenant could ever write a `calendar_period` row before this, so
+`minimize_exam_week_sessions` reported zero violations while looking
+healthy. DECISIONS.md § "Academic calendar periods".
 
 ## Group↔Term scoping, and why the solver filter is reference-derived
 
-Until this, `group` had **no relation to `term` at any level** — not on the
-table, not through `membership` (which carries only `created_at`, no validity
-window), not through `constraint_scope` (offering and kind only), and not on
-the wire. The only link was transitive: `group → offering_group →
-offering.term_id`. Two consequences, both measured:
+`group_term` is **many-to-many**, not `group.term_id` ownership — a leaf
+cohort belongs to one Term, but its parent programme persists across all of
+them and can't be owned by one. Unlinked = visible in every Term
+(fail-open, deliberately, opposite of this codebase's usual instinct).
+Backfill derived from actual usage (`offering_group ∪ session_group`), not
+guessed; ancestors not auto-scoped.
 
-- `assembleSolverInput` sent **every** tenant Group on every run, while
-  Offerings and Sessions were already narrowed to the Term (10 sent, 2
-  referenced on the demo tenant).
-- The Offering editor's Group picker offered every Group regardless of the
-  Offering's Term — nothing stopped attaching a 2024 cohort to a 2027
-  Offering, and `RESOURCES.groups.filters` had no `termId` to narrow with even
-  if it had wanted to.
-
-The tenant was already encoding the Term into the Group's name
-("dIT22 S1 4.Semester") for lack of anywhere else to put it — the requirement
-asserting itself through a text field.
-
-**Many-to-many (`group_term`), not `group.term_id` ownership.** The Group tree
-carries two lifetimes: a leaf cohort belongs to one Term, but its parent
-programme (e.g. "IT Security") persists across all of them and is never
-directly scheduled. Ownership is unsolvable for the parent — either permit a
-cross-Term parent (abandoning the model) or duplicate the programme node every
-Term (destroying its identity and orphaning `membership` rows, which have no
-Term of their own and need Group identity to stay stable for "which cohort is
-this student in" to have an answer). M2M is also a strict superset of
-ownership, and the reversibility argument settles it decisively: choosing M2M
-and later finding everyone uses one Term is harmless; choosing ownership and
-later finding cohorts persist is a migration that must merge duplicated
-Groups.
-
-**No link means visible in every Term — fail-open, deliberately**, which is
-the opposite of this codebase's usual instinct and chosen anyway: scoping is
-opt-in, so all existing Groups keep working the moment this ships and a new
-Group is usable immediately rather than invisible until someone remembers a
-second step. Fail-closed would make every existing Group unusable on landing
-and make correctness depend on a perfect backfill.
-
-Backfill is **derived from actual usage** — `offering_group ∪ session_group`
-joined to their Term — not from a rule that guesses. Ancestors are deliberately
-**not** auto-scoped: a programme node being an ancestor of something scheduled
-in one Term doesn't make the programme itself Term-bound.
-
-**The solver's Group filter is reference-derived, not scope-derived, and this
-is the load-bearing decision, not a style choice.** Filtering the solver's
-Groups by `group_term` would be the obvious move and is the wrong one: that
-table is tenant *configuration* a human sets, and nothing forces it to agree
-with what Offerings actually reference. Trust it and a mis-scoped Group
-produces a `SolverInput` whose Offering names a `group_id` the solver was
-never given — internally inconsistent, and the solver has no way to detect it.
-Deriving from references cannot fail that way, because the references ARE the
-source. The sent set is the **conflict closure** of the referenced ids (`{g} ∪
-ancestors ∪ descendants`, since the solver rebuilds this itself from
-`parent_id`), and it is closed under parent by construction — pinned three
-ways: an assembly-time assertion, 600 randomised hierarchies checked against an
-independently-written oracle, and a falsification test proving the guard isn't
-a no-op. A sibling branch is deliberately not pulled in unless something
-independently references it.
-
-**The scope table is never allowed near solver input.** `group_term` exists
-purely to answer "what should a human be offered in a picker," and that
-boundary is the whole point of the design — see BACKLOG.md's "Constraint
-params validation" entry and this file's drift-rule entries for the general
-shape of what happens when a config table and the thing it configures are
-allowed to silently disagree.
-
-**Verified**: backfill scoped the two real cohorts and left the other eight
-universal; the API narrows by `termId` correctly, including the two scoped
-cohorts excluded from another Term; the picker narrows the same way, checked
-against a server-rendered page (not just presence); the solver received
-exactly the referenced Groups plus closure (3, not 2 — the closure correctly
-pulls in the parent) with an independent SQL computation over `group_closure`
-agreeing exactly; and an invariant assertion on real assembled input shows zero
-dangling group references and zero orphaned `parentId`s in both directions,
-for both a populated and an empty Term.
-
-### Warning when a Group is scoped out of a Term that still uses it
-
-Real, harmless, and until this addition, silent: scoping a Group out of a Term
-whose Offerings or Sessions still reference it doesn't break anything (the
-solver's filter is reference-derived, see above — existing links keep
-working), but the Group then stops appearing in that Term's pickers, so a
-removed link can't be re-added without first re-scoping.
-
-**There is no "save" to warn before.** `ManageRelationsPanel` has no Save
-button — `add()`/`remove()` each call `persist()` directly, so removing a Term
-from the list IS the save. The warning therefore lands **after the write**,
-computed server-side inside the same transaction, and reported alongside the
-control — the same shape as hard-constraint violations from manual edits
-(warn, don't block, state the consequence next to where it happened).
-
-The response shape is **conditional**: a relation declaring `warnAfterWrite`
-returns `{ rows, warnings }`; every other relation still returns the bare array
-it always did, verified by a test that fails if the shape becomes unconditional
-for all of them (an object where an array is expected makes `Array.isArray`
-false client-side, so the regression would be a picker silently rendering an
-empty set — not an error).
-
-Rendered as `picker_warning`, in the warning palette with `role="status"`,
-deliberately not the error tone (`alert`) — a user who just saved successfully
-must not be shown red. Clearing every Term (widening a Group back to universal)
-produces no warning, since nothing can be orphaned by becoming universal;
-that's asserted explicitly rather than left to fall out of the query by
-accident.
+**The solver's Group filter is reference-derived, not scope-derived — the
+load-bearing decision.** Filtering by `group_term` (tenant *configuration*)
+could disagree with what Offerings actually reference, producing an
+internally-inconsistent `SolverInput` the solver can't detect. The sent set
+is the referenced ids' conflict closure (`{g} ∪ ancestors ∪ descendants`),
+closed by construction — pinned by an assembly-time assertion, 600
+randomised hierarchies against an independent oracle, and a falsification
+test. `group_term` is never allowed near solver input — it exists purely
+for picker UX. Scoping a Group out of a Term that still uses it warns
+after the write (`role="status"`, not `alert`) rather than blocking, since
+nothing breaks (reference-derived). DECISIONS.md § "Group↔Term scoping".
 
 ## Bootstrap & deploy sequence
 
-The order matters, and each step depends on the one before it.
-
 ```
 1. migrate deploy    schema only — tables, RLS, triggers, indexes. No rows.
-2. db seed           reference data (the 46-row permission catalogue).
-3. provision:tenant  the first tenant, its admin, and baseline constraints.
+2. db seed           reference data (permission catalogue).
+3. provision:tenant  first tenant, its admin, baseline constraints.
 4. start the app
 ```
 
-### The production image: verified 2026-08-26, after five blockers
-
-`ghcr.io/mindcollaps/calendry` had never been built or booted before. Each
-blocker was invisible until the previous one was fixed:
-
-1. **`docker build` could not read its own context.** `docker-compose.dev.yml`
-   bind-mounts `./db/` as the Postgres data directory, so once the dev stack has
-   run, the repo root holds a root-owned directory and every build dies with
-   `error from sender: open db: permission denied`. Now in `.dockerignore`, with
-   `vendor/` (1.5 GB, mostly the solver's Rust `target/`) and `.output`.
-2. **`COPY .config/wordlists` had no source** — a template leftover.
-3. **`prisma.config.js` imported `dotenv/config` unconditionally**, and the
-   runner has no application `node_modules`, so `migrate deploy` failed on the
-   config's first line. Now optional.
-4. **`npm install -g prisma` cannot satisfy `prisma.config.js`'s
-   `import "prisma/config"`**, and cherry-picking `node_modules/@prisma` out of
-   the builder misses transitive deps (`effect`). The toolchain is installed in
-   the runner against a *generated minimal manifest* — installing against the
-   real `package.json` resolves the whole app graph and fails on a nitro/vite
-   peer conflict. Keep `type: module` in it, or node parses the ESM config as
-   CommonJS.
-5. **`prisma db seed` runs `bun`, and the runner is a node image.** The bun
-   binary is copied from `oven/bun:1-alpine`; the alternative was a second,
-   node-shaped seed command that could drift from the one developers run. The
-   seed also imports `shared/permissions` and `scripts/lib/ownerDatabaseUrl`,
-   so both ship in the image.
-
-Verified against a throwaway Postgres with `.config/db-init` mounted: migrations
-ran, **56 permission rows** seeded, `/health` 200 and `/` 200. The runner is
-`node:22-alpine` because a Prisma 7 dependency declares `node >=22`.
-
-The registry credential reaches the build as a BuildKit secret at
-`/root/.bunfig.toml` (`HOME` is `/root` in `oven/bun:1-alpine`, checked). No
-token appears in `docker history` or the image filesystem.
-
-### CI
-
-Both workflows follow the pattern already used in `MindCollaps/KIK`:
-`REGISTRY`/`IMAGE_NAME` from `github.repository`, `push` gated on
-`event_name != 'pull_request'`, `latest` on the default branch, GHA cache. The
-solver repo has its own for `ghcr.io/mindcollaps/calendry-solver` and checks out
-`submodules: recursive` — `crates/proto/build.rs` compiles
-`vendor/calendry-proto/proto`, a submodule of a submodule.
-
-Two things worth not rediscovering:
-
-- **`secret-files`, not `secrets`.** `secrets` takes `<id>=<inline value>`, so
-  `id=bunfig,src=/path` was passed through as an id literally named `id`. The
-  mount resolved to nothing and `bun install` failed with an opaque 401 six
-  layers in.
-- **`PACKAGES_READ_TOKEN` must be a classic PAT** with `read:packages`; the
-  registry refuses fine-grained tokens. The workflow probes the registry before
-  building so a bad token fails by name.
-
-The app workflow's smoke step brings up the real `docker-compose.yml` and asserts
-both `/health` and a non-empty `permission` table — the healthcheck cannot see
-the seed step, and a migrated-but-unseeded database is deliberately unusable.
-
-- **Local:** `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db`,
-  then `bun run db-seed`, then `bun run provision:tenant -- --slug … --name … --admin-email … --admin-name …`.
-  Migrations are applied by the dev entrypoint, or run `prisma migrate deploy`
-  yourself.
-- **CI/CD and containers:** both `.config/entrypoint.sh` and
-  `.config/entrypoint.dev.sh` run `migrate deploy` then `db seed` before
-  starting the app. `migrate deploy` does **not** auto-seed — only
-  `migrate reset` and `migrate dev` do — so the explicit step is required in
-  production and must not be removed.
-- **Rebuilding a dev database:** `bun run db-reset` (`prisma migrate reset`)
-  replays the migrations *and* runs the seed automatically.
-- **Adding a permission needs a fourth step.** `db seed` mirrors the catalogue
-  into the `permission` table, but it deliberately does not touch
-  `access_role_permission` — which permissions a tenant's roles *hold* is tenant
-  configuration, and a seed that silently widened every tenant's admin role on
-  each deploy would be privilege escalation with no audit trail. `provision:tenant`
-  grants the full catalogue only at creation time, so **existing** tenants are
-  left without the new permission and the symptom is a 403 on a feature that
-  visibly exists. Backfill with
-  `bun run grant:permissions -- --role tenant-admin --all-missing`
-  (`--dry-run` first; owner connection, audited to stdout like `reset:password`).
-- **Changing a constraint type's SEVERITY needs a backfill, and it must run
-  BEFORE or WITH the deploy that carries the new catalogue — never after.**
-
-  `toWireConstraint` reads the CATALOGUE's severity, not the row's:
-
-  ```ts
-  weight: type.severity === 'SOFT' ? (row.weight ?? 0) : 0,
-  ```
-
-  A stored HARD row has `weight = NULL` by database CHECK
-  (`constraint_weight_matches_severity`). So in any window where the app carries
-  a SOFT catalogue entry and the rows still say HARD, every enabled row of that
-  type ships as **weight 0** — which the solver reads as "count it, do not
-  steer". The rule stops filtering *and* stops steering, and the only trace is a
-  line in `report.severityMismatches` that nothing surfaces to a human. It is
-  the silently-disabled-rule failure with a deploy-ordering trigger.
-
-  Repair with
-  `bun run backfill:constraints -- --retype <key>` (`--dry-run` first; owner
-  connection, audited to stdout). It rewrites `severity` and `weight` in ONE
-  statement because the CHECK pairs them — writing either alone is refused
-  mid-flight — and touches nothing else, so a tenant's enabled state, name,
-  params and scoped variants survive.
-
-  This is the deliberate exception to `--all-missing`'s rule that the command
-  never edits an existing row. The two modes cannot be combined, for the reason
-  they are separate: one creates what is absent, the other rewrites what is
-  there, and an audit line should say which happened.
-
-  `online_onsite_same_day_exclusion` HARD → SOFT is the case that established
-  this.
-- **A rebuilt dev database has one role and one account.** To restore the
-  under-privileged accounts the permission-gated checks need:
-  `bun run create:role -- --tenant test --key viewer --name "Schedule Viewer"
-  --permissions session.read,group.read,room.read,person.read,term.read,time_grid.read`,
-  then `create:account` twice against `--role viewer`.
-
-### The helper schema is `calendry_internal`, never `calendry`
-
-Helper functions (`current_tenant_id()`, the closure triggers, the two
-`SECURITY DEFINER` bridges) live in a schema called **`calendry_internal`**. The
-name matters: the database owner role is `calendry`, and PostgreSQL's default
-`search_path` is `("$user", public)`. A schema named `calendry` would therefore
-capture every unqualified `CREATE` issued by that role — including Prisma's own
-`_prisma_migrations` table, which the engine creates *before* any migration SQL
-runs, so no amount of `SET search_path` inside the files can prevent it.
-
-This is not hypothetical: it silently put all 35 tables in the wrong schema and
-broke `prisma migrate reset`, because reset drops only `public` and leaves the
-helper schema behind, which flips the resolution order on the second run.
-
-Both migrations also begin with `SET search_path = public;` as a second line of
-defence. Note the **GUC names stay `calendry.tenant_id` / `calendry.federation_id`** —
-session settings are a different namespace from schemas and were not renamed.
-
-### The solver runs as a compose service, and has two addresses
-
-`docker compose up` now brings up app, database AND solver. The solver is a
-vendored git submodule at `vendor/calendry-solver`, built by
-`vendor/calendry-solver/Dockerfile`.
-
-**That Dockerfile used to live here as `.config/Dockerfile.solver`, and moving it
-was a deliberate reversal.** The original reasoning — one place describing the
-whole stack — held for exactly as long as this repo's dev compose was its only
-consumer. It stopped holding when the solver repo needed to publish its own
-image: a workflow in that repository cannot reach into this one for a build
-definition, so the alternative was a second copy, i.e. two build definitions for
-one binary. That is the "two implementations of one concept" drift this file has
-already recorded three times (`paramField()`, `weekCountOf`/`weeksInTerm`,
-`blockTime()`/`blockOfMinute()`), and a Dockerfile is a particularly bad place
-for it: the copies diverge silently and the symptom is "works in dev, broken in
-production".
-
-The one-place property survives anyway, because the solver is vendored here as a
-submodule — `docker-compose.dev.yml` builds `./vendor/calendry-solver` with that
-repo's own `Dockerfile`, so a single checkout still brings up the whole stack.
-
-**It has its own nested submodule.** `calendry-proto` sits at
-`vendor/calendry-solver/vendor/calendry-proto`, so a plain `git submodule update
---init` is not enough — it needs `--recursive`, or the Rust build fails in
-`build.rs` with a (very clear) message about the proto directory being absent.
-
-**`CALENDRY_SOLVER_ADDR` means two different things**, which is the trap to know:
-
-- on the **solver** it is where to BIND. Its own default is `127.0.0.1:50051`,
-  which inside a container is reachable by nothing, so the compose service sets
-  `0.0.0.0:50051`.
-- on the **app** it is where to CONNECT.
-
-That is why a host-run solver was unreachable from the app container twice: the
-address was right for a host-run app and meaningless from inside a container, and
-the solver was bound to loopback so even the bridge gateway was refused.
-
-**Two addresses, same pattern as the two database URLs.** `solver:50051` resolves
-only on the compose network; `bun run test` starts a Nuxt server on the HOST,
-where it does not. So `solverAddress()` picks by testing for `/.dockerenv`,
-exactly as `scripts/lib/ownerDatabaseUrl.ts` does — `CALENDRY_SOLVER_ADDR` inside,
-`CALENDRY_SOLVER_ADDR_HOST` outside. Port 50051 is published in the dev override
-for the same reason 55432 is: host-side tooling. Production publishes neither.
-
-**`docker compose up -d <service>` does not start what it does not name.** Bringing
-up only `solver` and `calendry-app` left the database stopped and every test
-failed with "Can't reach database server at 127.0.0.1:55432", which looks like a
-configuration bug and is not one. Use a bare `docker compose up -d`.
-
-### Two database URLs, one database
-
-`MIGRATION_DATABASE_URL` uses `db:5432`, which resolves only between compose
-containers. `MIGRATION_DATABASE_URL_HOST` uses the port `docker-compose.dev.yml`
-publishes, for anything run from a developer's shell. Both are present inside
-the container (bun auto-loads `.env`, and the app container mounts the repo), so
-tooling cannot simply prefer whichever is set — `scripts/lib/ownerDatabaseUrl.ts`
-picks by testing for `/.dockerenv`. `prisma.config.js` repeats that logic, since
-it is loaded before any TypeScript is available.
-
-All three owner-connection consumers — the Prisma CLI, the seed, and
-`provision:tenant` — go through that selection. The runtime app role never does:
-it cannot write the catalogue (SELECT-only RLS policy) and cannot create tenants.
-
-## TimeGrid breaks: non-uniform, and one thing left open
-
-`time_grid.break_minutes` is the DEFAULT gap between consecutive blocks.
-`time_grid_break` adds sparse named overrides — `{afterBlockIndex, durationMinutes,
-label, dayOfWeek}` — where `dayOfWeek NULL` means every active day and a
-day-specific row beats it **at that position only**, so "same lunch every day,
-but Friday's afternoon break differs" is one extra row, not a duplicated day.
-
-**`shared/timeGrid.ts` is the single definition of when a block starts.** Both
-`blockTime()` (what a block is called) and `blockOfMinute()` (which block it is
-now) walk cumulative boundaries through it. They answer inverse questions about
-one timeline, and if they disagreed the schedule would render one time while
-`reference_slot` believed another — invisibly, until the solver refused to move a
-Session a user could see was still ahead. Do not reintroduce a local
-`blockLength + breakMinutes` stride anywhere; three had accumulated before this
-landed (the editor's preview, the diagnostic script, and the two helpers).
-
-**This is not only rendering.** `blockOfMinute()` feeds `computeReferenceSlot()`,
-which decides what the solver may move, and that function now passes the resolved
-DAY so a day-specific break is honoured. Computing it against the universal
-schedule would let a Friday afternoon class be rescheduled after it had run.
-
-**Nothing about breaks reaches the solver, and that is verified, not assumed.**
-The wire carries block INDICES; a gap's duration changes no index, no adjacency
-and no conflict. `toWireTimeGrid()` omits break data and has a test asserting the
-omission. Confirmed against the full feature: a run with two overrides configured
-returned SUCCEEDED and no break data appears anywhere in the request. Zero
-changes to `calendry-proto` or `calendry-solver`.
-
-**`fitsGrid()` deliberately does not consider breaks.** Its criterion is whether
-a field participates in the INDEX SPACE, which is exactly `blocksPerDay ×
-activeDays`. A break names an `afterBlockIndex` — it references that space
-without defining it — so adding a lunch creates, destroys and renumbers nothing.
-This same `fitsGrid()` guard also refuses narrowing `blocksPerDay`/`activeDays`
-out from under an existing Session (the actual TimeGrid-shrink incident) and the
-same predicate gates the move route, so a Session cannot be moved off-grid
-either.
-
-**Orphaned breaks are deleted and reported; orphaned Sessions refuse the edit.**
-The asymmetry is the design. A Session outside the grid is DATA that resolves to
-no time and breaks the solver. A break after a block that no longer exists is
-CONFIGURATION whose meaning has already gone — refusing a legitimate shrink to
-protect it would be worse. Both run in the same transaction, so a refused shrink
-deletes nothing, which is pinned by a test.
-
-### OPEN QUESTION — a Session whose duration spans a break
-
-**Undecided, deliberately** — see **[BACKLOG.md](BACKLOG.md) § Undecided**. It
-matters here because one of the two branches would overturn the decision this
-whole feature rests on: if such a placement is illegal, the SOLVER would need to
-know about breaks, and breaks currently never cross the wire.
-
-## `MinimizeBlockUsage` — generalizing first/last block into a block list
-
-`MinimizeFirstBlock`/`MinimizeLastBlock` were the same hardcoding as
-"minimize Saturday" one axis over — `is_first_block`/`is_last_block` are
-booleans baked into `SlotFlags` at fixed positions, and extending a TimeGrid's
-day silently moves what "last block" means underneath a tenant who never
-touched the rule. Replaced with `MinimizeBlockUsage { blocks: number[], first:
-bool, last: bool }` — absolute indices for "avoid block 5 specifically," plus
-the two relative booleans so "avoid the last block, however long the day gets"
-stays expressible without re-editing every time the grid changes. A strict
-superset; nothing is lost.
-
-Published as `calendry-proto@0.3.0`. Fields 20/21 (the old types) are kept and
-marked `deprecated`, not removed — `buf breaking` rejects removal outright, and
-a peer on the old schema may still send them. The app's catalogue keeps both
-old types too, marked `deprecatedBy`, since `type` is `createOnly` and removing
-them would make existing tenant rows unrenderable and uneditable.
-
-Verified with a real live solve after publish: `minimize_block_usage` correctly
-avoided the configured blocks; the change was proven against a real encode of
-the new proto message, not just a passing unit test against a plain object cast.
-
-## Resolved, with the reasoning kept
-
-- ~~**Two definitions of "how many weeks in a term," disagreeing on ~50% of
-  terms.**~~ **RESOLVED.** `weekCountOf` (`shared/academicCalendar.ts`,
-  Monday-anchored: `floor((mondayOf(end) − mondayOf(start))/7) + 1`) and
-  `weeksInTerm` (`app/composables/schedule.ts`, raw span:
-  `ceil((end − start)/7)`) computed the same question differently, and agreed
-  only when a term happened to start on a Monday. Confirmed on a real term
-  (Wintersemester, Sat-start, 2027-10-02 → 2027-12-23): the classifier, the
-  calendar-period UI, the solver's calendar assembly, and `POST
-  /api/sessions`'s own validation all agreed on 13 weeks via `weekCountOf`;
-  the schedule toolbar alone rendered "Week 1 / 12" via `weeksInTerm`, making
-  week 13 reachable server-side (`POST /api/sessions` with `termWeek: 13`
-  returned 201) but invisible in the UI at any URL, including `?week=13`,
-  which silently clamped back to 1.
-
-  `weeksInTerm` is deleted. The toolbar now calls `weekCountOf`, the same
-  function every other consumer already used — one more instance of the
-  "two implementations of one concept" drift this file has been bitten by
-  before (TimeGrid's `blockTime()`/`blockOfMinute()`, the missing-indexes
-  entry). Regression test in `tests/schedule-first-render.test.ts` uses a
-  Saturday-start term and asserts the two formulas disagree on those exact
-  dates before comparing the rendered count, so it can't quietly stop
-  discriminating if the fixture changes.
-
-  **A related, currently-harmless duplication was found and left alone,
-  worth knowing about:** `solverInput.ts` and `solverCalendar.ts` each
-  independently compute a Monday-anchored week INDEX for a given date
-  (`floor((mondayOf(date) − firstMonday)/7d)`) — no live disagreement, both
-  correctly Monday-anchored, but the same shape with no shared helper.
-  **Since resolved** (2026-08-25): extracted into `weekIndexOf` in
-  `shared/academicCalendar.ts`, with `weekCountOf` itself now expressed
-  through it, so a term's total and a date's index can't drift apart by
-  construction.
-
-**Open bugs and deferred work live in [BACKLOG.md](BACKLOG.md).** What follows
-is the opposite: problems that ARE fixed, kept here because each one's fix
-encodes a decision that would otherwise look arbitrary — and that someone could
-reasonably "fix" back to something worse. Deleting these would delete the
-argument, not the bug.
-
-- ~~**Three hand-written indexes are MISSING from the database.**~~ **RESOLVED
-  BY MEASUREMENT — no migration, and deliberately so.** The accidental migration
-  `20260813190131_init` (generated by `db-reset` before it was fixed) dropped
-  three indexes and is applied. They were measured before being recreated, and
-  the evidence said not to:
-
-  ```
-  session_room_conflict_idx     ON session_room   (room_id, session_id)
-  session_person_conflict_idx   ON session_person (person_id, session_id)
-  session_event_replay_idx      ON session_event  (tenant_id, generation_id, created_at, seq)
-  ```
-
-  **The first two were tracked against a query shape that does not exist.** The
-  original comment — and this file until now — said they back "the room/person
-  collision lookups in `refreshViolations()`". They do not. Every site that
-  touches these tables drives off `session_id`, never `room_id`/`person_id`:
-  `violations.ts` (`sessionId: { in: involvedIds }`), `solverInput.ts`
-  (`include: { rooms, people }`), `move.post.ts`, `generationMaterialize.ts`,
-  `affected-persons.get.ts`. Stage 7a's `no_double_booking_person` is no
-  exception — it builds attendee sets from session-keyed reads plus
-  `membership`. All of them are already served as **index-only scans** by
-  `session_room_pkey (session_id, room_id)` and
-  `session_person_pkey (session_id, person_id)`, and any future point lookup by
-  room or person is covered by the existing single-column
-  `session_room_room_id_idx` / `session_person_person_id_idx`. So these are not
-  premature — they are the wrong shape, and adding them costs write
-  amplification on tables every editing route writes.
-
-  Measured on a probe schema at solver scale (27k sessions, 27k `session_room`,
-  54k `session_person`), not on the 65-row dev tenant:
-
-  ```
-  A  session_room   WHERE session_id IN (40)  before 0.336ms → after 0.225ms  same plan
-  B  session_person WHERE session_id IN (40)  before 0.307ms → after 0.176ms  same plan
-                    idx_scan = 0 on BOTH new indexes — never chosen
-  C  federation_room_occupancy() join         before 5.802ms →       5.720ms  identical
-     forced onto session_room_conflict_idx           5.713ms / 8252 buffers vs 514
-  ```
-
-  C is the only room-driven query in the system, and it is a bulk join over ~10%
-  of the table with no `room_id` equality predicate — the seq scan is correct
-  and the index cannot beat it, only cost 16× the I/O.
-
-  **`session_event_replay_idx` has the right shape for a query nobody runs.**
-  `session_event` is write-only today: `sessionEvents.ts` creates rows, the demo
-  seeder deletes them raw, and there is **no read path anywhere** in `server/`,
-  `app/` or `scripts/` — no rollback or audit-history route is built. At 205k
-  events the natural plan uses the existing `session_event_generation_id_idx`
-  (0.653ms); with the tracked index it is 0.660ms, because a bitmap scan
-  discards ordering and it still sorts. Forcing an ordered `Index Scan` on a
-  5,000-event generation does remove the sort (1.643ms → 0.862ms), so the shape
-  is right — but that is 0.8ms on a query that does not exist, for an 11 MB
-  index.
-
-  **Add it in the same change as the replay reader**, where the ordered scan can
-  be verified against the real query instead of guessed at. Note that until
-  2026-08-23 adding it would not have stuck: `db-reset` ran `migrate dev`, which
-  is what dropped these three in the first place — see the "Never regenerate
-  `prisma/migrations/`" rule. That half is now fixed, so a future hand-written
-  index survives a rebuild. Same reasoning the
-  session sweeper applied at 28 rows, with the addition that the other two would
-  still be unused at 27,000. Do not recreate any of the three "to close the
-  tracked item" — the item is closed.
-
-
-Deliberately deferred, with the reasoning, so these are not rediscovered as
-surprises. None of these block current work.
-
-- ~~**Raw-SQL account artifacts in the `test` tenant.**~~ **BOTH RESOLVED.** Each
-  was originally written directly to the database, bypassing the paths that would
-  normally create them; each now exists only through an operator CLI. Kept here
-  because the reasoning is the record of why those CLIs exist at all:
-
-  - ~~**`ntill@gmx.de`'s password was set by hand.**~~ **RESOLVED.** Replaced
-    through the real path by `bun run reset:password`, which hashes via
-    `hashPassword()` from `server/utils/auth.ts`, revokes every session, sets
-    `must_change_password`, and emits an audit line. The password was then
-    changed through `POST /api/auth/change-password`. No hand-written hash
-    remains for this account. (The duplicate scrypt implementation that made
-    this a risk is also gone: `provision-tenant.ts` now imports the same
-    `hashPassword()` rather than carrying its own copy.)
-  - ~~**`vic@demo.local`** is a hand-inserted Person + Account + `viewer`
-    AccessRole.~~ **RESOLVED.** Both it and `viewer6b@calendry.local` are now
-    created through `bun run create:role` + `bun run create:account`, with no raw
-    SQL anywhere in the path. Their passwords live in the gitignored `.env` as
-    `VIC_ACCOUNT_PASSWORD` / `VIEWER_ACCOUNT_PASSWORD`.
-
-    **The role holds SIX permissions, not the seven previously recorded here.**
-    The original raw SQL listed seven, but vic's live `GET /api/auth/session`
-    reported six, and `session.get.ts` applies no filtering — it returns
-    `loadPermissions()` verbatim — so one INSERT never landed. The measurement
-    overrides the written record. The set is:
-
-        group.read, person.read, room.read, session.read, term.read, time_grid.read
-
-    `violation.read` was intended and absent. Recreated as six deliberately,
-    because six is what the 6b/6c evidence was actually gathered against.
-
-- **~~`CommonButton` renders a `<div>`~~ — FIXED.** It rendered a `<div>` with a
-  click handler, so every action built on it — the whole schedule inspector, the
-  solver control, the palette — was mouse-only: no Tab, no Enter/Space, not
-  announced as a button. `getTag` now defaults to `'button'` (including the
-  disabled case, so assistive tech hears "unavailable" rather than nothing).
-
-  Two things that made this less trivial than it looks, worth not rediscovering:
-
-  - **`type` was already taken** by the visual variant (`primary`,
-    `secondary-black`…), so the native button type needed its own prop:
-    `nativeType`, defaulting to `'button'`. Without that default, changing the
-    tag would have turned every button inside a `<form>` into an accidental
-    submit.
-  - **`login.vue` and `change-password.vue` depended on native submit.** They
-    passed `tag="button"` with NO `@click`, relying on the form's
-    `@submit.prevent` so Enter works in either field. They now pass
-    `native-type="submit"` — verified by pressing Enter in the password field and
-    landing on `/`.
-
-  A native `<button>` also inherits the UA font rather than the page's, so
-  `font: inherit` was added to `.button`; computed font now matches `body` on
-  every page.
-
-- ~~**Pre-launch sweep for leftover template-author branding/strings.**~~ **DONE.**
-  The Step 1 rebrand searched only for the `xxx-changeme` placeholder pattern, so
-  anything the template author hardcoded under a different name survived it;
-  `Swindler` (the page title and header text) was found by accident while
-  building the login UI and fixed then. A full case-insensitive sweep across all
-  three repos has now been done and found exactly **one** further instance:
-  `bun.lock` still recorded `"name": "xxx-changeme"` for the workspace, because
-  the rebrand changed `package.json` and `bun install` does not rewrite that
-  field (it reports "no changes" even when the two disagree). Fixed by hand and
-  re-verified with `--frozen-lockfile`.
-
-  Everything else was clean: `package.json` metadata, README, `robots.txt`, the
-  `useHead` titles, layouts, devcontainer, both compose files, `.config/`, and
-  both sibling repos. Note the stakes were lower than this entry assumed — the
-  template's author is this repo's own author, so there was never another
-  institution's product name to leak.
-
-  **Two vatsim-radar attributions in `modules/styles.ts` and
-  `app/scss/variables.scss` are deliberately KEPT.** They are provenance for
-  borrowed code (`// From https://vatsim-radar.com/ … modified to fit our
-  needs`), not branding; removing them would strip credit from third-party-derived
-  work. Do not "finish the sweep" by deleting them.
+- **Local**: `docker compose ... up -d db`, `bun run db-seed`, `bun run
+  provision:tenant -- --slug … --name … --admin-email … --admin-name …`.
+- **CI/containers**: entrypoints run `migrate deploy` then `db seed` —
+  `migrate deploy` does NOT auto-seed (only `reset`/`dev` do); this step
+  must not be removed.
+- **`db-reset`** replays migrations and seeds automatically.
+- **A new permission needs a 4th step** — seed doesn't touch
+  `access_role_permission` (would be silent privilege escalation).
+  Backfill: `bun run grant:permissions -- --role tenant-admin --all-missing`.
+- **A constraint SEVERITY change needs a backfill BEFORE/WITH the deploy,
+  never after** — `toWireConstraint` reads the catalogue's severity, not
+  the row's; a HARD row (`weight = NULL` by CHECK) ships as weight 0 under
+  a SOFT catalogue entry, silently disabled. Repair: `bun run
+  backfill:constraints -- --retype <key>` (rewrites severity+weight in one
+  statement, the CHECK pairs them).
+- **A rebuilt dev DB has one role/account** — see Operator CLIs above.
+- **Production image**: `node:22-alpine`; toolchain installs against a
+  generated minimal manifest (not the real `package.json`, which hits a
+  peer conflict); `bun` copied from `oven/bun:1-alpine`; registry
+  credential reaches the build as a BuildKit secret, never in image
+  history. Five blockers behind this: DECISIONS.md.
+- **CI**: BuildKit needs `secret-files` not `secrets` (file path vs.
+  inline value); `PACKAGES_READ_TOKEN` must be a classic PAT. Smoke step
+  asserts `/health` and a non-empty `permission` table.
+
+**The helper schema is `calendry_internal`, never `calendry`** — naming it
+after the owner role would let Postgres's default `search_path` capture
+Prisma's own `_prisma_migrations` table, created before any migration SQL
+runs, silently misplacing every table.
+
+**The solver runs as a compose service** (vendored submodule at
+`vendor/calendry-solver`, its own nested `calendry-proto` submodule — use
+`--init --recursive`). `CALENDRY_SOLVER_ADDR` means BIND on the solver
+(`0.0.0.0:50051` in-container) and CONNECT on the app; `solverAddress()`
+picks in-container vs. `_HOST` by testing `/.dockerenv`. Always `docker
+compose up -d` bare — a partial service list won't start what it doesn't
+name.
+
+**Two database URLs, one database** — `MIGRATION_DATABASE_URL` (compose-
+network) vs. `_HOST` (published port), selected the same `/.dockerenv` way
+by `ownerDatabaseUrl.ts`/`prisma.config.js`. The runtime app role never
+needs either (SELECT-only on `tenant`, can't create tenants).
+
+## TimeGrid breaks
+
+`time_grid.break_minutes` is the default gap; `time_grid_break` adds sparse
+`{afterBlockIndex, durationMinutes, label, dayOfWeek}` overrides
+(`dayOfWeek NULL` = every day, a day-specific row wins at that position
+only). `shared/timeGrid.ts`'s `blockTime()`/`blockOfMinute()` are the
+single definition of block boundaries — disagreeing would mean the
+schedule renders one time while `reference_slot` believes another. **Breaks
+never reach the solver** (verified: `toWireTimeGrid()` omits them, test
+asserts the omission) — the wire carries block indices only.
+`fitsGrid()`'s criterion is the index space (`blocksPerDay × activeDays`),
+deliberately ignoring breaks; the same guard blocks narrowing the grid
+under an existing Session and gates the move route. Orphaned breaks are
+deleted+reported; orphaned Sessions refuse the edit (DATA vs.
+CONFIGURATION asymmetry).
+
+**OPEN QUESTION** — a Session whose duration spans a break: undecided,
+deliberately, see **[BACKLOG.md](BACKLOG.md) § Undecided**. One branch
+would overturn "breaks never cross the wire."
+
+## `MinimizeBlockUsage`
+
+Replaced `MinimizeFirstBlock`/`MinimizeLastBlock` (booleans baked to fixed
+`SlotFlags` positions, silently wrong when a TimeGrid's day extends) with
+`{ blocks: number[], first: bool, last: bool }` — `calendry-proto@0.4.0`.
+Old fields kept `deprecated` not removed (`buf breaking` forbids removal;
+existing tenant rows still need to render/edit, `type` is `createOnly`).
 
 ## Things to never do without asking first
 
@@ -2115,5 +518,4 @@ surprises. None of these block current work.
 - Hardcode a tenant-open value (role name, kind, equipment tag) into logic
 - Bypass the event log for a Session mutation
 - Implement solver logic in this repo
-- Relax tenant isolation for anything other than declared Federation-shared
-  resources
+- Relax tenant isolation beyond the three declared exceptions above
