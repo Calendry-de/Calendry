@@ -403,8 +403,11 @@ const nameClash = computed(() => {
         background: $surface0;
 
         &:hover {
+            // Border may be `primary500`; TEXT may not. On `$surface0` the fill
+            // step measures 2.9:1 — the palette's own note calls it fills and
+            // icons only — while `primary700` is 5.6:1.
             border-color: $primary500;
-            color: $primary500;
+            color: $primary700;
         }
     }
 

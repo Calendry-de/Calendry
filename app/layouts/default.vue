@@ -3,9 +3,16 @@
         <div
             class="header"
         >
-            <div class="header-text">
-                Calendry
-            </div>
+            <NuxtLink
+                class="header-text"
+                :to="HOME_ROUTE"
+                aria-label="Calendry"
+            >
+                <common-logo
+                    :size="26"
+                    wordmark
+                />
+            </NuxtLink>
             <view-menu/>
             <view-login/>
         </div>
@@ -24,10 +31,18 @@ import ViewMenu from '~/components/views/ViewMenu.vue';
 import ViewLogin from '~/components/views/ViewLogin.vue';
 import ViewVersion from '~/components/views/ViewVersion.vue';
 import { colorsList } from '#imports';
+import { HOME_ROUTE } from '~/utils/routes';
 
 // Mounted here, once, so Ctrl+K works on every page that uses this layout —
 // including /schedule, whose own Escape handling stands down while the palette
 // holds the keyboard (see composables/overlay.ts).
+
+// The header's plain "Calendry" text is now the 11C lockup. This layout is
+// what /manage renders under, so the mark reaches the management area through
+// here rather than through a bar of its own — there is no management-only
+// header, and adding one to avoid also branding /dashboard and /schedule would
+// mean two headers to keep in step. It links to HOME_ROUTE, which is the one
+// place "where a signed-in session belongs" is written.
 
 defineSlots<{ default: () => any }>();
 
@@ -59,7 +74,8 @@ useLayout();
 
         margin-left: 24px;
 
-        font-size: 24px;
+        color: $content2;
+        text-decoration: none;
     }
 
     &-container {

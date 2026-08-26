@@ -161,15 +161,25 @@ const sections = useManageSections();
                 outline-offset: var(--space-1);
             }
 
+            /*
+             * Ink on the fill, from the light base, in BOTH themes — not
+             * `$surface0`. The teal fill does not follow the theme swap, so a
+             * label that does is measured against the wrong ground in one of
+             * them: `$surface0` is near-white in the light theme, which is
+             * 3.14:1 on `$primary500` and fails AA, while reading 5.7:1 in the
+             * dark theme where it resolves to ink. Pinning it to the ink value
+             * gives the same 5.7:1 in both. Same reasoning as
+             * `CommonButton --type-primary`.
+             */
             &--active {
-                color: $surface0;
+                color: $content0Orig;
                 background: $primary500;
 
-                svg { color: $surface0; }
+                svg { color: $content0Orig; }
 
                 @include hover() {
                     &:hover {
-                        color: $surface0;
+                        color: $content0Orig;
                         background: $primary500;
                     }
                 }
@@ -240,7 +250,7 @@ const sections = useManageSections();
             height: 14px;
         }
         @include hover() {
-            &:hover { color: $primary600; }
+            &:hover { color: $primary700; }
         }
     }
 }

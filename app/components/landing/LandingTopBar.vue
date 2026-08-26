@@ -1,7 +1,16 @@
 <template>
     <header class="topbar">
         <div class="topbar_measure">
-            <p class="topbar_wordmark">Calendry</p>
+            <NuxtLink
+                class="topbar_brand"
+                to="/"
+                aria-label="Calendry"
+            >
+                <common-logo
+                    :size="28"
+                    wordmark
+                />
+            </NuxtLink>
 
             <nav
                 class="topbar_nav"
@@ -39,6 +48,11 @@
  *
  * Still no "Sign up". Accounts are created by an administrator, and a button
  * that cannot do what it says is worse than its absence.
+ *
+ * The plain-text wordmark is now the 11C lockup — mark plus `alendry`, the
+ * mark itself supplying the C. It is a link to `/` rather than a bare `<p>`:
+ * a brand at the top-left of a public page is the affordance people reach for
+ * to get back to the top, and this page is long enough that they will.
  */
 </script>
 
@@ -69,13 +83,16 @@
         margin: 0 auto;
     }
 
-    &_wordmark {
-        margin: 0;
+    &_brand {
+        display: inline-flex;
+        align-items: center;
 
-        font-size: $fontSizeLg;
-        font-weight: 700;
+        // The mark is the tap target, so it needs the height a bare inline
+        // image would not have.
+        padding: $space3 0;
+
         color: $content2;
-        letter-spacing: -0.01em;
+        text-decoration: none;
     }
 
     &_nav {

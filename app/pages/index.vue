@@ -1,78 +1,83 @@
 <template>
-    <div class="landing">
-        <landing-top-bar/>
+    <common-page-opener
+        v-model="opening"
+        :speed="1"
+    >
+        <div class="landing">
+            <landing-top-bar/>
 
-        <main id="main">
-            <landing-hero/>
+            <main id="main">
+                <landing-hero/>
 
-            <landing-section
-                id="what"
-                title="A timetable you can hold, and one you can ask for"
-                lead="Two halves. This application stores and presents the schedule and everything
-                    it is made of; a separate solver service builds candidate placements from your
-                    rules and hands them back for a person to accept or reject."
-            >
-                <landing-capability-list :items="FEATURES"/>
-            </landing-section>
+                <landing-section
+                    id="what"
+                    title="A timetable you can hold, and one you can ask for"
+                    lead="Two halves. This application stores and presents the schedule and everything
+                        it is made of; a separate solver service builds candidate placements from your
+                        rules and hands them back for a person to accept or reject."
+                >
+                    <landing-capability-list :items="FEATURES"/>
+                </landing-section>
 
-            <landing-section
-                id="built"
-                title="What works today"
-                lead="Not a demo reel. Everything below is implemented, in use against a real
-                    database, and covered by this repository's integration suite."
-            >
-                <landing-roadmap-list :items="BUILT"/>
+                <landing-section
+                    id="built"
+                    title="What works today"
+                    lead="Not a demo reel. Everything below is implemented, in use against a real
+                        database, and covered by this repository's integration suite."
+                >
+                    <landing-roadmap-list :items="BUILT"/>
 
-                <landing-callout
-                    text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
-                    action="Get in touch"
-                    href="#contact"
-                />
-            </landing-section>
+                    <landing-callout
+                        text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
+                        action="Get in touch"
+                        href="#contact"
+                    />
+                </landing-section>
 
-            <landing-section
-                id="next"
-                title="Not built yet, and honest about it"
-                lead="Calendry is being built in phases, and each of these is a phase rather than a
-                    promise with a date on it. Where a decision is still open, it says which one."
-            >
-                <landing-roadmap-list :items="NEXT"/>
-            </landing-section>
+                <landing-section
+                    id="next"
+                    title="Not built yet, and honest about it"
+                    lead="Calendry is being built in phases, and each of these is a phase rather than a
+                        promise with a date on it. Where a decision is still open, it says which one."
+                >
+                    <landing-roadmap-list :items="NEXT"/>
+                </landing-section>
 
-            <landing-section
-                id="why"
-                title="Decisions worth defending"
-                lead="Timetabling software fails in specific, recognisable ways. These are the
-                    choices made against them — each one is a rule the codebase is actually built
-                    on, not a slogan."
-            >
-                <landing-principle-list :items="PRINCIPLES"/>
-            </landing-section>
+                <landing-section
+                    id="why"
+                    title="Decisions worth defending"
+                    lead="Timetabling software fails in specific, recognisable ways. These are the
+                        choices made against them — each one is a rule the codebase is actually built
+                        on, not a slogan."
+                >
+                    <landing-principle-list :items="PRINCIPLES"/>
+                </landing-section>
 
-            <landing-section
-                id="contact"
-                title="Tell us about your institution"
-                lead="Calendry is being built for real timetables, so the useful conversation is
-                    about yours: how many rooms and cohorts, what your week looks like, and what
-                    breaks today."
-            >
-                <landing-contact-capture/>
-            </landing-section>
+                <landing-section
+                    id="contact"
+                    title="Tell us about your institution"
+                    lead="Calendry is being built for real timetables, so the useful conversation is
+                        about yours: how many rooms and cohorts, what your week looks like, and what
+                        breaks today."
+                >
+                    <landing-contact-capture/>
+                </landing-section>
 
-            <landing-section
-                id="under-the-hood"
-                title="For the technically curious"
-                tone="inverse"
-            >
-                <landing-tech-band
-                    :lead="TECH_LEAD"
-                    :items="TECHNICAL_NOTES"
-                />
-            </landing-section>
-        </main>
+                <landing-section
+                    id="under-the-hood"
+                    title="For the technically curious"
+                    tone="inverse"
+                >
+                    <landing-tech-band
+                        :lead="TECH_LEAD"
+                        :items="TECHNICAL_NOTES"
+                    />
+                </landing-section>
+            </main>
 
-        <landing-footer/>
-    </div>
+            <landing-footer/>
+        </div>
+    </common-page-opener>
 </template>
 
 <script setup lang="ts">
@@ -84,6 +89,7 @@ import {
     TECHNICAL_NOTES,
     TECH_LEAD,
 } from '~/utils/landingContent';
+import { useFirstVisit } from '~/composables/pageOpener';
 
 /**
  * The public marketing page for calendry.de — the domain ROOT.
@@ -117,6 +123,21 @@ import {
  * COMPOSITION. Content lives in `~/utils/landingContent`, section markup in
  * `app/components/landing/`. This file only arranges them: pages compose, they
  * do not implement.
+ *
+ * THE OPENER runs here and NOWHERE ELSE, on a visitor's first arrival only.
+ * `/` is the one route where a brand moment is the job — every other page in
+ * this app is somebody's Tuesday, and a two-and-a-half second animation between
+ * a timetabler and their week is a cost with no return. It is also the only
+ * route a stranger reaches first.
+ *
+ * "First arrival" is decided from a COOKIE rather than `localStorage`, because
+ * the decision has to be made on the server: the veil has to be in the first
+ * HTML to cover the first paint, so a returning visitor whose HTML contained it
+ * would see a dark flash on every visit. See `useFirstVisit`.
+ *
+ * `markSeen()` fires immediately rather than on `done`, so a reload part-way
+ * through does not replay it, and so a visitor who leaves during the animation
+ * is still counted as having arrived.
  */
 definePageMeta({ layout: 'empty' });
 
@@ -149,6 +170,17 @@ useHead({
         { name: 'twitter:description', content: description },
     ],
 });
+/**
+ * `isFirstVisit` is read once, at setup, and copied into a plain ref. It is not
+ * reactive on purpose: `markSeen()` writes the cookie, and a computed reading
+ * that cookie would flip to `false` on mount and tear the veil out of the DOM
+ * one frame into its own animation.
+ */
+const { isFirstVisit, markSeen } = useFirstVisit('calendry_intro_seen');
+const opening = ref(isFirstVisit);
+
+onMounted(markSeen);
+
 </script>
 
 <style scoped lang="scss">

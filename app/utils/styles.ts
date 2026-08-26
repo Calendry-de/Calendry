@@ -21,6 +21,13 @@ import type { PartialRecord } from '../../types';
  * override rendering identically to `default`, which is exactly the duplicate
  * that made the original bug invisible.
  */
+/**
+ * The brand teal — the logo's accent and the interface's primary, one value.
+ * Declared above the palette so the two entries that carry it are visibly the
+ * same constant rather than two hex strings that happen to match today.
+ */
+const BRAND = '#2F9E8F';
+
 export const colorsList = {
     //#region neutrals
     white: '#FAFAFA',
@@ -60,41 +67,78 @@ export const colorsList = {
     content6: '#3c3c3f',
     content7: '#525255',
 
-    primary700: '#512da8',
-    primary600: '#6743b2',
-    primary500: '#7c59bc',
-    primary400: '#8f70c6',
-    primary300: '#a287d0',
+    // Primary is the brand teal, and `primary500` IS the logo's accent — the
+    // same value, written once as `BRAND` above, so the mark and the interface
+    // cannot drift apart. Purple retired here: the mark said one thing and
+    // every button said another.
+    //
+    // Two steps below 300 exist that no other ramp has, because no other ramp
+    // is ever used as a GROUND: `primary200` tints a selected row, `primary100`
+    // is a hover ground. Adding them to the semantic ramps would invite tinted
+    // error/success grounds nobody has designed.
+    primary700: '#1E6B61',
+    primary600: '#257F72',
+    primary500: BRAND,
+    primary400: '#58B4A7',
+    primary300: '#8ACDC3',
+    primary200: '#D9EDE9',
+    primary100: '#EFF7F5',
 
-    secondary700: '#2d512a',
-    secondary600: '#436743',
-    secondary500: '#587c58',
-    secondary400: '#719f71',
-    secondary300: '#86b287',
+    /**
+     * CONTRAST, MEASURED — the reason the ramp has a direction of use.
+     *
+     *   primary700 on surface0        5.6:1   body text, links      ✓ AA
+     *   white      on primary700      6.1:1   filled buttons        ✓ AA
+     *   content0   on primary500      5.7:1   filled buttons        ✓ AA
+     *   primary500 on surface0        2.9:1   fills and icons ONLY  ✗ AA
+     *
+     * So: `primary500` is a FILL, `primary700` is the text and the pressed
+     * state. Teal text on a teal fill is never legible — the old purple ramp
+     * tolerated white on `primary500` at 5.01:1 and this one does not (3.1:1),
+     * which is why `CommonButton`'s primary label is ink rather than white.
+     */
 
-    success700: '#46a92d',
-    success600: '#57b143',
-    success500: '#66bb58',
-    success400: '#7dc671',
-    success300: '#90d086',
+    // Clay — the one warm counterweight, for illustrations and empty states.
+    secondary700: '#94502F',
+    secondary600: '#A85E38',
+    secondary500: '#BE6E45',
+    secondary400: '#D08C68',
+    secondary300: '#E0AC90',
 
-    warning700: '#a97d2d',
-    warning600: '#b18c43',
-    warning500: '#bb9d58',
-    warning400: '#c6af71',
-    warning300: '#d0c686',
+    // Leaf, pushed off teal so "it worked" cannot be mistaken for "this is us".
+    success700: '#1F7442',
+    success600: '#26894E',
+    success500: '#2E9E58',
+    success400: '#5CB77D',
+    success300: '#8FCEA6',
 
-    error700: '#a92d46',
-    error600: '#b14357',
-    error500: '#bb5866',
-    error400: '#c6717d',
-    error300: '#d08690',
+    warning700: '#A87121',
+    warning600: '#C08628',
+    warning500: '#D69B33',
+    warning400: '#E4B662',
+    warning300: '#EFCF95',
 
-    info700: '#2da990',
-    info600: '#43b19d',
-    info500: '#58bbad',
-    info400: '#71c6bb',
-    info300: '#86d0c6',
+    error700: '#9E2B36',
+    error600: '#B93841',
+    error500: '#D14A4F',
+    error400: '#E0777A',
+    error300: '#EDA4A5',
+
+    // Blue, not teal. It was one hue from the brand, so a neutral notice and
+    // the product's own identity colour were telling the reader the same thing.
+    info700: '#1F5C8F',
+    info600: '#2872AB',
+    info500: '#3389C6',
+    info400: '#66A9D8',
+    info300: '#97C7E7',
+
+    /**
+     * The logo's accent. Kept as its own name because the logo component asks
+     * for "the brand colour", not for "step 500 of the primary ramp" — but it
+     * is the same constant, so renumbering the ramp cannot silently repaint
+     * the mark, and retuning the mark cannot leave the UI behind.
+     */
+    brandAccent: BRAND,
 };
 
 export type ColorsList = keyof typeof colorsList;

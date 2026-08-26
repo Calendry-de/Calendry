@@ -255,31 +255,46 @@ const getAttrs = computed(() => {
     }
 
     /*
-     * WHY THE LABEL IS WHITE AND THE STATES GO DARKER.
+     * WHY THE LABEL IS INK AND THE STATES GO LIGHTER — and why both flipped.
      *
-     * This was `$typographyPrimaryOrig` — which resolves through
-     * `variables.scss` to `$content5Orig`, the BODY TEXT colour, baked as a raw
-     * hex so it does not follow the theme. On the `$primary500` fill that
-     * measured 2.49:1, and 1.87:1 on the old focus background: the product's
-     * primary action failed WCAG AA on its own label in every theme.
+     * History, because the reversal looks like a mistake otherwise. The label
+     * was originally `$typographyPrimaryOrig` (body text, baked as raw hex):
+     * 2.49:1 on the fill, a primary action failing AA on its own label. It
+     * became `$whiteOrig`, which measured 5.01:1 on the PURPLE `$primary500`,
+     * and the hover/focus states were restated to move DOWN the ramp because
+     * white needs the darker steps ($primary600 = 6.66:1, $primary700 = 8.78:1).
      *
-     * White measures 5.01:1 on `$primary500`. The catch is that the base
-     * `@include pc` hover lightens to `$primary400`, where white is only
-     * 3.80:1 — so the hover and focus states are restated here to move DOWN
-     * the ramp instead ($primary600 = 6.66:1, $primary700 = 8.78:1). Darkening
-     * on a light ground is also the conventional direction.
+     * The teal ramp inverts that arithmetic. It is a much lighter fill, so
+     * white on `$primary500` is only 3.14:1 — the same failure the white label
+     * was introduced to fix, arriving from the other side. Ink passes on the
+     * fill instead (5.7:1), and with an ink label the states must move UP the
+     * ramp, since darkening is what costs contrast now:
+     *
+     *   $content0Orig on $primary500   5.7:1   rest      ✓ AA
+     *   $content0Orig on $primary400   7.6:1   hover     ✓ AA
+     *   $content0Orig on $primary300  10.4:1   active    ✓ AA
+     *
+     * (White would have been 3.14 / 2.55 / 1.80 across those same three.)
+     *
+     * `Orig` on the label, not `$content0`: the fill is a fixed brand colour in
+     * both themes, so a label that followed the theme would invert to near-white
+     * on teal in dark mode and fail there while passing here.
      */
     &--type-primary {
-        color: $whiteOrig;
+        color: $content0Orig;
 
         @include hover {
             &:hover {
-                background: var(--hover-color, $primary600);
+                background: var(--hover-color, $primary400);
             }
         }
 
-        &:active, &:focus-visible {
-            background: var(--focus-color, $primary700);
+        // `:focus` is listed as well as `:focus-visible`: the base rule above
+        // sets `:focus` to $primary600, where an ink label is 3.90:1, and it
+        // matches at the same specificity. Leaving it out puts the one state a
+        // keyboard user sees most below AA.
+        &:active, &:focus, &:focus-visible {
+            background: var(--focus-color, $primary300);
         }
     }
 
