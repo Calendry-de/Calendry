@@ -94,6 +94,19 @@ Update the checklist above as phases complete — don't let this file go stale.
   post-fix), and/or a generator realism fix. Not this app's repo to fix, but
   worth tracking here since it affects what a SUCCEEDED run's violations look
   like for any tenant with meaningful online delivery.
+- **[calendry + calendry-solver]** **Whose preferences count —
+  `PersonPreferenceFit.roles`.** The field exists on the wire and the solver
+  REFUSES a non-empty value (`PreferenceRolesUnsupported`) rather than
+  approximating it; this app sends an empty array, which means "lecturers only".
+  That is §4.1's decided scope, so nothing is broken — but the field is the seam
+  where a future decision lands without another schema bump, and the decision has
+  not been taken. What makes it non-obvious: a Session's attendee set includes
+  every member of every attached Group's descendant closure, so naively counting
+  attendees would let a 200-student cohort's aggregate preference outweigh the
+  person teaching. Any widening needs a normalisation rule per role, not just a
+  longer list. Refusal is deliberately the current behaviour — the failure to
+  avoid is a `roles` value silently interpreted as something narrower or wider
+  than the caller meant.
 - **[calendry]** "Multiple candidate schedules" — running the solver to
   produce several genuinely different options to choose between, rather than
   one best result per run. Discussed as an idea during a planning
@@ -221,6 +234,23 @@ have any implementation yet, and none should get one without the same depth of
 planning the solver's own architecture got — each is a different *shape* of
 problem from anything built so far, not a variation on an existing pattern.
 
+## A new Person still has no access until somebody assigns them a role
+
+`provision:tenant` now ships a `member` AccessRole (`session.read_own`), and
+`/manage/accounts` issues logins — so the two halves of "creating a person gives
+them nothing" are closed except the last one: **nothing assigns the role.**
+Creating a Person, giving them a login, and watching them sign in to an empty
+application is still the default path.
+
+Deliberately not auto-assigned — granting authority is
+`person_access_role.assign`, and a generic CRUD route that granted a role on
+every insert would be privilege escalation wearing a default's clothes
+(DECISIONS.md § "`session.read_own`"). What is missing is an AFFORDANCE, not a
+policy: the Person create form could offer the tenant's default role as a
+pre-ticked choice the admin can see and clear, which is a decision made once,
+visibly, rather than a rule applied invisibly. Worth doing with the searchable
+person picker, since both are Person-page work.
+
 ## Person-level self-service access model
 
 A Person logging in to manage only their own data (availability, day
@@ -258,18 +288,37 @@ accrues raw per placement (so the term stays placement-local and visible to
 `ruin_worst`); and the table is widened rather than split, with a grid-shaped
 room-type preference expected next.
 
-**Stages 1–4 are now built** (4 on 2026-08-27): the app assembles
+**Stages 1–5 are now built** (4 and 5 on 2026-08-27): the app assembles
 `Person.preferred` from `person_preference`, narrowed to the solved Term's grid,
 and reports whether the rule has any signal to work with — including the case
 where it is wholly inert, which is the `lecturer_veto` shape this feature has to
-avoid repeating.
+avoid repeating. Stage 5 is solver `41f6227`, which reads `Person.preferred` and
+charges the mean unmet fraction per placement; `wireField` was flipped in the
+same change, because the two together are one atomic step (before the evaluator,
+naming the field fails every solve outright instead of skipping the rule).
 
-**What is left is not app work.** Stage 5 is the solver's evaluator and belongs
-in `calendry-solver`; stage 6 proves it fires; stage 7 removes the "recorded, not
-yet used" disclaimers and is gated on 6. Until 5 lands, `person_preference_fit`
-deliberately has no `wireField`, so the constraint does not cross at all — the
-solver answers that variant with `UNIMPLEMENTED`, so setting it early would fail
-every solve for a tenant that enabled the rule rather than merely doing nothing.
+**Stages 6 and 7 are also done** (2026-08-27). `scripts/preference-solve-check.ts`
+solves the development tenant's instance three ways at one seed — constraint
+stripped, constraint sent, constraint sent again — and scores the placements
+against an independent restatement of the cost rule rather than asking the solver
+whether it did well. Rule off → on took the unmet cost **33 → 0**, per lecturer
+**4/24 → 24/24** and **3/16 → 16/16**; placements differ off vs on, are identical
+across two runs at one seed, and every run terminated on `move_budget`, without
+which that identity would mean nothing. Stage 7 then rewrote the
+`/my/preferences` disclaimer and corrected the two code comments that had made
+the same claim.
+
+**One question stage 7 could not answer, and it is a permissions decision.**
+`/my/preferences` cannot tell a lecturer whether their institution has actually
+enabled `person_preference_fit` — the rule is off by default and reading
+`constraint_def` needs `constraint.read`, an administrator's key. So the page
+names the dependency ("whether it does is an institution setting") instead of
+resolving it, which is honest but vague. Resolving it properly means deciding
+what a lecturer may see of their institution's configuration: either a narrow
+read on this one rule's enabled flag, or a `/my`-scoped endpoint that answers
+"are preferences weighed here" without exposing the constraint set. Deliberately
+NOT done as a copy edit — the same shape as `tenant.read`, where the question is
+whose data it is rather than who happens to be looking.
 
 E.g. "this tutor prefers mornings," "this tutor prefers these days if
 possible." Every existing soft constraint is tenant-configured and broadly
@@ -574,6 +623,16 @@ Both call sites should move together, and the Offering page's lecturer picker
 (`ManageRelationPicker` with `extraReference`) is the third consumer worth
 looking at while doing it: it has the same problem one entity over.
 
+A fourth arrived with the Logins section: `ManageAccountForm`'s person select
+draws from `/api/accounts/candidates`, capped at `CANDIDATE_LIMIT` (500,
+`shared/accounts.ts`). Smaller than the others because it lists only people
+WITHOUT a login, which in a settled institution is short — but an onboarding
+tenant that imported three thousand people and issued no logins yet will hit it.
+That cap is REPORTED in the form rather than silent, and the message names the
+CLI as the way through, so this is a usability gap and not a correctness one. Fix
+it with the same type-to-search control; the `q` filter it would need does not
+exist on that endpoint yet.
+
 ## Cancel-to-spare-bank
 
 Cancelling a Session (e.g. a lecturer got sick) should offer: try to find it a
@@ -645,15 +704,27 @@ Step 13 instance survived a whole phase.
 
 ## Password policy gaps
 
-`must_change_password` is BUILT for the operator-reset path — see CLAUDE.md
-§ "Open items on auth" for how that works and why. What is still missing:
+`must_change_password` is BUILT for the operator-reset path AND for the
+management area's Logins section (`POST /api/accounts/:id/reset-password` sets it
+unconditionally — an administrator necessarily learns the password they issue, so
+it is a shared secret from the moment it exists). What is still missing:
 
 - the initial password from `provision:tenant` is **not** flagged for rotation
   (a one-time stdout print that stays valid indefinitely);
 - no password expiry;
-- no complexity rule beyond the 12-character floor in `change-password.post.ts`;
+- no complexity rule beyond the 12-character floor, now shared by the API and the
+  form via `shared/password.ts`;
 - **no rate limiting on the change endpoint** — confirmed absent 2026-08-23;
-- no email delivery of reset links.
+- no email delivery of reset links. This is what makes every issue-a-password
+  path hand the secret to an administrator to relay by hand, which is the reason
+  `must_change_password` has to be unconditional rather than optional.
+
+**A tenant cannot recover a login it SHARES with another institution** — by
+design (CLAUDE.md § "Accounts"), and the escape hatch is an operator running
+`bun run reset:password`. If shared logins ever become common rather than the
+partner-university edge case, this needs a real answer: a self-service reset by
+email would belong to the account holder rather than to any tenant, and would
+make the sole-tenant rule unnecessary for the password specifically.
 
 
 ---

@@ -500,16 +500,26 @@ model PersonUnavailability {
 /// Stated here because nothing else states it, and the first evaluator to read
 /// these columns would otherwise fix the semantics by accident.
 ///
-/// STORED BUT NOT YET SOLVER-EFFECTIVE. Nothing reads this into `SolverInput`,
-/// because the wire has no field for it: `Person.preferred_days` /
-/// `preferred_blocks` and the `person_preference_fit` constraint type are a
-/// deliberately separate later slice that touches calendry-proto and the
-/// solver.
+/// SOLVER-EFFECTIVE since 2026-08-27. `assembleSolverInput` reads this into
+/// `SolverInput` as `Person.preferred` (proto 0.7.0), narrowed to the solved
+/// Term's grid, and the solver evaluates `person_preference_fit` against it
+/// (`calendry-solver` 41f6227) by charging the mean UNMET fraction per
+/// placement.
 ///
-/// This is NOT the `lecturer_veto` bug repeating itself. That one was a HARD
-/// constraint, enabled by default in every tenant, silently fed an empty list —
-/// it looked healthy and could never fire. This table feeds nothing, claims to
-/// feed nothing, and the page where people enter the data says so.
+/// This comment said the opposite until stage 5 landed — "nothing reads this,
+/// because the wire has no field for it" — and all three clauses had become
+/// false: something reads it, the field exists, and it is `Person.preferred`
+/// rather than the `preferred_days` / `preferred_blocks` named here. Corrected
+/// rather than left to be deleted later, because a stale comment on a schema
+/// column is read as current by whoever finds it next.
+///
+/// This is NOT the `lecturer_veto` bug repeating itself, and the three
+/// properties that keep it out of that hole still hold: the rule is SOFT (a
+/// mistake prices rather than refuses), it is OFF BY DEFAULT (no tenant's
+/// timetable moves without someone choosing it), and the assembly report counts
+/// the wholly-inert case so "configured but silent" is distinguishable from
+/// "configured and satisfied" — which is exactly what nothing did for
+/// `lecturer_veto`.
 ///
 /// An ABSENT row means "no preferences", so the write path DELETES the row when
 /// both arrays end up empty: that state then has exactly one representation

@@ -112,6 +112,22 @@ export const colorsList = {
     success400: '#5CB77D',
     success300: '#8FCEA6',
 
+    /*
+     * ONE STEP DARKER THAN THE RAMP, FOR WARNING TEXT ON A LIGHT SURFACE.
+     *
+     * `warning700` is the ramp's darkest and still measures 3.73:1 on
+     * `surface1` and 3.89:1 on `surface0` — below AA for normal text at every
+     * size it renders, while `error700` (6.60) and `success700` (5.18) pass
+     * comfortably on the same grounds. So this is one ramp step, not a systemic
+     * problem, and it was carrying the most important sentences on the
+     * self-service pages.
+     *
+     * A NEW TOKEN rather than a darker `warning700`, because that value is also
+     * used for BORDERS and TINTS (3:1 territory, which it passes) and by the
+     * schedule's violation styling. Text needs its own step; the dark theme
+     * override below keeps the light-on-dark value, where nothing failed.
+     */
+    warning800: '#8A5A12',
     warning700: '#A87121',
     warning600: '#C08628',
     warning500: '#D69B33',
@@ -194,6 +210,9 @@ export const themesList = {
         success700: '#5CB77D',
         warning600: '#D69B33',
         warning700: '#E4B662',
+        // Dark inverts the role: warning text sits on a dark ground, so it wants
+        // the LIGHT end. Measured 9.42:1 on surface1, 9.86:1 on surface0.
+        warning800: '#E4B662',
         error600: '#D14A4F',
         error700: '#E0777A',
     },

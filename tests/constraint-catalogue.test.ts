@@ -102,30 +102,82 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         expect(type!.defaultWeight).toBeGreaterThan(0);
     });
 
-    it('SKIPS a type whose proto field has not shipped, rather than encoding nothing', () => {
+    it('SENDS person_preference_fit, now that the solver evaluates it', () => {
         /*
-         * The failure this prevents: `toWireConstraint` assembles the config with
-         * an `as ConstraintConfig` cast and ts-proto encodes only fields it
-         * knows, so a fabricated field name would produce a ConstraintConfig
-         * with no params set — a rule the tenant enabled and weighted that is
-         * silently absent from every run. The rule ships disabled, but a tenant
-         * admin can flip it on before the proto catches up, so "off by default"
-         * is not the guard.
+         * INVERTED ON 2026-08-27, and the pair of assertions it replaced is
+         * worth remembering rather than deleting. This test used to assert the
+         * opposite — that the rule was SKIPPED — with a sibling asserting
+         * `wireField` was undefined, precisely so that flipping one would fail
+         * the other and force whoever did it to read why.
+         *
+         * Why it was skipped: until `calendry-solver` 41f6227 the solver
+         * answered this variant with `Status::unimplemented`, which fails the
+         * whole StartRun. Naming the field before the evaluator existed would
+         * have turned "the rule quietly does nothing" into "every solve fails",
+         * for any tenant who enabled it. The evaluator has landed, so the flip
+         * is now the correct half of that pair.
          */
         const result = toWireConstraint(
             { ...row(), type: 'person_preference_fit', severity: 'SOFT', weight: 5 },
             noKinds,
         );
 
-        expect('skip' in result).toBe(true);
-        expect((result as { skip: string }).skip).toContain('no field for this type yet');
+        expect('config' in result).toBe(true);
+
+        const config = (result as { config: Record<string, unknown> }).config;
+
+        expect(config.personPreferenceFit).toBeDefined();
+        // SOFT, so the weight is what the tenant chose rather than 0.
+        expect(config.weight).toBe(5);
     });
 
-    it('leaves person_preference_fit without a wire field until the proto carries it', () => {
-        // The inverse of the assertion above, so the two cannot both drift: if
-        // somebody adds the wireField, the skip test fails and this one tells
-        // them why it existed.
-        expect(findConstraintType('person_preference_fit')!.wireField).toBeUndefined();
+    it('sends an EMPTY variant, because a non-empty `roles` fails the run', () => {
+        /*
+         * The one cross-repo coupling that survived the flip, and it is not
+         * cosmetic. `PersonPreferenceFit` carries a `roles` field, and the
+         * solver REFUSES a non-empty one (`PreferenceRolesUnsupported`) rather
+         * than approximating it: empty means "lecturers only", which is the
+         * decided scope, and widening the counted set would let a 200-student
+         * cohort's aggregate preference outweigh the person teaching.
+         *
+         * So an empty `roles` is the only ACCEPTED value, not an unfinished one
+         * — a future `roles` param on this catalogue entry would fail every
+         * solve until the solver decides that scope. Asserted exactly, so adding
+         * a role in `buildVariant` fails here rather than at StartRun.
+         *
+         * EMPTY BUT PRESENT, and that distinction cost a real failure. This
+         * originally asserted `{}`, matching every other parameterless variant —
+         * and `{}` CRASHES for this message, because ts-proto iterates a
+         * repeated field without a presence check and `hashInput` encodes the
+         * input before anything is sent. The whole assembly threw
+         * `message.roles is not iterable`. So `roles: []` is load-bearing in two
+         * directions at once. See solver ADR-0026 and the note on `buildVariant`.
+         */
+        const result = toWireConstraint(
+            { ...row(), type: 'person_preference_fit', severity: 'SOFT', weight: 5 },
+            noKinds,
+        );
+
+        expect((result as { config: Record<string, unknown> }).config.personPreferenceFit).toEqual({ roles: [] });
+    });
+
+    it('has a wire field for every catalogue type', () => {
+        /*
+         * The replacement tripwire, pointing the other way. `person_preference_fit`
+         * was the last type without a field, so the catalogue is complete — and
+         * the skip-when-unmapped branch in `toWireConstraint` is currently
+         * unreachable from it.
+         *
+         * That branch STAYS: the situation recurs whenever a catalogue entry
+         * ships ahead of the schema, and dropping a rule silently is the failure
+         * it exists to prevent. This assertion is what makes the next such entry
+         * announce itself — it fails, and whoever added the type decides
+         * deliberately whether the field exists yet, instead of discovering
+         * months later that an enabled rule never crossed.
+         */
+        const unmapped = CONSTRAINT_TYPES.filter((type) => !type.wireField).map((type) => type.key);
+
+        expect(unmapped).toEqual([]);
     });
 
     it('sends a parameterless type as an empty variant', () => {

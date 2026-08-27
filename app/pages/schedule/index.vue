@@ -5,9 +5,17 @@
 -->
 <template>
     <main class="schedule">
-        <!-- Visually hidden: the week itself is the title, but a document with
-             no heading and no `main` leaves nothing to navigate by. -->
-        <h1 class="schedule_sr">Schedule</h1>
+        <!--
+            Visually hidden: the week itself is the title, but a document with no
+            heading and no `main` leaves nothing to navigate by.
+
+            It NAMES THE SCOPE, because the two pages are genuinely different and
+            a screen reader gets no other signal: with `session.read_own` this is
+            one person's timetable, not a sparse version of the institution's, and
+            "Schedule" over three chips reads as a tenant with almost nothing in
+            it. Taken from the server's answer, never from the permission.
+        -->
+        <h1 class="schedule_sr">{{ data.scope.value === 'own' ? 'Your schedule' : 'Schedule' }}</h1>
 
         <ScheduleToolbar
             v-model:term-id="filters.termId.value"
@@ -295,7 +303,11 @@ const canTriggerSolver = useHasPermission('solver.trigger');
  * The proposals list, not the solver: reviewing needs `session.read`, producing
  * needs `solver.trigger`, and a department head typically holds only the first.
  */
-const canReviewProposals = useHasPermission('session.read');
+/*
+ * `generation.read`, matching the route and the nav entry. It was `session.read`,
+ * which offered the Proposals button to everybody who could see the grid.
+ */
+const canReviewProposals = useHasPermission('generation.read');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
 const canUpdateSession = useHasPermission('session.update');

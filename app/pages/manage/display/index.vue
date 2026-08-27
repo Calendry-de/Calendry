@@ -190,19 +190,27 @@ definePageMeta({
      * row form and no `/api/display` resource behind it. Routed through it, the
      * page 404s on a static path with no `entity` param at all.
      *
-     * `session.read` to LOOK, which is what the nav gates on too; the form
-     * renders read-only without `session_kind.update`. Same split as the
-     * availability pages, and for the same reason: seeing why the schedule looks
-     * the way it does is not the same permission as changing it for everyone.
+     * `tenant.read` to LOOK, which is what the nav gates on too; the form renders
+     * read-only without `tenant.update`. Same split as the availability pages,
+     * and for the same reason: seeing a setting is not the same permission as
+     * changing it for everyone.
+     *
+     * BOTH KEYS MOVED TOGETHER, from `session.read`/`session_kind.update`. Under
+     * the old pair this page sat in the navigation of everybody who could look at
+     * a timetable — an institution's settings offered to every lecturer — and a
+     * role holding `session_kind.update` could save changes to a page it was
+     * never shown. `GET /api/display-settings` still answers `session.read`,
+     * because the schedule needs the colours to draw; the endpoint being wider
+     * than this gate is deliberate and documented there.
      */
     middleware: [
         () => {
             const held = new Set(useSession().value?.permissions ?? []);
 
-            if (!held.has('session.read')) {
+            if (!held.has('tenant.read')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Viewing display settings needs session.read.',
+                    statusMessage: 'Viewing this institution\'s display settings needs tenant.read.',
                 }));
             }
         },
@@ -216,7 +224,7 @@ const SOURCE_LABEL: Record<ColorSource, string> = {
     kind: 'The session kind’s colour',
 };
 
-const canEdit = useHasPermission('session_kind.update');
+const canEdit = useHasPermission('tenant.update');
 const request = useRequestFetch();
 
 const settings = useAsyncData(

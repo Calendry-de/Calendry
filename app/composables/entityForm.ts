@@ -61,6 +61,19 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     const draft = ref<Record<string, unknown>>({});
     const fieldErrors = ref<Record<string, string>>({});
     const formError = ref('');
+    /**
+     * The server's own `data` payload from the last failed write, unparsed.
+     *
+     * A message is for the person; this is for the FORM. `POST /api/accounts`
+     * answers an already-registered address with `{ accountExists: true }` and
+     * the create form turns that into an "attach it instead" affordance — a
+     * decision that must not be reached by matching on the sentence, because the
+     * sentence is wording and the flag is contract.
+     *
+     * Cleared on every attempt, so a stale flag cannot outlive the error that
+     * produced it.
+     */
+    const errorData = ref<Record<string, unknown> | null>(null);
     const busy = ref(false);
 
     /** Snapshot taken when the draft is seeded, so "dirty" is a real comparison. */
@@ -77,6 +90,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         pristine.value = JSON.stringify(next);
         fieldErrors.value = {};
         formError.value = '';
+        errorData.value = null;
     }
 
     /**
@@ -126,6 +140,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         busy.value = true;
         fieldErrors.value = {};
         formError.value = '';
+        errorData.value = null;
 
         try {
             const body: Record<string, unknown> = {};
@@ -185,10 +200,18 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
                 name?: string;
                 message?: string;
                 statusMessage?: string;
-                data?: { issues?: unknown };
+                data?: Record<string, unknown> & { issues?: unknown };
                 issues?: unknown;
             };
         };
+
+        /*
+         * h3 nests the `data` passed to `createError` one level inside the
+         * response body, so the server's own payload is `error.data.data` — the
+         * same shape `extractIssues` reads issues out of. Verified against a live
+         * 409 rather than assumed, for the reason that function documents.
+         */
+        errorData.value = e.data?.data ?? null;
 
         const issues = extractIssues(e.data);
 
@@ -231,6 +254,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         references,
         fieldErrors,
         formError,
+        errorData,
         busy,
         isDirty,
         isForeignOwned,
@@ -238,6 +262,19 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         save,
         remove,
         reset: seed,
+        /**
+         * Re-read the row from the server and re-seed the draft.
+         *
+         * For a change made by something OTHER than this form — an explicit verb
+         * on the same record. Issuing a new password moves `mustChangePassword`
+         * and the session count, and a panel rendering stale values beside a
+         * button that just changed them is a page contradicting itself.
+         *
+         * The re-seed is deliberate, not collateral: the same `watch` that
+         * handles any other client-side refetch owns it, so there is one rule
+         * for what a fresh row does to a draft.
+         */
+        refresh: () => asyncData.refresh(),
         pending: computed(() => asyncData.pending.value),
         /**
          * The page awaits this — the one await, at setup top level. Resolves

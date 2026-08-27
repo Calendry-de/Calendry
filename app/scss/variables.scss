@@ -45,6 +45,42 @@ $typographySecondary: $surface2;
     }
 }
 
+/*
+ * WHERE THE HEADER STOPS FITTING ON ONE LINE — content-driven, not a device.
+ *
+ * Measured min-content of the header bar, at its widest permission set:
+ *
+ *   223px logo lockup + 24px margin + 12px gap
+ * + 443px nav (four labelled buttons: 85.5 + 108.3 + 101.2 + 99.8 + 3 × 16 gap)
+ * + 12px gap + 61px account button + 18px padding
+ * = 793px
+ *
+ * Below that the bar cannot hold its contents, and it did not previously try:
+ * `.header__menu` had no `flex-wrap` and no collapse, so the document floored
+ * at 781px and every viewport under it scrolled horizontally — on a 390px phone
+ * that is a 391px dead zone beside every page in the app.
+ *
+ * The other mixins here are DEVICE lines (699 / 1365) and are the wrong tool:
+ * the header's constraint is the sum of its own parts, so it gets its own
+ * threshold and both the nav collapse and the logo's drop to mark-only hang off
+ * this single number. Re-measure it if the nav gains an entry.
+ */
+$navCollapseAt: 819px;
+
+/** Narrow: logo drops to its mark, nav collapses into the drawer. */
+@mixin navCollapsed() {
+    @media all and (max-width: $navCollapseAt) {
+        @content;
+    }
+}
+
+/** Wide: full lockup and inline nav. */
+@mixin navInline() {
+    @media all and (min-width: 820px) {
+        @content;
+    }
+}
+
 @mixin mobileSafariOnly() {
     @include mobileOnly() {
         @supports (-webkit-hyphens:none) {

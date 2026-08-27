@@ -447,12 +447,11 @@ import { applyConsequence, useGenerationReview } from '~/composables/generationR
 import { useHasPermission } from '~/composables/session';
 
 /**
- * Gated on `session.read` — the one permission everything this page reads sits
- * behind. Deliberately NOT the six-permission `schedule` middleware: every
- * reference fetch here is tolerant, so a caller who may read sessions but not
+ * Gated on `generation.read` — the one permission everything this page reads
+ * sits behind. Deliberately NOT the six-permission `schedule` middleware: every
+ * reference fetch here is tolerant, so a caller who may read proposals but not
  * rooms gets ids instead of names rather than a refusal. Without any guard, a
- * caller lacking `session.read` reached this page and was told the proposal was
- * "undefined".
+ * caller lacking it reached this page and was told the proposal was "undefined".
  */
 definePageMeta({ middleware: 'review' });
 

@@ -7,6 +7,52 @@ import { DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 import { useHasPermission } from '~/composables/session';
 
+interface DirectoryRoom { id: string; code: string; name: string; isVirtual: boolean }
+interface DirectoryPerson { id: string; givenName: string; familyName: string }
+interface DirectoryGroup { id: string; name: string; parentGroupId: string | null }
+
+/**
+ * `GET /api/schedule/context` — everything needed to DRAW, behind the page's own
+ * permission. See that route for why it exists and what it deliberately omits.
+ */
+interface ScheduleContext {
+    /** `any` is the whole institution's timetable; `own` is the caller's. */
+    scope: 'any' | 'own';
+    /** The term the server actually answered for. Never re-derived client-side. */
+    resolvedTermId: string;
+    terms: Term[];
+    timeGrids: TimeGrid[];
+    rooms: DirectoryRoom[];
+    people: DirectoryPerson[];
+    groups: DirectoryGroup[];
+}
+
+/**
+ * A directory fetch that may fail without taking the page with it.
+ *
+ * The `.catch` is not laziness: these lists feed CONTROLS, not the grid, and the
+ * honest response to "we could not read the room list" is a schedule with no
+ * room filter — not an empty screen. What must never happen is the version of
+ * this that had no catch, where one 403 inside a `Promise.all` rejected the
+ * whole handler and rendered nothing at all.
+ */
+function optional<T>(request: ReturnType<typeof useRequestFetch>, path: string): Promise<T[]> {
+    return request<T[]>(path).catch(() => [] as T[]);
+}
+
+/** Union by id, first occurrence winning. Both inputs describe the same rows. */
+function mergeById<T extends { id: string }>(primary: T[], extra: T[]): T[] {
+    const byId = new Map<string, T>();
+
+    for (const row of [...primary, ...extra]) {
+        if (!byId.has(row.id)) {
+            byId.set(row.id, row);
+        }
+    }
+
+    return [...byId.values()];
+}
+
 /**
  * Everything the schedule view reads from the server, plus what is derived from
  * it. Server state only — no selection, placement mode or view preferences.
@@ -28,30 +74,59 @@ export function useScheduleData(filters: {
 
     const canReadViolations = useHasPermission('violation.read');
 
+    /**
+     * DIRECTORY permissions, which are about QUERYING the institution rather
+     * than drawing a timetable.
+     *
+     * Every one of these used to be a REQUIREMENT of this page, because its
+     * reference wave fetched the whole roster to put names on chips — so the
+     * smallest role that could see a schedule could also enumerate every person,
+     * room and cohort. The names now travel with the schedule
+     * (`/api/schedule/context`); these keys buy the WIDER lists that the filters
+     * and the inspector's pickers offer.
+     *
+     * THEY DO NOT DECIDE WHETHER A FILTER EXISTS. That is the option count's job
+     * (see `ScheduleToolbar`): somebody reading their own timetable holds none of
+     * these and can still have sessions across three cohorts, and narrowing to
+     * one of them is exactly what a filter is for. What these keys change is how
+     * far the list reaches — their own schedule, or the whole institution.
+     *
+     * What they still decide is whether the REQUEST is made at all: skipping it
+     * keeps a guaranteed 403 off the wire.
+     */
+    const canReadGroups = useHasPermission('group.read');
+    const canReadRooms = useHasPermission('room.read');
+    const canReadPeople = useHasPermission('person.read');
+    const canReadKinds = useHasPermission('session_kind.read');
+
     /*
      * One wave: the sessions query keys off termId, which is only known after
-     * the reference data lands, so splitting it risks a fetch with an empty term.
+     * the context lands, so splitting it risks a fetch with an empty term.
      */
     const asyncData = useAsyncData('schedule', async () => {
-        const [terms, timeGrids, groupRows, roomRows, personRows, kindRows] = await Promise.all([
-            request<Term[]>('/api/terms'),
-            request<TimeGrid[]>('/api/time-grids'),
-            request<{ id: string; name: string; parentGroupId: string | null }[]>('/api/groups'),
-            request<{ id: string; name: string; code: string; isVirtual: boolean }[]>('/api/rooms'),
-            request<{ id: string; givenName: string; familyName: string }[]>('/api/persons'),
-            /*
-             * INDIVIDUALLY TOLERANT: `session_kind.read` is a different
-             * permission from the `session.read` this page is gated on, and
-             * inside a bare `Promise.all` that 403 blanked the whole page. A
-             * caller who cannot read kinds cannot be offered a kind picker
-             * either, so an empty list is the honest fallback.
-             */
-            request<{ id: string; name: string }[]>('/api/session-kinds').catch(() => []),
-        ]);
+        /**
+         * ONE ENDPOINT, THE PAGE'S OWN GATE. Everything needed to DRAW: the
+         * terms, the grid geometry, and names for the rooms, people and groups
+         * appearing in the sessions this caller may read — narrowed server-side
+         * by the same rule that narrows the sessions themselves.
+         *
+         * Not tolerant, deliberately: without this there is no schedule, so a
+         * failure must reach `loadError` and say so rather than degrade into a
+         * grid with no geometry.
+         */
+        const context = await request<ScheduleContext>('/api/schedule/context', {
+            query: filters.termId.value ? { termId: filters.termId.value } : {},
+        });
 
-        const resolvedTermId = filters.termId.value || terms[0]?.id || '';
+        /*
+         * THE SERVER'S ANSWER, not a second local default. The context's names
+         * describe the term IT resolved, so re-deriving "the first term" here
+         * would let the two disagree and put last year's room names on this
+         * year's chips.
+         */
+        const resolvedTermId = context.resolvedTermId;
 
-        const [sessions, violations] = await Promise.all([
+        const [sessions, violations, groupRows, roomRows, personRows, kindRows] = await Promise.all([
             resolvedTermId
                 ? request<ScheduleSession[]>('/api/sessions', {
                     query: { ...filters.query.value, termId: resolvedTermId },
@@ -60,20 +135,46 @@ export function useScheduleData(filters: {
             resolvedTermId && canReadViolations.value
                 ? request<Violation[]>('/api/violations', { query: { termId: resolvedTermId } })
                 : Promise.resolve([] as Violation[]),
+            /*
+             * THE DIRECTORY, AND EVERY ONE OF THESE IS OPTIONAL TWICE OVER:
+             * skipped when the permission is absent, and caught when it fails
+             * anyway. Both matter — the permission check keeps the request off
+             * the wire, and the catch survives a permission revoked mid-session
+             * or a role the client's cached session predates.
+             *
+             * This is the wave that used to blank the whole page. It cannot now:
+             * nothing here is required to render, and each list only decides
+             * whether one control appears.
+             */
+            canReadGroups.value ? optional<DirectoryGroup>(request, '/api/groups') : [],
+            canReadRooms.value ? optional<DirectoryRoom>(request, '/api/rooms') : [],
+            canReadPeople.value ? optional<DirectoryPerson>(request, '/api/persons') : [],
+            canReadKinds.value ? optional<{ id: string; name: string }>(request, '/api/session-kinds') : [],
         ]);
 
+        /*
+         * MERGED, context first. The directory is a superset when it arrived at
+         * all, so this is a no-op for an administrator and is the whole of the
+         * list for somebody reading their own timetable. Keyed by id so a row
+         * present in both appears once.
+         */
+        const rooms = mergeById<DirectoryRoom>(context.rooms, roomRows);
+        const people = mergeById<DirectoryPerson>(context.people, personRows);
+        const groups = mergeById<DirectoryGroup>(context.groups, groupRows);
+
         return {
-            terms,
-            timeGrids,
-            groups: groupRows,
-            rooms: roomRows.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
+            scope: context.scope,
+            terms: context.terms,
+            timeGrids: context.timeGrids,
+            groups,
+            rooms: rooms.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
             /*
              * Online delivery is a virtual ROOM, never a flag on Session
              * (TAXONOMY.md), so a Set here turns "is this online" from a lookup
              * per chip per render into one.
              */
-            virtualRoomIds: roomRows.filter((r) => r.isVirtual).map((r) => r.id),
-            people: personRows.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
+            virtualRoomIds: rooms.filter((r) => r.isVirtual).map((r) => r.id),
+            people: people.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
             kinds: kindRows,
             sessions,
             violations,
@@ -245,6 +346,13 @@ export function useScheduleData(filters: {
     return {
         terms, groups, rooms, people, kinds, resolvedTermId,
         virtualRoomIds, displaySettings,
+        /**
+         * Whether this caller is looking at the institution's timetable or their
+         * own. Read off the server's answer rather than inferred from the
+         * permission, so the page and the data can never describe different
+         * things.
+         */
+        scope: computed(() => reference.value?.scope ?? 'own'),
         term, totalWeeks, grid,
         allSessions, onGridSessions, offGridSessions,
         violations, violationsBySessionId,

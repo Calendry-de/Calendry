@@ -46,7 +46,18 @@ export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[n
 export type ConstraintEvaluator =
     /** This application, synchronously, on every manual edit. */
     | 'app'
-    /** The Rust solver service. Not implemented — configurable but inert. */
+    /**
+     * The Rust solver service, at generation time — as opposed to `'app'`, which
+     * evaluates synchronously on every manual edit.
+     *
+     * This said "Not implemented — configurable but inert", which had been stale
+     * for a long time and became flatly wrong on 2026-08-27, when
+     * `person_preference_fit` (the last unevaluated type) gained its evaluator in
+     * `calendry-solver` 41f6227. Every catalogue type now crosses the wire and is
+     * priced or enforced. What `'solver'` does still mean is that a breach is
+     * invisible until a run produces it: nothing here is checked while somebody
+     * drags a session around.
+     */
     | 'solver';
 
 export type ConstraintParamType =
@@ -99,7 +110,8 @@ export type WireConstraintField =
     | 'minimizeRoomRank'
     | 'minimizeExamWeek'
     | 'minimizeOnline'
-    | 'minimizeBlockUsage';
+    | 'minimizeBlockUsage'
+    | 'personPreferenceFit';
 
 export interface ConstraintTypeDef {
     key: string;
@@ -111,6 +123,13 @@ export interface ConstraintTypeDef {
      * `toWireConstraint` casts and ts-proto writes only fields it knows — so the
      * constraint would be dropped from the request with nothing reporting it.
      * A type with no `wireField` is SKIPPED and named in the assembly report.
+     *
+     * NO TYPE USES THIS TODAY — `person_preference_fit` was the last one, and it
+     * gained its field when the solver gained its evaluator. The optionality
+     * stays because the situation recurs every time a catalogue entry ships
+     * ahead of the schema, and skipping is the only safe answer; the test suite
+     * asserts the catalogue is currently complete, so a new type arriving
+     * without a field is a visible fact rather than a silently dropped rule.
      */
     wireField?: WireConstraintField;
     label: string;
@@ -437,11 +456,27 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'person_preference_fit',
         /*
-         * NO `wireField` YET — the proto field lands in the next slice. See the
-         * long note on `wireField` above for why naming a non-existent field
-         * would be worse than skipping: this rule is reported as unable to
-         * cross rather than encoded into nothing.
+         * CROSSES THE WIRE, and this line had to land in the same change as the
+         * solver's evaluator — never before it.
+         *
+         * The proto has carried the field since 0.7.0, but until
+         * `calendry-solver` 41f6227 its `convert.rs` answered this variant with
+         * `Status::unimplemented`. That is a StartRun FAILURE, not a skipped
+         * rule, so naming the field early would have taken a tenant who enabled
+         * this from "the rule quietly does nothing" to "every solve fails
+         * outright" — strictly worse than the state it replaced.
+         * `per-person-preferences-design.md` § "Where `wireField` gets flipped"
+         * has the three-row table.
+         *
+         * ONE COUPLING SURVIVES, and it is why `buildVariant` must keep
+         * returning `{}` for this key: the solver REFUSES a non-empty `roles`
+         * rather than approximating it, because empty means "lecturers only"
+         * and widening the counted set would let a 200-student cohort's
+         * aggregate preference outweigh the person teaching. An empty variant is
+         * therefore not laziness — it is the only accepted value, and sending a
+         * role would fail the run. See solver ADR-0026.
          */
+        wireField: 'personPreferenceFit',
         label: 'Honour personal preferences',
         description:
             'Prefer the days and blocks a lecturer has said they would rather teach. '

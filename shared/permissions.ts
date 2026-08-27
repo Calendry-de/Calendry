@@ -72,7 +72,39 @@ interface PermissionShape {
  */
 const EXPLICIT_PERMISSIONS = [
     // Session editing — explicit verbs, mirroring the routes (TAXONOMY.md §3).
-    { key: 'session.read', category: 'session', description: 'View the schedule' },
+    /**
+     * THE WHOLE timetable, everybody's sessions included. Sharpened from "View
+     * the schedule", which was true and unhelpful once there were two ways to
+     * see one: a role author choosing between these needs the difference in the
+     * words, not in a document.
+     *
+     * The key did NOT change. `session.read_own` is an ADDITION, and minting
+     * `session.read_any` alongside it would have left two names for one
+     * authority — while renaming this one would silently strip the capability
+     * from every hand-composed role in every existing tenant, since the backfill
+     * only repairs `tenant-admin`. See CLAUDE.md's rule about moving keys.
+     */
+    { key: 'session.read', category: 'session', description: "View the whole schedule, including other people's sessions" },
+    /**
+     * YOUR OWN sessions and nothing else: the ones you are attached to, plus the
+     * ones assigned to a Group you belong to (membership flows DOWN, so a
+     * cohort-wide lecture reaches its seminars — TAXONOMY.md §6).
+     *
+     * THE DEFAULT ROLE'S KEY. Provisioning grants it to `member`, because
+     * "everyone at this institution can see their own timetable" is the baseline
+     * a calendar product is for, and until now the smallest role that could see
+     * anything at all needed six read permissions covering the entire roster.
+     *
+     * IT IMPLIES NOTHING ELSE, and that is the point. `/schedule` used to demand
+     * `person.read`, `room.read`, `group.read`, `term.read` and `time_grid.read`
+     * as well, because its reference wave fetched the whole directory to put
+     * names on chips. A lecturer does not need to be able to query the staff
+     * list to be told which room they are teaching in — so the names for what
+     * they can see travel with it (`GET /api/schedule/context`), and the
+     * directory endpoints stay behind their own keys, feeding filters and
+     * pickers that are simply absent without them.
+     */
+    { key: 'session.read_own', category: 'session', description: 'View your own sessions — the ones you are in' },
     { key: 'session.create', category: 'session', description: 'Create a Session or Event directly' },
     { key: 'session.move', category: 'session', description: 'Re-place a Session' },
     { key: 'session.swap', category: 'session', description: 'Swap two Sessions' },
@@ -86,6 +118,20 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
 
     // Operations
+    /**
+     * READING proposals, separate from applying one.
+     *
+     * A Generation is a set of PROPOSED placements; `session.read` is authority
+     * over the applied timetable. Conflating them — which is what gating the
+     * proposal routes on `session.read` did — meant everybody who could look at
+     * a schedule was also offered "Proposals" in the navigation and could read
+     * every solver run's output. Two different data sets, two permissions.
+     *
+     * Read is NOT implied by `generation.apply`, and deliberately not folded
+     * into it: they are granted to the same person in practice, but a catalogue
+     * with no implication mechanism must not pretend to have one.
+     */
+    { key: 'generation.read', category: 'generation', description: 'View solver proposals and their previews' },
     { key: 'generation.apply', category: 'generation', description: 'Promote a Generation to the current baseline' },
     { key: 'solver.trigger', category: 'solver', description: 'Request a solver run' },
     { key: 'violation.read', category: 'violation', description: 'View current constraint violations' },
@@ -112,6 +158,46 @@ const EXPLICIT_PERMISSIONS = [
     // Administration
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
     { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },
+
+    /**
+     * The LOGIN plane, which is not a Person (TAXONOMY.md §4 vs §2).
+     *
+     * TWO KEYS, NOT FOUR CRUD VERBS, for the same reason `access_role` has two:
+     * what a tenant actually decides is "may audit the logins" versus "may mint,
+     * relink and reset them", and there is no coherent middle where somebody may
+     * create an Account but not reset its password — both hand out a working
+     * credential.
+     *
+     * SEPARATE FROM `person.*` deliberately. Creating a Person is scheduling
+     * data; creating an Account is issuing a credential. Folding the second into
+     * `person.create` would silently promote every roster editor in every
+     * existing tenant into someone who can hand out logins.
+     */
+    { key: 'account.read', category: 'administration', description: 'See which logins exist in this institution' },
+    { key: 'account.manage', category: 'administration', description: 'Create logins, attach them to people, reset passwords' },
+
+    /**
+     * The institution's OWN settings, as opposed to the entities inside it.
+     *
+     * Its own category rather than `administration`, because this is where every
+     * future tenant-level setting belongs — display, timezone, name — and a
+     * heading that reads "Institution" is what tells a role author that these
+     * are not about people or rooms.
+     *
+     * `tenant` is deliberately NOT in `CRUD_RESOURCES`: a Tenant is not a
+     * managed entity here (nobody creates or deletes one from inside it), so
+     * there is no `tenant.create`/`tenant.delete` and the prefix rule never
+     * generates any. Two keys, matching what a tenant actually decides.
+     *
+     * `tenant.update` REPLACED `session_kind.update` on the display-settings
+     * write. That was chosen when minting a permission looked disproportionate;
+     * it stopped being defensible the moment the page had a gate of its own,
+     * because a role could then hold the write and never see the page. Any
+     * custom role relying on the old pairing needs `tenant.update` granted —
+     * CLAUDE.md § "Bootstrap & deploy sequence".
+     */
+    { key: 'tenant.read', category: 'tenant', description: "View this institution's own settings" },
+    { key: 'tenant.update', category: 'tenant', description: "Change this institution's own settings" },
 ] as const satisfies readonly PermissionShape[];
 
 /**
@@ -214,6 +300,25 @@ export const RESOURCE_PERMISSIONS: Record<string, Partial<Record<CrudAction, rea
         create: ['access_role.manage'],
         update: ['access_role.manage'],
         delete: ['access_role.manage'],
+    },
+    /**
+     * `accounts` is NOT in `CRUD_RESOURCES` and never will be: `account` carries
+     * no `tenant_id` and no RLS (the pre-tenant auth plane), so the generic
+     * routes' `where: { tenantId }` would match nothing at all. It has its own
+     * handlers under `server/api/accounts/`, which read this map through
+     * `crudPermission()` exactly as the generic ones do — declared HERE rather
+     * than inline in those files so the management UI can predict the gate
+     * without knowing which routes are bespoke.
+     *
+     * `read` accepts `account.manage` too: somebody who may issue a login can
+     * obviously see the list, and requiring both keys would make a
+     * one-permission role render an empty page.
+     */
+    accounts: {
+        read: ['account.read', 'account.manage'],
+        create: ['account.manage'],
+        update: ['account.manage'],
+        delete: ['account.manage'],
     },
 };
 

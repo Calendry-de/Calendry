@@ -2,7 +2,7 @@
   "name": "calendry",
   "type": "module",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.1-beta",
   "scripts": {
     "preinstall": "node scripts/check-registry-auth.mjs",
     "check:registry-auth": "node scripts/check-registry-auth.mjs",

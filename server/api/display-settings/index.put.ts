@@ -12,20 +12,24 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * saved any should not have to know whether a row exists — and there is no
  * create/update distinction to expose when a second row cannot exist.
  *
- * Writing is gated on `session_kind.update` — an EXISTING permission, and the
- * closest true sibling: colours already live on Session kinds, and this page is
- * the tenant-wide version of exactly that decision. Whoever may set a kind's
- * colour is whoever should set the standard the kinds fall back to.
+ * Writing is gated on `tenant.update`. It was `session_kind.update` — an
+ * existing permission borrowed on the reasoning that colours already live on
+ * Session kinds, chosen because minting one looked disproportionate for a
+ * distinction nobody had asked for.
  *
- * Minting `display_settings.manage` was the alternative and was rejected on
- * cost: a new permission means editing the catalogue constant AND its migration
- * mirror, then a `grant:permissions` backfill, because the seed deliberately
- * never touches `access_role_permission` — until that backfill runs, every
- * existing tenant-admin 403s on a visible page. That is a lot of moving parts
- * for a distinction nobody asked for.
+ * WHAT CHANGED THAT: the page acquired a gate of its own (`tenant.read`). The
+ * borrowed pairing then described a role that may change this institution's
+ * settings and never see the page it changes them on — the asymmetry this
+ * codebase treats as a bug wherever else it appears. Once one key had to be
+ * minted, the second cost nothing but a line in the same backfill.
  *
- * Reading needs only `session.read`: everyone who sees the schedule needs to
- * know how to draw it.
+ * A CUSTOM ROLE HOLDING `session_kind.update` LOSES THIS WRITE until
+ * `tenant.update` is granted. `tenant-admin` is covered by
+ * `grant:permissions --all-missing`; anything hand-composed is not, and that is
+ * a deploy step, not a runtime concern — CLAUDE.md § "Bootstrap & deploy".
+ *
+ * Reading accepts `tenant.read` OR `session.read` — see index.get.ts for why
+ * that is not the same list.
  */
 const schema = z.object({
     highlightOnline: z.boolean().optional(),
@@ -53,7 +57,7 @@ export default defineEventHandler(async (event) => {
     const input = await readValidatedBody(event, schema.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, 'session_kind.update');
+        await requirePermission(event, tx, 'tenant.update');
 
         return mapDbErrors(async () => {
             const row = await tx.tenantDisplaySettings.upsert({

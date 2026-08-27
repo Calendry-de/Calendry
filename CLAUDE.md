@@ -238,6 +238,17 @@ Do not add a fourth exception without a comparably strong reason.
   enumerate every endpoint a page calls; one missing permission inside a
   `Promise.all` blanks the whole page with no error, the least diagnosable
   failure a UI has.
+- **A NAV ENTRY's gate is the section's authority, never the endpoint's** —
+  and the two are allowed to differ. `session.read` reads like "may view the
+  timetable", so gating anything else on it silently offers that thing to
+  everyone who can see a schedule: it put the institution's own settings
+  (`/manage/display`) and every solver proposal (`/schedule/proposals`) in a
+  lecturer's navigation. Fixed by minting `tenant.read`/`tenant.update` and
+  `generation.read`. The endpoint may stay wider — `GET /api/display-settings`
+  still answers `session.read`, because the schedule needs the colours to draw
+  and narrowing it would silently mis-render rather than deny. Same shape as
+  `access-roles` and `accounts`. Ask "whose data is this?", not "who happens
+  to be looking at it?" — DECISIONS.md § "`tenant.read` and `generation.read`".
 
 ## Current phase
 
@@ -260,19 +271,33 @@ functionally complete: 14 constraint types, LNS + simulated annealing,
 `SolverInput` and sends it; every gap in the snapshot is a wrong answer the
 solver has no way to detect.
 
-**Per-person preferences: the app SENDS them, the solver does not read them yet.**
+**Per-person preferences are LIVE end to end** (solver `41f6227`, 2026-08-27).
 `assembleSolverInput` populates `Person.preferred` from `person_preference`
 (proto `0.7.0`), narrowed to the solved Term's grid — the write boundary
 validates against the tenant's WIDEST grid, so a stored block can name a slot one
 Term has not got. A NULL `weight_multiplier` is sent as ABSENT, never 0: the wire
 field is `optional` because proto3's zero is itself a meaningful multiplier.
-**`person_preference_fit` deliberately has no `wireField`**, so the constraint
-does not cross at all — the solver answers that variant with `UNIMPLEMENTED`, so
-setting it before the evaluator lands would fail every solve for a tenant that
-enabled the rule instead of merely doing nothing. The assembly report counts the
-inert case (`placementsWithNoSignal == placementsCounted`) for the same reason
-`lecturer_veto` went unnoticed: nothing counted it. Design record and staging:
-`per-person-preferences-design.md`.
+`person_preference_fit` now carries `wireField: 'personPreferenceFit'`, and that
+line had to land in the SAME change as the solver's evaluator: before it, the
+solver answered the variant with `UNIMPLEMENTED`, which fails the whole StartRun
+rather than skipping the rule — strictly worse than not crossing at all. The
+assembly report counts the inert case (`placementsWithNoSignal ==
+placementsCounted`) for the same reason `lecturer_veto` went unnoticed: nothing
+counted it. Design record and staging: `per-person-preferences-design.md`; what
+the last three stages cost, including two false negatives that each looked like a
+clean answer: DECISIONS.md § "Per-person preferences: stages 5–7".
+
+**The solver charges `1 - fit`, and `roles` must stay EMPTY.** Two departures from
+this repo's design record, both in solver ADR-0026. The cost is the unmet
+fraction, not the fit, because a negative soft term would break the
+`hard_penalty` bound, the convergence check and `ruin_worst`'s ordering at once;
+and it is the **mean over a placement's counted lecturers of `multiplier × unmet`**
+— not the sum, and not `mean(multiplier) × mean(unmet)`, which is the form a
+reader writes from skimming and which a bound check cannot catch. A non-empty
+`roles` is REFUSED (`PreferenceRolesUnsupported`), so `buildVariant` must keep
+returning `{}` for this key: empty means "lecturers only", and widening the
+counted set would let a 200-student cohort's aggregate preference outweigh the
+person teaching.
 
 **`MinimizeRoomRank` has a direction parameter, `invert`** (`calendry-proto@0.5.0`):
 `false` (default) penalizes `rank >= threshold` (spare best rooms); `true`
@@ -364,10 +389,12 @@ row permanently uneditable). DB CHECK backs the weight floor. Why it
 mattered: negative weight erodes `hard_penalty`'s margin for every rule in
 the tenant. `params` still accepts arbitrary JSON — BACKLOG.md § Undecided.
 
-**Step 14 — AccessRole management has no UI/API.** `access_role`/
-`access_role_permission`/`person_access_role` deliberately absent from
-`RESOURCES`/`RELATIONS` — needs a picker over the fixed catalogue, not a
-generic form. Scope: BACKLOG.md § "Features not built".
+**Step 14 — AccessRole management is BUILT** (`RESOURCES['access-roles']`,
+`RELATIONS['persons/access-roles']`, `ManageAccessRoleForm`). The grants are
+`childKeys`, not a relation: there is no `/api/permissions` and must not be,
+because the editor renders from `shared/permissions.ts` so an unseeded
+permission is REPORTED rather than silently missing from a list that looks
+complete.
 
 **Auth**: `must_change_password` built (operator `reset:password` — revokes
 sessions, sets flag, audits; login blocks until `POST
@@ -376,6 +403,111 @@ Federation-level permissions out of scope (TAXONOMY.md §9.4). Session
 cleanup done — `sessionSweeper.ts` deletes `auth_session` past 30 days,
 needs no RLS exception (none exists) and no claim machinery (idempotent
 DELETE).
+
+## Two ways to read a schedule, and why the page needs nothing else
+
+`session.read` is the institution's whole timetable. **`session.read_own` is the
+caller's own** — sessions they are attached to, plus sessions assigned to a Group
+they belong to. It is the `member` role provisioning now ships, and the reason it
+could not exist before is worth keeping:
+
+- **`/schedule` used to require SIX permissions** (`session.read`, `term.read`,
+  `time_grid.read`, `group.read`, `room.read`, `person.read`) because it
+  assembled its own reference data from five CRUD endpoints to put names on
+  chips. So the smallest role that could look at a timetable held the authority
+  to query the entire staff directory — and "a lecturer sees their own schedule"
+  was unexpressible. DRAWING and QUERYING were being served by the same
+  endpoints.
+- **`GET /api/schedule/context` separates them.** It returns the frame (every
+  term, every TimeGrid with its breaks) plus names for the rooms, people and
+  groups **derived from the sessions the caller can actually see** — behind the
+  same gate as the schedule itself. The directory endpoints keep their own keys
+  and widen those same lists to the whole institution.
+- **A FILTER EXISTS WHEN IT HAS MORE THAN ONE OPTION — never because of a
+  permission.** Its options come from the schedule the caller can already see, so
+  there is nothing left to gate: the option list IS the boundary. Somebody
+  reading their own timetable across three cohorts gets a Group filter; anybody
+  whose list holds one entry does not, because narrowing to the only value there
+  is changes nothing, and a select offering only its placeholder claims the
+  institution has none. An ACTIVE filter always renders regardless, or a control
+  could vanish while still narrowing the view. Gating these on
+  `group.read`/`room.read`/`person.read` was the first attempt and was wrong in
+  exactly the case the feature was for.
+- **`sessionReadScope()` is the single definition of "visible"**, shared by
+  `/api/sessions` and `/api/schedule/context`. They must agree exactly: a context
+  wider than the session list publishes a name for something the caller cannot
+  read, silently, since nothing on screen would show it.
+- **"My own" walks the group closure UP** (`ancestorGroupIds`). Attendance flows
+  DOWN — a Cohort's lecture is attended by its Seminars (TAXONOMY.md §6) — so
+  "is this session mine" starts from the Groups I am a MEMBER of and asks whether
+  the Session names one of them or an ancestor. `descendantGroupIds` here would
+  show a Cohort member every seminar's private sessions, and looks correct on any
+  flat fixture. Same trap as `violations.ts`; pinned by
+  `tests/schedule-scope.test.ts`.
+- **Query filters compose with the scope, never replace it.** A `read_own` caller
+  passing `personId=<somebody else>` gets the sessions they share, not that
+  person's.
+- **`NavEntry.permission` is now an AND of ORs** (`PermissionRequirement`, the
+  shape the manage relations already used), evaluated by
+  `satisfiesPermissionRequirement`. A bare string is one key, a flat list is ALL,
+  a nested list is ANY. The schedule needs the last of those and a local
+  `.every()` would have been silently false for everybody.
+- **`member` is NOT `is_system` and is NOT auto-assigned.** It is a suggestion a
+  tenant may rename or delete, and granting authority stays a human decision
+  behind `person_access_role.assign` — a CRUD route that granted a role on every
+  insert would be privilege escalation wearing a default's clothes. Existing
+  tenants need it made by hand: `bun run create:role -- --tenant <slug> --key
+  member --name Member --permissions session.read_own`.
+
+## Accounts: the login plane, which a tenant only half-owns
+
+`/manage/accounts` ("Logins") issues credentials over HTTP. This REVERSES the
+earlier "only a CLI may mint accounts" stance — deliberately, on request, because
+creating a Person creates no way to sign in and the CLIs answered an existing
+Person with "already exists" and stopped. Reasoning and what replaced the old
+protection: DECISIONS.md § "Accounts in the management area".
+
+- **`accounts` is NOT in `CRUD_RESOURCES` and never will be.** `account` carries
+  no `tenant_id` and no RLS (exception 2), so the generic routes'
+  `where: { tenantId }` matches NOTHING — not everything, nothing, which reads as
+  an empty institution rather than a broken query. Own handlers under
+  `server/api/accounts/`; the gate is still declared in `RESOURCE_PERMISSIONS`
+  (`account.read` / `account.manage`) so the UI can predict it.
+- **Visibility IS the join**, and it substitutes for RLS: an Account is this
+  tenant's iff `account_person` links it to a Person here. Written once, in
+  `accountScope()`; the list query starts from `person` (RLS-scoped) rather than
+  from `account`. A cross-tenant id is 404, never 403.
+- **A tenant may change a credential only while it is the credential's ONLY
+  tenant** (`assertSoleTenant`). Password, email, activation, deletion all behave
+  identically in every institution an Account serves, so permitting them on a
+  shared login would be cross-tenant account takeover wearing administration's
+  clothes. Signing out is the one exception — fully recoverable by its holder.
+- **The mirror rule makes an orphan unrepresentable** (`assertDetachable`):
+  detaching the LAST identity would leave a working password no tenant can see or
+  revoke. So: sole tenant → delete allowed, detach refused; shared → detach
+  allowed, credential ops refused. Exact complements, no escape hatch. Creation
+  therefore REQUIRES a `personId`, and `persons.beforeDelete` refuses to delete a
+  Person who holds a login.
+- **`otherTenantCount` must be computed through
+  `calendry_internal.account_identities()`**, never a join to `person` — inside
+  the tenant transaction that join sees one tenant, so the count would be 0 for
+  everybody and both guards above would silently stop guarding.
+- **An already-registered email is an OFFER, not a wall.** 409 carrying
+  `accountExists: true` (a flag, so no client matches on wording), and
+  `attachExisting: true` links that credential instead. `useEntityForm().errorData`
+  exists for exactly this.
+- **The password is generated in the BROWSER** (`shared/password.ts`, shared floor
+  `PASSWORD_MIN_LENGTH`). The server generates one when none is sent, but the
+  create page navigates away on success, so a server-generated secret would be
+  gone before it could be read.
+- **`--attach` (create:account) and `--create` (reset:password)** are the CLI
+  halves of the same gap: reuse an existing Person / create a missing Account.
+  `--create` switches reset:password to the OWNER connection because it has to
+  read `person`, and says so on stdout. Neither ever upserts; `create:account`
+  reports "nothing to do" and exits 0 when the state already holds.
+- **A new permission needs the 4th deploy step.** `account.read`/`account.manage`
+  are new — `bun run grant:permissions -- --role tenant-admin --all-missing --yes`
+  on every existing tenant, or every tenant-admin 403s on a section they can see.
 
 ## The management area (Step 13)
 
@@ -416,10 +548,18 @@ DECISIONS.md § "Management area (Step 13)".
 `id`, so a second row per tenant is unrepresentable rather than constrained. An
 **absent row means defaults** (`DISPLAY_DEFAULTS` in `shared/sessionColor.ts`);
 provisioning deliberately does not seed one, so "never configured" and
-"configured, unchanged" render identically. Read gated on `session.read`, write
-on `session_kind.update` — an existing permission, chosen over minting one
-because a new permission needs the catalogue, its migration mirror AND a
-`grant:permissions` backfill before existing tenant-admins stop 403ing.
+"configured, unchanged" render identically.
+
+**The gates are `tenant.read` / `tenant.update`, and the READ is deliberately
+wider than the page.** `GET /api/display-settings` accepts `tenant.read` **OR**
+`session.read`, because it has two callers with different purposes: the settings
+page, and the schedule's own colour resolution, whose fetch is TOLERANT. Narrow
+it to `tenant.read` and nobody is denied a page — every lecturer's timetable just
+draws in default colours with nothing on screen to say why. The PAGE and the nav
+entry are `tenant.read` alone. Both keys moved off
+`session.read`/`session_kind.update`, which had put an institution's own settings
+in the navigation of everyone who could see a timetable: DECISIONS.md §
+"`tenant.read` and `generation.read`".
 
 **Colour is RESOLVED, never read off one field.** `resolveSessionColor()` walks
 the tenant's `colorSourceOrder` (default `offering` → `kind`) and returns
@@ -556,6 +696,28 @@ nothing breaks (reference-derived). DECISIONS.md § "Group↔Term scoping".
 - **A new permission needs a 4th step** — seed doesn't touch
   `access_role_permission` (would be silent privilege escalation).
   Backfill: `bun run grant:permissions -- --role tenant-admin --all-missing`.
+  Currently owed by any tenant provisioned before them: `account.read`,
+  `account.manage`, `tenant.read`, `tenant.update`, `generation.read`,
+  `session.read_own`. A tenant provisioned before the `member` role also has to
+  create it by hand — see "Two ways to read a schedule".
+- **A permission that MOVES is worse than one that is added**, because the
+  backfill only repairs `tenant-admin`. `tenant.update` took display-settings
+  writes off `session_kind.update`, and `generation.read` took the proposal
+  reads off `session.read` — a hand-composed role holding the old key silently
+  loses the capability, and nothing reports it. Grep tenants' `access_role`
+  grants before deploying such a change; the CHANGE ITSELF is the migration.
+- **A constraint gaining a `wireField` silently changes the timetable of every
+  tenant that had already enabled it.** Not hypothetical: the development tenant
+  had `person_preference_fit` switched ON with weight 5 for the whole period it
+  could not cross the wire, because enabling an inert rule costs nothing and
+  looks like preparation. The moment the field shipped, that tenant's next solve
+  started moving sessions — correctly, but without anyone choosing it on this
+  deploy. Same family as a permission that MOVES: the CHANGE ITSELF is the
+  migration. Before flipping a `wireField`, grep `constraint_def` for enabled
+  rows of that type and tell those tenants, or ship it disabled and let them
+  enable it deliberately. `defaultConstraintRow` only decides what a NEW tenant
+  seeds, and every solver-steering rule seeds off precisely to avoid this — which
+  is no protection once somebody has turned one on.
 - **A constraint SEVERITY change needs a backfill BEFORE/WITH the deploy,
   never after** — `toWireConstraint` reads the catalogue's severity, not
   the row's; a HARD row (`weight = NULL` by CHECK) ships as weight 0 under
@@ -625,3 +787,5 @@ existing tenant rows still need to render/edit, `type` is `createOnly`).
 - Bypass the event log for a Session mutation
 - Implement solver logic in this repo
 - Relax tenant isolation beyond the three declared exceptions above
+- Let a tenant change a credential on an Account another tenant also uses
+  (`assertSoleTenant`), or leave an Account with no `account_person` row

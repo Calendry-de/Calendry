@@ -57,6 +57,24 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
     return held;
 }
 
+/**
+ * Whether the caller holds `permission`, WITHOUT refusing when they do not.
+ *
+ * For a route whose ANSWER depends on the permission rather than whether it
+ * answers at all: `GET /api/sessions` serves both `session.read` (everything)
+ * and `session.read_own` (the caller's own), and the difference is a WHERE
+ * clause, not a status code. Reads the same request-cached set as the assertions
+ * below, so asking costs nothing extra.
+ *
+ * Deliberately NOT a way to soften a guard. A route that narrows on this must
+ * still `requireAnyPermission` first, or "holds neither" silently becomes the
+ * narrow branch — which would serve an unauthenticated shape of the data rather
+ * than refusing.
+ */
+export async function holdsPermission(event: H3Event, tx: Tx, permission: string): Promise<boolean> {
+    return (await heldPermissions(event, tx)).has(permission);
+}
+
 /** Asserts the caller holds `permission`, throwing 403 otherwise. */
 export async function requirePermission(event: H3Event, tx: Tx, permission: string): Promise<void> {
     const held = await heldPermissions(event, tx);

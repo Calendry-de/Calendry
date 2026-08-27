@@ -45,6 +45,15 @@ export default defineEventHandler(async (event) => {
         }
 
         const result = await mapDbErrors(async () => {
+            /*
+             * Entity-specific refusal, in this transaction, before the row goes.
+             * The counterpart to `beforeCreate`/`beforeUpdate`, and distinct from
+             * `afterWrite` below: a rule about what this row still REFERENCES
+             * cannot be checked afterwards, because the cascades have already
+             * run by then.
+             */
+            await config.beforeDelete?.({ tx, tenantId: identity.tenantId, id: id as string });
+
             const deleted = await delegate(tx, config.model).deleteMany({
                 where: { id, tenantId: identity.tenantId },
             });

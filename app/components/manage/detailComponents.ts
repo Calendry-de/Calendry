@@ -1,5 +1,6 @@
 import type { Component } from 'vue';
 import ManageAccessRoleForm from '~/components/manage/ManageAccessRoleForm.vue';
+import ManageAccountForm from '~/components/manage/ManageAccountForm.vue';
 import ManageCalendarPeriodForm from '~/components/manage/ManageCalendarPeriodForm.vue';
 import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder.vue';
 import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
@@ -46,6 +47,15 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
      *                 and no fetch that could be authoritative about them.
      */
     AccessRoleForm: ManageAccessRoleForm,
+    /**
+     * AccountForm      a login has a person it acts as, drawn from a
+     *                  candidates endpoint rather than from `/api/persons`, and
+     *                  a secret that must be visible exactly once. Neither is
+     *                  expressible as a registry field, and the credential verbs
+     *                  beside them (issue a password, sign out everywhere) must
+     *                  not sit under a Save button that does not cover them.
+     */
+    AccountForm: ManageAccountForm,
 };
 
 export const LIST_COMPONENTS: Record<string, Component> = {

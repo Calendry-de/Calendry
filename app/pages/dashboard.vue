@@ -45,11 +45,13 @@
 
         <CommonButton
             v-if="(session?.availableTenants.length ?? 0) > 1"
+            class="dashboard_action"
             type="secondary"
             @click="switchTenant"
         >Switch institution</CommonButton>
 
         <CommonButton
+            class="dashboard_action"
             type="secondary-black"
             @click="logout"
         >Sign out</CommonButton>
@@ -83,12 +85,24 @@ async function switchTenant() {
 </script>
 
 <style scoped lang="scss">
+/*
+ * `CommonPage` centres a full-width column rather than shrink-wrapping each
+ * child (it was `align-items: center`, which sized every child to
+ * `max-content`). The standalone buttons here are direct children of that
+ * column, so they must opt out of stretching or they span the whole measure.
+ * Named on the buttons rather than by reinstating `align-items` on the shell,
+ * because the shell's stretch is what lets a page hold a single left edge.
+ */
+.dashboard_action {
+    align-self: start;
+}
+
 .landing {
     &_links {
         display: flex;
         flex-wrap: wrap;
         gap: var(--space-4);
-        justify-content: center;
+        justify-content: flex-start;
     }
 
     &_permissions {
@@ -96,8 +110,8 @@ async function switchTenant() {
 
         ul {
             columns: 2;
-            margin: 8px 0 0;
-            font-size: 13px;
+            margin: var(--space-4) 0 0;
+            font-size: var(--font-size-md);
         }
     }
 }

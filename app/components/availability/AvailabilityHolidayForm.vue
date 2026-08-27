@@ -238,7 +238,7 @@ defineExpose({ reset });
     &_input {
         width: 100%;
         padding: 10px var(--space-5);
-        border: 1px solid $surface4;
+        border: 1px solid $content7;
         border-radius: var(--radius-lg);
 
         font-family: inherit;
@@ -249,7 +249,7 @@ defineExpose({ reset });
 
         &:focus {
             border-color: $primary500;
-            outline: none;
+            border-color: $primary600;
         }
     }
 
@@ -287,7 +287,7 @@ defineExpose({ reset });
         color: $content7;
 
         &--partial {
-            color: $warning700;
+            color: $warning800;
         }
     }
 
@@ -298,7 +298,10 @@ defineExpose({ reset });
         color: $content7;
 
         &--warn {
-            color: $warning700;
+            // The over-block disclosure — "the whole week is blocked" — was the
+            // other 3.73:1 string in this component. An earlier edit replaced
+            // only the first of the two.
+            color: $warning800;
         }
 
         &--error {

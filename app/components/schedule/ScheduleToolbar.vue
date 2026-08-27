@@ -28,7 +28,39 @@
             </label>
 
 
-            <label class="bar_field">
+            <!--
+                A FILTER EXISTS WHEN IT HAS SOMETHING TO CHOOSE BETWEEN, and that
+                is the whole rule — not a permission.
+
+                It WAS a permission (`group.read` / `room.read` / `person.read`),
+                which was wrong in the case that matters most: somebody reading
+                their own timetable holds none of those and may well have sessions
+                across three cohorts, and narrowing to one of them is exactly what
+                they want. Their options come from the schedule they can already
+                see, so there is nothing left to gate — the option list IS the
+                boundary.
+
+                The count rule also retires the empty-select case for everybody: a
+                select offering only its own placeholder claims this institution
+                has none of them. One option is no better — narrowing to the only
+                value there is changes nothing.
+
+                `|| ...Model` keeps an ACTIVE filter reachable whatever the list
+                does, so a control can never vanish while it is still narrowing
+                the view and leave no way to clear it.
+
+                (Deliberately not naming the placeholder strings in this comment:
+                an SSR render emits template comments into the HTML, so a comment
+                quoting an option is a comment a test can match.)
+
+                Term and Density stay unconditional: a term is the frame every
+                schedule is drawn in, and density is a view preference that reads
+                nothing.
+            -->
+            <label
+                v-if="showGroupFilter"
+                class="bar_field"
+            >
                 <span>Group</span>
                 <select
                     v-model="groupIdModel"
@@ -55,7 +87,10 @@
                 <span>Include nested</span>
             </label>
 
-            <label class="bar_field">
+            <label
+                v-if="showRoomFilter"
+                class="bar_field"
+            >
                 <span>Room</span>
                 <select
                     v-model="roomIdModel"
@@ -71,7 +106,10 @@
                 </select>
             </label>
 
-            <label class="bar_field">
+            <label
+                v-if="showPersonFilter"
+                class="bar_field"
+            >
                 <span>Person</span>
                 <select
                     v-model="personIdModel"
@@ -140,9 +178,10 @@
             <!--
                 THE DURABLE WAY TO A PROPOSAL. The solver's own "Review" button
                 lives in a transient state a reload destroys, so a proposal was
-                reachable for minutes by one person. Gated on `session.read`, not
-                `solver.trigger` — whoever reviews a schedule is usually not
-                whoever may generate one.
+                reachable for minutes by one person. Gated on `generation.read`,
+                not `solver.trigger` — whoever reviews a schedule is usually not
+                whoever may generate one, and not everybody who may READ one may
+                see proposals either.
             -->
             <CommonButton
                 v-if="canReviewProposals"
@@ -169,8 +208,14 @@
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
 import type { NamedRow, Term } from '~/composables/schedule';
 
-defineProps<{
+const props = defineProps<{
     terms: Term[];
+    /**
+     * WHAT THIS CALLER CAN SEE, not what the tenant has. For an administrator
+     * these are the full directory; for somebody reading their own timetable they
+     * are the groups, rooms and people appearing in it. The filters are built
+     * from them, which is why they need no permission of their own.
+     */
     groups: NamedRow[];
     rooms: NamedRow[];
     people: NamedRow[];
@@ -204,6 +249,14 @@ const groupIdModel = defineModel<string>('groupId', { required: true });
 const roomIdModel = defineModel<string>('roomId', { required: true });
 const personIdModel = defineModel<string>('personId', { required: true });
 const includeNestedModel = defineModel<boolean>('includeNested', { required: true });
+
+/**
+ * A filter is offered when it can narrow something — more than one option — or
+ * when it is already narrowing, so an active one is always clearable.
+ */
+const showGroupFilter = computed(() => props.groups.length > 1 || Boolean(groupIdModel.value));
+const showRoomFilter = computed(() => props.rooms.length > 1 || Boolean(roomIdModel.value));
+const showPersonFilter = computed(() => props.people.length > 1 || Boolean(personIdModel.value));
 
 // View state, owned by the page: neither affects the API query.
 const rowHeightModel = defineModel<number>('rowHeight', { required: true });

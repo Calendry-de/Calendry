@@ -6,10 +6,17 @@ import { withRequestTenant } from '../../utils/tenantDb';
 /**
  * The proposals a tenant could act on.
  *
- * Gated by `session.read`, not a new `generation.read`: this shows the same
- * placements the schedule already shows, and minting a permission would leave
- * every existing tenant 403ing on a visible feature until someone remembered
- * the backfill step.
+ * `generation.read`, and it used to be `session.read` on the reasoning that a
+ * proposal shows the same placements the schedule already shows. That reasoning
+ * was wrong in a way only the navigation made visible: everybody who could look
+ * at a schedule was offered "Proposals" in the header and could read every
+ * solver run this tenant had ever produced. A Generation is a set of PROPOSED
+ * placements — a different data set from the applied timetable, and one a
+ * lecturer has no business reading — so it gets its own key.
+ *
+ * `generation.read` is NOT implied by `generation.apply`, deliberately: the
+ * catalogue has no implication mechanism, so a role holding only the apply key
+ * would be able to promote a proposal it cannot look at. Grant both.
  */
 const querySchema = z.object({
     termId: z.string().optional(),
@@ -21,7 +28,7 @@ export default defineEventHandler(async (event) => {
     const query = await getValidatedQuery(event, querySchema.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-        await requirePermission(event, tx, 'session.read');
+        await requirePermission(event, tx, 'generation.read');
 
         const generations = await tx.generation.findMany({
             where: {

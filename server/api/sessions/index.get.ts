@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { conflictGroupIds } from '../../utils/groupClosure';
-import { requirePermission } from '../../utils/requirePermission';
+import { sessionReadScope } from '../../utils/scheduleScope';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 const querySchema = z.object({
@@ -22,26 +22,31 @@ const querySchema = z.object({
  * transaction that appends the event — so replaying on every read would be
  * O(events) per request for an answer already stored. The log exists for audit
  * and rollback, which is a separate (future) endpoint.
+ *
+ * TWO PERMISSIONS REACH THIS. `session.read` returns the institution's whole
+ * timetable; `session.read_own` returns the caller's own sessions. The narrowing
+ * is `sessionReadScope()`'s, not this handler's, because `GET
+ * /api/schedule/context` has to agree with it exactly — it publishes names for
+ * whatever this returns, so a second definition of "own" would either strand a
+ * chip without a name or name a room in a session the caller may not read.
+ *
+ * THE QUERY FILTERS COMPOSE WITH THE SCOPE, never replace it: a `read_own`
+ * caller passing `personId=<somebody else>` intersects their own set with that
+ * person's and gets the sessions they share, which is exactly right and is not a
+ * special case anywhere below.
  */
 export default defineEventHandler(async (event) => {
     const query = await getValidatedQuery(event, querySchema.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-            await requirePermission(event, tx, 'session.read');
-
-        /**
-         * Own Sessions plus Federation-shared ones (Stage 7c).
-         *
-         * A shared event must appear on every member tenant's timetable — that
-         * is the entire point of making Session federation-ownable. RLS would
-         * permit the read either way; this is what actually ASKS for them.
+        /*
+         * Refuses a caller holding neither key, and otherwise hands back the
+         * ownership predicate — tenant-owned plus Federation-shared, because a
+         * shared event must appear on every member tenant's timetable (Stage 7c)
+         * and RLS permits that read without ever asking for it — already
+         * narrowed to the caller's own sessions when that is all they may see.
          */
-        const where: Record<string, unknown> = {
-            OR: [
-                { tenantId: identity.tenantId },
-                ...(identity.federationId ? [{ federationId: identity.federationId }] : []),
-            ],
-        };
+        const { where } = await sessionReadScope(event, tx, identity);
 
         if (query.termId) where.termId = query.termId;
         if (query.termWeek !== undefined) where.termWeek = query.termWeek;

@@ -3,16 +3,38 @@
         class="header__menu"
         aria-label="Main"
     >
-        <CommonButton
-            v-for="entry in headerNav"
-            :key="entry.id"
-            :icon="entry.icon"
-            :to="entry.to"
-            :type="entry.active ? 'primary' : 'secondary'"
-            @click="entry.run?.()"
+        <!--
+            The menu button and the inline links are the same registry rendered
+            two ways, and exactly one is visible at a time — CSS decides which,
+            at `$navCollapseAt`. Both are always in the DOM so the switch needs
+            no JS and cannot disagree with the stylesheet.
+        -->
+        <button
+            class="header__menu_toggle"
+            type="button"
+            :aria-expanded="drawerOpen"
+            aria-controls="nav-drawer"
+            aria-label="Menu"
+            @click="drawerOpen = true"
         >
-            {{ entry.label }}
-        </CommonButton>
+            <Icon
+                name="material-symbols:menu"
+                aria-hidden="true"
+            />
+        </button>
+
+        <div class="header__menu_links">
+            <CommonButton
+                v-for="entry in headerNav"
+                :key="entry.id"
+                :icon="entry.icon"
+                :to="entry.to"
+                :type="entry.active ? 'primary' : 'secondary'"
+                @click="entry.run?.()"
+            >
+                {{ entry.label }}
+            </CommonButton>
+        </div>
 
         <button
             class="header__menu_search"
@@ -54,6 +76,15 @@ function openPalette() {
     paletteOpen.value = true;
 }
 
+/*
+ * The drawer is MOUNTED IN THE LAYOUT, beside the command palette, and opened
+ * from here by writing this shared flag — the same split, for the same reason.
+ * The drawer owns a focus trap, an overlay claim and a body scroll lock; a
+ * second instance rendered from this component would hold all three twice, and
+ * a leaked overlay claim silently stops Escape working on /schedule.
+ */
+const drawerOpen = useState('calendry.nav.open', () => false);
+
 // Cosmetic only; the handler accepts either modifier regardless of platform.
 const shortcutLabel = ref('Ctrl K');
 
@@ -70,6 +101,64 @@ onMounted(() => {
     gap: var(--space-6);
     align-items: center;
     justify-content: center;
+
+    // `min-width: 0` so this can actually be squeezed. As a grid item its
+    // default `min-width: auto` refused to shrink below the min-content of four
+    // non-wrapping buttons, which is how 443px of nav became a 781px document.
+    min-width: 0;
+
+    /*
+     * Exactly one of these two is visible, decided by `$navCollapseAt`.
+     * `justify-content: center` above is why the collapsed bar still reads as
+     * centred with only a 44px button in it.
+     */
+    &_toggle {
+        cursor: pointer;
+
+        display: none;
+        align-items: center;
+        justify-content: center;
+
+        // 44px: this is the ONLY way to reach any other section on a phone, so
+        // it gets the full touch target rather than the 25px the old inline
+        // buttons happened to be.
+        width: 44px;
+        height: 44px;
+        border: 1px solid $surface4;
+        border-radius: var(--radius-lg);
+
+        color: $content4;
+
+        background: $surface1;
+
+        .iconify {
+            width: 22px;
+            height: 22px;
+        }
+
+        &:focus-visible {
+            outline: 2px solid $primary400;
+            outline-offset: var(--space-1);
+        }
+
+        @include navCollapsed() {
+            display: flex;
+        }
+    }
+
+    &_links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-6);
+        align-items: center;
+        justify-content: center;
+
+        min-width: 0;
+
+        @include navCollapsed() {
+            display: none;
+        }
+    }
 
     &_search {
         cursor: pointer;
@@ -88,7 +177,10 @@ onMounted(() => {
 
         transition: 0.2s;
 
-        svg {
+        // `.iconify`, not `svg`: `Icon` renders an Iconify span, so this rule
+        // matched nothing and the glyph sat at its inherited 1em (13.3px
+        // measured) instead of 16px.
+        .iconify {
             width: 16px;
             height: 16px;
         }

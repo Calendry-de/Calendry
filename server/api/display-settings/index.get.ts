@@ -1,15 +1,26 @@
 import { DISPLAY_DEFAULTS } from '../../../shared/sessionColor';
-import { requirePermission } from '../../utils/requirePermission';
+import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /**
  * How this tenant wants its schedule drawn.
  *
- * Gated on `session.read`, not a new permission. It carries no tenant data of
- * its own — only instructions for rendering data the caller can already see —
- * and minting a permission would leave every existing tenant 403ing on a
- * visible feature until someone remembered the `grant:permissions` backfill
- * step (CLAUDE.md).
+ * `tenant.read` OR `session.read`, and the pair is the whole point.
+ *
+ * The PAGE is gated on `tenant.read` alone — viewing an institution's settings
+ * is not something everyone who looks at a timetable should be offered, which is
+ * what the navigation made obvious. But this endpoint has a second caller with a
+ * completely different purpose: the schedule's own colour resolution, whose fetch
+ * is TOLERANT by design (`scheduleData.ts` falls back to `DISPLAY_DEFAULTS`).
+ * Narrowing this to `tenant.read` would therefore not deny anybody anything — it
+ * would draw every lecturer's schedule in the wrong colours with nothing on
+ * screen to say why, which is precisely the "no data and fetch failed render
+ * identically" failure this codebase keeps writing rules about.
+ *
+ * So: `session.read` keeps reaching the RENDERING INSTRUCTIONS, and `tenant.read`
+ * is what admits somebody to the settings. Same deliberate divergence
+ * `access-roles` and `accounts` carry — the section's gate is narrower than the
+ * endpoint's.
  *
  * AN ABSENT ROW IS NOT AN ERROR. Provisioning does not seed one, so the common
  * case for a tenant that has never opened the page is no row at all — and that
@@ -19,7 +30,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * chance they might one day look.
  */
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
-    await requirePermission(event, tx, 'session.read');
+    await requireAnyPermission(event, tx, ['tenant.read', 'session.read']);
 
     const row = await tx.tenantDisplaySettings.findUnique({
         where: { tenantId: identity.tenantId },

@@ -1,4 +1,6 @@
 import type { ComputedRef } from 'vue';
+import type { PermissionRequirement } from '#shared/permissions';
+import { satisfiesPermissionRequirement } from '#shared/permissions';
 import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
 import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { useThemeToggle } from '~/composables/layout';
@@ -30,12 +32,22 @@ export interface NavEntry {
      * "always visible" — used only for account actions, which are about the
      * session rather than tenant data.
      *
-     * A LIST means ALL of them, not any: an entry needing several is hidden
-     * unless the caller holds every one. `/schedule` is the case that forced
-     * this — it draws nothing without six separate reads, and offering the link
-     * on the strength of one of them led straight to a blank page.
+     * AN AND OF ORS (`PermissionRequirement`, the same shape the relation gates
+     * use). A bare string is one permission; a list of strings means ALL of
+     * them; a NESTED list is one clause satisfied by ANY of its members.
+     *
+     *     'session.read'                          that one
+     *     ['session.read', 'term.read']           both
+     *     [['session.read', 'session.read_own']]  either
+     *
+     * The all-of form came first, from `/schedule` — which used to draw nothing
+     * without six separate reads, so offering the link on the strength of one of
+     * them led straight to a blank page. The any-of form arrived with
+     * `session.read_own`: the schedule is now reachable two ways, and an entry
+     * that could only say "all of" would have to name the more privileged key
+     * and hide the page from exactly the people it was added for.
      */
-    permission?: string | readonly string[];
+    permission?: string | PermissionRequirement;
     /** Exactly one of `to` / `run` is set. */
     to?: string;
     run?: () => void | Promise<void>;
@@ -99,10 +111,11 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'schedule',
             keywords: ['schedule', 'timetable', 'grid', 'week', 'calendar', 'sessions'],
             /*
-             * The page needs six permissions, not this one — see
-             * `schedulePermissions.ts`. Gating the LINK on the same set stops
-             * offering a destination that answers 403; the nav and the route
-             * agree because they read one list.
+             * EITHER read key — see `schedulePermissions.ts`, which the route
+             * middleware reads too, so the link and the destination cannot
+             * disagree. It was six permissions, all required, until the page
+             * stopped assembling the institution's directory in order to draw
+             * itself.
              */
             permission: SCHEDULE_PERMISSIONS,
             to: '/schedule',
@@ -123,11 +136,16 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             keywords: ['proposal', 'proposals', 'generation', 'solver', 'review', 'apply', 'pending'],
             /*
              * ONE permission, unlike its sibling `/schedule`: this page and the
-             * review screen are gated on `session.read` alone, matching
+             * review screen are gated on `generation.read` alone, matching
              * `GET /api/generations`, and their reference fetches are individually
              * TOLERANT. What matters is that the LINK and the ROUTE agree.
+             *
+             * It was `session.read`, which is how "anybody who may look at a
+             * timetable" came to be offered every solver proposal this tenant had
+             * ever produced. A Generation is PROPOSED placements, not the applied
+             * ones — a different data set, and now a different key.
              */
-            permission: 'session.read',
+            permission: 'generation.read',
             to: '/schedule/proposals',
         },
         {
@@ -203,13 +221,20 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'manage',
             keywords: ['display', 'colour', 'color', 'theme', 'highlight', 'online', 'appearance', 'palette'],
             /*
-             * READ is `session.read`, and that is what gates the entry: the page
-             * is meaningful to anyone who looks at a schedule, and it renders
-             * read-only without `session_kind.update`. Gating the link on the
-             * WRITE permission would hide from most people a page that explains
-             * why their schedule looks the way it does.
+             * `tenant.read`, and NOT the endpoint's own gate.
+             *
+             * This entry used to be `session.read` on the reasoning that the page
+             * explains why your schedule looks the way it does — which put an
+             * institution's settings in the navigation of everybody who can see a
+             * timetable, next to Proposals, which had the same problem. Settings
+             * are the institution's, so the key is the institution's.
+             *
+             * `GET /api/display-settings` still accepts `session.read` as well,
+             * deliberately: the schedule needs the COLOURS to draw. The endpoint
+             * being wider than the link is the point, not an oversight — see that
+             * route's own note.
              */
-            permission: 'session.read',
+            permission: 'tenant.read',
             to: '/manage/display',
         },
         {
@@ -298,10 +323,17 @@ export function useNavEntries(): ComputedRef<ResolvedNavEntry[]> {
                 return true;
             }
 
-            // ALL of them when it is a list — see the note on `permission`.
-            return typeof entry.permission === 'string'
-                ? held.has(entry.permission)
-                : entry.permission.every((key) => held.has(key));
+            /*
+             * One evaluator, shared with the server and with the manage
+             * relations' gates. A local `.every()` was the same rule for the
+             * all-of case and silently wrong for the any-of one — a nested array
+             * is truthy, so `held.has([...])` would have been `false` for
+             * everybody and hidden the schedule from the whole institution.
+             */
+            return satisfiesPermissionRequirement(
+                held,
+                typeof entry.permission === 'string' ? [entry.permission] : entry.permission,
+            );
         });
 
         // The Manage index earns its place only if it leads somewhere. Showing a

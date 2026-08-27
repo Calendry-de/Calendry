@@ -1,0 +1,167 @@
+import { z } from 'zod';
+import { ancestorGroupIds } from '../../utils/groupClosure';
+import { sessionReadScope } from '../../utils/scheduleScope';
+import { withRequestTenant } from '../../utils/tenantDb';
+
+/**
+ * Everything the schedule needs to DRAW itself, behind the same key that lets
+ * you look at it.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * `/schedule` used to assemble its own reference data from five CRUD endpoints —
+ * `/api/terms`, `/api/time-grids`, `/api/groups`, `/api/rooms`, `/api/persons` —
+ * each behind its own read permission. So the smallest role that could see a
+ * timetable at all needed `term.read`, `time_grid.read`, `group.read`,
+ * `room.read` and `person.read`: the authority to query the entire institution's
+ * roster, in order to put a lecturer's name on a chip. A lecturer wanting to
+ * know which room they are teaching in was being handed the staff directory.
+ *
+ * It was also the page's most persistent bug: one 403 inside that `Promise.all`
+ * rejected the whole wave and the page rendered NOTHING — twice, in two
+ * different disguises, which is why `SCHEDULE_PERMISSIONS` existed at all. One
+ * endpoint behind the page's own gate removes the class rather than the
+ * instances.
+ *
+ * NAMES FOR WHAT YOU CAN SEE, AND NOTHING ELSE
+ * --------------------------------------------
+ * The rooms, people and groups here are DERIVED FROM THE VISIBLE SESSIONS, not
+ * listed. A `session.read_own` caller therefore learns the name of the room they
+ * are booked into and the lecturer leading their lecture, and learns nothing
+ * about the rest of the institution — the narrowing is a property of the query
+ * rather than a filter someone has to maintain.
+ *
+ * That is also why `sessionReadScope()` is shared with `GET /api/sessions` and
+ * not reimplemented: the two must agree exactly about what "visible" means. A
+ * context wider than the session list publishes a name for something the caller
+ * cannot read; narrower, and a chip renders a raw uuid.
+ *
+ * WHAT IS DELIBERATELY *NOT* HERE
+ * -------------------------------
+ * The full directory. Filter dropdowns and the inspector's pickers need every
+ * room, every group and every person — that is querying, not drawing, and it
+ * stays behind `room.read` / `group.read` / `person.read`. The page fetches
+ * those separately and TOLERANTLY, and simply does not render the controls it
+ * has no data for. See `useScheduleData`.
+ *
+ * `terms` and `timeGrids` ARE complete, because they are the frame rather than
+ * the contents: the term picker has to offer every term, and a Term names the
+ * grid whose geometry the whole page is drawn on. Neither says anything about a
+ * person.
+ */
+const querySchema = z.object({ termId: z.string().optional() });
+
+export default defineEventHandler(async (event) => {
+    const query = await getValidatedQuery(event, querySchema.parse);
+
+    return withRequestTenant(event, async (tx, identity) => {
+        const { scope, where } = await sessionReadScope(event, tx, identity);
+
+        /*
+         * Terms and grids first: the caller needs them even for a term holding
+         * no sessions at all, and `termId` is resolved against them by the
+         * client exactly as it was before.
+         */
+        const [terms, timeGrids] = await Promise.all([
+            tx.term.findMany({
+                where: { tenantId: identity.tenantId },
+                select: { id: true, name: true, startDate: true, endDate: true, timeGridId: true },
+                orderBy: { startDate: 'desc' },
+            }),
+            tx.timeGrid.findMany({
+                where: { tenantId: identity.tenantId },
+                /*
+                 * WITH BREAKS. They change what every block is CALLED, so a grid
+                 * without them renders a timetable that is wrong rather than
+                 * merely sparse — the same reason `RESOURCES['time-grids']`
+                 * includes them.
+                 */
+                include: { breaks: true },
+            }),
+        ]);
+
+        /*
+         * RESOLVED HERE AND REPORTED BACK, rather than each side defaulting to
+         * "the first term". The client fetches its sessions with whatever this
+         * says, so the two cannot end up describing different terms — which is
+         * how the names below would come to belong to a week nobody is looking
+         * at. `startDate: 'desc'` matches `RESOURCES['terms']`, so the default
+         * is the same term the old five-fetch wave picked.
+         */
+        const termId = query.termId || terms[0]?.id || '';
+
+        /*
+         * The join rows of the visible sessions, and only those. Selected rather
+         * than the sessions themselves: this needs ids to look names up with,
+         * and pulling the full rows would be a second copy of a response the
+         * client is fetching anyway.
+         */
+        const visible = await tx.session.findMany({
+            where: { ...where, ...(termId ? { termId } : {}) },
+            select: {
+                rooms: { select: { roomId: true } },
+                people: { select: { personId: true } },
+                groups: { select: { groupId: true } },
+            },
+        });
+
+        const roomIds = [...new Set(visible.flatMap((s) => s.rooms.map((r) => r.roomId)))];
+        const personIds = [...new Set(visible.flatMap((s) => s.people.map((p) => p.personId)))];
+        const referencedGroupIds = [...new Set(visible.flatMap((s) => s.groups.map((g) => g.groupId)))];
+
+        /*
+         * ANCESTORS TOO, and this is not a widening. The inspector shows a
+         * Group's parent to disambiguate two identically-named seminars, so a
+         * Group whose parent is missing renders as an orphan — and the parent is
+         * already implied by the child being visible. `ancestorGroupIds` walks
+         * UP; `descendantGroupIds` here would publish sibling cohorts the caller
+         * has nothing to do with.
+         */
+        const groupIds = await ancestorGroupIds(tx, referencedGroupIds);
+
+        const [rooms, people, groups] = await Promise.all([
+            roomIds.length
+                ? tx.room.findMany({
+                    /*
+                     * No tenant predicate: the ids came from Sessions this caller
+                     * may read, and a federation-shared Session names a
+                     * federation-owned Room that `tenantId` would exclude — the
+                     * shared lecture hall would lose its name on the one
+                     * timetable that most needs it. RLS still applies.
+                     */
+                    where: { id: { in: roomIds } },
+                    select: { id: true, code: true, name: true, isVirtual: true },
+                })
+                : [],
+            personIds.length
+                ? tx.person.findMany({
+                    where: { id: { in: personIds } },
+                    select: { id: true, givenName: true, familyName: true },
+                })
+                : [],
+            groupIds.length
+                ? tx.group.findMany({
+                    where: { id: { in: groupIds } },
+                    select: { id: true, name: true, parentGroupId: true },
+                })
+                : [],
+        ]);
+
+        return {
+            /*
+             * REPORTED, not inferred. The client renders a different page for
+             * each — no filters, no editor, a heading that says whose timetable
+             * this is — and deriving that from "did the person list come back
+             * empty" would make a tenant with one room look like a restricted
+             * caller.
+             */
+            scope,
+            resolvedTermId: termId,
+            terms,
+            timeGrids,
+            rooms,
+            people,
+            groups,
+        };
+    });
+});

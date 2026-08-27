@@ -126,7 +126,7 @@ function describeLoadError(error: unknown): ReviewLoadError {
             return {
                 kind: 'forbidden',
                 title: 'You cannot review this proposal',
-                detail: 'Reviewing proposals needs the session.read permission. '
+                detail: 'Reviewing proposals needs the generation.read permission. '
                     + 'Ask a tenant administrator to grant it.',
                 retryable: false,
             };
@@ -268,8 +268,8 @@ export function useGenerationReview(generationId: string) {
          * TOLERANT, one fetch at a time. A single 403 inside a `Promise.all`
          * rejects the whole thing and renders a BLANK page — which is exactly
          * what `/api/offerings` did to a viewer, because it requires
-         * `offering.read` while this screen is gated on `session.read`. A page
-         * must only depend on what its own gate guarantees.
+         * `offering.read` while this screen is gated on `generation.read` alone.
+         * A page must only depend on what its own gate guarantees.
          *
          * Offerings now travel with the preview, under that same gate. The rest
          * degrade to showing ids, which is visibly wrong rather than blank.

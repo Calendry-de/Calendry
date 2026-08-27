@@ -67,6 +67,17 @@ const ENTITY_EDITOR = 'entity-editor@test.local';
 const SELF_SERVICE = 'self-service@test.local';
 
 /**
+ * Only `generation.read` — the reviewer case, and the reason that key exists.
+ *
+ * PRODUCT.md's reviewer is a department head who decides on solver output and
+ * administers nothing. Under the old gate that role was unexpressible: reading
+ * proposals meant `session.read`, so "may decide on proposals" and "may look at
+ * the timetable" were one permission, and every lecturer got the second by
+ * getting the first. This fixture is the shape that was missing.
+ */
+const PROPOSAL_REVIEWER = 'proposal-reviewer@test.local';
+
+/**
  * `viewer` holds ONLY `session.read` (pinned by auth-permissions.test.ts), so
  * it is the sharpest instrument available: any page it can reach that depends
  * on a second permission fails here.
@@ -78,6 +89,7 @@ const ROLES = [
     { name: 'personEditor', account: PERSON_EDITOR },
     { name: 'entityEditor', account: ENTITY_EDITOR },
     { name: 'selfService', account: SELF_SERVICE },
+    { name: 'proposalReviewer', account: PROPOSAL_REVIEWER },
 ] as const;
 
 /**
@@ -104,19 +116,33 @@ const PAGES = [
     },
     {
         /*
-         * The viewer holds ONLY `session.read`, and the schedule needs six
-         * reads to draw anything. It used to render blank; it now says which
-         * permissions are missing.
+         * THE VIEWER NOW DRAWS THE GRID, and this row moving is the whole point
+         * of the change that put it here.
          *
-         * This row is the fix's real proof. It sat in `it.fails` while the page
-         * was broken, so moving it back here — passing on its own terms rather
-         * than by being expected to fail — is the signal the gap is closed.
+         * It holds ONLY `session.read`. It used to render blank (one 403 inside
+         * the reference wave rejecting the lot), then — once the six-permission
+         * gate was added — a stated denial naming five permissions it did not
+         * need. Both were symptoms of the page assembling the institution's
+         * directory in order to draw itself. It draws from
+         * `/api/schedule/context` now, behind its own key, so the smallest role
+         * that may look at a timetable can actually see one.
          */
         path: '/schedule',
         roles: ['viewer'],
+        marker: 'grid_cell',
+        why: 'a grid cell — the viewer needs no directory permission to draw one',
+    },
+    {
+        /*
+         * A role holding NEITHER read key is still refused, and the denial names
+         * BOTH — a tenant admin told only `session.read` would grant the whole
+         * institution's timetable to somebody who needed their own.
+         */
+        path: '/schedule',
+        roles: ['constraintViewer'],
         status: 403,
-        marker: 'do not have permission to view the schedule',
-        why: 'a stated denial, not an empty grid and not a blank shell',
+        marker: 'session.read_own',
+        why: 'a stated denial naming both keys, not an empty grid',
     },
     {
         /*
@@ -156,15 +182,67 @@ const PAGES = [
          * title renders from a shell that does not need the fetch.
          */
         path: '/manage/display',
-        roles: ['admin', 'viewer'],
+        roles: ['admin'],
         marker: 'Where a session',
         why: 'the settings form, present only once /api/display-settings resolved',
     },
     {
+        /*
+         * The viewer used to be on the row above: the page was gated on
+         * `session.read`, so an institution's own settings sat in the navigation
+         * of everybody who could look at a timetable. Now `tenant.read`, and the
+         * denial is STATED rather than an empty form.
+         */
+        path: '/manage/display',
+        roles: ['viewer'],
+        status: 403,
+        marker: 'display settings needs tenant.read',
+        why: 'a stated denial naming the permission, not a blank settings form',
+    },
+    {
+        /*
+         * Proposals: `generation.read`, and the admin row is the control. The
+         * marker is the resolved empty state — it renders only on the branch
+         * where the fetch came back, so a 403 or a dropped request cannot pass
+         * as "nothing awaiting a decision".
+         */
+        path: '/schedule/proposals',
+        roles: ['admin', 'proposalReviewer'],
+        marker: 'Nothing awaiting a decision',
+        why: 'the resolved empty state, which the load-failure branch replaces',
+    },
+    {
+        /*
+         * The same page for the viewer, which holds `session.read` and therefore
+         * used to reach it — every solver proposal this tenant had ever produced,
+         * offered to anybody who could see the grid.
+         */
+        path: '/schedule/proposals',
+        roles: ['viewer'],
+        status: 403,
+        marker: 'do not have permission to review schedule proposals',
+        why: 'a stated denial, from the review middleware\'s new gate',
+    },
+    {
         path: '/manage',
-        roles: ['admin', 'viewer'],
+        roles: ['admin'],
         marker: 'Manage',
         why: 'the manage index renders whatever sections the role may read',
+    },
+    {
+        /*
+         * The viewer holds ONLY `session.read`, which after this change reaches
+         * no management section at all — Display and Proposals were the last two
+         * it did reach. The index must therefore say so rather than render an
+         * empty card grid, which would be indistinguishable from a failed load.
+         *
+         * Paired with the admin row above deliberately: "the empty message is
+         * present" proves nothing unless the same page fills for somebody.
+         */
+        path: '/manage',
+        roles: ['viewer'],
+        marker: 'do not have read access to any management section',
+        why: 'the stated empty state, not an empty grid',
     },
     {
         /*
@@ -240,10 +318,19 @@ const PAGES = [
         why: 'the veto form itself — present only once the grid and rows resolved',
     },
     {
+        /*
+         * The marker moved with stage 7 (2026-08-27). It was "Recorded, not yet
+         * used by the scheduler" — true until the solver gained its evaluator,
+         * and the sentence this page existed to be honest with. The replacement
+         * carries the same weight and is the reason the anchor is still THIS
+         * paragraph rather than a heading: it is the one thing on the page a
+         * lecturer needs in order to know what saving does, so losing it is the
+         * failure worth catching.
+         */
         path: '/my/preferences',
         roles: ['selfService'],
-        marker: 'Recorded, not yet used by the scheduler',
-        why: 'the honest disclosure that preferences do not affect the timetable yet',
+        marker: 'The scheduler can weigh these',
+        why: 'the honest disclosure of what saving a preference now does',
     },
     {
         path: '/manage/availability/reviews',
@@ -414,12 +501,44 @@ async function seedSelfService() {
     await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 }
 
+/**
+ * A person + account + role holding ONLY `generation.read`. Same lifecycle
+ * reasoning as `seedConstraintViewer` above.
+ */
+async function seedProposalReviewer() {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${PROPOSAL_REVIEWER}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId: TENANT_A, key: 'proposal-reviewer-page', name: 'Proposal Reviewer' },
+    });
+
+    await ownerDb.accessRolePermission.create({
+        data: { accessRoleId: role.id, permissionKey: 'generation.read', tenantId: TENANT_A },
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId: TENANT_A, givenName: 'Pru', familyName: 'Proposal', email: 'pru@a.test' },
+    });
+
+    await ownerDb.personAccessRole.create({
+        data: { personId: person.id, accessRoleId: role.id, tenantId: TENANT_A },
+    });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({
+        data: { email: PROPOSAL_REVIEWER, passwordHash: template.passwordHash },
+    });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     await seed();
     await seedConstraintViewer();
     await seedPersonEditor();
     await seedEntityEditor();
     await seedSelfService();
+    await seedProposalReviewer();
 
     for (const role of ROLES) {
         const { cookie } = await login(role.account, TEST_PASSWORD);
@@ -429,7 +548,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR, SELF_SERVICE]) {
+    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR, SELF_SERVICE, PROPOSAL_REVIEWER]) {
         await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${email}'`);
     }
 
@@ -469,16 +588,32 @@ describe('every page renders for every role that can reach it', () => {
     }
 
     /**
-     * `/schedule/proposals` is reachable on `session.read` ALONE, which is why it
-     * has its own middleware. The same `viewer` account is REFUSED `/schedule` (six
-     * reads to draw a grid) and ADMITTED here. Borrowing the schedule's gate would
-     * have denied the department head PRODUCT.md names as the reviewer.
+     * `/schedule/proposals` is reachable on `generation.read` ALONE, which is why
+     * it has its own middleware. The same `proposalReviewer` account is REFUSED
+     * `/schedule` (six reads to draw a grid) and ADMITTED here. Borrowing the
+     * schedule's gate would have denied the department head PRODUCT.md names as
+     * the reviewer.
+     *
+     * IT USED TO BE THE `viewer` ON BOTH SIDES OF THIS, because the gate was
+     * `session.read` — which is the state that turned out to be wrong in the
+     * other direction: every lecturer who could see a timetable was also offered
+     * every proposal. The single-permission property is what this test is about
+     * and it survives the key changing; the role holding that key does not.
      *
      * Asserted on a data-dependent branch with the failure branch asserted ABSENT:
      * "contained the heading" passes for a page whose fetch rejected.
      */
-    it('admits a session.read-only role to /schedule/proposals', async () => {
-        for (const role of ['admin', 'viewer'] as const) {
+    it('admits a generation.read-only role to /schedule/proposals', async () => {
+        // The contrast: one permission gets you the proposals list and NOT the
+        // week grid, which needs six reads. Without this the assertion below
+        // would pass just as well against a build that gated nothing.
+        const grid = await fetch(`${BASE}/schedule`, {
+            headers: { cookie: cookies.proposalReviewer! },
+        });
+
+        expect(grid.status, '/schedule admitted a role holding one permission').toBe(403);
+
+        for (const role of ['admin', 'proposalReviewer'] as const) {
             const res = await fetch(`${BASE}/schedule/proposals`, { headers: { cookie: cookies[role]! } });
 
             expect(res.status, `/schedule/proposals refused ${role}`).toBe(200);
@@ -542,7 +677,7 @@ describe('every page renders for every role that can reach it', () => {
      * Asserted in both directions: a link offered to everybody proves nothing.
      */
     it('offers a route to proposals from the schedule and the palette', async () => {
-        // Entry point 1: the schedule toolbar, gated on `session.read` rather
+        // Entry point 1: the schedule toolbar, gated on `generation.read` rather
         // than `solver.trigger` — the person who reviews a schedule is usually
         // not the person allowed to generate one.
         const schedule = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.admin! } })
@@ -557,8 +692,7 @@ describe('every page renders for every role that can reach it', () => {
         }).then((res) => res.text());
 
         const adminHtml = await palette('admin');
-        const viewerHtml = await palette('viewer');
-        const withoutHtml = await palette('constraintViewer');
+        const withoutHtml = await palette('viewer');
 
         /*
          * MATCHED AS AN `href` ATTRIBUTE, not as a bare path.
@@ -573,18 +707,59 @@ describe('every page renders for every role that can reach it', () => {
         const LINK = 'href="/schedule/proposals"';
 
         expect(adminHtml).toContain(LINK);
-        expect(viewerHtml, 'session.read alone is the gate, and the viewer holds it')
-            .toContain(LINK);
 
         /*
          * The negative direction, and it needs the page proven to have rendered
          * first — otherwise "no proposals entry" passes for a blank dashboard,
          * which is the trap this file exists to catch.
+         *
+         * THE VIEWER IS NOW THE NEGATIVE CASE. It used to be the second positive
+         * one, on the reasoning that `session.read` was the gate and the viewer
+         * holds it — which is exactly the state that turned out to be wrong:
+         * "may look at the timetable" was offering every solver proposal the
+         * tenant had ever produced. The gate is `generation.read` now, so a role
+         * holding only `session.read` belongs on this side of the assertion.
          */
         expect(withoutHtml, 'the dashboard itself failed to render, so the absence below proves nothing')
             .toContain('Ctrl');
-        expect(withoutHtml, 'offered to a role without session.read')
+        expect(withoutHtml, 'offered to a role without generation.read')
             .not.toContain(LINK);
+    });
+
+    /**
+     * NEITHER Display NOR Proposals is offered to somebody who can only look at
+     * a schedule.
+     *
+     * This is the report that produced `tenant.read` and `generation.read`. Both
+     * entries were gated on `session.read` — which sounds exactly like "may view
+     * the timetable" — so every lecturer was shown a link to the institution's
+     * own settings and a link to every solver proposal it had ever produced.
+     *
+     * Read off `/manage`, because that is the one page the viewer can still
+     * render, and asserted BOTH WAYS in one test: the admin's copy of the same
+     * page must contain both labels. An absence check alone would pass against a
+     * build where the navigation stopped rendering entirely, which is precisely
+     * the trap this file exists to catch.
+     */
+    it('keeps Display and Proposals out of a schedule viewer\'s navigation', async () => {
+        const body = async (role: string) => fetch(`${BASE}/manage`, {
+            headers: { cookie: cookies[role]! },
+        }).then((res) => res.text())
+            // Rendered body only. The hydration payload carries the whole nav
+            // registry as JSON, so matching there would find both labels for
+            // every role and prove nothing.
+            .then((html) => html.split('<script type="application/json"')[0] ?? '');
+
+        const viewer = await body('viewer');
+
+        expect(viewer).toContain('do not have read access to any management section');
+        expect(viewer).not.toContain('Proposals');
+        expect(viewer).not.toContain('Display');
+
+        const admin = await body('admin');
+
+        expect(admin).toContain('Proposals');
+        expect(admin).toContain('Display');
     });
 
     /**
@@ -806,21 +981,39 @@ describe('every page renders for every role that can reach it', () => {
         expect(asSelfService).not.toContain('Teaching preferences');
     });
 
-    it('names WHICH permissions are missing, not just that access is denied', async () => {
+    it('names WHICH permissions would open the schedule, not just that access is denied', async () => {
         /*
-         * "You do not have access" sends someone to ask for the wrong thing.
-         * The whole reason this page broke is that its real requirements were
-         * invisible, so the denial states them.
+         * "You do not have access" sends someone to ask for the wrong thing, so
+         * the denial states what would fix it.
+         *
+         * IT USED TO NAME FIVE — `term.read`, `time_grid.read`, `group.read`,
+         * `room.read`, `person.read` — because the page assembled the
+         * institution's directory in order to draw itself, and the `viewer`
+         * (holding `session.read`) was the role it refused. That was an honest
+         * message about a wrong requirement: none of those five is anything to do
+         * with looking at a timetable, and demanding them made "a lecturer sees
+         * their own schedule" unexpressible. The viewer now renders the page (see
+         * the PAGES table), so the denial belongs to a role holding NEITHER read
+         * key.
+         *
+         * BOTH keys are named on purpose. Told only `session.read`, an admin
+         * grants the whole institution's timetable to somebody who needed their
+         * own — an over-grant chosen by an error message.
          */
-        const res = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.viewer! } });
+        const res = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.constraintViewer! } });
         const html = await res.text();
 
-        for (const permission of ['term.read', 'time_grid.read', 'group.read', 'room.read', 'person.read']) {
+        expect(res.status).toBe(403);
+
+        for (const permission of ['session.read', 'session.read_own']) {
             expect(html, `denial should name ${permission}`).toContain(permission);
         }
 
-        // ...and not the one they DO hold.
-        expect(html).not.toContain('session.read,');
+        // And none of the five it no longer needs, which is what would show the
+        // old requirement had quietly come back.
+        for (const permission of ['term.read', 'time_grid.read', 'group.read', 'room.read', 'person.read']) {
+            expect(html, `the schedule should not demand ${permission}`).not.toContain(permission);
+        }
     });
 
     /*

@@ -138,7 +138,13 @@ export function isTotalBlackout(window: UnavailabilityWindow): boolean {
  * are the same state, which is why the write path deletes rather than storing the
  * second representation.
  *
- * STORED BUT NOT YET SOLVER-EFFECTIVE: no wire field exists for these.
+ * SOLVER-EFFECTIVE since 2026-08-27: these cross as `Person.preferred` (proto
+ * 0.7.0) and the solver prices `person_preference_fit` against them. This line
+ * said "no wire field exists for these", which stopped being true when the field
+ * shipped; the write boundary's own asymmetry is the part still worth knowing —
+ * it validates against the tenant's WIDEST grid, so a stored value can name a
+ * slot the solved Term has not got, and `assembleSolverInput` narrows and counts
+ * the drop rather than sending an impossible slot.
  */
 /** A term, as the availability screens need it to resolve and preview dates. */
 export interface TermWindow {

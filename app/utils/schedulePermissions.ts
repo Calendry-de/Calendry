@@ -1,44 +1,53 @@
+import type { PermissionRequirement } from '#shared/permissions';
+import { satisfiesPermissionRequirement } from '#shared/permissions';
+
 /**
- * Every permission the schedule page actually needs.
+ * What the schedule page actually needs: EITHER read key, and nothing else.
  *
- * WHY THIS IS A LIST AND NOT JUST `session.read`
+ * WHAT THIS USED TO BE, AND WHY IT STOPPED
  *
- * `/schedule` draws a week grid, and to draw one it needs the Term (for dates
- * and week count), the TimeGrid (for block geometry), and the Groups, Rooms and
- * People that a Session's chips and pickers name. Those arrive as one
- * `Promise.all` of five reference fetches, each behind its OWN read permission.
+ * A list of six: `session.read`, `term.read`, `time_grid.read`, `group.read`,
+ * `room.read`, `person.read`. Not arbitrary — the page assembled its own
+ * reference data from five CRUD endpoints, each behind its own permission, in
+ * one `Promise.all`, and a single 403 rejected the whole wave and rendered a
+ * BLANK page. Twice, in two disguises. Gating on all six turned that blank page
+ * into a stated denial, which was the right fix for the symptom.
  *
- * The page used to be gated on nothing at all, so a role holding only
- * `session.read` — which sounds exactly like "may view the schedule" — reached
- * it, one fetch 403'd, the whole wave rejected, and the page rendered NOTHING.
- * Blank: not an error, not a partial view, and indistinguishable from a tenant
- * that has not been set up yet.
+ * It was the wrong shape for the product. It meant the smallest role that could
+ * look at a timetable held the authority to query the entire staff directory,
+ * every room and every cohort — so "let a lecturer see their own timetable" was
+ * unexpressible. The cause was never the permissions; it was that DRAWING a
+ * schedule and QUERYING the institution were being served by the same endpoints.
  *
- * WHY GATING RATHER THAN TOLERATING EACH FETCH
+ * They are separated now. `GET /api/schedule/context` returns the names for
+ * whatever the caller can see, behind the same key that lets them see it, so the
+ * page's gate and its data agree BY CONSTRUCTION rather than by this list being
+ * kept in sync with a fetch wave nobody re-reads. The directory endpoints still
+ * exist, still need their own keys, and feed filters and pickers that are absent
+ * without them — which is a visibly different page, not a broken one.
  *
- * Degrading each fetch to an empty list keeps the page up, but a schedule with
- * no TimeGrid renders "No time grid configured" — which is a LIE to someone
- * whose tenant has one and who simply may not read it. A permission problem
- * that renders as a configuration problem sends the reader to fix the wrong
- * thing. Better to say plainly which permission is missing.
- *
- * `session_kind.read` is deliberately NOT here. Kinds feed the Event editor's
- * kind picker, not the grid, so that fetch stays individually tolerant: a role
- * that cannot read kinds can still see the schedule, and simply is not offered
- * a kind picker.
+ * SO THIS FILE IS NOW ONE CLAUSE. Kept as a named export rather than inlined
+ * because three places must agree about it — the route middleware, the nav
+ * entry, and the API — and the version of this that was three literals is how
+ * the link and the route came to disagree in the first place.
  */
-export const SCHEDULE_PERMISSIONS = [
-    'session.read',
-    'term.read',
-    'time_grid.read',
-    'group.read',
-    'room.read',
-    'person.read',
-] as const;
+export const SCHEDULE_PERMISSIONS: PermissionRequirement = [
+    // ONE clause, holding two alternatives: any of these is enough. Not two
+    // clauses, which would mean BOTH — see `PermissionRequirement`.
+    ['session.read', 'session.read_own'],
+];
 
-/** Which of the required permissions the caller is missing. Empty means allowed. */
-export function missingSchedulePermissions(held: Iterable<string>): string[] {
-    const set = new Set(held);
-
-    return SCHEDULE_PERMISSIONS.filter((permission) => !set.has(permission));
+/** Whether these permissions can open the schedule at all. */
+export function canViewSchedule(held: Iterable<string>): boolean {
+    return satisfiesPermissionRequirement(new Set(held), SCHEDULE_PERMISSIONS);
 }
+
+/**
+ * The sentence a denial says.
+ *
+ * Names BOTH keys, because a tenant admin reading "needs session.read" would
+ * grant the whole institution's timetable to somebody who only ever needed their
+ * own — the more privileged of the two, chosen by an error message.
+ */
+export const SCHEDULE_DENIAL = 'You do not have permission to view the schedule. '
+    + 'It needs session.read (everyone’s) or session.read_own (your own).';

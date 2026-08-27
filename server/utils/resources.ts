@@ -118,6 +118,17 @@ export interface ResourceConfig {
         patch: Record<string, unknown>;
     }) => Promise<void>;
     /**
+     * Entity-specific refusal on DELETE, inside the transaction, before the row
+     * goes.
+     *
+     * BEFORE AND NOT `afterWrite`, which already fires on delete: a rule about
+     * what the row still REFERENCES cannot be checked afterwards, because the
+     * references are gone too. `person` is the case that forced it — deleting a
+     * Person cascades `account_person`, so a guard measuring the aftermath sees a
+     * consistent database and an Account nobody can reach.
+     */
+    beforeDelete?: (ctx: { tx: Tx; tenantId: string; id: string }) => Promise<void>;
+    /**
      * Runs INSIDE the write transaction, AFTER the row and its children — on
      * create, update AND delete. Throwing rolls the transaction back.
      *
@@ -409,8 +420,8 @@ const permissionKeySchema = z.custom<PermissionKey>(isPermissionKey, {
  * opaque foreign-key violation on `permission_key`; with it, the answer names
  * the keys and the command that fixes them.
  *
- * Reads the whole table — 53 rows, only on writes — rather than a query per
- * key.
+ * Reads the whole table — a few dozen rows, only on writes — rather than a
+ * query per key.
  */
 async function assertPermissionsSeeded(tx: Tx, submitted: unknown): Promise<void> {
     if (!Array.isArray(submitted) || submitted.length === 0) {
@@ -438,6 +449,45 @@ async function assertPermissionsSeeded(tx: Tx, submitted: unknown): Promise<void
 export const RESOURCES: Record<string, ResourceConfig> = {
     persons: {
         model: 'person',
+        /**
+         * A Person holding a login cannot simply be deleted.
+         *
+         * `account_person.person_id` is ON DELETE CASCADE, so the database would
+         * accept this happily and leave the Account behind with no identity in
+         * any tenant: invisible to every list, unreachable by every reset route,
+         * and still holding a password that works. Not a warning — a state with
+         * no owner is not something to mention, it is something to prevent, which
+         * is the same call `sessionsOutsideGrid` makes for a narrowing TimeGrid.
+         *
+         * 409 naming the address, and the two ways forward, because the admin
+         * hitting this has a real intention and "no" alone would send them to the
+         * database.
+         */
+        async beforeDelete({ tx, tenantId, id }) {
+            /*
+             * Reached THROUGH `person`, not by `accountPerson.findUnique({
+             * personId })`. `account_person` has no RLS, so asking it directly
+             * would answer for another tenant's Person too — turning a
+             * cross-tenant id from a flat 404 into a 409 that names somebody
+             * else's login. A row that is not this tenant's simply falls through
+             * here and the delete reports 404, as it always did.
+             */
+            const person = await tx.person.findFirst({
+                where: { id, tenantId },
+                select: { accountLink: { select: { account: { select: { email: true } } } } },
+            });
+
+            const link = person?.accountLink;
+
+            if (link) {
+                throw createError({
+                    statusCode: 409,
+                    statusMessage: `This person holds the login ${link.account.email}. Delete that `
+                        + 'login, or attach it to somebody else, before deleting the person — '
+                        + 'otherwise the password keeps working with nobody able to see or revoke it.',
+                });
+            }
+        },
         create: z.object({
             externalRef: z.string().nullish(),
             givenName: z.string().min(1),
@@ -1003,7 +1053,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         /*
          * The grants travel WITH the role on read, because every screen that
          * shows a role shows what it holds. Bounded by construction: there are
-         * 53 permissions and a handful of roles per tenant.
+         * a few dozen permissions and a handful of roles per tenant.
          */
         include: { permissions: true },
         /**

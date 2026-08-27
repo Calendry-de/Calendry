@@ -41,6 +41,39 @@ export async function conflictGroupIds(tx: Tx, groupIds: string[]): Promise<stri
     return [...out];
 }
 
+/**
+ * `groupIds` plus everything they are nested BENEATH — the inverse of
+ * `descendantGroupIds`, and the one a person's own timetable needs.
+ *
+ * The direction is the whole subtlety, and getting it backwards is a silent
+ * over- or under-report exactly as it is in `violations.ts`. Attendance flows
+ * DOWN: a Session assigned to a Cohort is attended by everyone in its Seminars.
+ * So to ask "which Sessions am I in", start from the Groups I am a MEMBER of and
+ * walk UP — a Session assigned to my Seminar's parent Cohort is mine, a Session
+ * assigned to a sibling Seminar is not.
+ *
+ * Using `descendantGroupIds` here would answer the other question and show a
+ * cohort member every seminar's private sessions.
+ */
+export async function ancestorGroupIds(tx: Tx, groupIds: string[]): Promise<string[]> {
+    if (groupIds.length === 0) {
+        return [];
+    }
+
+    const rows = await tx.groupClosure.findMany({
+        where: { descendantId: { in: groupIds } },
+        select: { ancestorId: true },
+    });
+
+    const out = new Set<string>(groupIds);
+
+    for (const row of rows) {
+        out.add(row.ancestorId);
+    }
+
+    return [...out];
+}
+
 /** `groupIds` plus everything nested beneath them. Used for notification audience. */
 export async function descendantGroupIds(tx: Tx, groupIds: string[]): Promise<string[]> {
     if (groupIds.length === 0) {

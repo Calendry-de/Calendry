@@ -142,6 +142,24 @@ describe('permission enforcement', () => {
             // real run surface. Still `solver.trigger`, still denied — the
             // assertion is unchanged, only the path moved.
             api('/api/solver/runs', { method: 'POST', cookie, body: JSON.stringify({ termId: f.termA }) }),
+            /*
+             * Proposals are `generation.read`, not `session.read`. Under the old
+             * gate this returned 200: a role holding only "may view the
+             * schedule" could read every solver run this tenant had produced,
+             * and was offered a link to them in the navigation.
+             */
+            api('/api/generations', { cookie }),
+            api(`/api/generations/${f.generationA}`, { cookie }),
+            api(`/api/generations/${f.generationA}/preview`, { cookie }),
+            /*
+             * WRITING display settings is `tenant.update`, moved off
+             * `session_kind.update` when the page acquired a gate of its own.
+             * Reading it is asserted the other way below — it must NOT be
+             * denied, because the schedule needs the colours to draw.
+             */
+            api('/api/display-settings', {
+                method: 'PUT', cookie, body: JSON.stringify({ highlightOnline: false }),
+            }),
         ]);
 
         for (const res of denied) {
@@ -150,9 +168,30 @@ describe('permission enforcement', () => {
 
         // 403 not 404: the caller is legitimately inside this tenant.
         expect(JSON.stringify(denied[0]?.body)).toContain('session.move');
+        expect(JSON.stringify(denied[6]?.body)).toContain('generation.read');
+        expect(JSON.stringify(denied[9]?.body)).toContain('tenant.update');
 
         // And the denied move genuinely did not happen.
         expect((await ownerDb.session.findUnique({ where: { id: f.sessionA } }))?.blockIndex).toBe(0);
+    });
+
+    /**
+     * The one thing `tenant.read` must NOT narrow.
+     *
+     * `/api/display-settings` accepts `tenant.read` OR `session.read`, because
+     * the schedule's colour fetch is tolerant: narrowing it to the new key would
+     * not deny anybody a page — it would draw every lecturer's timetable in
+     * default colours with nothing on screen to say why. The endpoint being
+     * wider than the link that leads to its page is deliberate, and this is the
+     * assertion that stops somebody "tidying" it.
+     */
+    it('still lets a schedule viewer read the colours it needs to draw', async () => {
+        const { cookie } = await login(ACCOUNTS.viewerA, TEST_PASSWORD);
+
+        const res = await api<{ colorSourceOrder: string[] }>('/api/display-settings', { cookie });
+
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.colorSourceOrder)).toBe(true);
     });
 
     it('reports the caller\'s permissions for UI gating', async () => {

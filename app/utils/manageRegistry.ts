@@ -895,6 +895,107 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
     },
 
     /**
+     * Account — the LOGIN, which is not a Person.
+     *
+     * THE DISTINCTION THIS SECTION EXISTS TO MAKE VISIBLE: a Person is who the
+     * timetable places and notifies (TAXONOMY.md §2); an Account is a credential
+     * that can act as one Person per institution (§4). Creating a Person
+     * therefore does not create a login — which is exactly the gap that sent
+     * admins to `bun run create:account`, where an already-existing Person
+     * answered "already exists" and the trail ended.
+     *
+     * SECTION GATE IS `account.read`, and reading the API additionally accepts
+     * `account.manage` — the same deliberate divergence `access-roles` carries in
+     * the opposite direction. A role that may issue logins therefore needs
+     * `account.read` as well to see the section; the API stays usable either way
+     * so a create response and the person picker never 403 under a manage-only
+     * role.
+     *
+     * Second-to-last, immediately before Access roles: the two administration
+     * sections belong together, and this is the one you visit first — a login is
+     * what makes an access role reach anybody.
+     */
+    {
+        key: 'accounts',
+        // Naming the table, as `access-roles` does; the four verbs come from the
+        // overrides below because the catalogue holds two capabilities, not eight.
+        permissionPrefix: 'account',
+        permissionOverrides: {
+            read: 'account.read',
+            create: 'account.manage',
+            update: 'account.manage',
+            delete: 'account.manage',
+        },
+        label: 'Login',
+        plural: 'Logins',
+        icon: 'material-symbols:key-outline',
+        description: 'How people sign in — credentials, separate from the people they act as.',
+        keywords: [
+            'account', 'accounts', 'login', 'logins', 'credential', 'password',
+            'sign in', 'signin', 'user', 'users', 'reset',
+        ],
+        title: (row) => String(row.email ?? 'Login'),
+        detailComponent: 'AccountForm',
+        columns: [
+            { key: 'email', label: 'Email' },
+            { key: 'personName', label: 'Acts as' },
+            { key: 'isActive', label: 'Active', format: 'boolean' },
+            { key: 'mustChangePassword', label: 'Must change', format: 'boolean', secondary: true },
+            { key: 'lastLoginAt', label: 'Last sign-in', format: 'date', secondary: true },
+        ],
+        fields: [
+            {
+                key: 'email',
+                label: 'Email',
+                type: 'email',
+                required: true,
+                help: 'The sign-in address, and unique across the whole deployment — one '
+                    + 'credential can act in several institutions.',
+            },
+            /*
+             * `custom`, so the control is the bespoke picker over
+             * `/api/accounts/candidates` rather than a `reference` field over
+             * every Person. Most people already have a login, and offering them
+             * produces a 409 from `@@unique([personId])` after the form is
+             * filled in. Declared here so the key still takes part in the draft,
+             * dirty tracking and the payload — omitting it drops it from saves
+             * silently.
+             */
+            { key: 'personId', label: 'Acts as', type: 'text', required: true, custom: true },
+            /*
+             * `createOnly` AND `custom`. Changing a password later is an explicit
+             * verb (`POST /api/accounts/:id/reset-password`) because it revokes
+             * every session, so an editable field on the detail page would offer
+             * that consequence as an ordinary save.
+             */
+            { key: 'password', label: 'Initial password', type: 'text', createOnly: true, custom: true },
+            /*
+             * Explicit consent to reuse the credential that already holds the
+             * typed address, rather than minting a second one. A FIELD and not a
+             * second endpoint, because it has to ride along in the create payload
+             * the shared form builds — and because it belongs to the draft: the
+             * admin's answer to "attach instead?" is part of what they are about
+             * to submit, not a separate action.
+             */
+            { key: 'attachExisting', label: 'Attach the existing login', type: 'boolean', createOnly: true, custom: true },
+            {
+                key: 'mustChangePassword',
+                label: 'Must choose a new password at first sign-in',
+                type: 'boolean',
+                help: 'A password an administrator knows is a shared secret. This is what makes '
+                    + 'that temporary — sign-in succeeds but issues no session until it is changed.',
+            },
+            {
+                key: 'isActive',
+                label: 'Active',
+                type: 'boolean',
+                help: 'Deactivating blocks sign-in immediately, in every institution this '
+                    + 'credential is used at. The Person stays on the timetable either way.',
+            },
+        ],
+    },
+
+    /**
      * AccessRole — who may DO what, as opposed to the domain Role directly
      * above, which is scheduling vocabulary and grants nothing (TAXONOMY.md §4
      * vs §2). The two share a word and nothing else, so both descriptions say

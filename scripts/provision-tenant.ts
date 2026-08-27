@@ -156,6 +156,52 @@ async function main() {
                 })),
             });
 
+            /**
+             * The default role: everybody's own timetable, and nothing else.
+             *
+             * WHY IT SHIPS WITH THE TENANT. Until `session.read_own` existed the
+             * smallest role that could see a schedule at all needed six read
+             * permissions covering the entire roster, so the honest answer to
+             * "what do I give a lecturer?" was "compose one yourself, carefully".
+             * A calendar product whose baseline role has to be hand-built is one
+             * where the baseline is whatever the first admin guessed.
+             *
+             * EXACTLY ONE PERMISSION, deliberately. Adding
+             * `availability.manage_own` would be defensible and is not this
+             * script's call — declaring when the timetable may not use you is a
+             * consequence the tenant owns (see the catalogue's note on it), and a
+             * default that quietly grants two things is how a default stops being
+             * read.
+             *
+             * NOT `is_system`, unlike `tenant-admin`. That flag means
+             * "provisioning owns this and the tenant must not delete it", which
+             * is true of the last administrator and false of a suggestion: an
+             * institution that wants a different baseline should be able to
+             * rename it, widen it, or remove it outright.
+             *
+             * NOT AUTO-ASSIGNED to new People either. Granting authority is
+             * `person_access_role.assign` and belongs to a human decision on the
+             * Person page — a generic CRUD route that silently granted a role on
+             * every insert would be privilege escalation wearing a default's
+             * clothes.
+             */
+            const memberAccessRole = await tx.accessRole.create({
+                data: {
+                    tenantId: tenant.id,
+                    key: 'member',
+                    name: 'Member',
+                    description: 'Sees their own timetable. The baseline for everyone at this institution.',
+                },
+            });
+
+            await tx.accessRolePermission.create({
+                data: {
+                    accessRoleId: memberAccessRole.id,
+                    permissionKey: 'session.read_own',
+                    tenantId: tenant.id,
+                },
+            });
+
             const person = await tx.person.create({
                 data: { tenantId: tenant.id, givenName, familyName, email: adminEmail },
             });
@@ -183,6 +229,7 @@ async function main() {
         console.log(`\nProvisioned tenant '${result.tenant.slug}' (${result.tenant.id})`);
         console.log(`  Admin Person : ${result.person.id} <${adminEmail}>`);
         console.log(`  Access role  : tenant-admin (all ${PERMISSIONS.length} permissions)`);
+        console.log('  Access role  : member (session.read_own) — the default, assign it to people');
         console.log(`  Domain role  : lecturer (is_system)`);
         console.log(
             `  Constraints  : ${DEFAULT_CONSTRAINTS.length} default rows`

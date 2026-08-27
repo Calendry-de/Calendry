@@ -157,12 +157,13 @@
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
+import { formatDate } from '~/utils/formatDate';
 
 /**
- * Gated on `session.read`, matching the API route behind it and the review page
- * it leads to. Deliberately not the six-permission `schedule` middleware: this
- * page renders proposals, and degrades to an unnamed term rather than refusing
- * a caller who cannot read terms.
+ * Gated on `generation.read`, matching the API route behind it and the review
+ * page it leads to. Deliberately not the six-permission `schedule` middleware:
+ * this page renders proposals, and degrades to an unnamed term rather than
+ * refusing a caller who cannot read terms.
  */
 definePageMeta({ middleware: 'review' });
 
@@ -312,26 +313,7 @@ const rows = computed(() => {
 
 const refresh = () => listing.refresh();
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/**
- * Formatted from the stored instant, deliberately NOT via `toLocaleDateString`.
- *
- * Two hazards it avoids. `toLocaleDateString(undefined, …)` resolves the server's
- * locale during SSR and the browser's on hydration, which is a mismatch whenever
- * they differ; and reading the day through the local timezone means a server in
- * one zone and a reader in another can disagree about which DAY a proposal was
- * created on. Reading the UTC parts gives one answer everywhere.
- */
-function formatDate(iso: string): string {
-    const date = new Date(iso);
-
-    if (Number.isNaN(date.getTime())) {
-        return 'date unknown';
-    }
-
-    return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
-}
 </script>
 
 <style scoped lang="scss">

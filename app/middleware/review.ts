@@ -8,11 +8,20 @@ import { useSession } from '~/composables/session';
  *
  * That one demands all six of SCHEDULE_PERMISSIONS, because the week grid
  * genuinely cannot draw without the Term, TimeGrid, Groups, Rooms and People.
- * These two pages are gated on `session.read` alone, exactly like the API
+ * These two pages are gated on `generation.read` alone, exactly like the API
  * routes behind them: every reference fetch they make is TOLERANT (see the
  * `optional()` helper in `generationReview.ts`), so a caller who may read
- * sessions but not rooms sees ids instead of names rather than an empty screen.
+ * proposals but not rooms sees ids instead of names rather than an empty screen.
  * Borrowing the six-permission gate would refuse people the data permits.
+ *
+ * WHY `generation.read` AND NOT `session.read`
+ *
+ * It was `session.read` until the navigation made the consequence visible:
+ * everybody who could look at a timetable was offered "Proposals" and could read
+ * every solver run. A Generation is a set of PROPOSED placements — not the
+ * applied timetable — so reviewing one is its own authority. `session.read` is
+ * deliberately not required on top: demanding authority over the live schedule to
+ * read a proposal would make "may review proposals" unexpressible alone.
  *
  * WHY IT EXISTS AT ALL, GIVEN THE PAGE ALSO HANDLES 403
  *
@@ -31,13 +40,13 @@ import { useSession } from '~/composables/session';
 export default defineNuxtRouteMiddleware(() => {
     const session = useSession();
 
-    if (session.value?.permissions.includes('session.read')) {
+    if (session.value?.permissions.includes('generation.read')) {
         return;
     }
 
     return abortNavigation(createError({
         statusCode: 403,
-        statusMessage: 'You do not have permission to review schedule proposals. It needs: session.read.',
-        data: { missing: ['session.read'] },
+        statusMessage: 'You do not have permission to review schedule proposals. It needs: generation.read.',
+        data: { missing: ['generation.read'] },
     }));
 });

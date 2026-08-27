@@ -156,14 +156,21 @@
             </p>
 
             <CommonButton
-                v-if="generationStatus === 'READY'"
+                v-if="canReadGenerations && generationStatus === 'READY'"
                 type="primary"
                 @click="openReview"
             >Review</CommonButton>
+            <!--
+                Every other case says WHICH case it is. This branch used to read
+                "Discarded." for anything that was not APPLIED — including a
+                status that never arrived, which is what a missing
+                `generation.read` now produces: a run that finished, a proposal
+                that exists, and a sentence claiming somebody threw it away.
+            -->
             <span
                 v-else
                 class="solver_hint"
-            >{{ generationStatus === 'APPLIED' ? 'Applied.' : 'Discarded.' }}</span>
+            >{{ doneHint }}</span>
 
             <CommonButton
                 type="link"
@@ -199,6 +206,7 @@
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
 import { useSolverRun } from '~/composables/solverRun';
+import { useHasPermission } from '~/composables/session';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '~~/shared/solverBudget';
 
 const props = defineProps<{ termId: string }>();
@@ -219,6 +227,45 @@ const maxWallSeconds = ref(DEFAULT_MAX_WALL_MILLIS / 1000);
 /** The Generation's CURRENT status — an applied proposal must stop inviting a decision. */
 const generationStatus = ref<string | null>(null);
 const doneMeta = ref<{ placements?: number; hardViolations?: number } | null>(null);
+
+/**
+ * Whether this caller may read the proposal this run produced.
+ *
+ * `solver.trigger` and `generation.read` are separate keys and neither implies
+ * the other, so "may start a run, may not look at its output" is a role a tenant
+ * can compose. Checked here rather than left to the fetch's `catch`, because a
+ * 403 and a dropped request are the same `null` and must not read the same.
+ */
+const canReadGenerations = useHasPermission('generation.read');
+
+/**
+ * What to say when there is no Review button.
+ *
+ * Four distinguishable facts, deliberately not collapsed: the caller may not
+ * look, somebody applied it, somebody discarded it, or the status did not come
+ * back. The last one is why this exists — it was previously indistinguishable
+ * from the third.
+ */
+const doneHint = computed(() => {
+    if (!canReadGenerations.value) {
+        return 'A proposal was produced. Reviewing it needs the generation.read permission.';
+    }
+
+    if (generationStatus.value === 'APPLIED') {
+        return 'Applied.';
+    }
+
+    if (generationStatus.value === 'SUPERSEDED') {
+        return 'Discarded.';
+    }
+
+    if (generationStatus.value === null) {
+        return 'Could not read the proposal\u2019s status.';
+    }
+
+    // Mirrors the discard route's own 409 wording, so the two agree.
+    return `The proposal is ${generationStatus.value.toLowerCase()} and is not awaiting a decision.`;
+});
 
 async function startRun() {
     confirmCancel.value = false;
@@ -244,7 +291,9 @@ watch(() => run.value?.generationId, async (generationId) => {
     generationStatus.value = null;
     doneMeta.value = null;
 
-    if (!generationId) {
+    // No id, or no authority to ask. Skipped rather than attempted-and-caught, so
+    // the hint above can say which of the two it is.
+    if (!generationId || !canReadGenerations.value) {
         return;
     }
 

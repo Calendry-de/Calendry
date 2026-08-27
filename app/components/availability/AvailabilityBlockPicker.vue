@@ -1,9 +1,11 @@
 <template>
-    <div class="blocks">
-        <span
-            v-if="label"
-            class="blocks_label"
-        >{{ label }}</span>
+    <!--
+        A FIELDSET, like `ManageWeekdayPicker`. This was a `div` with the group
+        name in a bare `span` bound to nothing, so a screen reader announced
+        eight unrelated checkboxes with no idea what they were blocks OF.
+    -->
+    <fieldset class="blocks">
+        <legend v-if="label">{{ label }}</legend>
 
         <p
             v-if="help"
@@ -20,13 +22,32 @@
                 class="blocks_item"
                 :class="{ 'blocks_item--on': selected.includes(index) }"
             >
+                <!--
+                    A REAL, VISIBLE checkbox. This input carried
+                    `display: none`, which takes a control out of the focus
+                    order AND out of the accessibility tree: all eight blocks
+                    were unreachable by keyboard and invisible to assistive
+                    technology, on both /my pages — WCAG 2.1.1 and 4.1.2, both
+                    Level A. Since the block axis is the only way to say "not
+                    this time of day", the sole window a keyboard user could
+                    express was the whole day, the most destructive one.
+
+                    Showing it rather than visually-hiding it also restores the
+                    non-colour selection signal the chip never had: `--on`
+                    changed the ground by a measured 1.09:1 and the border by
+                    2.81:1, so selection was conveyed by little more than hue.
+                    The tick is unambiguous in greyscale, and it is what the
+                    sibling picker has always done.
+                -->
                 <input
                     :checked="selected.includes(index)"
                     type="checkbox"
                     @change="toggle(index)"
                 >
-                <span class="blocks_item-name">{{ index + 1 }}</span>
-                <span class="blocks_item-time">{{ timeOf(index) }}</span>
+                <span class="blocks_item-text">
+                    <span class="blocks_item-name">{{ index + 1 }}</span>
+                    <span class="blocks_item-time">{{ timeOf(index) }}</span>
+                </span>
             </label>
         </div>
 
@@ -45,7 +66,7 @@
             class="blocks_error"
             role="alert"
         >{{ error }}</p>
-    </div>
+    </fieldset>
 </template>
 
 <script setup lang="ts">
@@ -120,7 +141,13 @@ function toggle(index: number) {
     flex-direction: column;
     gap: var(--space-3);
 
-    &_label {
+    // A fieldset carries UA margin, padding and a border; all three go.
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    legend {
+        padding: 0 0 var(--space-3);
         font-size: var(--font-size-sm);
         font-weight: 650;
         color: $content4;
@@ -143,23 +170,42 @@ function toggle(index: number) {
         cursor: pointer;
 
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        gap: var(--space-3);
         align-items: center;
 
         padding: var(--space-2) var(--space-3);
-        border: 1px solid $surface4;
+        // The chip's ground is 1.04:1 from its container's, so this border is
+        // what identifies it; no surface step reaches 1.4.11's 3:1.
+        border: 1px solid $content7;
         border-radius: var(--radius-lg);
 
         background: $surface0;
 
         input {
-            display: none;
+            flex: none;
+            margin: 0;
+            accent-color: $primary500;
+        }
+
+        /*
+         * The ring goes on the CHIP, not the 13px checkbox inside it: the
+         * visible control is the whole label, so that is what focus should
+         * outline. `:focus-within` is how a wrapper reports its input's focus.
+         */
+        &:focus-within {
+            outline: 2px solid $primary600;
+            outline-offset: var(--space-1);
         }
 
         &--on {
             border-color: $primary500;
             background: $surface2;
+        }
+
+        &-text {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-1);
         }
 
         &-name {

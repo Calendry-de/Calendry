@@ -85,6 +85,8 @@ $success400Raw: toRawRGB(#5CB77D);
 $success400Orig: #5CB77D;
 $success300Raw: toRawRGB(#8FCEA6);
 $success300Orig: #8FCEA6;
+$warning800Raw: toRawRGB(#8A5A12);
+$warning800Orig: #8A5A12;
 $warning700Raw: toRawRGB(#A87121);
 $warning700Orig: #A87121;
 $warning600Raw: toRawRGB(#C08628);
@@ -168,6 +170,7 @@ isuccess600: var(--success600, $success600Raw),
 isuccess500: var(--success500, $success500Raw),
 isuccess400: var(--success400, $success400Raw),
 isuccess300: var(--success300, $success300Raw),
+iwarning800: var(--warning800, $warning800Raw),
 iwarning700: var(--warning700, $warning700Raw),
 iwarning600: var(--warning600, $warning600Raw),
 iwarning500: var(--warning500, $warning500Raw),
@@ -242,6 +245,7 @@ $success600: rgb(map.get($colorsMap, isuccess600));
 $success500: rgb(map.get($colorsMap, isuccess500));
 $success400: rgb(map.get($colorsMap, isuccess400));
 $success300: rgb(map.get($colorsMap, isuccess300));
+$warning800: rgb(map.get($colorsMap, iwarning800));
 $warning700: rgb(map.get($colorsMap, iwarning700));
 $warning600: rgb(map.get($colorsMap, iwarning600));
 $warning500: rgb(map.get($colorsMap, iwarning500));

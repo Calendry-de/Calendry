@@ -233,11 +233,23 @@ export function toWireConstraint(row: {
 
 /**
  * The per-type payload. Most variants are empty messages — the type IS the
- * rule — and only three carry parameters.
+ * rule — and only four carry parameters.
  *
  * `percent` is converted here: tenants think in 0–100, the wire wants 0.0–1.0,
  * and doing it at this single boundary keeps the STORED value the one the user
  * typed.
+ *
+ * THE `default` BRANCH IS ONLY SAFE FOR A MESSAGE WITH NO FIELDS AT ALL, which
+ * is not the same as a message this app sends no values for. ts-proto's encoder
+ * iterates a repeated field without a presence check (`for (const v of
+ * message.roles)`), so `{}` for a message that HAS a repeated field throws
+ * `not iterable` — and it throws inside `hashInput`, before any request is made,
+ * which surfaces as the whole assembly failing rather than as a bad constraint.
+ * Probed across all sixteen variants: `MaxOnlineShare`, `MinimizeBlockUsage`,
+ * `MinimizeDayUsage`, `MinimizeRoomRank` and `PersonPreferenceFit` all crash on
+ * `{}`, and the first four have explicit cases below. `PersonPreferenceFit` was
+ * the only one that could reach the default, and it did the moment its
+ * `wireField` was set.
  */
 function buildVariant(typeKey: string, params: Record<string, unknown>): Record<string, unknown> {
     switch (typeKey) {
@@ -283,6 +295,26 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 first: Boolean(params.first),
                 last: Boolean(params.last),
             };
+
+        case 'person_preference_fit':
+            /*
+             * EMPTY, BUT PRESENT. `roles` must be an empty array rather than
+             * absent for two independent reasons, and only one of them is about
+             * this app.
+             *
+             * Encoding: see the note above — ts-proto iterates `roles`
+             * unguarded, so omitting it throws during `hashInput`.
+             *
+             * Semantics: the solver REFUSES a non-empty `roles`
+             * (`PreferenceRolesUnsupported`) rather than approximating it.
+             * Empty means "lecturers only", which is the decided scope — a
+             * Session's attendee set includes every member of every attached
+             * Group's descendant closure, so counting attendees would let a
+             * 200-student cohort's aggregate preference outweigh the person
+             * teaching. So this is the only ACCEPTED value, not a placeholder
+             * for one; sending a role would fail the run. Solver ADR-0026.
+             */
+            return { roles: [] };
 
         default:
             return {};

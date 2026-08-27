@@ -171,6 +171,12 @@ condition, since the same shape keeps recurring in new disguises.
   check reports `schedule rendered=True solver control=False`.
 - The three "missing" indexes (see "Database & migrations" above) — a
   constraint tracked against a query shape that never existed.
+- **An objective total of 118.5 with a soft rule both off and on** — which reads
+  as "the term was never added" and meant "the term was added and satisfied". A
+  single number served both answers; the per-constraint breakdown plus a
+  deliberately unsatisfiable run separated them. See "Per-person preferences:
+  stages 5–7" below, which also records a starved search imitating a rule that
+  does not fire.
 
 The counter-example to copy: provisioning against an unseeded database fails
 on a foreign key and writes nothing. Loud, specific, unmistakable.
@@ -655,6 +661,382 @@ stops being everything the next time a permission is added.
 
 ---
 
+# `session.read_own`: the six-permission schedule, and what was actually wrong
+
+## The requirement that could not be expressed
+
+"A lecturer should see their own timetable" was not a small permission change. It
+was blocked by `/schedule` demanding SIX reads — `session.read`, `term.read`,
+`time_grid.read`, `group.read`, `room.read`, `person.read` — every one of which
+had a good reason:
+
+The page assembled its own reference data from five CRUD endpoints, in one
+`Promise.all`, to put names on chips. A single 403 in that wave rejected the whole
+handler and the page rendered BLANK. That happened twice, in two disguises, and
+the fix both times was to widen the gate so the denial was at least STATED rather
+than inferred from an empty screen. `SCHEDULE_PERMISSIONS` and
+`missingSchedulePermissions()` existed for exactly that.
+
+Correct for the symptom, wrong for the product. It meant the smallest role that
+could look at a timetable held the authority to enumerate the entire staff
+directory, every room and every cohort. The real fault was never the permission
+list: **drawing a schedule and querying the institution were being served by the
+same endpoints**, and no arrangement of keys over those endpoints could have
+separated them.
+
+## What replaced it
+
+`GET /api/schedule/context`, behind the schedule's own gate, returning:
+
+- the FRAME — every Term, every TimeGrid with its breaks. Complete, because the
+  term picker must offer every term and a Term names the grid the whole page is
+  drawn on. Neither says anything about a person.
+- NAMES for the rooms, people and groups **appearing in the sessions this caller
+  can see**, derived from them rather than listed. So a lecturer learns which
+  room they are in and who leads the lecture, and learns nothing else — the
+  narrowing is a property of the query, not a filter somebody maintains.
+
+The directory endpoints keep their own keys and WIDEN those same lists from "what
+this caller can see" to "everything the institution has".
+
+**The filters were gated on those keys first, and that was wrong.** It failed in
+precisely the case the whole change was for: somebody reading their own timetable
+holds none of `group.read` / `room.read` / `person.read`, and may well have
+sessions across three cohorts — narrowing to one of them is exactly what a filter
+is for, and the permission version removed the control. The options come from the
+schedule they can already see, so there was never anything left to gate; the
+option list IS the boundary.
+
+The rule that replaced it is a count: **a filter exists when it has more than one
+thing to choose between**, plus "or is currently narrowing", so an active filter
+can never vanish and strand the view. That also retires the empty-select case for
+everybody, including administrators — a select offering only its own placeholder
+claims the institution has no rooms, and a select with one option cannot narrow
+anything.
+
+`SCHEDULE_PERMISSIONS` collapsed from six required keys to one clause holding two
+alternatives. That is not a relaxation — it is the list finally describing what
+the page reads, which it now does BY CONSTRUCTION rather than by being kept in
+sync with a fetch wave nobody re-reads.
+
+## The three things that could have gone silently wrong
+
+**The direction of the group walk.** Attendance flows DOWN: a Session assigned to
+a Cohort is attended by everyone in its Seminars (TAXONOMY.md §6). So "is this
+session mine" starts from the Groups I am a MEMBER of and walks UP —
+`ancestorGroupIds`, added for this. `descendantGroupIds` would answer the other
+question and hand a Cohort member every seminar's private sessions, and it would
+pass every test on a fixture whose groups are flat. `tests/schedule-scope.test.ts`
+seeds a sibling seminar precisely so that mistake fails. This is the same trap
+`violations.ts` already has a rule about, in a third disguise.
+
+**Two definitions of "visible".** `/api/sessions` and `/api/schedule/context` must
+agree exactly, because the second publishes names for whatever the first returns.
+Wider, and it names a room in a session the caller cannot read — silently, since
+nothing on screen shows it. Narrower, and a chip renders a raw uuid, which is
+merely ugly. So there is one function, `sessionReadScope()`, and the test asserts
+the agreement rather than each side separately.
+
+**The nav entry could not say "either".** `NavEntry.permission` was
+`string | readonly string[]` meaning ALL, evaluated by a local `.every()`. Passing
+a nested array for the any-of case would have been truthy per element and
+`held.has([...])` false for everybody — the schedule would have vanished from the
+whole institution's navigation, with no error. Upgraded to `PermissionRequirement`
+and `satisfiesPermissionRequirement`, the shape and evaluator the manage
+relations' gates already used. Existing flat arrays keep meaning ALL, so nothing
+else moved.
+
+## Naming: why `session.read` was not renamed
+
+The request was "a permission to view your own schedule and a permission to view
+the schedule of others". The second already existed. Minting `session.read_any`
+alongside `session.read` would have left two names for one authority; renaming it
+would have silently stripped the capability from every hand-composed role in every
+existing tenant, since `grant:permissions --all-missing` only repairs
+`tenant-admin`. So `session.read` kept its key and had its DESCRIPTION sharpened
+to say what it actually grants — a role author choosing between the two needs the
+difference in the words, and the words were "View the schedule".
+
+## `member`: a default that is not a default
+
+Provisioning now creates a `member` AccessRole holding `session.read_own` and
+nothing else. Three deliberate restraints:
+
+- **Exactly one permission.** Adding `availability.manage_own` would be
+  defensible and is not provisioning's call — a default that quietly grants two
+  things is how a default stops being read.
+- **Not `is_system`.** That flag means "the tenant must not delete this", true of
+  the last administrator and false of a suggestion.
+- **Not auto-assigned to new People.** Granting authority is
+  `person_access_role.assign` and belongs to a human decision on the Person page.
+  A generic CRUD route that granted a role on every insert would be privilege
+  escalation wearing a default's clothes. This does mean creating a Person still
+  leaves them with nothing until somebody assigns the role — that is the
+  remaining half of the "a new person can do nothing" complaint, and it is a
+  deliberate stop rather than an oversight.
+
+## One thing the tests caught about the tests
+
+An assertion on server-rendered HTML matched a TEMPLATE COMMENT. The comment
+added above the schedule's filters explained the change by quoting the option
+labels ("All groups"), and Vue emits template comments into the SSR output — so
+"the page does not contain All groups" failed against a page that correctly
+omitted the select. Worth knowing generally: **prose inside a `<template>` is
+part of the response body**, and a comment that quotes user-facing strings is a
+comment a test can match.
+
+---
+
+# `tenant.read` and `generation.read`: what the navigation exposed
+
+## The report
+
+Two entries in the manage navigation — **Display** and **Proposals** — were both
+gated on `session.read`. Each had its own written justification and each was
+defensible in isolation:
+
+- display settings "carry no tenant data of their own, only instructions for
+  rendering data the caller can already see";
+- a proposal "shows the same placements the schedule already shows".
+
+Put side by side in one nav list, they stopped being defensible. `session.read`
+reads as "may view the timetable" and is the permission a lecturer holds. What it
+was actually granting was: this institution's own configuration page, and every
+schedule the solver had ever produced for it — including runs nobody applied.
+Neither is a lecturer's business, and nothing on screen suggested they were being
+offered anything unusual.
+
+The general shape, now a standing rule in CLAUDE.md: **borrowing an existing
+permission because minting one is expensive works until something puts the
+borrowed key next to what it now controls.** Both justifications above answer
+"who happens to be looking at this data?" and neither answers "whose data is
+this?".
+
+## Three keys, not two
+
+`tenant.read` and `generation.read` were requested. `tenant.update` was added on
+top, and that decision is the one worth recording.
+
+Display settings were WRITTEN under `session_kind.update` — borrowed on the
+reasoning that colours already live on Session kinds. Once the page had a gate of
+its own, that pairing described a role which may change this institution's
+settings and never see the page it changes them on. That asymmetry is treated as
+a bug everywhere else in this codebase, and once one key had to be minted the
+second cost nothing but a line in the same backfill.
+
+`tenant` is deliberately NOT in `CRUD_RESOURCES`: a Tenant is not a managed
+entity from inside itself, so there is no `tenant.create`/`tenant.delete` and the
+prefix rule generates none. Two keys, matching what a tenant actually decides.
+Its own catalogue CATEGORY rather than `administration`, because every future
+tenant-level setting belongs there and a heading that reads "Tenant" is what
+tells a role author these are not about people or rooms.
+
+## The endpoint stayed wider than the page, deliberately
+
+`GET /api/display-settings` accepts `tenant.read` **OR** `session.read`.
+
+Narrowing it to `tenant.read` looks like the tidy answer and is the wrong one.
+The endpoint has a second caller: `scheduleData.ts` reads it to resolve session
+colours, and that fetch is TOLERANT by design — `.catch(() => DISPLAY_DEFAULTS)`.
+So narrowing it would not deny anybody a page. It would draw every lecturer's
+schedule in default colours, silently, with nothing distinguishing "this tenant
+never configured any" from "you were refused". That is the
+"no-data and fetch-failed render identically" failure this codebase keeps writing
+rules about, and it would have been introduced by a change whose whole purpose
+was to tighten something.
+
+Same divergence `access-roles` and `accounts` already carry, in both directions:
+the section's gate and the endpoint's list are separate questions.
+
+`tests/auth-permissions.test.ts` § "still lets a schedule viewer read the colours
+it needs to draw" exists to stop somebody tidying this later.
+
+## `generation.read` is not implied by `generation.apply`
+
+The catalogue has no implication mechanism, so a role holding only the apply key
+would be able to promote a proposal it cannot look at. Both are granted together
+in practice; the catalogue must not pretend that is structural.
+
+`session.read` is deliberately NOT required on top of `generation.read` for the
+preview, even though a preview returns placements. A Generation is a set of
+PROPOSED placements — a different data set from the applied timetable — and
+demanding authority over the live schedule to read a proposal would make "may
+review proposals" unexpressible on its own. That role is exactly the department
+head PRODUCT.md names as the reviewer, and it was unexpressible before this:
+`tests/page-renders-per-role.test.ts` now seeds one (`generation.read` and
+nothing else) and asserts it reaches `/schedule/proposals` and is refused
+`/schedule`.
+
+## Two things this turned up on the way
+
+**A test asserted the wrong direction and had to be flipped.** "offers a route to
+proposals from the schedule and the palette" asserted that the viewer — holding
+only `session.read` — DOES see the proposals link, with the comment "session.read
+alone is the gate, and the viewer holds it". It was a correct test of an
+incorrect design, and it is the closest thing to a record that the old behaviour
+was deliberate rather than accidental. The viewer is now the negative case in
+that same test.
+
+**The solver panel told a lie for a missing permission.** `ScheduleSolverControl`
+fetches the Generation its run produced to decide whether to offer "Review", and
+its failure branch rendered `generationStatus === 'APPLIED' ? 'Applied.' :
+'Discarded.'` — so a null status printed **"Discarded."**. Before this change
+that was reachable only through a dropped request; `generation.read` makes it
+reachable through a permission, since `solver.trigger` and `generation.read` are
+separate keys and "may start a run, may not read its output" is a composable
+role. Now four distinguishable facts, and the fetch is skipped rather than
+attempted-and-caught so the hint can say which one applies.
+
+## Consequences a future session should not undo
+
+- Display and Proposals must NOT be re-gated on `session.read`, however
+  reasonable each looks alone.
+- `GET /api/display-settings` must keep accepting `session.read`.
+- Both moved keys need `grant:permissions --all-missing` on every existing
+  tenant, and a hand-composed role holding `session_kind.update` for display
+  writes loses that capability silently — CLAUDE.md § "Bootstrap & deploy".
+
+---
+
+# Accounts in the management area: reversing "only a CLI may mint accounts"
+
+## What the old stance was, and what it actually cost
+
+`create:account` and `reset:password` carried an explicit rationale: "an endpoint
+that mints accounts and grants access roles is an account-creation-and-privilege-
+granting endpoint reachable from the internet. Keeping it in a CLI means the
+running application cannot create accounts, no matter what it is tricked into
+doing."
+
+That is a real property and it was given up knowingly. What it cost was found by
+using the product: creating a Person under Manage → People creates no way for
+that person to sign in — Person and Account are different things (TAXONOMY.md §2
+vs §4) — and both CLIs then refused the follow-up. `create:account` answered
+"A Person with email X already exists in tenant Y. This script creates; it does
+not update. Use reset:password or grant:permissions" — and `reset:password`
+answered "No account with email X." So the two tools each named the other, and
+neither could finish the job. Nothing in the product could, either.
+
+The three options were: leave it (a documented dead end reachable from the
+ordinary path), fix only the CLIs (correct, but every login still needs shell
+access to the database host), or expose it. Exposed, at the user's explicit
+request, and BOTH CLI gaps fixed as well — they remain the only path that works
+before a tenant has anybody who can sign in.
+
+## What replaced the protection, since something had to
+
+The old stance's value was "the running application cannot mint a credential."
+That is gone. Four narrower properties were put in its place, and the negative
+cases in `tests/account-api.test.ts` are what separate this build from one where
+they are decoration:
+
+1. **Visibility is the join.** `account` has no `tenant_id` and no RLS, so there
+   is no policy to lean on. `accountScope()` is the only place "this tenant's
+   login" is defined, and the list query starts from `person` — RLS-scoped — so
+   the boundary is a property of the query rather than a WHERE clause each
+   handler has to remember. Cross-tenant ids are 404.
+
+2. **Sole-tenant ownership of the credential.** The genuinely new attack this
+   feature creates: one Account may act in several tenants, so tenant A's admin
+   resetting its password can then sign in and select tenant B's identity —
+   cross-tenant account takeover through a feature that looks like ordinary
+   administration. `assertSoleTenant` refuses password, email, activation and
+   deletion whenever `otherTenantCount > 0`. Signing out is allowed anyway,
+   because it is fully recoverable by the holder and refusing it would remove the
+   one immediate response to a stolen laptop from the tenant most likely to hear
+   about it.
+
+3. **Orphans are unrepresentable, not warned about.** An Account with no
+   `account_person` row is invisible to every tenant — unlistable, unresettable,
+   undeletable — while its password still works. So creation requires a
+   `personId`, `assertDetachable` refuses to remove the last identity, and
+   `persons.beforeDelete` refuses to delete a Person holding a login (the FK is
+   ON DELETE CASCADE, so the database would have accepted it happily). The two
+   assertions are exact complements: sole tenant → delete allowed, detach
+   refused; shared → detach allowed, credential ops refused. Neither needs an
+   escape hatch, which is why neither has one.
+
+4. **Two permissions, not four CRUD verbs**, mirroring `access_role`: what a
+   tenant decides is "may audit the logins" versus "may mint and reset them", and
+   there is no coherent middle where somebody may create an Account but not reset
+   its password. Folding creation into `person.create` was rejected outright — it
+   would have promoted every roster editor in every existing tenant into someone
+   who can hand out credentials, silently.
+
+## Two traps this hit, both the codebase's own recurring shapes
+
+**`otherTenantCount` computed inside the tenant transaction.** The obvious
+implementation — `account.persons.person.tenantId`, a nested Prisma select — is
+wrong in the worst available way: `person` is behind RLS, so the join returns only
+the calling tenant's row, every account reports exactly one tenant, and BOTH
+guards above pass for every shared login while looking correct. It has to go
+through `calendry_internal.account_identities()`, the SECURITY DEFINER function
+the auth plane already uses. The list route does it with a
+`CROSS JOIN LATERAL` so one query serves a whole page. `tests/account-api.test.ts`
+§ "counts the other institutions a shared login serves" is the assertion that
+would catch a regression; without it the suite would pass against a build with no
+isolation at all.
+
+**The person select rendered empty server-side.** The candidates list is fetched
+client-only (`server: false`) — this is a CHILD component and the page holds the
+single top-level await, so fetching on the server without awaiting would render
+the option list twice from two different states. Consequence: the edit page's
+`<select>` server-rendered as "— Choose a person —", selected, for a login that
+plainly has one, corrected a moment later on the client. Same family as the
+SSR/watcher bugs and the `<select>`/`:selected` bug already recorded here, found
+the same way — by a test asserting CONTENT ("Vic Viewer") rather than element
+presence. Fixed by seeding the option list from the ROW, which is part of the
+page's own awaited data, and unioning the client-fetched candidates onto it.
+
+## Smaller calls, recorded so they are not re-litigated
+
+- **`accounts` deliberately absent from `CRUD_RESOURCES`** while still declared in
+  `RESOURCE_PERMISSIONS`. The generic routes' `where: { tenantId }` matches
+  nothing against a table with no such column, and "nothing" reads as an empty
+  institution rather than as a broken query. Bespoke handlers, shared gate
+  declaration, so the client's permission prediction stays derived.
+- **The section gate is `account.read` while the API's read also accepts
+  `account.manage`** — the same deliberate divergence `access-roles` carries in
+  the other direction (its section is `access_role.manage`-only while the API
+  also accepts `person_access_role.assign`). A manage-only role can therefore use
+  every endpoint but does not see the section; granting both is the intended
+  composition, and provisioning grants the whole catalogue anyway.
+- **The password is generated in the browser.** `shared/password.ts` holds the
+  floor and the generator for both runtimes, because a form that accepts eleven
+  characters over an API that refuses them puts the error on a field the user
+  filled in correctly by the rule they were shown. Generating client-side is what
+  lets the create page navigate to the detail page on success without losing the
+  one moment the secret is legible.
+- **`errorData` on `useEntityForm`.** The already-registered-email 409 carries
+  `accountExists: true` so the form can offer to attach. Matching on the message
+  text would have worked and would break the moment the wording changes; the flag
+  is contract, the sentence is not.
+- **Detach is `POST /accounts/:id/detach`, not `PATCH { personId: null }`.** The
+  routes convention (explicit verbs for editing ops) plus one practical reason:
+  the form's person select has a placeholder option, and clearing it must not be
+  able to remove a tenant's access to a credential by accident. PATCH answers
+  `personId: null` with a 422 that names the action instead of a zod type error.
+- **`beforeDelete` added to `ResourceConfig`.** `afterWrite` already fires on
+  delete and is useless here — the cascades have run by then, so a guard
+  measuring the aftermath sees a consistent database and an unreachable Account.
+  It reads through `person` rather than `account_person` directly: that table has
+  no RLS, so the direct query would have turned a cross-tenant id from a flat 404
+  into a 409 naming somebody else's login.
+- **`create:account` reports "nothing to do" and exits 0** when the requested
+  state already holds. Exiting non-zero would make an idempotent provisioning
+  script look broken; still never an upsert, so no password, name or role is
+  rewritten.
+- **`reset:password --create` switches to the OWNER connection** and prints that
+  it did. Finding a Person by email means reading `person`, which is behind RLS
+  with no tenant context out here. The default path keeps the app role, for the
+  reason that script always gave: an operator should not need credentials that can
+  drop FORCE ROW LEVEL SECURITY just to change a password. It also refuses to pick
+  when an address is on several rosters, and warns loudly when the person holds no
+  AccessRole — a login that signs in and sees nothing is the most confusing
+  possible outcome, and granting is tenant configuration, not password recovery.
+
+---
+
 # Management area (Step 13) — verification detail behind the standing rules
 
 CLAUDE.md keeps the standing rules (permission-gating shape, bespoke-slot
@@ -876,6 +1258,83 @@ Two things that made this less trivial than it looks:
 
 A native `<button>` also inherits the UA font rather than the page's, so
 `font: inherit` was added to `.button`.
+
+---
+
+# Per-person preferences: stages 5–7, and three false negatives on the way
+
+The design record (`per-person-preferences-design.md`) holds the decisions and
+the staging. This is what the last three stages actually cost, because all three
+of the traps below produced a result that looked like a clean answer.
+
+**The flip broke assembly instantly, and the default branch was the reason.**
+Setting `wireField: 'personPreferenceFit'` — one line, the last app-side step —
+threw `message.roles is not iterable` inside `hashInput`, before any request was
+made, so the symptom was the whole `SolverInput` assembly failing rather than one
+constraint misbehaving. Cause: `buildVariant`'s `default: return {}` is only safe
+for a message with NO FIELDS AT ALL, which is not the same as a message this app
+sends no values for. ts-proto iterates a repeated field without a presence check.
+Probed all sixteen variants rather than fixing the one: `MaxOnlineShare`,
+`MinimizeBlockUsage`, `MinimizeDayUsage`, `MinimizeRoomRank` and
+`PersonPreferenceFit` all crash on `{}`, and the first four already had explicit
+cases — `PersonPreferenceFit` was the only one that could ever reach the default,
+and it did the moment its field was named. `{ roles: [] }` is also the only value
+the solver accepts, so the fix is load-bearing in two unrelated directions.
+
+**An objective TOTAL cannot distinguish "term absent" from "term satisfied."**
+The first stage 6 run reported `objective=118.5` with the rule off and on —
+identical, which reads exactly like a term that was never added. It had been
+added and driven to zero, and the other soft terms were unmoved by placements
+that only changed which day they sat on. The fix is to read the per-constraint
+COMPONENT from `ObjectiveBreakdown`, plus an unsatisfiable-by-construction
+variant (every stated preference rewritten to one shared slot, which 40
+placements cannot share) that charges 100 when it cannot be met. Without that
+second run, a component of 0 and no component at all still look alike. Same shape
+as the case log above: a number that means both "nothing to report" and "nothing
+happened."
+
+**A starved search imitates a rule that does not fire.** A later run of the same
+script came back with the placements IDENTICAL off vs on and the unmet cost
+unchanged at 32 — the exact signature of a feature that does not work. The runs
+had terminated on `time_budget` rather than `move_budget`, and the search had
+barely progressed past construction. This is why the determinism rule matters
+operationally and not just for reproducibility: `time_budget` is not comparable
+run to run, so a comparison drawn across two of them is not evidence either way.
+The script now uses a deliberately generous 180s wall clock so the move budget
+binds, and prints `termination` so an invalid comparison is visible rather than
+silently believed. It also uses fresh idempotency keys per invocation — the
+solver's registry is in-memory and keyed by what the caller passes, so a stable
+key replays the first invocation's answers forever, including across the code
+change you are trying to measure.
+
+**And a fourth: the check itself solved an empty Term and called it a failure.**
+The script took the first Term by `startDate`. A second Term was then created in
+the development tenant with an earlier start and no offerings, and every line the
+script prints reported exactly what a broken feature reports — 0 placements,
+unmet cost 0 both ways, "moved toward the stated preferences: NO". Nothing was
+wrong except the fixture. It now picks the Term with the most offerings, PRINTS
+which one and why, and ABORTS on an empty instance or zero scored placements
+rather than scoring them. Verified against both the locally built solver and the
+published compose image, which agree: unmet cost 33 → 0.
+
+**Stage 7 replaced the disclaimer rather than removing it, against the plan.**
+The stage table said "remove the 'Recorded, not yet used by the scheduler'
+disclaimer". Removing it would have left the page claiming by omission that
+preferences are honoured, and they are honoured only where the tenant enabled
+`person_preference_fit` — which is off by default. That is the same untrue
+reassurance the disclaimer existed to prevent, pointing the other way. The page
+now names the dependency, because it cannot read `constraint_def`:
+`constraint.read` is an administrator's key and widening it is a permissions
+decision. Tracked in BACKLOG.md rather than decided in a copy edit.
+
+**Two comments were corrected mid-feature rather than at stage 7.** The schema
+comment on `PersonPreference` and the type comment in `shared/availability.ts`
+both said "STORED BUT NOT YET SOLVER-EFFECTIVE ... no wire field exists", and
+stage 4 had already falsified all three clauses of it — something read it, the
+field existed, and it was `Person.preferred` rather than the two column names the
+comment guessed at. Waiting for stage 7 to delete them would have left them wrong
+for however long the solver work took. A stale comment on a schema column is read
+as current by whoever finds it next.
 
 ---
 

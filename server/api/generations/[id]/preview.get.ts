@@ -20,7 +20,10 @@ import type { Tx } from '../../../utils/tenantDb';
  * IT IS A SNAPSHOT, NOT A PROMISE. A manual edit between preview and apply
  * legitimately changes the outcome, which is what `computedAt` is for.
  *
- * Gated by `session.read` — see index.get.ts.
+ * Gated by `generation.read` — see index.get.ts. `session.read` is deliberately
+ * NOT required on top: this returns the placements a proposal WOULD create, not
+ * the ones in force, and demanding authority over the applied timetable to read
+ * a proposal would make "may review proposals" unexpressible on its own.
  */
 const querySchema = z.object({
     include: z.enum(['placements']).optional(),
@@ -37,7 +40,7 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(
         event,
         async (tx, identity) => {
-            await requirePermission(event, tx, 'session.read');
+            await requirePermission(event, tx, 'generation.read');
 
             const generation = await tx.generation.findFirst({
                 where: { id, tenantId: identity.tenantId },
