@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import type { VNode } from 'vue';
 defineProps({
     revert: {
         type: Boolean,
@@ -24,7 +25,7 @@ defineProps({
     },
 });
 
-defineSlots<{ default: () => any }>();
+defineSlots<{ default: () => VNode[] }>();
 
 const checked = defineModel({ type: Boolean, required: true });
 </script>

@@ -5,7 +5,7 @@
             novalidate
             @submit.prevent="submit"
         >
-            <common-input-text
+            <CommonInputText
                 v-model="draft.name"
                 placeholder="Given and family name"
                 :input-attrs="{
@@ -13,7 +13,7 @@
                     'aria-invalid': errors.name ? 'true' : 'false',
                     'aria-describedby': errors.name ? 'contact-error-name' : undefined,
                 }"
-            >Your name</common-input-text>
+            >Your name</CommonInputText>
             <p
                 v-if="errors.name"
                 id="contact-error-name"
@@ -28,7 +28,7 @@
                 <span>{{ errors.name }}</span>
             </p>
 
-            <common-input-text
+            <CommonInputText
                 v-model="draft.institution"
                 placeholder="School, university or consortium"
                 :input-attrs="{
@@ -36,7 +36,7 @@
                     'aria-invalid': errors.institution ? 'true' : 'false',
                     'aria-describedby': errors.institution ? 'contact-error-institution' : undefined,
                 }"
-            >Institution</common-input-text>
+            >Institution</CommonInputText>
             <p
                 v-if="errors.institution"
                 id="contact-error-institution"
@@ -88,10 +88,10 @@
                 <span>{{ errors.message }}</span>
             </p>
 
-            <common-button
+            <CommonButton
                 native-type="submit"
                 type="primary"
-            >Open an email to us</common-button>
+            >Open an email to us</CommonButton>
 
             <p
                 v-if="opened"

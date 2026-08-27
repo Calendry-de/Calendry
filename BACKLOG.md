@@ -251,13 +251,25 @@ catalogue entry, a `Person.preferred` wire field, and a solver evaluator. The
 data shape is not "on `Person`"; it is the `person_preference` table, and it has
 been since the availability work.
 
-**All five design questions were decided on 2026-08-26** and stage 1 of the
-record's rollout is closed: preference axes combine additively; the weight is a
-tenant-wide default times a per-person multiplier clamped to `[0.5, 2.0]`; only
-lecturers' preferences count; cost accrues raw per placement (so the term stays
-placement-local and visible to `ruin_worst`); and the table is widened rather
-than split, with a grid-shaped room-type preference expected next. Stages 2–7 are
-proposed and have had no build session.
+**All five design questions were decided on 2026-08-26**: preference axes
+combine additively; the weight is a tenant-wide default times a per-person
+multiplier clamped to `[0.5, 2.0]`; only lecturers' preferences count; cost
+accrues raw per placement (so the term stays placement-local and visible to
+`ruin_worst`); and the table is widened rather than split, with a grid-shaped
+room-type preference expected next.
+
+**Stages 1–4 are now built** (4 on 2026-08-27): the app assembles
+`Person.preferred` from `person_preference`, narrowed to the solved Term's grid,
+and reports whether the rule has any signal to work with — including the case
+where it is wholly inert, which is the `lecturer_veto` shape this feature has to
+avoid repeating.
+
+**What is left is not app work.** Stage 5 is the solver's evaluator and belongs
+in `calendry-solver`; stage 6 proves it fires; stage 7 removes the "recorded, not
+yet used" disclaimers and is gated on 6. Until 5 lands, `person_preference_fit`
+deliberately has no `wireField`, so the constraint does not cross at all — the
+solver answers that variant with `UNIMPLEMENTED`, so setting it early would fail
+every solve for a tenant that enabled the rule rather than merely doing nothing.
 
 E.g. "this tutor prefers mornings," "this tutor prefers these days if
 possible." Every existing soft constraint is tenant-configured and broadly

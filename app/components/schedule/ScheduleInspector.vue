@@ -71,7 +71,7 @@
                     <!-- Read-only renders as TEXT, not a disabled control: a
                          disabled select reads as "unavailable right now"
                          rather than "not yours to change". -->
-                    <dd v-if="!canMove">{{ session.rooms.map(r => lookup.room(r.roomId)).join(', ') }}</dd>
+                    <dd v-if="!canMove">{{ roomNames }}</dd>
                     <dd v-else>
                         <select
                             class="inspector_rooms"
@@ -126,9 +126,7 @@
                 -->
                 <div>
                     <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
-                    <dd v-if="lecturers.length">
-                        {{ lecturers.map(p => lookup.person(p.personId)).join(', ') }}
-                    </dd>
+                    <dd v-if="lecturers.length">{{ lecturerNames }}</dd>
                     <dd
                         v-else
                         class="inspector_muted"
@@ -140,7 +138,7 @@
                         v-if="!editable && !attendees.length"
                         class="inspector_muted"
                     >Nobody assigned individually</dd>
-                    <dd v-else-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
+                    <dd v-else-if="!editable">{{ attendeeNames }}</dd>
                     <dd v-else>
                         <!--
                             The SAME picker as groups. It replaced a
@@ -228,39 +226,39 @@
             </section>
 
             <div class="inspector_actions">
-                <common-button
+                <CommonButton
                     v-if="canMove"
                     :type="placing ? 'secondary-black' : 'primary'"
                     width="100%"
                     :disabled="busy || session.isLocked"
                     @click="$emit('toggle-place')"
-                >{{ placing ? 'Cancel move' : 'Move…' }}</common-button>
+                >{{ placing ? 'Cancel move' : 'Move…' }}</CommonButton>
 
                 <p
                     v-if="canMove && session.isLocked"
                     class="inspector_hint"
                 >Unlock this session before moving it.</p>
 
-                <common-button
+                <CommonButton
                     v-if="canSwap"
                     :type="swapping ? 'secondary-black' : 'secondary'"
                     width="100%"
                     :disabled="busy || session.isLocked"
                     @click="$emit('toggle-swap')"
-                >{{ swapping ? 'Cancel swap' : 'Swap with…' }}</common-button>
+                >{{ swapping ? 'Cancel swap' : 'Swap with…' }}</CommonButton>
 
                 <p
                     v-if="swapping"
                     class="inspector_hint"
                 >Now choose the session to swap places with.</p>
 
-                <common-button
+                <CommonButton
                     v-if="canLock"
                     type="secondary"
                     width="100%"
                     :disabled="busy"
                     @click="$emit('toggle-lock')"
-                >{{ session.isLocked ? 'Unlock' : 'Lock in place' }}</common-button>
+                >{{ session.isLocked ? 'Unlock' : 'Lock in place' }}</CommonButton>
 
                 <!--
                     EVENTS ONLY. An Offering-linked Session cannot be deleted —
@@ -269,13 +267,13 @@
                     disabled.
                 -->
                 <template v-if="canDelete && session.offeringId === null">
-                    <common-button
+                    <CommonButton
                         v-if="!confirmingDelete"
                         type="destructive"
                         width="100%"
                         :disabled="busy"
                         @click="confirmingDelete = true"
-                    >Delete event</common-button>
+                    >Delete event</CommonButton>
 
                     <template v-else>
                         <p class="inspector_hint">
@@ -283,19 +281,19 @@
                             will re-create it.
                         </p>
 
-                        <common-button
+                        <CommonButton
                             type="destructive"
                             width="100%"
                             :disabled="busy"
                             @click="$emit('delete')"
-                        >{{ busy ? 'Deleting…' : 'Yes, delete it' }}</common-button>
+                        >{{ busy ? 'Deleting…' : 'Yes, delete it' }}</CommonButton>
 
-                        <common-button
+                        <CommonButton
                             type="secondary"
                             width="100%"
                             :disabled="busy"
                             @click="confirmingDelete = false"
-                        >Keep it</common-button>
+                        >Keep it</CommonButton>
                     </template>
                 </template>
 
@@ -449,6 +447,21 @@ const worst = computed(() => (props.violations.some((v) => v.severity === 'HARD'
 // why it is one definition and not a string literal per component.
 const lecturers = computed(() => lecturersOf(props.session?.people ?? []));
 const attendees = computed(() => attendeesOf(props.session?.people ?? []));
+
+/*
+ * The read-only renderings, resolved here rather than in the template.
+ *
+ * Each was a `.map().join()` inside an interpolation, so it rebuilt an array and
+ * a string on every render of a panel that re-renders on every selection — and
+ * the name resolution it does is a lookup per row. As computeds they resolve once
+ * per change of the thing they describe.
+ */
+const roomNames = computed(() => (props.session?.rooms ?? [])
+    .map((row) => props.lookup.room(row.roomId)).join(', '));
+const lecturerNames = computed(() => lecturers.value
+    .map((row) => props.lookup.person(row.personId)).join(', '));
+const attendeeNames = computed(() => attendees.value
+    .map((row) => props.lookup.person(row.personId)).join(', '));
 </script>
 
 <style scoped lang="scss">
@@ -504,7 +517,10 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
             opacity: 0.7;
         }
 
-        p { max-width: 24ch; margin: 0; }
+        p {
+            max-width: 24ch;
+            margin: 0;
+        }
     }
 
     &_head {
@@ -540,6 +556,10 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
         border: 0;
         border-radius: 6px;
 
+        color: $content7;
+
+        background: none;
+
         /*
          * The MARK stays 24px; the TARGET reaches 44px. A panel corner cannot
          * carry a 44px visible button without becoming the loudest thing in a
@@ -551,15 +571,14 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
             inset: -12px;
         }
 
-        color: $content7;
-
-        background: none;
+        &:focus-visible { outline: 2px solid $primary400; }
 
         @include hover() {
-            &:hover { color: $content5; background: $surface3; }
+            &:hover {
+                color: $content5;
+                background: $surface3;
+            }
         }
-
-        &:focus-visible { outline: 2px solid $primary400; }
     }
 
     &_facts {
@@ -649,7 +668,10 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
             text-transform: uppercase;
             letter-spacing: 0.03em;
 
-            svg { width: 15px; height: 15px; }
+            svg {
+                width: 15px;
+                height: 15px;
+            }
         }
 
         ul {

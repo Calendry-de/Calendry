@@ -103,16 +103,16 @@
                         v-if="canEdit"
                         class="people_actions"
                     >
-                        <common-button
+                        <CommonButton
                             :disabled="busy"
                             type="primary"
                             @click="save(person.id)"
-                        >{{ busy ? 'Saving…' : 'Save' }}</common-button>
-                        <common-button
+                        >{{ busy ? 'Saving…' : 'Save' }}</CommonButton>
+                        <CommonButton
                             :disabled="busy"
                             type="secondary"
                             @click="open = null"
-                        >Cancel</common-button>
+                        >Cancel</CommonButton>
                     </div>
                 </div>
             </li>

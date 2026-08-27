@@ -47,27 +47,27 @@
             v-if="!readonly"
             class="entity-form_actions"
         >
-            <common-button
+            <CommonButton
                 :disabled="form.busy.value || !form.isDirty.value"
                 type="primary"
                 @click="$emit('save')"
-            >{{ form.busy.value ? 'Saving…' : saveLabel }}</common-button>
+            >{{ form.busy.value ? 'Saving…' : saveLabel }}</CommonButton>
 
-            <common-button
+            <CommonButton
                 v-if="form.isDirty.value"
                 :disabled="form.busy.value"
                 type="secondary"
                 @click="$emit('reset')"
-            >Discard changes</common-button>
+            >Discard changes</CommonButton>
 
             <span class="entity-form_spacer"/>
 
-            <common-button
+            <CommonButton
                 v-if="canDelete && mode === 'edit' && !form.isSystemRow.value"
                 :disabled="form.busy.value"
                 type="destructive"
                 @click="$emit('request-delete')"
-            >Delete</common-button>
+            >Delete</CommonButton>
         </footer>
 
         <p

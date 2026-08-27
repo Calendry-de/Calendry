@@ -38,7 +38,7 @@
         <p
             v-else
             class="blocks_static"
-        >{{ selected.length ? selected.map((index) => `${index + 1} (${timeOf(index)})`).join(', ') : 'Any block' }}</p>
+        >{{ selectedSummary }}</p>
 
         <p
             v-if="error"
@@ -88,6 +88,11 @@ const indices = computed(() => Array.from(
  * of clock time. Naming one day's times here would state the wrong thing for
  * the others; the schedule grid already shows the per-day truth.
  */
+/** The read-only rendering: "1 (08:00), 2 (08:45)", or the empty-means-any note. */
+const selectedSummary = computed(() => (selected.value.length
+    ? selected.value.map((index) => `${index + 1} (${timeOf(index)})`).join(', ')
+    : 'Any block'));
+
 function timeOf(index: number): string {
     if (!props.grid) {
         return '';

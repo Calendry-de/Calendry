@@ -7,7 +7,7 @@
             <div class="popup-content">
                 <slot/>
                 <div class="popup-control">
-                    <common-button
+                    <CommonButton
                         icon="material-symbols:check-rounded"
                         :primary-color="submitColor"
                         type="primary"
@@ -16,8 +16,8 @@
                         <template #default>
                             {{ submitText }}
                         </template>
-                    </common-button>
-                    <common-button
+                    </CommonButton>
+                    <CommonButton
                         icon="material-symbols:close-rounded"
                         :primary-color="closeColor"
                         type="primary"
@@ -26,7 +26,7 @@
                         <template v-if="closeText">
                             {{ closeText }}
                         </template>
-                    </common-button>
+                    </CommonButton>
                 </div>
             </div>
         </div>
@@ -35,7 +35,7 @@
 
 
 <script setup lang="ts">
-import type { PropType } from 'vue';
+import type { PropType, VNode } from 'vue';
 
 defineProps({
     type: {
@@ -63,9 +63,11 @@ defineProps({
     },
     submitIcon: {
         type: String,
+        default: undefined,
     },
     closeIcon: {
         type: String,
+        default: undefined,
     },
 });
 
@@ -79,7 +81,7 @@ const emit = defineEmits({
 });
 
 defineSlots<{
-    default(): any;
+    default(): VNode[];
 }>();
 </script>
 

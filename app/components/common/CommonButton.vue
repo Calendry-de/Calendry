@@ -45,12 +45,12 @@
 </template>
 
 <script setup lang="ts">
+import type { PropType, VNode } from 'vue';
 // The label wrapper was <ui-text type="2b">, but no UiText component exists in
 // this repo — it was never ported from the source template, so Vue could not
 // resolve it and logged a warning for every button with a label. Styling is
 // keyed on the .button_content class rather than the tag, so a span is a
 // drop-in replacement. Restore a typography component here if one is added.
-import type { PropType } from 'vue';
 import type { RouteLocationRaw } from 'vue-router';
 import { NuxtLink } from '#components';
 import type { ColorsList } from '~/utils/styles';
@@ -59,6 +59,7 @@ import { colorsList } from '~/utils/styles';
 const props = defineProps({
     tag: {
         type: String,
+        default: undefined,
     },
     /**
      * The NATIVE button type — distinct from `type`, which is this component's
@@ -72,6 +73,7 @@ const props = defineProps({
     },
     width: {
         type: String,
+        default: undefined,
     },
     iconWidth: {
         type: String,
@@ -132,16 +134,12 @@ const props = defineProps({
     },
 });
 
-defineEmits({
-    click(e: MouseEvent) {
-        return true;
-    },
-});
+defineEmits<{ click: [e: MouseEvent] }>();
 
 defineSlots<{
-    default?(): any;
-    icon?(): any;
-    append?(): any;
+    default?(): VNode[];
+    icon?(): VNode[];
+    append?(): VNode[];
 }>();
 
 /**
@@ -161,7 +159,7 @@ const getTag = computed(() => {
 const isNativeButton = computed(() => getTag.value === 'button');
 
 const getAttrs = computed(() => {
-    const attrs: Record<string, any> = {};
+    const attrs: Record<string, RouteLocationRaw | string | boolean | undefined> = {};
     if (props.to) {
         attrs.to = props.to;
         attrs.noPrefetch = true;

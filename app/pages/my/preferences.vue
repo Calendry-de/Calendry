@@ -1,5 +1,5 @@
 <template>
-    <common-page title="My teaching preferences">
+    <CommonPage title="My teaching preferences">
         <p class="intro">
             Days and times you would rather teach. Unlike unavailability, a preference is a
             <strong>soft</strong> wish — it never blocks a placement, so it needs no approval
@@ -56,21 +56,21 @@
             >Saved.</p>
 
             <div class="actions">
-                <common-button
+                <CommonButton
                     :disabled="busy || !dirty"
                     type="primary"
                     @click="save"
-                >{{ busy ? 'Saving…' : 'Save preferences' }}</common-button>
+                >{{ busy ? 'Saving…' : 'Save preferences' }}</CommonButton>
 
-                <common-button
+                <CommonButton
                     v-if="dirty"
                     :disabled="busy"
                     type="secondary"
                     @click="seed"
-                >Discard changes</common-button>
+                >Discard changes</CommonButton>
             </div>
         </section>
-    </common-page>
+    </CommonPage>
 </template>
 
 <script setup lang="ts">

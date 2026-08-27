@@ -1,5 +1,5 @@
 <template>
-    <common-page title="My settings">
+    <CommonPage title="My settings">
         <p class="intro">Things you set for yourself. Nobody else's data is reachable from here.</p>
 
         <nav class="cards">
@@ -18,7 +18,7 @@
                 <span class="cards_hint">{{ entry.description }}</span>
             </NuxtLink>
         </nav>
-    </common-page>
+    </CommonPage>
 </template>
 
 <script setup lang="ts">

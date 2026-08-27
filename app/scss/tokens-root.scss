@@ -1,9 +1,9 @@
 // The single emission point for the sizing tokens.
-//
+
 // Registered in nuxt.config's `css` array so it is bundled exactly once.
 // It previously lived in layout.scss, which both layouts @use — that put an
 // identical :root block in two CSS chunks. Harmless, but avoidable.
-//
+
 // The SCSS aliases in tokens.scss point at these properties; the px values
 // exist only here.
 :root {

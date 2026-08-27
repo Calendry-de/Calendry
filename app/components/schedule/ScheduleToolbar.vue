@@ -129,13 +129,13 @@
             <!-- Hidden without `session.create`, not disabled: there is no
                  read-only version of "add an event", and disabled reads as
                  "unavailable right now" rather than "not yours". -->
-            <common-button
+            <CommonButton
                 v-if="canCreateSession && solverTermId"
                 data-create-toggle
                 :icon="creating ? 'material-symbols:close' : 'material-symbols:add'"
                 :type="creating ? 'secondary' : 'transparent'"
                 @click="$emit('toggle-create')"
-            >{{ creating ? 'Cancel event' : 'Add event' }}</common-button>
+            >{{ creating ? 'Cancel event' : 'Add event' }}</CommonButton>
 
             <!--
                 THE DURABLE WAY TO A PROPOSAL. The solver's own "Review" button
@@ -144,12 +144,12 @@
                 `solver.trigger` — whoever reviews a schedule is usually not
                 whoever may generate one.
             -->
-            <common-button
+            <CommonButton
                 v-if="canReviewProposals"
                 icon="material-symbols:fact-check-outline"
                 type="transparent"
                 to="/schedule/proposals"
-            >Proposals</common-button>
+            >Proposals</CommonButton>
 
             <!--
                 Last in the group so its status line and the panel it summarises
@@ -231,6 +231,11 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
     z-index: 2;
 
     display: grid;
+    grid-template-areas:
+        'scope scope'
+        'view actions';
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-6) var(--space-7);
 
     /*
      * `end` puts the buttons on the selects' optical line rather than the
@@ -239,11 +244,6 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
      * tall states stay out of flow (see `ScheduleSolverControl`).
      */
     align-items: end;
-    gap: var(--space-6) var(--space-7);
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-        'scope scope'
-        'view actions';
 
     padding: var(--space-5) var(--space-6);
     border-radius: var(--radius-xl);
@@ -258,19 +258,19 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
      * `ScheduleAgenda` and `ScheduleWeekNav` already apply it under.
      */
     @include mobileOnly() {
-        #{&}_select,
-        #{&}_violations-toggle {
-            min-height: 44px;
-        }
-
-        /* Tighter rows than the desktop's 16px: on a phone the toolbar already
-           costs 303px before any schedule appears. */
-        gap: var(--space-5) var(--space-7);
-        grid-template-columns: minmax(0, 1fr);
         grid-template-areas:
             'scope'
             'view'
             'actions';
+        grid-template-columns: minmax(0, 1fr);
+
+        /* Tighter rows than the desktop's 16px: on a phone the toolbar already
+           costs 303px before any schedule appears. */
+        gap: var(--space-5) var(--space-7);
+        #{&}_select,
+        #{&}_violations-toggle {
+            min-height: 44px;
+        }
 
         /*
          * On a phone the cap is the container, not 220px — more than half the
@@ -287,11 +287,10 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
 
     &_group {
         display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: var(--space-4) var(--space-5);
-
         grid-area: scope;
+        flex-wrap: wrap;
+        gap: var(--space-4) var(--space-5);
+        align-items: flex-end;
 
         /* So a long tenant name shrinks the group rather than the bar. */
         min-width: 0;
@@ -313,19 +312,16 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         min-width: 0;
 
         > span {
-            color: $content7;
             font-size: var(--font-size-xs);
             font-weight: 600;
-            letter-spacing: 0.05em;
+            color: $content7;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
     }
 
     &_select {
-
-        min-width: 120px;
-        max-width: 220px;
-        padding: var(--space-3) var(--space-4);
+        cursor: pointer;
 
         /*
          * A `<select>` sizes itself to its widest option and every option here
@@ -334,24 +330,30 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
          * ellipsis is what makes the cap readable rather than a crop.
          */
         overflow: hidden;
+
+        min-width: 120px;
+        max-width: 220px;
+        padding: var(--space-3) var(--space-4);
         border: 1px solid $surface5;
         border-radius: var(--radius-md);
 
-        background: $surface0;
-        color: $content5;
-
         font-family: inherit;
         font-size: var(--font-size-md);
+        color: $content5;
         text-overflow: ellipsis;
-        cursor: pointer;
 
-        &:focus-visible { outline: 2px solid $primary400; outline-offset: 1px; }
+        background: $surface0;
+
+        &:focus-visible {
+            outline: 2px solid $primary400;
+            outline-offset: 1px;
+        }
     }
 
     &_check {
         display: flex;
-        align-items: center;
         gap: var(--space-3);
+        align-items: center;
 
         /*
          * OPTICAL, not rhythmic — the one off-scale value left on this screen
@@ -361,9 +363,9 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
          * governs intervals between things, not corrections inside one.
          */
         padding-bottom: 7px;
-        color: $content6;
 
         font-size: var(--font-size-sm);
+        color: $content6;
 
         input { accent-color: $primary500; }
     }
@@ -371,34 +373,43 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
     &_muted { color: $content7; }
 
     &_violations-toggle {
+        cursor: pointer;
 
         display: flex;
-        align-items: center;
         gap: var(--space-3);
+        align-items: center;
 
         padding: var(--space-4) var(--space-5);
         border: 1px solid $surface5;
         border-radius: var(--radius-md);
 
-        background: $surface0;
-        color: $content6;
-
         font-family: inherit;
         font-size: var(--font-size-sm);
-        cursor: pointer;
+        color: $content6;
 
-        svg { width: 15px; height: 15px; }
+        background: $surface0;
 
-        @include hover() {
-            &:hover { border-color: $surface6; color: $content4; }
+        svg {
+            width: 15px;
+            height: 15px;
         }
 
-        &:focus-visible { outline: 2px solid $primary400; outline-offset: 1px; }
+        @include hover() {
+            &:hover {
+                border-color: $surface6;
+                color: $content4;
+            }
+        }
+
+        &:focus-visible {
+            outline: 2px solid $primary400;
+            outline-offset: 1px;
+        }
 
         &--active {
             border-color: $primary500;
-            background: varToRgba('primary500', 0.16);
             color: $content2;
+            background: varToRgba('primary500', 0.16);
         }
     }
 }

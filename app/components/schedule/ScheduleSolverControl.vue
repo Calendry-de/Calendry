@@ -342,19 +342,19 @@ const failedSummary = computed(() => {
 .solver {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: var(--space-5);
+    align-items: center;
 
     &_advanced-toggle {
+        cursor: pointer;
 
         border: 0;
 
-        background: none;
-        color: $content5;
-
         font-size: var(--font-size-xs);
+        color: $content5;
         text-decoration: underline;
-        cursor: pointer;
+
+        background: none;
     }
 
     /*
@@ -370,9 +370,9 @@ const failedSummary = computed(() => {
     &_advanced,
     &_panel {
         position: absolute;
+        z-index: 1;
         top: calc(100% + var(--space-4));
         right: 0;
-        z-index: 1;
 
         /* Never wider than the viewport, never so narrow that the objective and
            its trend wrap. */
@@ -381,17 +381,17 @@ const failedSummary = computed(() => {
         border: 1px solid $surface3;
         border-radius: var(--radius-lg);
 
+        background: $surface1;
+
         /* Offset and blur, so it reads as a layer above the grid. */
         box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
-
-        background: $surface1;
     }
 
     &_advanced {
         display: flex;
         flex-wrap: wrap;
-        align-items: flex-end;
         gap: var(--space-5);
+        align-items: flex-end;
     }
 
     &_panel {
@@ -404,9 +404,9 @@ const failedSummary = computed(() => {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-        color: $content5;
 
         font-size: var(--font-size-xs);
+        color: $content5;
 
         input {
             width: 130px;
@@ -414,10 +414,10 @@ const failedSummary = computed(() => {
             border: 1px solid $surface4;
             border-radius: var(--radius-sm);
 
-            background: $surface1;
+            font-size: var(--font-size-sm);
             color: $content1;
 
-            font-size: var(--font-size-sm);
+            background: $surface1;
         }
     }
 
@@ -427,24 +427,24 @@ const failedSummary = computed(() => {
      */
     &_live {
         display: flex;
-        align-items: center;
         gap: var(--space-5);
+        align-items: center;
     }
 
     &_live-head {
         display: flex;
-        align-items: center;
         gap: var(--space-5);
+        align-items: center;
     }
 
     &_status {
         display: flex;
-        align-items: center;
         gap: var(--space-2);
-        color: $content2;
+        align-items: center;
 
         font-size: var(--font-size-sm);
         font-weight: 600;
+        color: $content2;
 
         &--done {
             color: $content1;
@@ -457,36 +457,36 @@ const failedSummary = computed(() => {
 
     &_objective {
         display: flex;
-        align-items: baseline;
         gap: var(--space-3);
+        align-items: baseline;
     }
 
     &_objective-value {
-        color: $content1;
         font-size: var(--font-size-md);
         font-weight: 600;
+        color: $content1;
     }
 
     &_trend {
-        color: $content5;
         font-size: var(--font-size-xs);
+        color: $content5;
 
         &--stalled {
-            color: $content2;
             font-weight: 600;
+            color: $content2;
         }
     }
 
     &_counters {
-        color: $content5;
         font-size: var(--font-size-xs);
+        color: $content5;
     }
 
     &_budget {
+        overflow: hidden;
 
         width: 100%;
         height: 6px;
-        overflow: hidden;
         border-radius: var(--radius-sm);
 
         background: $surface4;
@@ -507,27 +507,27 @@ const failedSummary = computed(() => {
     }
 
     &_hint {
-        color: $content5;
         font-size: var(--font-size-xs);
+        color: $content5;
     }
 
     &_confirm {
         display: flex;
         flex-wrap: wrap;
-        align-items: center;
         gap: var(--space-3);
+        align-items: center;
 
         margin-top: var(--space-2);
-        color: $content2;
 
         font-size: var(--font-size-xs);
+        color: $content2;
     }
 
     &_done {
         display: flex;
         flex-wrap: wrap;
-        align-items: center;
         gap: var(--space-5);
+        align-items: center;
     }
 
     /*
@@ -537,20 +537,20 @@ const failedSummary = computed(() => {
      */
     &_error {
         position: absolute;
+        z-index: 2;
         top: calc(100% + var(--space-4));
         right: 0;
-        z-index: 2;
 
         width: min(360px, calc(100vw - var(--space-8)));
         padding: var(--space-5) var(--space-6);
         border: 1px solid $error500;
         border-radius: var(--radius-lg);
-        box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
-
-        background: $surface1;
-        color: $content2;
 
         font-size: var(--font-size-xs);
+        color: $content2;
+
+        background: $surface1;
+        box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
     }
 }
 </style>

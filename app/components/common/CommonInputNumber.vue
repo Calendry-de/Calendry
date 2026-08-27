@@ -1,5 +1,5 @@
 <template>
-    <common-input-text
+    <CommonInputText
         v-model="inputValue"
         v-model:focused="focused"
         :height
@@ -16,36 +16,34 @@
         >
             <slot name="icon"/>
         </template>
-    </common-input-text>
+    </CommonInputText>
 </template>
 
 <script setup lang="ts">
-import type { PropType } from 'vue';
+import type { InputHTMLAttributes, PropType, VNode } from 'vue';
 import CommonInputText from '~/components/common/CommonInputText.vue';
 
 defineProps({
     inputAttrs: {
-        type: Object as PropType<Record<string, any>>,
+        type: Object as PropType<InputHTMLAttributes>,
         default: () => {},
     },
     height: {
         type: String,
+        default: undefined,
     },
     placeholder: {
         type: String,
+        default: undefined,
     },
 });
 
-defineEmits({
-    input(event: Event) {
-        return true;
-    },
-    change(event: Event) {
-        return true;
-    },
-});
+defineEmits<{
+    input: [event: Event];
+    change: [event: Event];
+}>();
 
-defineSlots<{ default?: () => string; icon?: () => any }>();
+defineSlots<{ default?: () => string; icon?: () => VNode[] }>();
 
 const focused = defineModel('focused', { type: Boolean });
 const model = defineModel({ type: Number as PropType<null | number>, default: null });

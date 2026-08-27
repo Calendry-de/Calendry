@@ -1,7 +1,7 @@
 <template>
     <div class="toast-container">
         <transition-group name="toast-list">
-            <common-toast
+            <CommonToast
                 v-for="(toast, index) in toasts"
                 :key="toast.id"
                 class="toast-item"

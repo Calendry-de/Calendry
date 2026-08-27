@@ -33,11 +33,11 @@
                 class="weight_default"
             >
                 <span class="weight_state">Using the institution's default weight</span>
-                <common-button
+                <CommonButton
                     size="S"
                     type="secondary"
                     @click="startOverride"
-                >Set an override</common-button>
+                >Set an override</CommonButton>
             </div>
 
             <div
@@ -59,11 +59,11 @@
                     <span class="weight_times">× the default</span>
                 </label>
 
-                <common-button
+                <CommonButton
                     size="S"
                     type="secondary"
                     @click="clearOverride"
-                >Use default</common-button>
+                >Use default</CommonButton>
             </div>
 
             <p

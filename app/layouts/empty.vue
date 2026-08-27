@@ -1,18 +1,19 @@
 <template>
     <div class="app_content">
-        <nuxt-loading-indicator :color="colorsList.primary300"/>
+        <NuxtLoadingIndicator :color="colorsList.primary300"/>
         <slot/>
-        <common-toast-container/>
+        <CommonToastContainer/>
         <view-version v-if="showVersion"/>
     </div>
 </template>
 
 <script setup lang="ts">
+import type { VNode } from 'vue';
 import { colorsList } from '#imports';
 import ViewVersion from '~/components/views/ViewVersion.vue';
 import { LANDING_ROUTE } from '~/utils/routes';
 
-defineSlots<{ default: () => any }>();
+defineSlots<{ default: () => VNode[] }>();
 
 useLayout();
 

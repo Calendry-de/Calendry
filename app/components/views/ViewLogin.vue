@@ -1,11 +1,11 @@
 <template>
     <template v-if="ready">
         <div class="btn-wrap">
-            <common-button
+            <CommonButton
                 v-if="!signedIn"
                 to="/login"
-            >Sign in</common-button>
-            <common-button
+            >Sign in</CommonButton>
+            <CommonButton
                 v-else
                 icon-width="45px"
                 type="secondary"
@@ -16,11 +16,11 @@
                         {{ displayName }}
                     </div>
                 </template>
-            </common-button>
+            </CommonButton>
         </div>
     </template>
     <template v-else>
-        <common-loader smol/>
+        <CommonLoader smol/>
     </template>
 </template>
 

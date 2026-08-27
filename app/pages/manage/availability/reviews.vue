@@ -104,11 +104,11 @@
                 >{{ entryError }}</p>
 
                 <div class="entry_actions">
-                    <common-button
+                    <CommonButton
                         :disabled="busy === 'entry' || !subject || (!draftDays.length && !draftBlocks.length)"
                         type="primary"
                         @click="submitRecurring"
-                    >{{ busy === 'entry' ? 'Recording…' : 'Record it' }}</common-button>
+                    >{{ busy === 'entry' ? 'Recording…' : 'Record it' }}</CommonButton>
                 </div>
             </template>
         </section>
@@ -153,16 +153,16 @@
                     </label>
 
                     <div class="rows_actions">
-                        <common-button
+                        <CommonButton
                             :disabled="busy === row.id"
                             type="primary"
                             @click="decide(row.id, 'APPROVED')"
-                        >Approve</common-button>
-                        <common-button
+                        >Approve</CommonButton>
+                        <CommonButton
                             :disabled="busy === row.id"
                             type="secondary"
                             @click="decide(row.id, 'REJECTED')"
-                        >Reject</common-button>
+                        >Reject</CommonButton>
                     </div>
                 </li>
             </ul>
@@ -207,11 +207,11 @@
                         rather than what rejecting silently does.
                     -->
                     <div class="rows_actions">
-                        <common-button
+                        <CommonButton
                             :disabled="busy === row.id"
                             type="destructive"
                             @click="remove(row.id)"
-                        >Delete</common-button>
+                        >Delete</CommonButton>
                     </div>
                 </li>
             </ul>

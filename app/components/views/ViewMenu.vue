@@ -3,7 +3,7 @@
         class="header__menu"
         aria-label="Main"
     >
-        <common-button
+        <CommonButton
             v-for="entry in headerNav"
             :key="entry.id"
             :icon="entry.icon"
@@ -12,7 +12,7 @@
             @click="entry.run?.()"
         >
             {{ entry.label }}
-        </common-button>
+        </CommonButton>
 
         <button
             class="header__menu_search"

@@ -1,83 +1,83 @@
 <template>
-    <common-page-opener
+    <CommonPageOpener
         v-model="opening"
         :speed="1"
     >
         <div class="landing">
-            <landing-top-bar/>
+            <LandingTopBar/>
 
             <main id="main">
-                <landing-hero/>
+                <LandingHero/>
 
-                <landing-section
+                <LandingSection
                     id="what"
                     title="A timetable you can hold, and one you can ask for"
                     lead="Two halves. This application stores and presents the schedule and everything
                         it is made of; a separate solver service builds candidate placements from your
                         rules and hands them back for a person to accept or reject."
                 >
-                    <landing-capability-list :items="FEATURES"/>
-                </landing-section>
+                    <LandingCapabilityList :items="FEATURES"/>
+                </LandingSection>
 
-                <landing-section
+                <LandingSection
                     id="built"
                     title="What works today"
                     lead="Not a demo reel. Everything below is implemented, in use against a real
                         database, and covered by this repository's integration suite."
                 >
-                    <landing-roadmap-list :items="BUILT"/>
+                    <LandingRoadmapList :items="BUILT"/>
 
-                    <landing-callout
+                    <LandingCallout
                         text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
                         action="Get in touch"
                         href="#contact"
                     />
-                </landing-section>
+                </LandingSection>
 
-                <landing-section
+                <LandingSection
                     id="next"
                     title="Not built yet, and honest about it"
                     lead="Calendry is being built in phases, and each of these is a phase rather than a
                         promise with a date on it. Where a decision is still open, it says which one."
                 >
-                    <landing-roadmap-list :items="NEXT"/>
-                </landing-section>
+                    <LandingRoadmapList :items="NEXT"/>
+                </LandingSection>
 
-                <landing-section
+                <LandingSection
                     id="why"
                     title="Decisions worth defending"
                     lead="Timetabling software fails in specific, recognisable ways. These are the
                         choices made against them — each one is a rule the codebase is actually built
                         on, not a slogan."
                 >
-                    <landing-principle-list :items="PRINCIPLES"/>
-                </landing-section>
+                    <LandingPrincipleList :items="PRINCIPLES"/>
+                </LandingSection>
 
-                <landing-section
+                <LandingSection
                     id="contact"
                     title="Tell us about your institution"
                     lead="Calendry is being built for real timetables, so the useful conversation is
                         about yours: how many rooms and cohorts, what your week looks like, and what
                         breaks today."
                 >
-                    <landing-contact-capture/>
-                </landing-section>
+                    <LandingContactCapture/>
+                </LandingSection>
 
-                <landing-section
+                <LandingSection
                     id="under-the-hood"
                     title="For the technically curious"
                     tone="inverse"
                 >
-                    <landing-tech-band
+                    <LandingTechBand
                         :lead="TECH_LEAD"
                         :items="TECHNICAL_NOTES"
                     />
-                </landing-section>
+                </LandingSection>
             </main>
 
-            <landing-footer/>
+            <LandingFooter/>
         </div>
-    </common-page-opener>
+    </CommonPageOpener>
 </template>
 
 <script setup lang="ts">

@@ -2,7 +2,7 @@
     <div class="hero">
         <div class="hero_measure">
             <div class="hero_copy">
-                <landing-status-badge
+                <LandingStatusBadge
                     label="In active development"
                     :detail="`v${ version }`"
                 />
@@ -24,18 +24,18 @@
                 </p>
 
                 <div class="hero_actions">
-                    <common-button
+                    <CommonButton
                         type="primary"
                         href="#contact"
-                    >Get in touch</common-button>
-                    <common-button
+                    >Get in touch</CommonButton>
+                    <CommonButton
                         type="secondary"
                         href="#built"
-                    >See what works today</common-button>
+                    >See what works today</CommonButton>
                 </div>
             </div>
 
-            <landing-hero-grid class="hero_figure"/>
+            <LandingHeroGrid class="hero_figure"/>
         </div>
     </div>
 </template>

@@ -17,7 +17,7 @@
             {{ missingTypes.length }} rule{{ missingTypes.length === 1 ? '' : 's' }} in the catalogue
             {{ missingTypes.length === 1 ? 'has' : 'have' }} no row for this tenant and
             {{ missingTypes.length === 1 ? 'is' : 'are' }} therefore <strong>not evaluated at all</strong>:
-            <code>{{ missingTypes.map((t) => t.key).join(', ') }}</code>.
+            <code>{{ missingTypeKeys }}</code>.
             An operator can repair this with <code>bun run backfill:constraints -- --all-missing</code>.
         </p>
 
@@ -29,7 +29,7 @@
             {{ unknownTypeRows.length }} stored rule{{ unknownTypeRows.length === 1 ? '' : 's' }}
             name{{ unknownTypeRows.length === 1 ? 's' : '' }} a type this build does not know and
             cannot be shown or edited here:
-            <code>{{ [...new Set(unknownTypeRows.map((r) => r.type))].join(', ') }}</code>.
+            <code>{{ unknownTypeKeys }}</code>.
             The solver skips {{ unknownTypeRows.length === 1 ? 'it' : 'them' }} too.
         </p>
 
@@ -66,12 +66,12 @@
                     @update:weight="setWeight(entry.row, $event)"
                 >
                     <template #actions>
-                        <common-button
+                        <CommonButton
                             v-if="canCreate"
                             icon="material-symbols:add"
                             :to="`/manage/constraints/new?type=${entry.type.key}`"
                             type="transparent"
-                        >Add scoped variant</common-button>
+                        >Add scoped variant</CommonButton>
                     </template>
                 </ManageConstraintRow>
             </ul>
@@ -151,11 +151,11 @@
                     @update:weight="setWeight(variant.row, $event)"
                 >
                     <template #actions>
-                        <common-button
+                        <CommonButton
                             icon="material-symbols:edit-outline"
                             :to="`/manage/constraints/${variant.row.id}`"
                             type="transparent"
-                        >Edit</common-button>
+                        >Edit</CommonButton>
                     </template>
                 </ManageConstraintRow>
             </ul>
@@ -167,12 +167,12 @@
                 None yet. Every rule above applies to all session kinds.
             </p>
 
-            <common-button
+            <CommonButton
                 v-if="canCreate"
                 icon="material-symbols:add"
                 to="/manage/constraints/new"
                 type="secondary"
-            >Add a rule</common-button>
+            >Add a rule</CommonButton>
         </section>
 
         <p
@@ -306,6 +306,12 @@ const missingTypes = computed(() => defaultConstraintTypes()
  * how `no_double_booking_person` stayed missing for a whole stage.
  */
 const unknownTypeRows = computed(() => rows.value.filter((row) => !findConstraintType(row.type)));
+
+/** The two alarm banners' key lists, so the template only reads a string. */
+const missingTypeKeys = computed(() => missingTypes.value.map((type) => type.key).join(', '));
+const unknownTypeKeys = computed(() => (
+    [...new Set(unknownTypeRows.value.map((row) => row.type))].join(', ')
+));
 
 interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
 

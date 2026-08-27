@@ -39,7 +39,7 @@
             v-else-if="list.pending.value && !list.rows.value.length"
             class="list_loading"
         >
-            <common-loader/>
+            <CommonLoader/>
         </div>
 
         <p
@@ -134,19 +134,19 @@
             class="list_pager"
             aria-label="Pages"
         >
-            <common-button
+            <CommonButton
                 :disabled="page === 0"
                 type="secondary"
                 @click="page = Math.max(0, page - 1)"
-            >Previous</common-button>
+            >Previous</CommonButton>
 
             <span>Page {{ page + 1 }} of {{ list.pageCount.value }}</span>
 
-            <common-button
+            <CommonButton
                 :disabled="page + 1 >= list.pageCount.value"
                 type="secondary"
                 @click="page = Math.min(list.pageCount.value - 1, page + 1)"
-            >Next</common-button>
+            >Next</CommonButton>
         </nav>
     </div>
 </template>

@@ -114,7 +114,7 @@
                     -->
                     <template v-else>
                         <p
-                            v-for="permission in category.permissions.filter((p) => granted.has(p.key))"
+                            v-for="permission in grantedIn(category)"
                             :key="permission.key"
                             class="grants_static"
                         >
@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import type { PermissionCategory, PermissionKey } from '#shared/permissions';
+import type { PermissionCategory, PermissionDef, PermissionKey } from '#shared/permissions';
 import type { useEntityForm } from '~/composables/entityForm';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import { isPermissionKey, permissionCategories } from '#shared/permissions';
@@ -238,8 +238,27 @@ function toggle(key: PermissionKey) {
     commit(next);
 }
 
+/**
+ * Which permissions of each category are granted, resolved once per change.
+ *
+ * The read-only branch filtered inside its own `v-for` expression, so every
+ * render built a fresh array — a new identity for `v-for` to diff against — and
+ * `countIn` filtered the same list again for each of its three call sites. One
+ * pass over the catalogue, keyed by category, serves all of them.
+ */
+const grantedByCategory = computed(() => new Map(
+    categories.map((category) => [
+        category.key,
+        category.permissions.filter((permission) => granted.value.has(permission.key)),
+    ]),
+));
+
+function grantedIn(category: PermissionCategory): PermissionDef[] {
+    return grantedByCategory.value.get(category.key) ?? [];
+}
+
 function countIn(category: PermissionCategory): number {
-    return category.permissions.filter((permission) => granted.value.has(permission.key)).length;
+    return grantedIn(category).length;
 }
 
 /**

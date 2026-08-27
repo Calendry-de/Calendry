@@ -15,7 +15,7 @@ import {
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
 import { HEAVY_VETO_RATIO, blockedSlotSummary } from '../../shared/availability';
-import { approvedBlackoutsFor } from './availability';
+import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
@@ -106,6 +106,34 @@ export interface AssemblyReport {
      * looks wrong is easier to explain with the number in hand.
      */
     groupsOmitted: number;
+    /**
+     * What the preference rule has to work with, and whether it has anything.
+     *
+     * TWO DISTINCT FACTS, not one. `droppedOutOfGridValues` is an ordinary
+     * narrowing report like the equipment-quantity and multi-room counts: the
+     * write boundary validates a preference against the tenant's WIDEST grid, so
+     * a stored block can legitimately name a slot this Term's grid has not got,
+     * and it is dropped rather than sent as a slot the solver would reject.
+     *
+     * `placementsWithNoSignal` is not a narrowing at all — nothing was dropped,
+     * there was simply nothing to say. It is here because a tenant can enable
+     * `person_preference_fit`, give it a weight, see it active in the constraint
+     * grid, and have it contribute exactly zero to every placement: no counted
+     * lecturer, or none of them has stated anything. That is the `lecturer_veto`
+     * shape — a rule that looks configured and can never fire — and the reason it
+     * went unnoticed there is precisely that nothing counted it. Equal to
+     * `placementsCounted` means the rule is wholly inert.
+     */
+    preferences: {
+        /** Lecturers being sent who have stated something after narrowing. */
+        lecturersWithPreference: number;
+        /** Values this Term's grid has no day or block for. */
+        droppedOutOfGridValues: number;
+        /** Placements no counted lecturer has said anything about. */
+        placementsWithNoSignal: number;
+        /** Placements the rule could speak about at all, so the ratio is readable. */
+        placementsCounted: number;
+    };
     counts: {
         rooms: number;
         persons: number;
@@ -424,6 +452,49 @@ export async function assembleSolverInput(
     );
 
     /**
+     * Stated preferences, narrowed to THIS Term's grid.
+     *
+     * The write boundary validates against the tenant's widest grid on purpose —
+     * a preference is not term-scoped, so it stays expressible for every grid the
+     * tenant has. Here one grid is in force, and a value naming a day it does not
+     * teach or a block it does not have is dropped and counted. Sending it would
+     * be sending the solver a slot that does not exist.
+     */
+    const preferencesByPerson = await statedPreferencesFor(
+        tx,
+        personRows.map((person) => person.id),
+    );
+    const activeDays = new Set(grid.activeDays);
+    const narrowedPreferences = new Map<string, { days: number[]; blocks: number[]; weightMultiplier?: number }>();
+    let droppedOutOfGridValues = 0;
+
+    for (const [personId, stated] of preferencesByPerson) {
+        const days = stated.days.filter((day) => activeDays.has(day));
+        const blocks = stated.blocks.filter((block) => block < grid.blocksPerDay);
+
+        droppedOutOfGridValues += (stated.days.length - days.length) + (stated.blocks.length - blocks.length);
+
+        // An empty result is NOT stored: after narrowing it means the same thing
+        // as no row at all, and `Person.preferred` has one representation for
+        // that — absent. Keeping `{days:[],blocks:[]}` would give it two.
+        if (days.length > 0 || blocks.length > 0) {
+            narrowedPreferences.set(personId, {
+                days,
+                blocks,
+                /*
+                 * NULL becomes ABSENT, never 0. The column's NULL means "use the
+                 * tenant default"; the wire field is `optional double` for
+                 * exactly this reason, because proto3's zero default is itself a
+                 * meaningful multiplier — 0 would mean "ignore this person
+                 * entirely". Passing `null` through would not compile, and
+                 * coercing it to a number would be the silent wrong answer.
+                 */
+                weightMultiplier: stated.weightMultiplier ?? undefined,
+            });
+        }
+    }
+
+    /**
      * Warn-and-allow: refusing heavy unavailability would be this layer overruling
      * an administrator who already approved it. Counted against the DEFAULT grid,
      * blanket windows only — see `blockedSlotSummary`.
@@ -472,6 +543,21 @@ export async function assembleSolverInput(
             // it rather than travelling to a service that has no use for it.
             reason: '',
         })),
+        /*
+         * ABSENT when the person has stated nothing, rather than an empty
+         * `Preference`. The wire's own comment says empty means no preference, so
+         * the two are the same fact — and this codebase's rule is that such a
+         * fact gets one representation.
+         *
+         * The rule this feeds is NOT yet sent: the catalogue entry still has no
+         * `wireField`, so `person_preference_fit` is reported as unable to cross
+         * and the solver never evaluates anything. Populating the Person field
+         * ahead of that is safe and deliberate — an unread field costs a few
+         * bytes, while flipping `wireField` before the solver can evaluate the
+         * type would turn a reported skip into `Status::unimplemented`, failing
+         * every solve for a tenant that enabled it.
+         */
+        preferred: narrowedPreferences.get(person.id),
     }));
 
     const groups = sentGroupRows.map((group) => ({
@@ -778,6 +864,34 @@ export async function assembleSolverInput(
             sourceRef: 'federation-shared',
         } as ExternalOccupancy));
 
+    /**
+     * Whether the preference rule has anything to say about each placement.
+     *
+     * Counted over the WIRE offerings, after the split, because that is the unit
+     * the solver actually places: an Offering that became four series has four
+     * independent lecturer sets and four times the placements. `frequency` gives
+     * the placement count without inventing one.
+     *
+     * The counted set is `candidateLecturerIds` (§4.1 — lecturers only). Today
+     * the pool equals the requirement, so it IS the set that will lead the
+     * session; if genuine pool selection ever lands this becomes a decision
+     * variable and this count becomes an upper bound rather than the answer.
+     */
+    let placementsWithNoSignal = 0;
+    let placementsCounted = 0;
+
+    for (const offering of offerings) {
+        const placements = Math.max(0, offering.requiredSessionCount);
+
+        placementsCounted += placements;
+
+        const hasSignal = offering.candidateLecturerIds.some((id) => narrowedPreferences.has(id));
+
+        if (!hasSignal) {
+            placementsWithNoSignal += placements;
+        }
+    }
+
     const input: SolverInput = {
         requestingTenantId: options.tenantId,
         // Now real: the snapshot carries federation-shared rooms and the
@@ -827,6 +941,15 @@ export async function assembleSolverInput(
             skippedConstraints,
             severityMismatches,
             groupsOmitted: groupRows.length - sentGroupRows.length,
+            preferences: {
+                lecturersWithPreference: personRows.filter((person) => (
+                    narrowedPreferences.has(person.id)
+                    && person.personRoles.some((link) => link.role.key === 'lecturer')
+                )).length,
+                droppedOutOfGridValues,
+                placementsWithNoSignal,
+                placementsCounted,
+            },
             counts: {
                 rooms: rooms.length,
                 persons: persons.length,

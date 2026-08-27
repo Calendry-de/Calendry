@@ -1,10 +1,10 @@
 <template>
     <aside class="callout">
         <p class="callout_text">{{ text }}</p>
-        <common-button
+        <CommonButton
             type="primary"
             :href="href"
-        >{{ action }}</common-button>
+        >{{ action }}</CommonButton>
     </aside>
 </template>
 

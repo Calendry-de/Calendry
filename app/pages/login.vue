@@ -1,5 +1,5 @@
 <template>
-    <common-box>
+    <CommonBox>
         <h1 class="login_title">Calendry</h1>
 
         <!-- STEP 1 — credentials -->
@@ -18,7 +18,7 @@
                 class="login_lead"
             >Sign in to continue.</p>
 
-            <common-input-text
+            <CommonInputText
                 v-model="email"
                 placeholder="Email"
                 input-type="email"
@@ -26,7 +26,7 @@
                 :input-attrs="{ autocomplete: 'username', required: true, autofocus: true }"
             />
 
-            <common-input-text
+            <CommonInputText
                 v-model="password"
                 placeholder="Password"
                 input-type="password"
@@ -47,12 +47,12 @@
                 fire the handler twice. CommonButton defaults to type="button",
                 so this opt-in is what keeps Enter-to-submit working.
             -->
-            <common-button
+            <CommonButton
                 native-type="submit"
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Signing in…' : 'Sign in' }}</common-button>
+            >{{ busy ? 'Signing in…' : 'Sign in' }}</CommonButton>
 
             <p class="login_note">
                 Accounts are created by an administrator. There is no self-service sign-up.
@@ -75,14 +75,14 @@
                 Your account belongs to more than one institution. Choose one to continue.
             </p>
 
-            <common-button
+            <CommonButton
                 v-for="tenant in availableTenants"
                 :key="tenant.tenantId"
                 type="secondary"
                 width="100%"
                 :disabled="busy"
                 @click="chooseTenant(tenant.tenantId)"
-            >{{ tenant.name }}</common-button>
+            >{{ tenant.name }}</CommonButton>
 
             <p
                 v-if="error"
@@ -90,13 +90,13 @@
                 role="alert"
             >{{ error }}</p>
 
-            <common-button
+            <CommonButton
                 type="link"
                 :disabled="busy"
                 @click="cancelSelection"
-            >Use a different account</common-button>
+            >Use a different account</CommonButton>
         </div>
-    </common-box>
+    </CommonBox>
 </template>
 
 <script setup lang="ts">

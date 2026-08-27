@@ -61,9 +61,10 @@
 </template>
 
 <script setup lang="ts">
+import type { InputHTMLAttributes } from 'vue';
     const props = defineProps({
     inputAttrs: {
-        type: Object as PropType<Record<string, any>>,
+        type: Object as PropType<InputHTMLAttributes>,
         default: () => {},
     },
     inputType: {
@@ -72,15 +73,18 @@
     },
     height: {
         type: String,
+        default: undefined,
     },
     placeholder: {
         type: String,
+        default: undefined,
     },
     disabled: {
         type: Boolean,
     },
     icon: {
         type: String,
+        default: undefined,
     },
     maxInputLength: {
         type: Number,
@@ -92,14 +96,10 @@
     },
 });
 
-defineEmits({
-    input(event: Event) {
-        return true;
-    },
-    change(event: Event) {
-        return true;
-    },
-});
+defineEmits<{
+    input: [event: Event];
+    change: [event: Event];
+}>();
 
 defineSlots<{ default?: () => string }>();
 

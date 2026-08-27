@@ -43,9 +43,7 @@
                         name="material-symbols:event-busy-outline"
                         aria-hidden="true"
                     />
-                    {{ violation.offering
-                        ? [violation.offering.code, violation.offering.title].filter(Boolean).join(' · ')
-                        : 'Unplaced demand' }}
+                    {{ subjectOf(violation) }}
                 </span>
 
                 <span>{{ describeViolation(violation, lookup) }}</span>
@@ -70,6 +68,23 @@ defineProps<{
 }>();
 
 defineEmits<{ select: [sessionId: string] }>();
+
+/**
+ * What a row is ABOUT. A named function rather than the expression it replaces,
+ * which ran `[code, title].filter(Boolean).join(' · ')` inside the `v-for` — so
+ * once per violation on every render of the panel.
+ *
+ * Not a `computed`, because the value is per row rather than per component: a
+ * computed would have to be a Map keyed by violation, and these rows have no
+ * stable key of their own (an offering-scoped violation names no session).
+ */
+function subjectOf(violation: Violation): string {
+    if (!violation.offering) {
+        return 'Unplaced demand';
+    }
+
+    return [violation.offering.code, violation.offering.title].filter(Boolean).join(' · ');
+}
 </script>
 
 <style scoped lang="scss">

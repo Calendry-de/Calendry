@@ -1,5 +1,5 @@
 <template>
-    <common-page title="My unavailability">
+    <CommonPage title="My unavailability">
         <p class="intro">
             Days and blocks you cannot teach. What you submit here is
             <strong>reviewed by an administrator</strong> before it affects any timetable —
@@ -121,11 +121,11 @@
             >{{ error }}</p>
 
             <div class="actions">
-                <common-button
+                <CommonButton
                     :disabled="busy || wouldBlockEverything"
                     type="primary"
                     @click="submit"
-                >{{ busy ? 'Submitting…' : 'Submit for approval' }}</common-button>
+                >{{ busy ? 'Submitting…' : 'Submit for approval' }}</CommonButton>
             </div>
         </section>
 
@@ -191,7 +191,7 @@
                 </li>
             </ul>
         </section>
-    </common-page>
+    </CommonPage>
 </template>
 
 <script setup lang="ts">

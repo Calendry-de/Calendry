@@ -4,11 +4,16 @@ Working draft. Companion to `CLAUDE.md` (this repo and `calendry-solver`),
 `TAXONOMY.md` and `BACKLOG.md`. Decisions with reasoning; open questions left
 open on purpose.
 
-**Status: design pass only.** No migration, no proto change, no solver code.
-Sections 1–3 record decisions that are already *shipped* (see §0). **All five
-open questions were decided on 2026-08-26** and are folded in below with the
-tradeoff analysis that produced them; stage 1 of §7 is therefore closed and
-stages 2–7 remain proposed, with no build session yet.
+**Status: stages 1–4 built; 5–7 open.** Sections 1–3 record decisions that are
+already *shipped* (see §0). **All five open questions were decided on
+2026-08-26.** Stage 4 was built on 2026-08-27 — the app now assembles and sends
+`Person.preferred` and reports whether the rule has anything to work with.
+
+**What remains is not app work.** Stage 5 is the solver's evaluator and belongs
+in `calendry-solver`, per this repo's standing rule that solver logic is not
+authored here; stage 6 proves it fires; stage 7 removes the disclaimers and is
+gated on 6. Until stage 5 lands the constraint deliberately does not cross the
+wire at all — see "Where `wireField` gets flipped".
 
 One decision changed a conclusion this document had previously reached: §4's
 bounded per-person override makes the flat refusal of "per-person weights"
@@ -807,16 +812,17 @@ normalise. Revisiting §4.2 therefore reopens §4, not just §6.
 Analogous to the solver's own Stage 1–7 plan, and deliberately marked proposed:
 this has had no build session.
 
-**Stages 1–3 are closed (2026-08-26).** Stage 3's tag exists but is NOT yet
-published to GitHub Packages, so the app still resolves `0.5.0` — see the stage
-rows. Stages 4–7 have had no build session and stay proposed.
+**Stages 1–4 are closed.** 1–3 on 2026-08-26, 4 on 2026-08-27. Stage 3's tag
+turned out to be published after all (the row said otherwise and had gone stale),
+which is what unblocked 4. Stages 5–7 have had no build session; 5 and 6 are
+solver-side work that does not belong in this repo.
 
 | Stage | Scope | Gate |
 |---|---|---|
 | ~~1~~ | **DONE, 2026-08-26.** Decisions taken: §2 additive; §4 tenant default with a per-person multiplier clamped to `[0.5, 2.0]`; §4.1 lecturers only; §4.2 raw per-placement; §1 widen the row, with a room-type kind next. Two follow-ups fall out of it and belong to stage 2/3 rather than here: write the additive semantics into the `PersonPreference` schema comment, and decide keys-vs-join-table for the room-type kind. | passed |
 | ~~2~~ | **DONE, 2026-08-26.** Catalogue entry (SOFT, off by default, `wireField` unset so it skips), the `weight_multiplier` column + CHECK + staff-only clamp validation, the additive-semantics schema comment, and the staff UI control. Two tests falsified rather than trusted. | passed |
-| ~~3~~ | **DONE except publication, 2026-08-26.** `Person.preferred` (5), `Preference` with `optional double weight_multiplier`, `PersonPreferenceFit` (27); tagged `v0.7.0`; solver pin moved and its `convert.rs` given an explicit `Status::unimplemented` branch, because the exhaustive match made "present but unread" impossible. **NOT PUSHED / NOT PUBLISHED** — the app therefore still resolves `0.5.0`, and `package.json` is deliberately left at `^0.5.0` because `^0.7.0` fails `bun install` outright until the registry has it. | `buf lint` + `buf breaking` clean and falsified two ways; 12-assertion old-peer wire check; solver `cargo build`/`clippy`/`test` (102) green |
-| 4 | `assembleSolverInput` reads `person_preference` for the Persons it already sends, and **reports counts in its report** the way the equipment-quantity gap and the multi-room gap do. Two DISTINCT counts, not one: (a) preferences that cannot cross the wire, so nothing is silently dropped; (b) **placements with no preference signal at all** — empty counted-lecturer set, or every counted lecturer having no stated preference — so an enabled-but-inert rule is visible. See the gate note below. | Assembly test; a wire assertion that a preference reaches the request; **an assertion that both counts are reported, including a fixture where (b) is non-zero** |
+| ~~3~~ | **DONE, and PUBLISHED.** `Person.preferred` (5), `Preference` with `optional double weight_multiplier`, `PersonPreferenceFit` (27); tagged `v0.7.0`; solver pin moved and its `convert.rs` given an explicit `Status::unimplemented` branch, because the exhaustive match made "present but unread" impossible. **Correction, 2026-08-27:** this row said "NOT PUSHED / NOT PUBLISHED" and that had gone stale — the registry lists `0.7.0` and serves it as `latest`. `package.json` was still pinned `^0.5.0`, and a caret on a `0.x` range does not cross a minor, so the app went on resolving `0.5.0` and `Person.preferred` was absent from the generated types. Bumped to `^0.7.0` and installed. | `buf lint` + `buf breaking` clean and falsified two ways; 12-assertion old-peer wire check; solver `cargo build`/`clippy`/`test` (102) green |
+| ~~4~~ | **DONE, 2026-08-27.** `statedPreferencesFor` in `server/utils/availability.ts` is the single read path (no status filter — preferences have no state machine, §3). `assembleSolverInput` narrows every stated value to THIS Term's grid, populates `Person.preferred`, and reports four numbers: `lecturersWithPreference`, `droppedOutOfGridValues`, `placementsWithNoSignal`, `placementsCounted`. A NULL `weight_multiplier` is sent as ABSENT, never 0. `wireField` deliberately NOT set — see the sequencing note below. | 8 assertions in `tests/person-preference-wire.test.ts`, falsified two ways: removing the grid filter fails 2 of them, coercing NULL to 0 fails 1. The inert count is asserted in both directions, and the shared fixture's lecturer-less offering supplies the `|P| = 0` case |
 | 5 | Solver: `SoftParams::PersonPreferenceFit`, the `pref_cost[placement][day][block]` table, integration into `soft`, drift-assertion coverage. | `cargo test`; the incremental-objective drift assertion; **plus the mean-not-sum test below** |
 | 6 | **Prove it fires.** A falsification test (rule disabled ⇒ identical placements; enabled ⇒ different) plus a real solve showing placements move toward preferred blocks at the configured weight. | Follows the calendar-period precedent: a probe period, then a solve at the *original* weight |
 | 7 | Remove the "Recorded, not yet used by the scheduler" disclaimer from `/my/preferences`, and the "STORED BUT NOT YET SOLVER-EFFECTIVE" note from the schema. | Stage 6 green |
@@ -825,6 +831,52 @@ rows. Stages 4–7 have had no build session and stay proposed.
 the only thing keeping this feature honest with the people entering data into
 it. Removing it before stage 6 passes would turn a truthful "we record this" into
 an untrue "we use this".
+
+### Where `wireField` gets flipped — stage 5, never stage 4
+
+**Found while building stage 4, and the stage table never said it.** The
+catalogue entry's `wireField` is what decides whether `person_preference_fit`
+crosses the wire at all. Flipping it is not part of stage 4 and must wait for
+stage 5, because the solver's `convert.rs` currently answers that variant with
+
+```
+Status::unimplemented("person_preference_fit is in the schema but not yet evaluated")
+```
+
+That is a `StartRun` failure, not a skipped rule. So the ordering is:
+
+| `wireField` | solver | what a tenant who enables the rule gets |
+|---|---|---|
+| unset (today) | refuses | rule reported as unable to cross; **every solve still succeeds** |
+| set, before stage 5 | refuses | **every solve fails outright** |
+| set, with stage 5 | evaluates | the feature |
+
+The middle row is strictly worse than the first, and it is one line away. Stage 4
+therefore populates `Person.preferred` — an unread field costs a few bytes and
+nothing else — while leaving the constraint uncrossable, which is why the
+assembly can ship ahead of the evaluator without a flag.
+
+### What count (a) actually turned out to be
+
+The stage 4 row called it "preferences that cannot cross the wire", by analogy
+with the equipment-quantity and multi-room counts. Once `Person.preferred` exists
+that framing has no referent: days, blocks and the multiplier all cross, so
+nothing about a preference is inexpressible.
+
+The real narrowing is **values this Term's grid has no day or block for**, and it
+comes from a deliberate asymmetry already recorded in `shared/availability.ts`:
+the write boundary validates against the tenant's **widest** grid, because a
+preference is not term-scoped and must stay expressible for every grid the tenant
+has. At solve time exactly one grid is in force. A stored `block 9` is therefore
+legitimate data and an impossible slot in the same breath — dropped, counted, and
+never sent as a slot the solver would have to reject.
+
+One consequence worth pinning, and it is tested: a preference whose every value
+falls outside the grid narrows to nothing, and is then sent as an **absent**
+`Preference` rather than an empty one. After narrowing "stated nothing" and
+"stated nothing usable" are the same fact, and that fact keeps one
+representation — while `droppedOutOfGridValues` still records that something was
+thrown away.
 
 ### Stage 4 must report the inert case, not just the undeliverable one
 

@@ -206,7 +206,10 @@ function countFor(day: number): number {
             background: varToRgba('primary500', 0.2);
         }
 
-        &:focus-visible { outline: 2px solid $primary400; outline-offset: -2px; }
+        &:focus-visible {
+            outline: 2px solid $primary400;
+            outline-offset: -2px;
+        }
     }
 
     &_count {
@@ -275,7 +278,10 @@ function countFor(day: number): number {
         align-items: center;
         color: $primary700;
 
-        svg { width: 15px; height: 15px; }
+        svg {
+            width: 15px;
+            height: 15px;
+        }
     }
 
     &_empty {

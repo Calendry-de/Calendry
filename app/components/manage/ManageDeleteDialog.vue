@@ -30,17 +30,17 @@
                 >{{ error }}</p>
 
                 <div class="confirm_actions">
-                    <common-button
+                    <CommonButton
                         ref="cancelRef"
                         type="secondary"
                         :disabled="busy"
                         @click="$emit('cancel')"
-                    >Cancel</common-button>
-                    <common-button
+                    >Cancel</CommonButton>
+                    <CommonButton
                         type="destructive"
                         :disabled="busy"
                         @click="$emit('confirm')"
-                    >{{ busy ? 'Deleting…' : 'Delete' }}</common-button>
+                    >{{ busy ? 'Deleting…' : 'Delete' }}</CommonButton>
                 </div>
             </div>
         </div>

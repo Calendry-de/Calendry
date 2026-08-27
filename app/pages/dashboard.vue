@@ -1,5 +1,5 @@
 <template>
-    <common-page title="Signed in">
+    <CommonPage title="Signed in">
         <!--
             The signed-in home. It exists so the login flow has somewhere to land
             and so the session is inspectable; it is not a dashboard in the
@@ -21,13 +21,13 @@
         </p>
 
         <nav class="landing_links">
-            <common-button
+            <CommonButton
                 v-for="entry in destinations"
                 :key="entry.id"
                 :icon="entry.icon"
                 :to="entry.to!"
                 type="secondary"
-            >{{ entry.label }}</common-button>
+            >{{ entry.label }}</CommonButton>
         </nav>
 
         <details
@@ -43,17 +43,17 @@
             </ul>
         </details>
 
-        <common-button
+        <CommonButton
             v-if="(session?.availableTenants.length ?? 0) > 1"
             type="secondary"
             @click="switchTenant"
-        >Switch institution</common-button>
+        >Switch institution</CommonButton>
 
-        <common-button
+        <CommonButton
             type="secondary-black"
             @click="logout"
-        >Sign out</common-button>
-    </common-page>
+        >Sign out</CommonButton>
+    </CommonPage>
 </template>
 
 <script setup lang="ts">

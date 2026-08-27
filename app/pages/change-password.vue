@@ -1,5 +1,5 @@
 <template>
-    <common-box>
+    <CommonBox>
         <h1 class="cp_title">Choose a new password</h1>
 
         <form
@@ -12,7 +12,7 @@
                     : 'Enter your current password and a new one.' }}
             </p>
 
-            <common-input-text
+            <CommonInputText
                 v-model="email"
                 placeholder="Email"
                 input-type="email"
@@ -20,7 +20,7 @@
                 :input-attrs="{ autocomplete: 'username', required: true }"
             />
 
-            <common-input-text
+            <CommonInputText
                 v-model="currentPassword"
                 placeholder="Current password"
                 input-type="password"
@@ -28,7 +28,7 @@
                 :input-attrs="{ autocomplete: 'current-password', required: true }"
             />
 
-            <common-input-text
+            <CommonInputText
                 v-model="newPassword"
                 placeholder="New password"
                 input-type="password"
@@ -44,20 +44,20 @@
                 role="alert"
             >{{ error }}</p>
 
-            <common-button
+            <CommonButton
                 native-type="submit"
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Saving…' : 'Change password' }}</common-button>
+            >{{ busy ? 'Saving…' : 'Change password' }}</CommonButton>
 
-            <common-button
+            <CommonButton
                 type="link"
                 :disabled="busy"
                 @click="navigateTo('/login')"
-            >Back to sign in</common-button>
+            >Back to sign in</CommonButton>
         </form>
-    </common-box>
+    </CommonBox>
 </template>
 
 <script setup lang="ts">

@@ -85,11 +85,11 @@
         >{{ error }}</p>
 
         <div class="holiday_actions">
-            <common-button
+            <CommonButton
                 :disabled="busy || !preview"
                 type="primary"
                 @click="submit"
-            >{{ busy ? 'Submitting…' : submitLabel }}</common-button>
+            >{{ busy ? 'Submitting…' : submitLabel }}</CommonButton>
         </div>
     </div>
 </template>

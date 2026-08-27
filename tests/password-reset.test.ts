@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { api, login } from './helpers/client';
-import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
+import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
 
 /**
  * Forced password reset and the change-password round trip.
@@ -11,12 +11,11 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
  * asserted across tenants, because sessions hang off account_id rather than
  * person_id and a per-tenant revocation would silently miss the others.
  */
-let f: Fixtures;
-
 const NEW_PASSWORD = 'a-brand-new-password-99';
 
 beforeAll(async () => {
-    f = await seed();
+    // The fixtures' ids are not read here; seeding is the point.
+    await seed();
 }, 60_000);
 
 afterAll(async () => {

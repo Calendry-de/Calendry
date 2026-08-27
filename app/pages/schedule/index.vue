@@ -552,7 +552,11 @@ const showViolations = ref(false);
 
         background: varToRgba('primary500', 0.16);
 
-        svg { flex: none; width: var(--space-6); height: var(--space-6); }
+        svg {
+            flex: none;
+            width: var(--space-6);
+            height: var(--space-6);
+        }
 
         strong { font-weight: 650; }
     }

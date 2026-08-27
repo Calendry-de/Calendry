@@ -108,6 +108,53 @@ export interface GridLimits {
     } | null;
 }
 
+/**
+ * Stated preferences for the given people — the ONLY read path into
+ * `person_preference` for solver input, mirroring `approvedBlackoutsFor`.
+ *
+ * No status filter, because preferences have no state machine: a preference is
+ * SOFT, so an unreviewed one shifts a weighted term rather than refusing a
+ * placement, and there is nothing for an approver to protect (design record §3).
+ * That asymmetry with unavailability is deliberate and is the reason this is a
+ * separate function rather than a parameter on that one.
+ *
+ * `weightMultiplier` travels. It is per-Person data and cannot be pre-resolved
+ * into `ConstraintConfig.weight`: that carries one scalar per constraint row and
+ * `ConstraintScope` has no person axis, so collapsing several lecturers'
+ * multipliers into it would be the silent widening the offering-scope skip
+ * exists to prevent.
+ */
+export async function statedPreferencesFor(
+    tx: Tx,
+    personIds: string[],
+): Promise<Map<string, { days: number[]; blocks: number[]; weightMultiplier: number | null }>> {
+    const out = new Map<string, { days: number[]; blocks: number[]; weightMultiplier: number | null }>();
+
+    if (personIds.length === 0) {
+        return out;
+    }
+
+    const rows = await tx.personPreference.findMany({
+        where: { personId: { in: personIds } },
+        select: {
+            personId: true,
+            preferredDays: true,
+            preferredBlocks: true,
+            weightMultiplier: true,
+        },
+    });
+
+    for (const row of rows) {
+        out.set(row.personId, {
+            days: row.preferredDays,
+            blocks: row.preferredBlocks,
+            weightMultiplier: row.weightMultiplier,
+        });
+    }
+
+    return out;
+}
+
 export async function tenantGridLimits(tx: Tx, tenantId: string): Promise<GridLimits> {
     const grids = await tx.timeGrid.findMany({
         where: { tenantId },

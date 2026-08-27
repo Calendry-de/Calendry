@@ -6,7 +6,7 @@
                 to="/"
                 aria-label="Calendry"
             >
-                <common-logo
+                <CommonLogo
                     :size="64"
                     wordmark
                 />
@@ -20,11 +20,11 @@
                     class="topbar_link"
                     to="/login"
                 >Sign in</NuxtLink>
-                <common-button
+                <CommonButton
                     type="primary"
                     size="S"
                     href="#contact"
-                >Get in touch</common-button>
+                >Get in touch</CommonButton>
             </nav>
         </div>
     </header>

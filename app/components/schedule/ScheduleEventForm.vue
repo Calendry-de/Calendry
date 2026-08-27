@@ -15,11 +15,11 @@
                 </p>
             </div>
 
-            <common-button
+            <CommonButton
                 icon="material-symbols:close"
                 type="transparent"
                 @click="$emit('cancel')"
-            >Cancel</common-button>
+            >Cancel</CommonButton>
         </header>
 
         <!--
@@ -161,11 +161,11 @@
         >{{ error }}</p>
 
         <footer class="evform_foot">
-            <common-button
+            <CommonButton
                 :disabled="!kinds.length || !kindId || !title.trim() || busy"
                 type="primary"
                 @click="submit"
-            >{{ busy ? 'Creating…' : 'Create event' }}</common-button>
+            >{{ busy ? 'Creating…' : 'Create event' }}</CommonButton>
         </footer>
     </div>
 </template>
@@ -393,9 +393,9 @@ async function submit() {
 
     &_head {
         display: flex;
+        gap: var(--space-4);
         align-items: flex-start;
         justify-content: space-between;
-        gap: var(--space-4);
 
         h2 {
             margin: 0;
@@ -405,16 +405,16 @@ async function submit() {
 
     &_when {
         margin: var(--space-1) 0 0;
-        color: $content6;
         font-size: var(--font-size-sm);
         font-variant-numeric: tabular-nums;
+        color: $content6;
     }
 
     &_note {
         margin: 0;
-        color: $content6;
         font-size: var(--font-size-sm);
         line-height: 1.5;
+        color: $content6;
     }
 
     // Where a control would have been, so the gap reads as an explanation rather
@@ -424,16 +424,16 @@ async function submit() {
         padding: var(--space-4) var(--space-5);
         border: 1px dashed $surface5;
         border-radius: var(--radius-md);
-        color: $content6;
 
         font-size: var(--font-size-xs);
         line-height: 1.45;
+        color: $content6;
     }
 
     &_grid {
         display: grid;
-        gap: var(--space-5);
         grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        gap: var(--space-5);
     }
 
     &_field {
@@ -443,8 +443,8 @@ async function submit() {
         font-size: var(--font-size-sm);
 
         i {
-            color: $primary400;
             font-style: normal;
+            color: $primary400;
         }
 
         select,
@@ -453,10 +453,10 @@ async function submit() {
             border: 1px solid $surface5;
             border-radius: var(--radius-md);
 
-            background: $surface0;
+            font: inherit;
             color: inherit;
 
-            font: inherit;
+            background: $surface0;
         }
     }
 
@@ -465,22 +465,22 @@ async function submit() {
     }
 
     &_multi-hint {
-        color: $content6;
         font-size: var(--font-size-xs);
         font-style: normal;
+        color: $content6;
     }
 
     &_lock {
         display: flex;
-        align-items: flex-start;
         gap: var(--space-4);
+        align-items: flex-start;
         font-size: var(--font-size-sm);
 
         em {
             display: block;
-            color: $content6;
             font-size: var(--font-size-xs);
             font-style: normal;
+            color: $content6;
         }
     }
 
@@ -489,10 +489,10 @@ async function submit() {
         padding: var(--space-4);
         border-radius: var(--radius-md);
 
-        background: rgb(179 38 30 / 12%);
+        font-size: var(--font-size-sm);
         color: $content6;
 
-        font-size: var(--font-size-sm);
+        background: rgb(179 38 30 / 12%);
     }
 
     &_foot {

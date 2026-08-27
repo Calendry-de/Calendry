@@ -8,7 +8,7 @@
                 :to="HOME_ROUTE"
                 aria-label="Calendry"
             >
-                <common-logo
+                <CommonLogo
                     :size="52"
                     wordmark
                 />
@@ -17,16 +17,17 @@
             <view-login/>
         </div>
         <div class="app_content">
-            <nuxt-loading-indicator :color="colorsList.primary300"/>
+            <NuxtLoadingIndicator :color="colorsList.primary300"/>
             <slot/>
         </div>
-        <common-toast-container/>
-        <common-command-palette/>
+        <CommonToastContainer/>
+        <CommonCommandPalette/>
         <view-version/>
     </div>
 </template>
 
 <script setup lang="ts">
+import type { VNode } from 'vue';
 import ViewMenu from '~/components/views/ViewMenu.vue';
 import ViewLogin from '~/components/views/ViewLogin.vue';
 import ViewVersion from '~/components/views/ViewVersion.vue';
@@ -44,7 +45,7 @@ import { HOME_ROUTE } from '~/utils/routes';
 // mean two headers to keep in step. It links to HOME_ROUTE, which is the one
 // place "where a signed-in session belongs" is written.
 
-defineSlots<{ default: () => any }>();
+defineSlots<{ default: () => VNode[] }>();
 
 useLayout();
 </script>

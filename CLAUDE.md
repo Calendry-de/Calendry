@@ -260,6 +260,20 @@ functionally complete: 14 constraint types, LNS + simulated annealing,
 `SolverInput` and sends it; every gap in the snapshot is a wrong answer the
 solver has no way to detect.
 
+**Per-person preferences: the app SENDS them, the solver does not read them yet.**
+`assembleSolverInput` populates `Person.preferred` from `person_preference`
+(proto `0.7.0`), narrowed to the solved Term's grid — the write boundary
+validates against the tenant's WIDEST grid, so a stored block can name a slot one
+Term has not got. A NULL `weight_multiplier` is sent as ABSENT, never 0: the wire
+field is `optional` because proto3's zero is itself a meaningful multiplier.
+**`person_preference_fit` deliberately has no `wireField`**, so the constraint
+does not cross at all — the solver answers that variant with `UNIMPLEMENTED`, so
+setting it before the evaluator lands would fail every solve for a tenant that
+enabled the rule instead of merely doing nothing. The assembly report counts the
+inert case (`placementsWithNoSignal == placementsCounted`) for the same reason
+`lecturer_veto` went unnoticed: nothing counted it. Design record and staging:
+`per-person-preferences-design.md`.
+
 **`MinimizeRoomRank` has a direction parameter, `invert`** (`calendry-proto@0.5.0`):
 `false` (default) penalizes `rank >= threshold` (spare best rooms); `true`
 penalizes `rank <= threshold` (prefer them). New tenants seed `invert: true`

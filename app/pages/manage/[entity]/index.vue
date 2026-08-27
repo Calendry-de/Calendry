@@ -7,11 +7,11 @@
             v-if="canCreate && !entity.hideCreateAction"
             #actions
         >
-            <common-button
+            <CommonButton
                 icon="material-symbols:add"
                 :to="`/manage/${entity.key}/new`"
                 type="primary"
-            >New {{ entity.label.toLowerCase() }}</common-button>
+            >New {{ entity.label.toLowerCase() }}</CommonButton>
         </template>
 
         <component

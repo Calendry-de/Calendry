@@ -104,9 +104,9 @@
  *
  * HOW TO USE IT. Wrap what should be revealed, and control it with `v-model`:
  *
- *     <common-page-opener v-model="opening">
+ *     <CommonPageOpener v-model="opening">
  *         <my-page/>
- *     </common-page-opener>
+ *     </CommonPageOpener>
  *
  * It sets the model to `false` and emits `done` when the veil has lifted. The
  * slot renders identically whether or not it is playing, so nothing downstream

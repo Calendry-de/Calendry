@@ -17,7 +17,7 @@
                 aria-hidden="true"
             />
             Save this {{ entity.label.toLowerCase() }} first — then you can assign
-            {{ relations.defs.map((def) => def.label.toLowerCase()).join(', ') }}.
+            {{ assignableLabels }}.
         </p>
 
         <ManageRelationPicker
@@ -53,12 +53,16 @@ import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
  * component at all. Its complexity is a longer `relations` array, not different
  * code.
  */
-defineProps<{
+const props = defineProps<{
     entity: ManageEntity;
     relations: ReturnType<typeof useEntityRelations>;
     mode: 'create' | 'edit';
     canUpdate: boolean;
 }>();
+
+/** What the unsaved-entity hint lists, derived here rather than in the template. */
+const assignableLabels = computed(() => props.relations.defs
+    .map((def) => def.label.toLowerCase()).join(', '));
 </script>
 
 <style scoped lang="scss">

@@ -16,18 +16,21 @@
 
     h2 {
         display: flex;
-        align-items: center;
         gap: var(--space-3);
+        align-items: center;
 
         margin: 0 0 10px;
-        color: $content6;
 
         font-size: var(--font-size-sm);
         font-weight: 650;
-        letter-spacing: 0.04em;
+        color: $content6;
         text-transform: uppercase;
+        letter-spacing: 0.04em;
 
-        svg { width: 15px; height: 15px; }
+        svg { 
+            width: 15px; 
+            height: 15px; 
+        }
     }
 
     ul {
@@ -44,18 +47,19 @@
     li {
         display: flex;
         flex-wrap: wrap;
-        align-items: baseline;
         gap: var(--space-2) 10px;
-        color: $content7;
+        align-items: baseline;
 
         font-size: var(--font-size-sm);
+        color: $content7;
     }
 
     button {
+        cursor: pointer;
 
         display: flex;
-        align-items: center;
         gap: 5px;
+        align-items: center;
 
         /*
          * A REAL TARGET, not a text run. At `padding: 0` these rows were ~18px
@@ -66,30 +70,39 @@
          */
         width: 100%;
         min-height: 32px;
+        margin-inline: calc(-1 * var(--space-4));
         padding: var(--space-3) var(--space-4);
         border: 0;
         border-radius: var(--radius-sm);
 
-        background: none;
-        color: $content5;
-
         font-family: inherit;
         font-size: var(--font-size-sm);
         font-weight: 600;
+        color: $content5;
         text-align: left;
-        cursor: pointer;
-        margin-inline: calc(-1 * var(--space-4));
 
-        svg { width: 14px; height: 14px; }
+        background: none;
+
+        svg {
+            width: 14px;
+            height: 14px;
+        }
 
         .is-hard { color: $error700; }
         .is-soft { color: $warning700; }
 
         @include hover() {
-            &:hover { background: $surface2; color: $primary700; text-decoration: underline; }
+            &:hover {
+                color: $primary700;
+                text-decoration: underline;
+                background: $surface2;
+            }
         }
 
-        &:focus-visible { outline: 2px solid $primary400; outline-offset: var(--space-1); }
+        &:focus-visible {
+            outline: 2px solid $primary400;
+            outline-offset: var(--space-1);
+        }
 
         // Thumb-reached below 700px, where the side column goes static and these
         // rows sit in the page flow.

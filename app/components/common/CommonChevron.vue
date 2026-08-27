@@ -1,5 +1,5 @@
 <template>
-    <common-button
+    <CommonButton
         :icon="right ? 'material-symbols:chevron-right' : 'material-symbols:chevron-left'"
         icon-width="30px"
         type="transparent"
@@ -14,11 +14,7 @@ defineProps({
     right: Boolean,
 });
 
-defineEmits({
-    click(e: MouseEvent) {
-        return true;
-    },
-});
+defineEmits<{ click: [e: MouseEvent] }>();
 </script>
 
 <style scoped lang="scss">
