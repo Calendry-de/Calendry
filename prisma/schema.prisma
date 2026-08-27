@@ -277,6 +277,7 @@ model Tenant {
   roles                 Role[]
   groups                Group[]
   groupTerms            GroupTerm[]
+  groupAvailability     GroupTermAvailability[]
   memberships           Membership[]
   personRoles           PersonRole[]
   rooms                 Room[]
@@ -599,6 +600,7 @@ model Group {
   offeringGroups OfferingGroup[]
   sessionGroups  SessionGroup[]
   terms          GroupTerm[]
+  availability   GroupTermAvailability[]
 
   ancestorClosures   GroupClosure[] @relation("ClosureAncestor")
   descendantClosures GroupClosure[] @relation("ClosureDescendant")
@@ -847,6 +849,7 @@ model Term {
   sessions             Session[]
   solverRuns           SolverRun[]
   groups               GroupTerm[]
+  groupAvailability    GroupTermAvailability[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -882,6 +885,56 @@ model GroupTerm {
   @@index([termId])
   @@index([tenantId])
   @@map("group_term")
+}
+
+/// When a Group is available WITHIN one Term — the cohort that runs only the
+/// first six weeks.
+///
+/// AN ABSENT ROW MEANS THE WHOLE TERM. Fail-open, matching `GroupTerm`'s choice
+/// for the same reason: scoping is opt-in, so an existing Group keeps working
+/// and a new one is schedulable immediately rather than after a second step.
+///
+/// NOT columns on `GroupTerm`, deliberately, and the reason is a trap rather
+/// than taste. That table's row EXISTENCE already means something — and the
+/// opposite kind of thing: no row means "every Term", a row means "only these".
+/// A date range there would make narrowing a Group inside one Term silently
+/// scope it OUT of all the others. It also keeps `GroupTerm` what it is
+/// documented to be, a visibility scope that never reaches the solver, where
+/// this table exists precisely in order to reach it.
+///
+/// ONE WINDOW PER (GROUP, TERM), by primary key, so a second is unrepresentable
+/// rather than rejected — the same construction as `TenantDisplaySettings`
+/// being keyed by `tenantId` alone. The wire could carry several disjoint
+/// windows; this is a narrowing of what the tenant can SAY, not of what the
+/// solver can honour.
+///
+/// STORED POSITIVE, SENT NEGATIVE. These are the dates the Group IS available;
+/// `assembleSolverInput` inverts them into the complementary week indices as
+/// `Group.blackouts`, because the wire has one convention for absence shared
+/// with `Person.blackouts`. The inversion happens once, at assembly.
+model GroupTermAvailability {
+  groupId  String @map("group_id")
+  termId   String @map("term_id")
+  tenantId String @map("tenant_id")
+
+  /// Both nullable, at least one required (DB CHECK). One-sided is a real
+  /// request — "joins in week 5, runs to the end" — and making the caller
+  /// restate the Term's own boundary would store a second copy of it that goes
+  /// stale when the Term moves.
+  availableFrom DateTime? @map("available_from") @db.Date
+  availableTo   DateTime? @map("available_to") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  term   Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, termId])
+  @@index([termId])
+  @@index([tenantId])
+  @@map("group_term_availability")
 }
 
 /// Holidays, break weeks and exam periods as structured data.

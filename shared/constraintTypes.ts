@@ -21,9 +21,12 @@ export const STRUCTURAL_CONSTRAINT_TYPES = [
 export type StructuralConstraintType = (typeof STRUCTURAL_CONSTRAINT_TYPES)[number];
 
 /**
- * Types owned by the solver service (TAXONOMY.md §7), which does not exist yet.
- * Listed so the boundary is explicit and a missing check is visibly deferred
- * rather than forgotten.
+ * Types owned by the solver service (TAXONOMY.md §7) — evaluated at generation
+ * time rather than by this app on every manual edit.
+ *
+ * Listed so the boundary is explicit and a missing app-side check is visibly
+ * deferred rather than forgotten. The comment here used to say the solver "does
+ * not exist yet", which stopped being true a long time before it was corrected.
  */
 export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'exact_frequency_per_offering',
@@ -38,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'group_veto',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -111,7 +115,8 @@ export type WireConstraintField =
     | 'minimizeExamWeek'
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
-    | 'personPreferenceFit';
+    | 'personPreferenceFit'
+    | 'groupVeto';
 
 export interface ConstraintTypeDef {
     key: string;
@@ -233,6 +238,29 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         label: 'Lecturer unavailability',
         description: 'Days or blocks an individual has blocked out.',
         evaluator: 'solver',
+        severity: 'HARD',
+        params: [],
+    },
+    {
+        key: 'group_veto',
+        wireField: 'groupVeto',
+        label: 'Honour group availability windows',
+        description:
+            'A group is only scheduled inside the dates it is available in a term — '
+            + 'for a cohort that runs the first half of a term, or joins late. '
+            + 'Groups with no window set are available all term.',
+        evaluator: 'solver',
+        /*
+         * Same architecture as `lecturer_veto`, which this is a twin of one
+         * entity across: the WINDOWS live on the Group
+         * (`group_term_availability`) and this row is the tenant-level switch.
+         * Hence `params: []` — there is nothing to configure that is not either
+         * enablement or somebody's own stated window.
+         *
+         * HARD, like its twin: an absent cohort cannot attend, so a Session
+         * placed outside its window is not an expensive choice but a wrong one.
+         * A tenant who wants "prefer to avoid" wants a different, soft rule.
+         */
         severity: 'HARD',
         params: [],
     },

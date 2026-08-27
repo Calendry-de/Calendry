@@ -4,6 +4,31 @@
         :back-to="`/manage/${entity.key}`"
         :title="title"
     >
+        <!--
+            THE SAME ACTION THE LIST HEADER CARRIES, kept on the detail screen so
+            entering a run of records does not round-trip through the list.
+
+            Creating lands you HERE — `new.vue` navigates to the row it just made
+            — so without this the loop is: back to the list, New, fill, create,
+            back to the list. Two navigations per record whose only purpose is to
+            reach a button that was already on screen a moment ago.
+
+            Same conditions as the list's copy, read from the same registry entry:
+            `hideCreateAction` still suppresses it for the constraint catalogue,
+            where "New" would frame a fixed set of switches as a collection you
+            populate.
+        -->
+        <template
+            v-if="canCreate && !entity.hideCreateAction"
+            #actions
+        >
+            <CommonButton
+                icon="material-symbols:add"
+                :to="`/manage/${entity.key}/new`"
+                type="secondary"
+            >New {{ entity.label.toLowerCase() }}</CommonButton>
+        </template>
+
         <component
             :is="bespoke ?? ManageEntityForm"
             v-model:draft="form.draft.value"
@@ -56,7 +81,7 @@ const route = useRoute();
 const entity = findManageEntity(route.params.entity as string)!;
 const id = route.params.id as string;
 
-const { canUpdate, canDelete } = useEntityPermissions(entity);
+const { canCreate, canUpdate, canDelete } = useEntityPermissions(entity);
 
 const bespoke = resolveDetailComponent(entity.detailComponent);
 

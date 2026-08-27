@@ -24,7 +24,7 @@ import {
  * which weeks a period reclassifies. Re-exported here because several server
  * modules already import them from this file.
  */
-export { isoDate, isoWeekday, mondayOf, weekIndexOf } from '../../shared/academicCalendar';
+export { isoDate, isoWeekday, mondayOf, weekCountOf, weekIndexOf } from '../../shared/academicCalendar';
 
 // ---------------------------------------------------------------------------
 // TimeGrid

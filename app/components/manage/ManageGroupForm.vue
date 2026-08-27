@@ -61,6 +61,18 @@
                     </template>
                 </p>
             </div>
+
+            <!--
+                EDIT MODE ONLY, and not for tidiness: the window is a
+                sub-resource that saves immediately against `/api/groups/{id}/
+                availability`, so on the create page there is no id for it to
+                hang off. Same reason `ManageRelationsPanel` sits out creation.
+            -->
+            <ManageGroupAvailability
+                v-if="mode === 'edit' && form.row.value"
+                :group-id="String(form.row.value.id)"
+                :readonly="readonly"
+            />
         </template>
     </ManageEntityForm>
 </template>
@@ -69,6 +81,7 @@
 import type { useEntityForm } from '~/composables/entityForm';
 import type { EntityRow } from '~/utils/manageRegistry';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
+import ManageGroupAvailability from '~/components/manage/ManageGroupAvailability.vue';
 import { descendantIds, indentedOptions } from '~/utils/groupTree';
 
 /**

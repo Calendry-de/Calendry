@@ -763,6 +763,46 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /**
+     * The create action stays on the DETAIL screen, so entering a run of records
+     * does not round-trip through the list.
+     *
+     * Creating lands you on the row you just made, so without this the loop was:
+     * back to the list, New, fill, create — two navigations per record whose only
+     * purpose was to reach a button that had been on screen a moment earlier.
+     *
+     * Both directions in one test, because "the link is not there" is true of a
+     * page that rendered nothing: the room's own code proves the first page
+     * rendered, and the constraint's own name proves the second did.
+     */
+    it('offers the next record from the detail screen, unless the entity forbids it', async () => {
+        const detail = async (path: string) => fetch(`${BASE}${path}`, {
+            headers: { cookie: cookies.admin! },
+        }).then((res) => res.text())
+            // Rendered body only — the hydration payload carries every registry
+            // key, so a raw match would find the path for any entity at all.
+            .then((html) => html.split('<script type="application/json"')[0] ?? '');
+
+        const room = await detail('/manage/rooms/test-room-private-a');
+
+        expect(room, 'the page did not render, so the link below proves nothing').toContain('A101');
+        expect(room).toContain('href="/manage/rooms/new"');
+
+        /*
+         * `hideCreateAction` still wins. The constraint catalogue is a fixed set
+         * of switches rather than a collection you populate — framing it as one
+         * is how a tenant ended up with types that had no row and were therefore
+         * never evaluated — so the detail screen must not grow the affordance the
+         * list deliberately does without.
+         */
+        const stored = await ownerDb.constraint.findFirstOrThrow({ where: { tenantId: TENANT_A } });
+        const rule = await detail(`/manage/constraints/${stored.id}`);
+
+        expect(rule, 'the constraint page did not render').toContain(stored.name);
+        expect(rule, 'a hideCreateAction entity grew a create button')
+            .not.toContain('href="/manage/constraints/new"');
+    });
+
+    /**
      * The manage sections a role may not read are not there AT ALL — no nav
      * entry, and a direct URL redirects to /manage. Asserted as a REDIRECT
      * rather than as an absent marker: "the page did not contain X" passes just

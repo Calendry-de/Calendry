@@ -60,6 +60,18 @@ yet.
       closed too: the solver's virtual-room capacity-1 bug is fixed in
       `calendry-solver`, and the AccessRole gap that blocked viewer-account
       regression checks is closed — see `create:role`.
+- [x] **Per-person soft preferences — COMPLETE end to end (2026-08-27).** A
+      lecturer states preferred days and blocks; the solver prices them. All
+      seven stages of `per-person-preferences-design.md` are closed, including
+      the evaluator in `calendry-solver` (ADR-0026) and a real-solve
+      verification that took the stated preferences from 7 of 40 placements
+      satisfied to 40 of 40. `scripts/preference-solve-check.ts` re-runs it.
+- [x] **Group availability windows — BUILT (2026-08-27), publish step
+      outstanding.** A cohort can run only part of a Term; the solver honours it
+      as `Group.blackouts` via the new `group_veto` rule (`calendry-proto`
+      v0.8.0, solver ADR-0027). Verified end to end. What is NOT done is
+      outward-facing: the proto tag is unpublished, so see § "Group availability
+      windows" below before deploying.
 - [ ] Import (CSV/Excel)
 - [ ] Export (iCal/Google/Outlook)
 - [ ] Notifications (delivery; audience resolution already exists)
@@ -325,6 +337,31 @@ possible." Every existing soft constraint is tenant-configured and broadly
 scoped (a kind, a rank threshold); a preference belonging to one individual
 Person needs new solver logic reading per-person data, not just a new catalogue
 entry.
+
+## Group availability windows — BUILT 2026-08-27, one step outstanding
+
+`group_term_availability` + the `group_veto` constraint + `Group.blackouts` on
+the wire (proto `v0.8.0`, solver `8d506ce`). A cohort can run the first half of a
+Term. Verified end to end by `scripts/group-availability-check.ts`. Design notes
+live in CLAUDE.md § "Group availability windows"; the solver-side direction
+decision is `calendry-solver` ADR-0027.
+
+**OUTSTANDING, and it blocks nothing else in this repo:** the proto commit is
+pushed nowhere and `v0.8.0` is not published. The tag exists locally on
+`992563f` in `~/Documents/codeing/calendry-proto`; the environment that built
+this had no GitHub credentials. Until it is published:
+
+- `package.json` says `^0.8.0`, which `bun install` cannot resolve — it will pull
+  `0.7.0` and typecheck will fail on `Group.blackouts`. Loud, not silent.
+- `vendor/calendry-solver` is pinned to a commit whose own proto submodule points
+  at an unpublished commit, so `--recursive` clone fails for anyone else.
+- The compose solver image (`ghcr.io/mindcollaps/calendry-solver:latest`) predates
+  `GroupVeto`, so a window set through the UI is stored and sent but not
+  enforced until that image is rebuilt.
+
+Sequence to finish: push proto + tag, publish `v0.8.0`, re-pin the solver's
+submodule to the tag, push the solver, rebuild the solver image, then
+`bun run backfill:constraints -- --all-missing` on every existing tenant.
 
 ## Compactness / "minimize gaps in the day"
 

@@ -199,16 +199,16 @@ async function save() {
 .note {
     max-width: 68ch;
     margin: 0;
-    color: $content7;
 
     font-size: var(--font-size-sm);
     line-height: 1.6;
+    color: $content7;
 }
 
 .note {
     display: flex;
-    align-items: flex-start;
     gap: var(--space-3);
+    align-items: flex-start;
 
     // `.iconify`, not `svg` — `Icon` renders a span, so the old rule matched
     // nothing and the glyph stayed shrinkable inside this flex row.
@@ -225,8 +225,8 @@ async function save() {
     }
 
     &--error {
-        color: $error700;
         font-weight: 600;
+        color: $error700;
     }
 
     &--ok {
@@ -271,9 +271,9 @@ async function save() {
 
     h2 {
         margin: 0;
-        color: $content2;
         font-size: var(--font-size-md);
         font-weight: 680;
+        color: $content2;
     }
 }
 

@@ -220,6 +220,27 @@ SSR", "`<select>` needs `:selected`"). This is the run of instances.
   that had a TimeGrid rendered as "— None —" until hydration corrected it —
   the page stating the opposite of the truth.
 
+## The pattern to copy
+
+First-render state comes from the AWAITED promise, never from a watcher:
+
+```ts
+const asyncData = useAsyncData(key, fetcher);
+
+// Seeds before first render, server-side included.
+await asyncData;
+seed();
+
+// Later client refreshes only.
+watch(() => asyncData.data.value, seed);
+```
+
+In a page, hold the `await` at the top level. In a composable, do NOT — an
+`await` inside detaches it from the Nuxt instance; return the handle and let the
+page await it. Generalisation: anything a watcher seeds is `undefined` at first
+render server-side, so prefer `computed` over a watcher-assigned `ref` whenever
+first render depends on the value.
+
 ---
 
 # Solver: `MinimizeRoomRank` gains `invert` — full record
@@ -785,6 +806,63 @@ omitted the select. Worth knowing generally: **prose inside a `<template>` is
 part of the response body**, and a comment that quotes user-facing strings is a
 comment a test can match.
 
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Two ways to read a schedule, and why the page needs nothing else
+
+`session.read` is the institution's whole timetable. **`session.read_own` is the
+caller's own** — sessions they are attached to, plus sessions assigned to a Group
+they belong to. It is the `member` role provisioning now ships, and the reason it
+could not exist before is worth keeping:
+
+- **`/schedule` used to require SIX permissions** (`session.read`, `term.read`,
+  `time_grid.read`, `group.read`, `room.read`, `person.read`) because it
+  assembled its own reference data from five CRUD endpoints to put names on
+  chips. So the smallest role that could look at a timetable held the authority
+  to query the entire staff directory — and "a lecturer sees their own schedule"
+  was unexpressible. DRAWING and QUERYING were being served by the same
+  endpoints.
+- **`GET /api/schedule/context` separates them.** It returns the frame (every
+  term, every TimeGrid with its breaks) plus names for the rooms, people and
+  groups **derived from the sessions the caller can actually see** — behind the
+  same gate as the schedule itself. The directory endpoints keep their own keys
+  and widen those same lists to the whole institution.
+- **A FILTER EXISTS WHEN IT HAS MORE THAN ONE OPTION — never because of a
+  permission.** Its options come from the schedule the caller can already see, so
+  there is nothing left to gate: the option list IS the boundary. Somebody
+  reading their own timetable across three cohorts gets a Group filter; anybody
+  whose list holds one entry does not, because narrowing to the only value there
+  is changes nothing, and a select offering only its placeholder claims the
+  institution has none. An ACTIVE filter always renders regardless, or a control
+  could vanish while still narrowing the view. Gating these on
+  `group.read`/`room.read`/`person.read` was the first attempt and was wrong in
+  exactly the case the feature was for.
+- **`sessionReadScope()` is the single definition of "visible"**, shared by
+  `/api/sessions` and `/api/schedule/context`. They must agree exactly: a context
+  wider than the session list publishes a name for something the caller cannot
+  read, silently, since nothing on screen would show it.
+- **"My own" walks the group closure UP** (`ancestorGroupIds`). Attendance flows
+  DOWN — a Cohort's lecture is attended by its Seminars (TAXONOMY.md §6) — so
+  "is this session mine" starts from the Groups I am a MEMBER of and asks whether
+  the Session names one of them or an ancestor. `descendantGroupIds` here would
+  show a Cohort member every seminar's private sessions, and looks correct on any
+  flat fixture. Same trap as `violations.ts`; pinned by
+  `tests/schedule-scope.test.ts`.
+- **Query filters compose with the scope, never replace it.** A `read_own` caller
+  passing `personId=<somebody else>` gets the sessions they share, not that
+  person's.
+- **`NavEntry.permission` is now an AND of ORs** (`PermissionRequirement`, the
+  shape the manage relations already used), evaluated by
+  `satisfiesPermissionRequirement`. A bare string is one key, a flat list is ALL,
+  a nested list is ANY. The schedule needs the last of those and a local
+  `.every()` would have been silently false for everybody.
+- **`member` is NOT `is_system` and is NOT auto-assigned.** It is a suggestion a
+  tenant may rename or delete, and granting authority stays a human decision
+  behind `person_access_role.assign` — a CRUD route that granted a role on every
+  insert would be privilege escalation wearing a default's clothes. Existing
+  tenants need it made by hand: `bun run create:role -- --tenant <slug> --key
+  member --name Member --permissions session.read_own`.
+
 ---
 
 # `tenant.read` and `generation.read`: what the navigation exposed
@@ -1035,6 +1113,58 @@ page's own awaited data, and unioning the client-fetched candidates onto it.
   AccessRole — a login that signs in and sees nothing is the most confusing
   possible outcome, and granting is tenant configuration, not password recovery.
 
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Accounts: the login plane, which a tenant only half-owns
+
+`/manage/accounts` ("Logins") issues credentials over HTTP. This REVERSES the
+earlier "only a CLI may mint accounts" stance — deliberately, on request, because
+creating a Person creates no way to sign in and the CLIs answered an existing
+Person with "already exists" and stopped. Reasoning and what replaced the old
+protection: DECISIONS.md § "Accounts in the management area".
+
+- **`accounts` is NOT in `CRUD_RESOURCES` and never will be.** `account` carries
+  no `tenant_id` and no RLS (exception 2), so the generic routes'
+  `where: { tenantId }` matches NOTHING — not everything, nothing, which reads as
+  an empty institution rather than a broken query. Own handlers under
+  `server/api/accounts/`; the gate is still declared in `RESOURCE_PERMISSIONS`
+  (`account.read` / `account.manage`) so the UI can predict it.
+- **Visibility IS the join**, and it substitutes for RLS: an Account is this
+  tenant's iff `account_person` links it to a Person here. Written once, in
+  `accountScope()`; the list query starts from `person` (RLS-scoped) rather than
+  from `account`. A cross-tenant id is 404, never 403.
+- **A tenant may change a credential only while it is the credential's ONLY
+  tenant** (`assertSoleTenant`). Password, email, activation, deletion all behave
+  identically in every institution an Account serves, so permitting them on a
+  shared login would be cross-tenant account takeover wearing administration's
+  clothes. Signing out is the one exception — fully recoverable by its holder.
+- **The mirror rule makes an orphan unrepresentable** (`assertDetachable`):
+  detaching the LAST identity would leave a working password no tenant can see or
+  revoke. So: sole tenant → delete allowed, detach refused; shared → detach
+  allowed, credential ops refused. Exact complements, no escape hatch. Creation
+  therefore REQUIRES a `personId`, and `persons.beforeDelete` refuses to delete a
+  Person who holds a login.
+- **`otherTenantCount` must be computed through
+  `calendry_internal.account_identities()`**, never a join to `person` — inside
+  the tenant transaction that join sees one tenant, so the count would be 0 for
+  everybody and both guards above would silently stop guarding.
+- **An already-registered email is an OFFER, not a wall.** 409 carrying
+  `accountExists: true` (a flag, so no client matches on wording), and
+  `attachExisting: true` links that credential instead. `useEntityForm().errorData`
+  exists for exactly this.
+- **The password is generated in the BROWSER** (`shared/password.ts`, shared floor
+  `PASSWORD_MIN_LENGTH`). The server generates one when none is sent, but the
+  create page navigates away on success, so a server-generated secret would be
+  gone before it could be read.
+- **`--attach` (create:account) and `--create` (reset:password)** are the CLI
+  halves of the same gap: reuse an existing Person / create a missing Account.
+  `--create` switches reset:password to the OWNER connection because it has to
+  read `person`, and says so on stdout. Neither ever upserts; `create:account`
+  reports "nothing to do" and exits 0 when the state already holds.
+- **A new permission needs the 4th deploy step.** `account.read`/`account.manage`
+  are new — `bun run grant:permissions -- --role tenant-admin --all-missing --yes`
+  on every existing tenant, or every tenant-admin 403s on a section they can see.
+
 ---
 
 # Management area (Step 13) — verification detail behind the standing rules
@@ -1083,6 +1213,46 @@ every catalogue rule renders, zero editable toggles, zero weight inputs, no
 deliberately by re-rendering with a disabled checkbox instead of static text
 (fails three of four assertions).
 
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### The management area (Step 13)
+
+`/manage` is one scaffold: three route files render every entity from
+`app/utils/manageRegistry.ts`, which is also the nav source — sidebar,
+index, header, palette can't drift from each other or the entity list.
+
+- **Permission rule, uniform**: no `.read` → hidden entirely; `.read`
+  without write → visible read-only, rendered as **static text, not
+  disabled inputs**; unknown section → 404 (typo distinguishable from
+  permission problem).
+- **Bespoke means one slot** (`detailComponent`/`listComponent`), never a
+  page — shell/header/permissions/save stay shared. Qualifying: GroupTree,
+  TimeGridEditor, ConstraintBuilder, CalendarPeriodEditor. Offering is
+  deliberately NOT bespoke — its complexity is registry data, not
+  different code.
+- **`custom: true`** keeps a field in draft/dirty-tracking/payload with a
+  bespoke control; omitting it drops the field from saves silently.
+- **Relations are PUT-set sub-resources**, saved immediately per change,
+  not part of the entity's Save transaction. `warnAfterWrite` relations
+  return `{ rows, warnings }`; every other relation returns a bare array.
+- **The create action lives on the LIST and the DETAIL screen**, from one
+  registry entry (`canCreate && !hideCreateAction`). Creating navigates to the
+  row it just made, so without the second copy a run of records costs two
+  navigations each to reach a button that was on screen a moment earlier.
+  `secondary` on the detail screen: Save is the primary action there.
+- **The Ctrl+K palette holds no permission logic** — input is the
+  already-filtered nav source.
+- **Overlays claim the keyboard** via `useOverlay()`, following open
+  *state* not the function that opened it.
+- **Structural constraint types** (`RoomDoubleBooking` etc.) are
+  tenant-toggleable at all three layers (app evaluator, solver input,
+  solver's `convert.rs`) — not "always-on" despite some prose elsewhere
+  claiming so.
+
+Verification detail (the `paramField()` divergence, invisible-deprecated-
+types bug, ten-file `vartorgba` styling bug, read-only-path test):
+DECISIONS.md § "Management area (Step 13)".
+
 ---
 
 # Academic calendar periods — why the preview earns its place
@@ -1113,6 +1283,23 @@ zero sessions in weeks 11 and 12, redistributing all 65 into earlier weeks.
 Before this, the same term spread evenly across all 13 weeks including those
 two.
 
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Academic calendar periods
+
+`calendar_period` is a managed resource on the generic scaffold, gated on
+`term.update` (child-of-Term, not a new permission), with one bespoke
+field: a live week-reclassification preview. A period fully outside the
+Term's range is rejected (400); overlapping periods within a Term are
+allowed and unchecked (the EXAM-wins precedence rule needs overlap to have
+meaning). Classification lives once, in `shared/academicCalendar.ts`'s
+`classifyWeeks`, called by both the preview and the solver's input — `EXAM`
+uses "touches the week," `BREAK`/`HOLIDAY` use "covers the entire week," so
+identical dates can classify differently by `kind`. Closed a dead end: no
+tenant could ever write a `calendar_period` row before this, so
+`minimize_exam_week_sessions` reported zero violations while looking
+healthy. DECISIONS.md § "Academic calendar periods".
+
 ---
 
 # Group↔Term scoping — measurement behind the design decision
@@ -1137,6 +1324,29 @@ picker offered every Group regardless of the Offering's Term. The tenant was
 already encoding the Term into the Group's name ("dIT22 S1 4.Semester") for
 lack of anywhere else to put it — the requirement asserting itself through a
 text field.
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Group↔Term scoping, and why the solver filter is reference-derived
+
+`group_term` is **many-to-many**, not `group.term_id` ownership — a leaf
+cohort belongs to one Term, but its parent programme persists across all of
+them and can't be owned by one. Unlinked = visible in every Term
+(fail-open, deliberately, opposite of this codebase's usual instinct).
+Backfill derived from actual usage (`offering_group ∪ session_group`), not
+guessed; ancestors not auto-scoped.
+
+**The solver's Group filter is reference-derived, not scope-derived — the
+load-bearing decision.** Filtering by `group_term` (tenant *configuration*)
+could disagree with what Offerings actually reference, producing an
+internally-inconsistent `SolverInput` the solver can't detect. The sent set
+is the referenced ids' conflict closure (`{g} ∪ ancestors ∪ descendants`),
+closed by construction — pinned by an assembly-time assertion, 600
+randomised hierarchies against an independent oracle, and a falsification
+test. `group_term` is never allowed near solver input — it exists purely
+for picker UX. Scoping a Group out of a Term that still uses it warns
+after the write (`role="status"`, not `alert`) rather than blocking, since
+nothing breaks (reference-derived). DECISIONS.md § "Group↔Term scoping".
 
 ---
 
@@ -1204,6 +1414,16 @@ Verified with a real live solve after publishing `calendry-proto@0.3.0`:
 `minimize_block_usage` correctly avoided the configured blocks — proven
 against a real encode of the new proto message, not just a unit test against
 a plain object cast.
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### `MinimizeBlockUsage`
+
+Replaced `MinimizeFirstBlock`/`MinimizeLastBlock` (booleans baked to fixed
+`SlotFlags` positions, silently wrong when a TimeGrid's day extends) with
+`{ blocks: number[], first: bool, last: bool }` — `calendry-proto@0.4.0`.
+Old fields kept `deprecated` not removed (`buf breaking` forbids removal;
+existing tenant rows still need to render/edit, `type` is `createOnly`).
 
 ---
 
@@ -1335,6 +1555,363 @@ field existed, and it was `Person.preferred` rather than the two column names th
 comment guessed at. Waiting for stage 7 to delete them would have left them wrong
 for however long the solver work took. A stale comment on a schema column is read
 as current by whoever finds it next.
+
+---
+
+# Schedule display standards
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Schedule display standards
+
+`tenant_display_settings` is a **singleton keyed by `tenant_id`** — no surrogate
+`id`, so a second row per tenant is unrepresentable rather than constrained. An
+**absent row means defaults** (`DISPLAY_DEFAULTS` in `shared/sessionColor.ts`);
+provisioning deliberately does not seed one, so "never configured" and
+"configured, unchanged" render identically.
+
+**The gates are `tenant.read` / `tenant.update`, and the READ is deliberately
+wider than the page.** `GET /api/display-settings` accepts `tenant.read` **OR**
+`session.read`, because it has two callers with different purposes: the settings
+page, and the schedule's own colour resolution, whose fetch is TOLERANT. Narrow
+it to `tenant.read` and nobody is denied a page — every lecturer's timetable just
+draws in default colours with nothing on screen to say why. The PAGE and the nav
+entry are `tenant.read` alone. Both keys moved off
+`session.read`/`session_kind.update`, which had put an institution's own settings
+in the navigation of everyone who could see a timetable: DECISIONS.md §
+"`tenant.read` and `generation.read`".
+
+**Colour is RESOLVED, never read off one field.** `resolveSessionColor()` walks
+the tenant's `colorSourceOrder` (default `offering` → `kind`) and returns
+**null** when nothing supplies one — never a fallback accent. The chip previously
+read `kind?.color ?? primary500`, so every session without a kind colour claimed
+the colour reserved for "where a session may land". `null` at any level means
+INHERIT, which is why every colour column is nullable.
+
+**Online delivery stays a virtual Room** (TAXONOMY.md). `isOnlineSession()` asks
+the rooms; the setting decides only whether that is drawn. Marked with a dashed
+edge, so it survives greyscale and an unset colour — same rule as violations.
+
+---
+
+# Grid geometry
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Grid geometry is minute-true and rows grow
+
+Both week grids (`ScheduleGrid`, `ScheduleReviewGrid`) share `useGridGeometry` +
+`clusterSlots`. Three properties, each of which replaced a bug:
+
+- **Rows are `minmax(<true minutes × perMinute>px, auto)`.** The minimum keeps
+  the picture proportional; `auto` is what lets a crowded block grow instead of
+  overflowing. **A slot must stay IN FLOW** — it was briefly `position:
+  absolute`, and an out-of-flow slot contributes nothing to its row's height, so
+  a block that could not fit its sessions silently overflowed.
+- **A block's time label shares its grid ROW with that block's cells.** Alignment
+  is structural, not computed, so the gutter cannot drift from the columns. Two
+  separate bugs came from it not being so.
+- **Placement inside a row is px at a CONSTANT scale**, never a percentage of the
+  row. A percentage stretched with the row, so a minute was worth more pixels in
+  a busy row than a quiet one, and a lone session rendered as tall as the crowded
+  day beside it. Slots also need `align-self: start` or the grid stretches them
+  — **except a slot spanning several rows whole, which needs `stretch`**. Its
+  grid area also contains the row gaps between those rows and any height a row
+  gained from another column's crowding; neither is a minute, so `min-height`
+  always falls short and a two-block session drew as ending early. `bandWithin`
+  sets this per slot; only the browser can measure it.
+
+Past three abreast a cluster stacks as one-line chips rather than fanning into
+slivers, and **nothing is ever hidden** — a collapse-past-three rule turned 17 of
+20 slots in a real week into "+N more" buttons. **A crowded cluster emits one
+slot per START BLOCK, each confined to that block's row**, and every member of
+such a cluster goes compact even where its own block is quiet (a fanned member
+spanning rows would be drawn over a compact stack). One slot for the whole
+cluster put members at their list index rather than their time, and inflated
+every row it spanned — a grid item whose content exceeds its spanned `auto`
+tracks makes the browser distribute the excess across all of them, so a
+30-minute break drew as tall as a 45-minute block and chips landed on the break
+band. Safe only because compact mode already gives up drawing duration, so there
+is no overlap left to avoid. Shared rows cost per-day drift:
+a day whose own breaks move its blocks is NAMED (`dayDiffers` → "own breaks")
+rather than drawn, and every chip and cell label resolves its own day's clock
+time via `blockTime(grid, index, dayOfWeek)`. **Below a 30-minute block the
+gutter labels on the hour** — a 15-minute grid is 44 rows and 44 stacked times is
+not a time column; unlabelled rows keep their cell and their accessible name.
+
+---
+
+# The schedule toolbar
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### The schedule toolbar's height is invariant, and that is load-bearing
+
+`.bar` is a **grid with two named rows** (`'scope scope'` / `'view actions'`),
+not a wrapping flex row — one row per group, so each row is sized by one group
+and nothing else. Verified 146px at 1440/1280/1024 and 303px at 390 across
+idle, live-solver and long-tenant-name states. One row does not fit: scope
+621 + view 231 + actions 507 + gaps is 1407px of a 1408px row, so every
+variable in it decided the bar's height.
+
+Two things depend on that invariance and will break it if undone:
+
+- **The solver's tall states are anchored panels** (`position: absolute` on
+  `.solver_advanced`/`.solver_panel`/`.solver_error`, anchored to `.bar`, which
+  carries `position: relative` + `z-index: 2` so they clear the sticky side
+  column). In flow the bar went 142px → **321px** and the actions group's
+  bottom alignment moved "Add event"/"Proposals" **190px down the page** for
+  the duration of a run. Only the one-line status stays in the bar.
+- **`align-items: end`** is what puts buttons on the selects' optical line
+  rather than the labels' (measured 16px off before). It was `flex-start`
+  precisely because a tall in-flow solver dragged every select down to meet it;
+  it is safe only while nothing in that row can grow past a control's height.
+
+**`.bar_select` is capped** (`max-width: 220px` + `text-overflow: ellipsis`,
+and `max-width: 100%` under `mobileOnly` where 220px is half the row). A
+`<select>` sizes itself to its widest option and every option here is tenant
+free text — uncapped, realistic German names took Term 132px → 367px and the
+bar to three rows. The four tenant-data selects carry a `:title` so a truncated
+value stays recoverable by mouse.
+
+---
+
+# TimeGrid breaks
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### TimeGrid breaks
+
+`time_grid.break_minutes` is the default gap; `time_grid_break` adds sparse
+`{afterBlockIndex, durationMinutes, label, dayOfWeek}` overrides
+(`dayOfWeek NULL` = every day, a day-specific row wins at that position
+only). `shared/timeGrid.ts`'s `blockTime()`/`blockOfMinute()` are the
+single definition of block boundaries — disagreeing would mean the
+schedule renders one time while `reference_slot` believes another. **Breaks
+never reach the solver** (verified: `toWireTimeGrid()` omits them, test
+asserts the omission) — the wire carries block indices only.
+`fitsGrid()`'s criterion is the index space (`blocksPerDay × activeDays`),
+deliberately ignoring breaks; the same guard blocks narrowing the grid
+under an existing Session and gates the move route. Orphaned breaks are
+deleted+reported; orphaned Sessions refuse the edit (DATA vs.
+CONFIGURATION asymmetry).
+
+**OPEN QUESTION** — a Session whose duration spans a break: undecided,
+deliberately, see **[BACKLOG.md](BACKLOG.md) § Undecided**. One branch
+would overturn "breaks never cross the wire."
+
+---
+
+# Group availability windows
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Group availability windows
+
+`group_term_availability` answers "when inside this Term is this Group around?"
+— a block-placement cohort, a late intake. **One window per (Group, Term), by
+primary key**, so a second is unrepresentable; **absent row = the whole Term**,
+fail-open like `group_term` and for the same reason. At least one bound is
+required (DB CHECK): a boundless row says exactly what an absent row says.
+
+- **Stored POSITIVE, sent NEGATIVE.** The tenant records availability; the wire
+  has one convention for absence (`Unavailability`, shared with
+  `Person.blackouts`). `blackedOutWeeks()` in `shared/academicCalendar.ts` is the
+  only place that flips, and it is called by both the assembly and the editor's
+  preview so they cannot disagree. Inverting it fails 9 of 11 assertions in
+  `tests/group-availability-weeks.test.ts` — the polarity bug is otherwise
+  silent, since every Session still gets placed either way.
+- **Week granularity rounds toward AVAILABLE.** `Unavailability.weeks` indexes
+  the Term's weeks, so a window ending mid-week frees that whole week. The rule
+  is HARD; rounding the other way would refuse placements that are fine. Same
+  "touches the week" reading `EXAM` periods use.
+- **`group_veto` enforces it, and seeds DISABLED** like its twin `lecturer_veto`
+  — windows are Group data, enablement is tenant policy. So the editor says so
+  where the dates are entered rather than leaving a tenant to wonder; without
+  that this would be the third "recorded, but is it used?" surface here.
+- **The solver's direction is not symmetric.** A window binds the Group and its
+  DESCENDANTS, so the query walks UP (`expand_ancestry`). A leaf's absence must
+  not veto its parent's lecture, which the parent's other children still attend.
+  Solver ADR-0027; all three candidate closures agree on a flat hierarchy.
+- Verified end to end by `scripts/group-availability-check.ts`: rule off, 7 of
+  one cohort's 20 placements sat in blocked weeks; rule on, 0 — while 23
+  placements of other groups still used those weeks, so the rule is narrow
+  rather than globally restrictive.
+- **A new constraint type needs `bun run backfill:constraints -- --all-missing`**
+  on every existing tenant, or nobody can enable it. Already the mechanism for
+  this; `group_veto` is what it currently reports as missing.
+
+---
+
+# Solver & proto: operational detail
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Solver integration (calendry-solver)
+
+Three repos: `calendry` (this app, owns Postgres) ↔ `calendry-solver` (Rust
+gRPC optimizer, **stateless**, vendored at `vendor/calendry-solver` — see
+"What this project is" above) ↔ `calendry-proto` (shared schema; consumed
+*here* as the npm package `@mindcollaps/calendry-proto`, **GitHub Packages
+not npmjs.org**; consumed by the Rust side as its own nested submodule
+inside `vendor/calendry-solver`, not checked out separately in this repo).
+Solver is
+functionally complete: 14 constraint types, LNS + simulated annealing,
+`StartRun`/`GetStatus`/`CancelRun`. 27,000-Session instance solves in ~349ms.
+
+**The solver never touches Postgres** — this app assembles a complete
+`SolverInput` and sends it; every gap in the snapshot is a wrong answer the
+solver has no way to detect.
+
+**Per-person preferences are LIVE end to end** (solver `41f6227`, 2026-08-27).
+`assembleSolverInput` populates `Person.preferred` from `person_preference`
+(proto `0.7.0`), narrowed to the solved Term's grid — the write boundary
+validates against the tenant's WIDEST grid, so a stored block can name a slot one
+Term has not got. A NULL `weight_multiplier` is sent as ABSENT, never 0: the wire
+field is `optional` because proto3's zero is itself a meaningful multiplier.
+`person_preference_fit` now carries `wireField: 'personPreferenceFit'`, and that
+line had to land in the SAME change as the solver's evaluator: before it, the
+solver answered the variant with `UNIMPLEMENTED`, which fails the whole StartRun
+rather than skipping the rule — strictly worse than not crossing at all. The
+assembly report counts the inert case (`placementsWithNoSignal ==
+placementsCounted`) for the same reason `lecturer_veto` went unnoticed: nothing
+counted it. Design record and staging: `per-person-preferences-design.md`; what
+the last three stages cost, including two false negatives that each looked like a
+clean answer: DECISIONS.md § "Per-person preferences: stages 5–7".
+
+**The solver charges `1 - fit`, and `roles` must stay EMPTY.** Two departures from
+this repo's design record, both in solver ADR-0026. The cost is the unmet
+fraction, not the fit, because a negative soft term would break the
+`hard_penalty` bound, the convergence check and `ruin_worst`'s ordering at once;
+and it is the **mean over a placement's counted lecturers of `multiplier × unmet`**
+— not the sum, and not `mean(multiplier) × mean(unmet)`, which is the form a
+reader writes from skimming and which a bound check cannot catch. A non-empty
+`roles` is REFUSED (`PreferenceRolesUnsupported`), so `buildVariant` must keep
+returning `{}` for this key: empty means "lecturers only", and widening the
+counted set would let a 200-student cohort's aggregate preference outweigh the
+person teaching.
+
+**`MinimizeRoomRank` has a direction parameter, `invert`** (`calendry-proto@0.5.0`):
+`false` (default) penalizes `rank >= threshold` (spare best rooms); `true`
+penalizes `rank <= threshold` (prefer them). New tenants seed `invert: true`
+(direction, not enablement — `enabledByDefault` stays `false`). Full
+reasoning: DECISIONS.md § "`MinimizeRoomRank` gains `invert`".
+
+**Installing the proto package**: credential in `~/.bunfig.toml`/gitignored
+`./bunfig.toml`, never committed (`bun run check:registry-auth` diagnoses
+offline). Three things producing the same opaque 401: a bunfig scope token
+needs that entry's own `url`; an `.npmrc` auth line overrides a bunfig
+token; GitHub Packages needs a **classic** PAT (`ghp_`), rejects
+fine-grained. Scope entries resolve nearest-first, wholesale not merged.
+
+**Warn-and-allow parity**: a `SUCCEEDED` run with residual hard violations
+is still an applicable Generation (same `constraint_violation` mechanism as
+manual edits) — not discarded, not auto-applied. `GenerationStatus.INFEASIBLE`
+is consequently unused for solver output by design. DECISIONS.md § "Solver:
+warn-and-allow".
+
+**Determinism: only the move budget is reproducible.** `(input, seed, move
+budget)` → byte-identical output, but only when termination was
+`move_budget` or `converged` — `time_budget` is not reproducible.
+`termination_reason` says which. `maxMoves` default **30,000,000** (was
+50,000, stopped ~21% short of convergence); wall-clock cap **30s** (was
+10s, keeps move-budget the binding one). `StartRunResponse.seed` echoes the
+seed used. Measurement: DECISIONS.md § "Solver: determinism & `maxMoves`".
+
+**Idempotency key is `<inputHash>:<seed>`** — SHA-256 of the *encoded*
+`SolverInput` (not JSON), so a repeat start against unchanged data returns
+the same run. Budget is NOT part of the key — restart the solver between
+measurements at different budgets, or you'll replay the first run.
+
+**Staged plan**: all seven stages complete, changelog in
+**[BACKLOG.md](BACKLOG.md) § Staged plan**. What's still live:
+
+- **Stage 2**: concurrency enforced by a partial unique index (not
+  `findFirst`); a failed StartRun resolves its own row to `FAILED`; a poll
+  failure is NOT a run failure (`stale: true`, status untouched). Full
+  verification: DECISIONS.md § "Solver: Stage 2 established".
+- **Stage 4 polling**: background poller owns correctness, on-demand owns
+  latency (both call `pollSolverRun()`). Results captured the moment a run
+  goes terminal — the solver's registry is in-memory, no persistence.
+  `NOT_FOUND` (gRPC 5) = solver lost the run, terminal, row → `FAILED`.
+  Anything else including `UNAVAILABLE` = transient, row untouched. Claim
+  is a **lease** (`FOR UPDATE SKIP LOCKED` + a per-tenant advisory xact
+  lock), not a session lock — reasoning: DECISIONS.md § "Solver: Stage 4
+  polling". During a solver outage, effective retry interval is the 30s
+  claim lease, not adaptive cadence.
+- **Virtual room capacity-1, RESOLVED cross-repo** (`calendry-solver`
+  `99b41e3`). `capacity` still gates eligibility (no `concurrentCapacity`
+  yet). The fix had been accidentally enforcing `MaxOnlineShare` — expect
+  more `MaxOnlineShare` violations post-fix on heavy-online tenants (warn-
+  and-allow working as designed). DECISIONS.md + BACKLOG.md § "Needs a
+  decision, not a design pass".
+- **`violations.ts`: membership flows DOWN, conflict flows BOTH WAYS.**
+  `attendeeSets` uses `descendantGroupIds`, `conflictSets` uses
+  `conflictGroupIds` — swapping either reintroduces an under- or
+  over-reporting bug. DECISIONS.md § "`violations.ts`".
+
+**Tracked wire-format gaps** (all in **[BACKLOG.md](BACKLOG.md) § Solver**,
+each reports rather than narrows silently — don't "fix" by picking a
+value): equipment quantity, multi-room Sessions, the solver's unbounded run
+registry, violations naming solver-invented Sessions with no join key.
+
+**Operator CLIs** — `create:account`/`create:role` for an existing tenant:
+
+    bun run create:account -- --tenant test --email x@y.edu --name "…" [--role tenant-admin]
+    bun run create:role -- --tenant test --key viewer --name "…" --permissions a.read,b.read [--dry-run]
+
+Owner connection, audited to stdout. Existing email REUSED not duplicated;
+duplicates fail loudly, never upserted; **no `--all`** for `create:role`
+(compose from audited grants, don't mint an unaudited superuser role). Why
+these exist: DECISIONS.md § "Accounts & roles".
+
+Test accounts: `verify@calendry.local` (HTTP verification,
+`VERIFY_ACCOUNT_PASSWORD` in `.env`); `vic@demo.local` /
+`viewer6b@calendry.local` / `cviewer@calendry.local` hold `viewer` (six
+reads, no `solver.trigger`/`generation.apply`) — use for asserting an
+affordance is ABSENT, and also assert the page rendered. A rebuilt dev DB
+has one role/account — recreate with one `create:role` + `create:account`
+per test account.
+
+**Constraint shape validated at the write boundary** — severity (must
+match catalogue HARD/SOFT) and weight (`>= 0`, no ceiling) enforced via
+`validateConstraintShape()` on CREATE and UPDATE (`beforeUpdate` validates
+only touched fields, deliberately — merged-row validation would make a bad
+row permanently uneditable). DB CHECK backs the weight floor. Why it
+mattered: negative weight erodes `hard_penalty`'s margin for every rule in
+the tenant. `params` still accepts arbitrary JSON — BACKLOG.md § Undecided.
+
+**Step 14 — AccessRole management is BUILT** (`RESOURCES['access-roles']`,
+`RELATIONS['persons/access-roles']`, `ManageAccessRoleForm`). The grants are
+`childKeys`, not a relation: there is no `/api/permissions` and must not be,
+because the editor renders from `shared/permissions.ts` so an unseeded
+permission is REPORTED rather than silently missing from a list that looks
+complete.
+
+**Auth**: `must_change_password` built (operator `reset:password` — revokes
+sessions, sets flag, audits; login blocks until `POST
+/api/auth/change-password`), gaps in BACKLOG.md § "Password policy gaps".
+Federation-level permissions out of scope (TAXONOMY.md §9.4). Session
+cleanup done — `sessionSweeper.ts` deletes `auth_session` past 30 days,
+needs no RLS exception (none exists) and no claim machinery (idempotent
+DELETE).
+
+---
+
+# Design tooling
+
+_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+
+### Design work
+
+- Use the **`design-taste-frontend`** skill (`.claude/skills/`, source
+  `Leonxlnx/taste-skill`) for visual/UI work; pair with **`frontend-design`**
+  (`anthropics/skills`, fetch via `skills use ... --skill frontend-design`)
+  for greenfield/reshaped UI — distinctive choices over the three
+  AI-generated-design defaults (warm-cream serif / near-black-accent /
+  broadsheet-hairline).
+- Tokens (`app/scss/tokens-root.scss` / `tokens.scss`) remain the
+  implementation layer regardless — see design-tokens rule below.
 
 ---
 

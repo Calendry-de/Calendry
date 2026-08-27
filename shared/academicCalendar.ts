@@ -166,3 +166,60 @@ export function classifyWeeks(
 
     return weeks;
 }
+
+/** A Group's availability window inside one Term. `null` on a side = open. */
+export interface AvailabilityWindow {
+    availableFrom: Date | null;
+    availableTo: Date | null;
+}
+
+/**
+ * The week indices a Group is NOT available — the complement of its window.
+ *
+ * THE ONE PLACE THE POLARITY FLIPS. A tenant states when a Group *is* around,
+ * because that is the question an academic calendar answers ("this cohort runs
+ * weeks 1-6"). The wire has exactly one way to say absence, `Unavailability`,
+ * shared with `Person.blackouts`. Inverting in a single named function keeps
+ * that flip auditable instead of leaving it inline at the assembly site, where a
+ * future reader would have to infer the direction from a `!`.
+ *
+ * Week-granular, not day-granular, and that is a real narrowing worth stating:
+ * `Unavailability.weeks` is an index into the Term's calendar weeks, so a window
+ * ending mid-week frees the WHOLE of that week. Rounding the other way — dropping
+ * a week the Group is present for part of — would refuse placements that are
+ * legitimately fine, and this rule is HARD. So a partially-covered week counts as
+ * available, deliberately: the same "touches the week" reading `EXAM` periods
+ * use, for the same reason.
+ *
+ * A window with both sides open returns nothing, matching an absent row. The
+ * database forbids that state (`group_term_availability_needs_a_bound`) so it
+ * cannot arrive from storage, but the function is total rather than throwing —
+ * "no constraint" is the honest answer to "no bounds", and it is what an absent
+ * row already means.
+ */
+export function blackedOutWeeks(
+    termStart: Date,
+    termEnd: Date,
+    window: AvailabilityWindow,
+): number[] {
+    const { availableFrom, availableTo } = window;
+
+    if (!availableFrom && !availableTo) {
+        return [];
+    }
+
+    const total = weekCountOf(termStart, termEnd);
+    // A partially-covered week is AVAILABLE, so the available span is widened to
+    // whole weeks before being inverted.
+    const firstFree = availableFrom ? weekIndexOf(termStart, availableFrom) : 0;
+    const lastFree = availableTo ? weekIndexOf(termStart, availableTo) : total - 1;
+    const out: number[] = [];
+
+    for (let index = 0; index < total; index += 1) {
+        if (index < firstFree || index > lastFree) {
+            out.push(index);
+        }
+    }
+
+    return out;
+}

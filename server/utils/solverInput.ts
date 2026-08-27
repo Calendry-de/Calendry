@@ -15,6 +15,7 @@ import {
 } from './solverCalendar';
 import { multiRoomSessionIds, toWireSession } from './solverSessions';
 import { HEAVY_VETO_RATIO, blockedSlotSummary } from '../../shared/availability';
+import { blackedOutWeeks } from '../../shared/academicCalendar';
 import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
@@ -106,6 +107,22 @@ export interface AssemblyReport {
      * looks wrong is easier to explain with the number in hand.
      */
     groupsOmitted: number;
+    /**
+     * Group availability windows, and whether any of them narrows anything.
+     *
+     * Two numbers for the same reason the preference block below has four: a
+     * tenant can set a window, see it saved, enable `group_veto`, and have it
+     * change nothing — because the range happens to cover the whole Term, or
+     * because week granularity rounded it away. That reads identically to a
+     * feature that does not work. `windowsCoveringWholeTerm == windowsSent`
+     * means every window is inert.
+     */
+    groupAvailability: {
+        /** Groups being sent that carry a window for this Term. */
+        windowsSent: number;
+        /** Of those, windows that black out no week at all. */
+        windowsCoveringWholeTerm: number;
+    };
     /**
      * What the preference rule has to work with, and whether it has anything.
      *
@@ -389,7 +406,17 @@ export async function assembleSolverInput(
                 where: { tenantId: options.tenantId, isActive: true },
                 include: { personRoles: { include: { role: true } }, memberships: true },
             }),
-            tx.group.findMany({ where: { tenantId: options.tenantId } }),
+            tx.group.findMany({
+                where: { tenantId: options.tenantId },
+                /*
+                 * The Term-scoped availability window, if the tenant set one.
+                 * Filtered to THIS Term here rather than at use: a window is a
+                 * range of dates inside one Term, and week indices on the wire
+                 * are indices into THAT Term's calendar — the same ambiguity
+                 * `person_unavailability.term_id` exists to remove.
+                 */
+                include: { availability: { where: { termId: options.termId } } },
+            }),
             tx.offering.findMany({
                 where: { tenantId: options.tenantId, termId: term.id, isActive: true },
                 include: {
@@ -582,25 +609,64 @@ export async function assembleSolverInput(
          * fact gets one representation.
          *
          * The rule this feeds is NOT yet sent: the catalogue entry still has no
-         * `wireField`, so `person_preference_fit` is reported as unable to cross
-         * and the solver never evaluates anything. Populating the Person field
-         * ahead of that is safe and deliberate — an unread field costs a few
-         * bytes, while flipping `wireField` before the solver can evaluate the
-         * type would turn a reported skip into `Status::unimplemented`, failing
-         * every solve for a tenant that enabled it.
+         * `wireField` — which it now DOES, since `calendry-solver` 41f6227 added
+         * the evaluator and the catalogue entry was flipped in the same change.
+         * The ordering mattered and is worth keeping: before the evaluator
+         * existed, naming the field would have turned a reported skip into
+         * `Status::unimplemented`, failing every solve for a tenant that
+         * enabled the rule rather than merely doing nothing.
          */
         preferred: narrowedPreferences.get(person.id),
     }));
 
-    const groups = sentGroupRows.map((group) => ({
-        id: group.id,
-        parentId: group.parentGroupId ?? '',
-        name: group.name,
-        size: group.expectedSize ?? 0,
-        // group_closure is deliberately NOT transmitted: the solver derives the
-        // ancestor/descendant closure from parent_id, and shipping ours would
-        // create a second source of truth that can drift undetectably.
-    }));
+    let groupsWithAvailabilityWindow = 0;
+    let groupWindowsCoveringWholeTerm = 0;
+
+    const groups = sentGroupRows.map((group) => {
+        /*
+         * POSITIVE IN, NEGATIVE OUT. The tenant stores when the Group IS
+         * available; the wire has one convention for absence, shared with
+         * `Person.blackouts`. `blackedOutWeeks` owns the flip — see its comment
+         * for why a partially-covered week counts as available.
+         */
+        const window = group.availability[0];
+        const weeks = window
+            ? blackedOutWeeks(term.startDate, term.endDate, window)
+            : [];
+
+        if (window) {
+            groupsWithAvailabilityWindow += 1;
+
+            if (weeks.length === 0) {
+                // A window that blacks out nothing. Legitimate — a tenant may
+                // set a range covering the Term — and worth counting, because
+                // "configured" and "configured to no effect" are otherwise the
+                // same absence of violations. Same reasoning as
+                // `placementsWithNoSignal` for preferences.
+                groupWindowsCoveringWholeTerm += 1;
+            }
+        }
+
+        return {
+            id: group.id,
+            parentId: group.parentGroupId ?? '',
+            name: group.name,
+            size: group.expectedSize ?? 0,
+            /*
+             * ALWAYS AN ARRAY, never omitted. ts-proto iterates a repeated field
+             * without a presence check, so an absent `blackouts` throws
+             * `not iterable` inside `hashInput` — before any request is made,
+             * surfacing as the whole assembly failing rather than as one bad
+             * Group. Cost the same hour on `PersonPreferenceFit.roles`.
+             */
+            blackouts: weeks.length
+                ? [{ days: [], blocks: [], weeks, reason: 'group availability window' }]
+                : [],
+            // group_closure is deliberately NOT transmitted: the solver derives the
+            // ancestor/descendant closure from parent_id, and shipping ours would
+            // create a second source of truth that can drift undetectably.
+        };
+    });
 
     let droppedEquipmentQuantities = 0;
     const offeringsWithNoDerivableCapacity: { id: string; title: string }[] = [];
@@ -973,6 +1039,10 @@ export async function assembleSolverInput(
             skippedConstraints,
             severityMismatches,
             groupsOmitted: groupRows.length - sentGroupRows.length,
+            groupAvailability: {
+                windowsSent: groupsWithAvailabilityWindow,
+                windowsCoveringWholeTerm: groupWindowsCoveringWholeTerm,
+            },
             preferences: {
                 lecturersWithPreference: personRows.filter((person) => (
                     narrowedPreferences.has(person.id)

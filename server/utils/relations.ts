@@ -206,6 +206,48 @@ export const RELATIONS: Record<string, RelationConfig> = {
         warnAfterWrite: groupTermScopeWarnings,
     },
 
+    /**
+     * When a Group is available inside each Term — the cohort that runs only the
+     * first six weeks.
+     *
+     * NOT in the manage registry's `relations` array, deliberately, so the
+     * generic `ManageRelationsPanel` does not render it. That panel edits a SET
+     * of links with at most one number or one reference per row, and this needs
+     * two dates; declared here it still gets the PUT-set machinery, the tenant
+     * column, and the `group.update` gate for free while the UI stays bespoke
+     * inside `ManageGroupForm` — the "bespoke means one slot" rule.
+     *
+     * ABSENT ROW MEANS THE WHOLE TERM, so removing a row is how a tenant clears
+     * a window. A PUT-set gives that for nothing: a term dropped from the
+     * submitted list has its row deleted.
+     */
+    'groups/availability': {
+        parent: 'groups',
+        parentModel: 'group',
+        model: 'groupTermAvailability',
+        parentKey: 'groupId',
+        /*
+         * Both bounds optional, at least one required — the DB CHECK says the
+         * same thing, and a row with neither is exactly what an absent row
+         * already means. Refused here so the caller gets a 400 naming the field
+         * rather than a constraint-violation 500.
+         */
+        item: z.object({
+            termId: id,
+            availableFrom: z.coerce.date().nullish(),
+            availableTo: z.coerce.date().nullish(),
+        }).refine(
+            (row) => row.availableFrom != null || row.availableTo != null,
+            { message: 'A window needs a start date, an end date, or both. Remove the term to clear it.' },
+        ).refine(
+            (row) => row.availableFrom == null
+                || row.availableTo == null
+                || row.availableFrom <= row.availableTo,
+            { message: 'The window ends before it starts.' },
+        ),
+        select: { termId: true, availableFrom: true, availableTo: true },
+    },
+
     'offerings/groups': {
         parent: 'offerings',
         parentModel: 'offering',
