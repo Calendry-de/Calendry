@@ -73,12 +73,34 @@
                 class="chip_room"
             >{{ roomCode }}</span>
         </span>
+
+        <!--
+            WHO AND WHICH — shown only when the filters are not already saying it.
+            With a Group or Person filter set, every chip on screen belongs to
+            that group or that person, and repeating it on all of them spends the
+            chip's scarcest resource to say something the toolbar already said.
+            Unfiltered, it is the one thing the chip could not otherwise answer:
+            two sessions of the same offering at the same hour differ by cohort.
+        -->
+        <span
+            v-if="whoLabel || whichLabel"
+            class="chip_who"
+        >
+            <span
+                v-if="whichLabel"
+                class="chip_group"
+            >{{ whichLabel }}</span>
+            <span
+                v-if="whoLabel"
+                class="chip_person"
+            >{{ whoLabel }}</span>
+        </span>
     </button>
 </template>
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
-import { blockTime, sessionLabel, weekdayName } from '~/composables/schedule';
+import { attendeesOf, blockTime, lecturersOf, sessionLabel, weekdayName } from '~/composables/schedule';
 import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 
@@ -101,6 +123,16 @@ const props = defineProps<{
     virtualRoomIds?: Set<string>;
     /** The tenant's display standards; defaults when the fetch degraded. */
     display?: DisplaySettings;
+    /** Resolvers for the who/which line. Absent means the fact is omitted, not guessed. */
+    groupName?: (id: string) => string;
+    personName?: (id: string) => string;
+    /**
+     * Whether the Group / Person filters are OFF. The chip says which cohort and
+     * whose session only when the toolbar is not already saying it for every
+     * chip on screen.
+     */
+    showGroup?: boolean;
+    showPerson?: boolean;
 }>();
 
 defineEmits<{ select: [] }>();
@@ -178,6 +210,55 @@ const roomCode = computed(() => roomLabel.value.split(' · ')[0] ?? '');
  * them apart. Everything the sighted reader gets from position now reaches the
  * accessible name as words.
  */
+/**
+ * The cohort, and "+N" rather than a list.
+ *
+ * A Session can carry many Groups — the elective/track merging case — and a
+ * chip that lists four cohort names is a chip with no room for anything else.
+ * The first plus a count is the honest summary; the inspector has the full list
+ * and is one click away.
+ */
+const whichLabel = computed(() => {
+    if (!props.showGroup || !props.groupName) {
+        return '';
+    }
+
+    const groups = props.session.groups;
+
+    if (!groups.length) {
+        return '';
+    }
+
+    const first = props.groupName(groups[0]!.groupId);
+
+    return groups.length > 1 ? `${first} +${groups.length - 1}` : first;
+});
+
+/**
+ * Who is leading it, falling back to who is attending.
+ *
+ * Lecturer first because that is the fixed Role key and the question a
+ * timetabler is usually asking; a Session with no lecturer but named attendees
+ * still has someone worth naming, and saying nothing there would read as "no
+ * one is involved".
+ */
+const whoLabel = computed(() => {
+    if (!props.showPerson || !props.personName) {
+        return '';
+    }
+
+    const people = lecturersOf(props.session.people);
+    const fallback = people.length ? people : attendeesOf(props.session.people);
+
+    if (!fallback.length) {
+        return '';
+    }
+
+    const first = props.personName(fallback[0]!.personId);
+
+    return fallback.length > 1 ? `${first} +${fallback.length - 1}` : first;
+});
+
 const accessibleName = computed(() => {
     const parts = [sessionLabel(props.session)];
 
@@ -188,6 +269,14 @@ const accessibleName = computed(() => {
 
     if (roomLabel.value) {
         parts.push(roomLabel.value);
+    }
+
+    if (whichLabel.value) {
+        parts.push(whichLabel.value);
+    }
+
+    if (whoLabel.value) {
+        parts.push(whoLabel.value);
     }
 
     if (props.session.kind?.name) {
@@ -286,6 +375,34 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
         font-variant-numeric: tabular-nums;
         color: $content6;
     }
+
+    /*
+     * The who/which line. Ellipsised per part rather than as a whole, so a long
+     * cohort name cannot eat the lecturer's — each says as much as it can and
+     * then stops, which is the readable failure.
+     */
+    &_who {
+        display: flex;
+        gap: 6px;
+        align-items: baseline;
+
+        min-width: 0;
+
+        font-size: 11px;
+        color: $content7;
+    }
+
+    &_group,
+    &_person {
+        overflow: hidden;
+        flex: 0 1 auto;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    // A cohort is a thing; a person is a name. The weight difference is the
+    // cheapest way to tell them apart at 11px without a second colour.
+    &_group { font-weight: 600; }
 
     &_room {
         overflow: hidden;

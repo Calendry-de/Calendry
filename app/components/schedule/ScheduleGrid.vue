@@ -118,6 +118,10 @@
                 :room-name="roomName"
                 :virtual-room-ids="virtualRoomIds"
                 :display="display"
+                :group-name="groupName"
+                :person-name="personName"
+                :show-group="showGroup"
+                :show-person="showPerson"
                 :session="session"
                 :violations="violations.get(session.id) ?? []"
                 :selected="session.id === selectedId"
@@ -192,6 +196,11 @@ const props = defineProps<{
     /** Virtual room ids and the tenant's display standards, for chip colour. */
     virtualRoomIds?: Set<string>;
     display?: DisplaySettings;
+    /** Who/which resolvers, and whether the toolbar is already saying it. */
+    groupName?: (id: string) => string;
+    personName?: (id: string) => string;
+    showGroup?: boolean;
+    showPerson?: boolean;
     /**
      * What choosing a cell will DO, for the slot's accessible name. `place` and
      * `create` both make cells the targets, and a blind user pressing one
@@ -560,6 +569,14 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
             // The stack has no position to read a time off, so the chip states
             // it. This is the whole reason the stacked form is not lossy.
             :deep(.chip_time) { display: inline; }
+
+            // On one line the who/which parts join the row rather than stacking
+            // under it, and give way first: the offering and the room identify
+            // the session, the cohort narrows it.
+            :deep(.chip_who) {
+                flex: 0 1 auto;
+                min-width: 0;
+            }
         }
 
         /*

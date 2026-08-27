@@ -129,13 +129,30 @@
                     </dd>
                 </div>
 
-                <div v-if="lecturers.length">
+                <!--
+                    ALWAYS RENDERED, even when empty.
+                    A row that disappears when it has nothing in it makes "no
+                    lecturer is assigned" indistinguishable from "this panel does
+                    not track lecturers" — and the first is a schedule defect
+                    somebody needs to see, while the second is not a thing.
+                -->
+                <div>
                     <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
-                    <dd>{{ lecturers.map(p => lookup.person(p.personId)).join(', ') }}</dd>
+                    <dd v-if="lecturers.length">
+                        {{ lecturers.map(p => lookup.person(p.personId)).join(', ') }}
+                    </dd>
+                    <dd
+                        v-else
+                        class="inspector_muted"
+                    >Nobody assigned</dd>
                 </div>
-                <div v-if="editable || attendees.length">
+                <div>
                     <dt>{{ attendees.length === 1 ? 'Person' : 'People' }}</dt>
-                    <dd v-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
+                    <dd
+                        v-if="!editable && !attendees.length"
+                        class="inspector_muted"
+                    >Nobody assigned individually</dd>
+                    <dd v-else-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
                     <dd v-else>
                         <!--
                             The SAME picker as groups, one field down — add from
@@ -183,9 +200,13 @@
                     </dd>
                 </div>
 
-                <div v-else-if="session.groups.length">
+                <div v-else>
                     <dt>{{ session.groups.length === 1 ? 'Group' : 'Groups' }}</dt>
-                    <dd>
+                    <dd
+                        v-if="!session.groups.length"
+                        class="inspector_muted"
+                    >No group attends this</dd>
+                    <dd v-else>
                         <!-- One level of ancestry, muted: "Seminar A1" alone is
                              ambiguous across cohorts, and the nesting is what
                              explains why a clash propagates. -->
@@ -310,7 +331,10 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
-import { blockTime, describeViolation, formatSlotDate, sessionLabel, weekdayName } from '~/composables/schedule';
+import {
+    attendeesOf, blockTime, describeViolation, formatSlotDate,
+    lecturersOf, sessionLabel, weekdayName,
+} from '~/composables/schedule';
 import { useViewerLocale } from '~/composables/locale';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 import type { RelationDef } from '~/utils/manageRegistry';
@@ -448,18 +472,10 @@ const endBlock = computed(() => (props.session
 
 const worst = computed(() => (props.violations.some((v) => v.severity === 'HARD') ? 'hard' : 'soft'));
 
-/**
- * `lecturer` is the ONE fixed Role key (TAXONOMY.md §2) — every other role name
- * is tenant vocabulary and must never be assumed. Matching on the key is the
- * same test `solverInput.ts` uses to build `lecturerIds`, so the panel and the
- * solver agree about who is leading a Session.
- */
-const lecturers = computed(() => (props.session?.people ?? [])
-    .filter((p) => p.role?.key === 'lecturer'));
-
-/** Everyone else directly assigned — students, auditors, whatever the tenant calls them. */
-const attendees = computed(() => (props.session?.people ?? [])
-    .filter((p) => p.role?.key !== 'lecturer'));
+// The split lives in `composables/schedule.ts` — see `LECTURER_ROLE_KEY` for
+// why it is one definition and not a string literal per component.
+const lecturers = computed(() => lecturersOf(props.session?.people ?? []));
+const attendees = computed(() => attendeesOf(props.session?.people ?? []));
 </script>
 
 <style scoped lang="scss">

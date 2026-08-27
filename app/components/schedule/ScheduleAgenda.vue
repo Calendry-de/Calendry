@@ -98,6 +98,10 @@
                     :room-name="roomName"
                     :virtual-room-ids="virtualRoomIds"
                     :display="display"
+                    :group-name="groupName"
+                    :person-name="personName"
+                    :show-group="showGroup"
+                    :show-person="showPerson"
                     :session="session"
                     :violations="violations.get(session.id) ?? []"
                     :selected="session.id === selectedId"
@@ -127,6 +131,10 @@ const props = defineProps<{
     roomName?: (id: string) => string;
     virtualRoomIds?: Set<string>;
     display?: DisplaySettings;
+    groupName?: (id: string) => string;
+    personName?: (id: string) => string;
+    showGroup?: boolean;
+    showPerson?: boolean;
 }>();
 
 defineEmits<{

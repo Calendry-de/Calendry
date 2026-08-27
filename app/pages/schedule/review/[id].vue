@@ -1,5 +1,23 @@
 <template>
-    <div class="review">
+    <!--
+        THE OPENER MARKS A CHANGE OF MODE.
+
+        Arriving here is a deliberate, infrequent act — you pressed Review on one
+        proposal — and what follows is the only screen in the product that can
+        replace a whole term's timetable. The veil is the beat between browsing a
+        schedule and deciding about one.
+
+        Faster than the landing page's, because this is a work surface and not an
+        entrance: the same movement, over in about two thirds of the time. It
+        collapses entirely under `prefers-reduced-motion`, which the component
+        handles on mount.
+    -->
+    <CommonPageOpener
+        v-model="opening"
+        :mark-size="140"
+        :speed="1.6"
+    >
+        <div class="review">
         <header class="review_head">
             <div class="review_identity">
                 <NuxtLink
@@ -423,12 +441,14 @@
                 </template>
             </section>
         </template>
-    </div>
+        </div>
+    </CommonPageOpener>
 </template>
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonLoader from '~/components/common/CommonLoader.vue';
+import CommonPageOpener from '~/components/common/CommonPageOpener.vue';
 import ScheduleReviewAgenda from '~/components/schedule/ScheduleReviewAgenda.vue';
 import ScheduleReviewGrid from '~/components/schedule/ScheduleReviewGrid.vue';
 import ScheduleReviewSummary from '~/components/schedule/ScheduleReviewSummary.vue';
@@ -455,6 +475,18 @@ const {
 } = useGenerationReview(generationId);
 
 const canApply = useHasPermission('generation.apply');
+
+/**
+ * Plays on arrival, every time — deliberately unlike the landing page, which
+ * gates its opener on a first-visit cookie.
+ *
+ * The reasoning differs because the visit does: the landing page is entered
+ * repeatedly by the same person and a replayed intro there is friction, while
+ * this screen is opened once per proposal to make one decision. Suppressing it
+ * after the first would mean the beat is missing exactly when the reviewer is
+ * least used to being here.
+ */
+const opening = ref(true);
 
 const confirmApply = ref(false);
 const confirmDiscard = ref(false);

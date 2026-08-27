@@ -167,6 +167,35 @@ export function blockTime(
 }
 
 /**
+ * The one fixed Role key (TAXONOMY.md §2).
+ *
+ * Every OTHER role name is tenant vocabulary and must never be assumed — this
+ * one is schema-level, and it is the same test `server/utils/solverInput.ts`
+ * uses to build `lecturerIds`, so the panel, the chip and the solver agree
+ * about who is leading a Session.
+ *
+ * Named here because three client surfaces now split people this way; a fourth
+ * copy of a bare `'lecturer'` string literal is how one of them ends up
+ * disagreeing with the solver.
+ */
+export const LECTURER_ROLE_KEY = 'lecturer';
+
+export interface AssignedPerson {
+    personId: string;
+    role: { key: string } | null;
+}
+
+/** Who is LEADING this Session. */
+export function lecturersOf<T extends AssignedPerson>(people: readonly T[]): T[] {
+    return people.filter((person) => person.role?.key === LECTURER_ROLE_KEY);
+}
+
+/** Everyone else directly assigned — students, auditors, whatever the tenant calls them. */
+export function attendeesOf<T extends AssignedPerson>(people: readonly T[]): T[] {
+    return people.filter((person) => person.role?.key !== LECTURER_ROLE_KEY);
+}
+
+/**
  * What to call a Session on screen.
  *
  * ONE definition, five consumers — the chip, the inspector, the off-grid tray,
