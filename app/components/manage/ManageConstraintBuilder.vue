@@ -129,17 +129,11 @@
                 />
 
                 <!--
-                    The inline `help` on the field is one line, because that slot
-                    is a hint and is REPLACED by the validation error when one is
-                    present (ManageField renders them `v-else-if`). The part
-                    people actually get wrong needs more room than that and must
-                    not disappear the moment the field is invalid — so it lives
-                    here, beside the control rather than inside it.
-
-                    What it has to correct is the intuition that weight is a
-                    score out of ten. It is not; it is a ratio against whatever
-                    else is enabled, which is why "is 5 a good weight?" has no
-                    answer without knowing the rest of the tenant's rules.
+                    Here rather than in the field's `help` slot, which is a hint
+                    ManageField REPLACES with the validation error — the part people
+                    get wrong must not disappear the moment the field is invalid.
+                    What it corrects: weight is not a score out of ten, it is a ratio
+                    against whatever else is enabled.
                 -->
                 <p
                     v-if="draft.severity === 'SOFT'"
@@ -250,16 +244,10 @@ import { CONSTRAINT_TYPES, findConstraintType, missingConstraintParams } from '#
 import { constraintParamControls } from '~/utils/constraintFields';
 
 /**
- * The constraint rule builder.
- *
- * Bespoke because these four fields CONSTRAIN EACH OTHER: the chosen type fixes
- * the severity and dictates which parameters exist, and `weight` is meaningful
- * only when severity is SOFT — a pairing the database enforces with a CHECK.
- * Rendered as four independent generic controls they would happily compose
- * states the server rejects.
- *
- * Scope: the thirteen types already in the system. Not a dynamic rule builder —
- * see the file comment in shared/constraintTypes.ts.
+ * Bespoke because these four fields CONSTRAIN EACH OTHER: the chosen type fixes the
+ * severity and dictates which parameters exist, and `weight` is meaningful only when
+ * severity is SOFT — a pairing the database enforces with a CHECK. As four
+ * independent generic controls they would compose states the server rejects.
  */
 const props = defineProps<{
     form: ReturnType<typeof useEntityForm>;
@@ -333,18 +321,15 @@ function toggleScope(kindId: string) {
 }
 
 /**
- * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry from
- * the constraint grid.
+ * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry.
  *
- * Applied SYNCHRONOUSLY at setup, never from a watcher. A watcher does not
- * flush during SSR, so the server would render the type picker unset and the
- * client would correct it on hydration — the exact mismatch this codebase has
- * hit three times (edit forms, `<select>`, the solver control).
+ * Applied SYNCHRONOUSLY at setup, never from a watcher: a watcher does not flush
+ * during SSR, so the server would render the picker unset and the client correct it
+ * on hydration.
  *
- * When preset, the picker renders as static text. That is what makes the
- * mislabelled-name defect unreachable from this path: the bug needed
- * `selectType()` to run a SECOND time, after the name had auto-filled from the
- * first choice. Here it runs exactly once, before the user can type anything.
+ * When preset the picker renders as static text, which is what makes the
+ * mislabelled-name defect unreachable from this path — that bug needed
+ * `selectType()` to run a second time, after the name had auto-filled.
  */
 const presetType = props.mode === 'create'
     ? findConstraintType(useRoute().query.type as string | undefined)
@@ -357,20 +342,13 @@ if (presetType) {
 }
 
 /**
- * `min: 0`, matching the API and the solver rather than being stricter than
- * both. It was 1, which quietly rejected a weight the solver accepts: zero
- * means "evaluate this rule and report its breach count, but do not steer the
- * search" (calendry-solver, convert.rs::soft_instance). A control that refuses
- * a legal value is the same builder-versus-API divergence that let a negative
- * weight through in the other direction.
+ * `min: 0`, matching the API and the solver rather than being stricter than both. It
+ * was 1, which rejected a weight the solver accepts: zero means "evaluate and report
+ * breaches, but do not steer the search". No maximum, deliberately — there is no
+ * value at which a weight becomes wrong.
  *
- * No maximum, deliberately: there is no value at which a weight becomes wrong,
- * so a ceiling could only ever be arbitrary. See `RESOURCES.constraints.weight`.
- *
- * The `help` line is kept to a sentence because ManageField renders help and
- * error as `v-else-if` — it is replaced by the validation message the moment
- * the field is invalid. The guidance that must NOT disappear at that point is
- * the `builder_note` block in the template.
+ * The `help` line stays a sentence because ManageField replaces it with the
+ * validation message; the guidance that must not disappear is in the template.
  */
 const weightField: FieldDef = {
     key: 'weight',
@@ -398,17 +376,10 @@ function selectType(key: string) {
     );
 
     /**
-     * Rename ONLY when the name is still auto-filled.
-     *
-     * The previous version filled it only when blank, which produced a real
-     * defect in tenant data: pick "Cap online share per group" (name auto-fills)
-     * → change your mind and pick "Keep exam weeks clear" → the type updates and
-     * the name does not. The saved constraint is then permanently mislabelled,
-     * and since `type` is createOnly it cannot be corrected by editing — only by
-     * deleting and recreating. Exactly one such row existed in the demo tenant.
-     *
-     * So: an untouched auto-filled name follows the type, a name someone
-     * actually typed is never overwritten.
+     * Rename ONLY when the name is still auto-filled. Filling it merely when blank
+     * produced real bad data: pick one type (name auto-fills), change your mind, and
+     * the type updates while the name does not — and since `type` is createOnly the
+     * row cannot be corrected by editing, only deleted and recreated.
      */
     const wasAutoFilled = !draft.value.name
         || CONSTRAINT_TYPES.some((candidate) => candidate.label === draft.value.name);

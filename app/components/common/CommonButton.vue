@@ -145,15 +145,10 @@ defineSlots<{
 }>();
 
 /**
- * A real <button> by default, not a <div>.
- *
- * It rendered a div until now, which meant every action built on this component
- * — the whole schedule inspector, the solver control, the command palette — was
- * mouse-only: not reachable by Tab, not activated by Enter or Space, and not
- * announced as a button by a screen reader.
- *
- * `disabled` also gets a real button rather than a div, so assistive tech hears
- * "unavailable" instead of nothing.
+ * A real <button> by default, not a <div>. It rendered a div until now, so every
+ * action built on this component was mouse-only: not reachable by Tab, not
+ * activated by Enter or Space, not announced as a button. `disabled` gets a real
+ * button too, so assistive tech hears "unavailable" instead of nothing.
  */
 const getTag = computed(() => {
     if (props.disabled) return props.tag ?? 'button';
@@ -260,30 +255,19 @@ const getAttrs = computed(() => {
     }
 
     /*
-     * WHY THE LABEL IS INK AND THE STATES GO LIGHTER — and why both flipped.
+     * THE LABEL IS INK AND THE STATES GO LIGHTER, which is the reverse of what the
+     * purple ramp needed. White measured 5.01:1 on `$primary500` when it was purple;
+     * on the teal fill it is only 3.14:1 — the same failure the white label was
+     * introduced to fix, arriving from the other side. Ink passes instead, and with
+     * an ink label the states must move UP the ramp, since darkening now costs
+     * contrast:
      *
-     * History, because the reversal looks like a mistake otherwise. The label
-     * was originally `$typographyPrimaryOrig` (body text, baked as raw hex):
-     * 2.49:1 on the fill, a primary action failing AA on its own label. It
-     * became `$whiteOrig`, which measured 5.01:1 on the PURPLE `$primary500`,
-     * and the hover/focus states were restated to move DOWN the ramp because
-     * white needs the darker steps ($primary600 = 6.66:1, $primary700 = 8.78:1).
+     *   $content0Orig on $primary500   5.7:1   rest    ✓ AA
+     *   $content0Orig on $primary400   7.6:1   hover   ✓ AA
+     *   $content0Orig on $primary300  10.4:1   active  ✓ AA
      *
-     * The teal ramp inverts that arithmetic. It is a much lighter fill, so
-     * white on `$primary500` is only 3.14:1 — the same failure the white label
-     * was introduced to fix, arriving from the other side. Ink passes on the
-     * fill instead (5.7:1), and with an ink label the states must move UP the
-     * ramp, since darkening is what costs contrast now:
-     *
-     *   $content0Orig on $primary500   5.7:1   rest      ✓ AA
-     *   $content0Orig on $primary400   7.6:1   hover     ✓ AA
-     *   $content0Orig on $primary300  10.4:1   active    ✓ AA
-     *
-     * (White would have been 3.14 / 2.55 / 1.80 across those same three.)
-     *
-     * `Orig` on the label, not `$content0`: the fill is a fixed brand colour in
-     * both themes, so a label that followed the theme would invert to near-white
-     * on teal in dark mode and fail there while passing here.
+     * `Orig`, not `$content0`: the fill is a fixed brand colour in both themes, so a
+     * theme-following label would invert to near-white on teal in dark mode.
      */
     &--type-primary {
         color: $content0Orig;
@@ -339,20 +323,14 @@ const getAttrs = computed(() => {
     }
 
     /**
-     * Chrome, not a surface. `transparent` is for controls that sit ON other
-     * content — a chevron over a carousel, an affordance in a header — where a
-     * filled rest state would read as a panel of its own.
+     * Chrome, not a surface — for controls that sit ON other content, where a filled
+     * rest state would read as a panel of its own.
      *
-     * WHY IT CANNOT JUST REUSE `secondary`. That variant is
-     * `var(--primary-color, transparent)`, so it is only transparent until a
-     * caller sets --primary-color, and its :active/:focus jumps to a solid
-     * $primary500. Both are wrong here: a chevron that flashes solid purple
-     * when clicked reads as a primary action rather than a nudge. The wash
-     * steps $whiteAlpha4 -> $whiteAlpha8 instead, and the rest state is
-     * unconditional.
-     *
-     * Unlike `link` it keeps padding, radius and the 40px icon box, so it stays
-     * a real hit target rather than collapsing to the glyph's own bounds.
+     * It cannot reuse `secondary`: that is `var(--primary-color, transparent)`, so
+     * it is only transparent until a caller sets the variable, and its
+     * :active/:focus jumps to solid $primary500 — a chevron that flashes solid when
+     * clicked reads as a primary action. Unlike `link` it keeps padding, radius and
+     * the 40px icon box, so it stays a real hit target.
      */
     &--type-transparent {
         background: transparent;

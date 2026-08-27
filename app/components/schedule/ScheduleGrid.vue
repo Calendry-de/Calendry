@@ -1,10 +1,16 @@
 <template>
+    <!--
+        `role="group"`, NOT `role="grid"`: the grid role promises row/column
+        navigation this DOM cannot deliver — there are no `role="row"` wrappers
+        because a multi-block chip SPANS rows and cannot belong to one. Naming is
+        solved instead by every chip and target assembling its own full label.
+    --    -->
     <div
         class="grid"
         :class="{ 'grid--placing': placing, 'grid--swapping': swapping }"
         :style="cssVars"
-        role="grid"
-        aria-label="Week"
+        role="group"
+        aria-label="Week grid"
     >
         <div
             class="grid_corner"
@@ -15,7 +21,6 @@
             v-for="(day, index) in grid.activeDays"
             :key="`head-${day}`"
             class="grid_day"
-            role="columnheader"
             :style="{ gridRow: 1, gridColumn: index + 2 }"
         >
             <span class="grid_day-long">{{ weekdayName(day, locale) }}</span>
@@ -25,12 +30,10 @@
                 class="grid_day-date"
             >{{ formatSlotDate(dateOf(day), locale) }}</span>
             <!--
-                Named only when this day's blocks do not start at the times in
-                the gutter. Silence would be the wrong default: the rows are
-                shared, so a day with its own breaks CANNOT be drawn at its own
-                offsets, and a viewer comparing a chip's time to the column
-                beside it deserves to know why they differ.
-            -->
+                Named only when this day's blocks do not start at the gutter's
+                times: the rows are shared, so a day with its own breaks cannot
+                be drawn at its own offsets.
+            --            -->
             <span
                 v-if="dayDiffers(day)"
                 class="grid_day-note"
@@ -39,18 +42,10 @@
         </div>
 
         <!--
-            THE TIME COLUMN SHARES ITS ROWS WITH THE BLOCKS IT LABELS.
-
-            It used to be absolute offsets computed from minutes, per day, with
-            the gutter computing its own — so the two agreed only as long as
-            nothing outgrew its block. Four sessions in one slot either shrank to
-            unreadable slivers or overflowed, and once they overflowed the
-            columns and the gutter disagreed about where 16:15 was.
-
-            Now a block's label and that block's cells are in the same grid row.
-            Whatever makes the row taller moves the label with it; nothing is
+            The time column shares its rows with the blocks it labels, so
+            whatever makes a row taller moves its label with it. Nothing is
             computed, so nothing can drift.
-        -->
+        --        -->
         <template
             v-for="row in rows"
             :key="`${row.kind}-${row.index}`"
@@ -59,7 +54,6 @@
                 v-if="row.kind === 'block'"
                 class="grid_time"
                 :class="{ 'grid_time--quiet': !labelledLines.has(row.line) }"
-                role="rowheader"
                 :style="{ gridRow: row.line, gridColumn: 1 }"
             >
                 <span class="grid_time-start">{{ row.start }}</span>
@@ -73,15 +67,11 @@
                 >{{ row.minutes }}′</div>
 
                 <!--
-                    A break is inert by construction — no handler, no tabindex —
-                    so placement mode cannot target it. A Session may not START
-                    in a gap: there is no block index for it, and `fitsGrid()`
-                    would have nothing to validate.
-
-                    One band across every day, because these are the UNIVERSAL
-                    gaps, and its row is sized to its own label rather than to a
-                    share of the block height.
-                -->
+                    Inert by construction — no handler, no tabindex — so
+                    placement mode cannot target it. A Session may not START in a
+                    gap: there is no block index for it. One band across every
+                    day, because these are the UNIVERSAL gaps.
+                --                -->
                 <div
                     class="grid_gap"
                     :style="{ gridRow: row.line, gridColumn: '2 / -1' }"
@@ -122,6 +112,7 @@
                 :person-name="personName"
                 :show-group="showGroup"
                 :show-person="showPerson"
+                :dense="dense"
                 :session="session"
                 :violations="violations.get(session.id) ?? []"
                 :selected="session.id === selectedId"
@@ -146,37 +137,15 @@ import ScheduleSessionChip from './ScheduleSessionChip.vue';
 /**
  * The week grid, laid out in ROWS that grow with what is in them.
  *
- * WHY IT STOPPED BEING PER-DAY MINUTE OFFSETS
- *
- * It was `grid-auto-rows: var(--row-height)` with one row per block, so every
- * gap between blocks rendered as zero height — the TimeGrid break feature was
- * built without this component ever being updated, and a tenant with a
- * 45-minute morning break saw their blocks butted together while the time column
- * correctly said 12:15 then 13:00.
- *
- * The fix for that was a per-day absolutely-positioned stack sized from each
- * day's own `blockBoundaries()`, which was minute-true and let a day with its
- * own breaks visibly drift from the gutter. But a block's height was then a
- * function of the density setting alone, so several sessions in one slot either
- * fanned into unreadable slivers or overflowed their block — and when they
- * overflowed, each column and the gutter computed offsets independently and
- * disagreed about where a time was.
- *
- * So the rows are shared and CONTENT-SIZED (`useGridGeometry`): a block row is
- * at least the chosen density and grows when its fullest day needs more, and a
- * block's label sits in the same row as its cells. Alignment is structural.
- *
- * WHAT THAT COSTS: per-day drift can no longer be drawn. A day whose own breaks
- * move its blocks is NAMED in its header instead, its cells' accessible labels
- * carry that day's real clock times, and the gutter is explicitly the shared
- * timeline rather than a claim about every column.
+ * Rows are shared across days and content-sized (`useGridGeometry`): a block row
+ * is at least the chosen density and grows when its fullest day needs more, with
+ * a block's label in the same row as its cells. The cost is that per-day drift
+ * cannot be drawn — a day whose own breaks move its blocks is NAMED in its
+ * header, and its cells' labels carry that day's real clock times.
  *
  * NO GEOMETRY IS COMPUTED HERE. Rows, spans and slot placement come from
- * `useGridGeometry` / `clusterSlots`, over `blockBoundaries()`, `blockSpan()`
- * and `gapsOfDay()` in `shared/timeGrid.ts` — the same walk `blockTime()` and
- * `blockOfMinute()` use. A local `blockLength + breakMinutes` stride is exactly
- * what that module was created to delete; three of them had accumulated once
- * already, and the review grid needs the identical projection.
+ * `useGridGeometry`/`clusterSlots` over `shared/timeGrid.ts`. A local
+ * `blockLength + breakMinutes` stride is what that module exists to delete.
  */
 const props = defineProps<{
     grid: TimeGrid;
@@ -202,10 +171,8 @@ const props = defineProps<{
     showGroup?: boolean;
     showPerson?: boolean;
     /**
-     * What choosing a cell will DO, for the slot's accessible name. `place` and
-     * `create` both make cells the targets, and a blind user pressing one
-     * deserves to know which — "Move to Friday 09:00" and "Add event at Friday
-     * 09:00" are different promises.
+     * What choosing a cell will DO, for its accessible name: "Move to Friday
+     * 09:00" and "Add event at Friday 09:00" are different promises.
      */
     targetVerb?: string;
 }>();
@@ -220,6 +187,13 @@ const locale = useViewerLocale();
 /** This column's calendar date, in the week currently shown. */
 const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
 
+/**
+ * Compact density drops the chip's third line. Derived here because the
+ * threshold is a fact about the chip's intrinsic height against a row, not
+ * something the page should have to know.
+ */
+const dense = computed(() => props.rowHeight < 60);
+
 const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
@@ -230,11 +204,9 @@ const blockRows = computed(() => rows.value.filter(
 ));
 
 /**
- * The target layer: one button per day per block, explicitly placed.
- *
- * The accessible name resolves THIS DAY's clock time, not the gutter's. With
- * shared rows a day carrying its own breaks starts its blocks elsewhere, and
- * announcing the shared timeline would promise a slot the move would not make.
+ * The target layer: one button per day per block. The accessible name resolves
+ * THIS DAY's clock time, not the gutter's — announcing the shared timeline would
+ * promise a slot the move would not make.
  */
 const cells = computed(() => props.grid.activeDays.flatMap((day, index) => (
     blockRows.value.map((row) => ({
@@ -249,11 +221,7 @@ const cells = computed(() => props.grid.activeDays.flatMap((day, index) => (
     }))
 )));
 
-/**
- * Sessions packed against overlaps, one positioned slot per column of each
- * cluster — or, past the fan limit, one full-width slot whose members stack
- * under each other. `clusterSlots` owns that rule; both grids share it.
- */
+/** Sessions packed against overlaps; `clusterSlots` owns the rule, both grids share it. */
 const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clusterSlots(
     props.sessions.filter((session) => session.dayOfWeek === day),
     (session) => ({
@@ -272,10 +240,9 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 <style scoped lang="scss">
 .grid {
     /*
-     * Rows come from `gridTemplateRows` in the inline style, because the row
-     * COUNT is data: one per block, one per break. Nothing here auto-places —
-     * every child names its own row and column — which is what keeps the time
-     * column in column 1 no matter what is scheduled.
+     * Rows come from `gridTemplateRows` inline, because the row COUNT is data.
+     * Nothing auto-places — every child names its own row and column, which is
+     * what keeps the time column in column 1 whatever is scheduled.
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
@@ -358,12 +325,8 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
     }
 
     /*
-     * A row the gutter chose not to label keeps its cell — the column's rhythm
-     * is the grid's, not the label's — and keeps its TIME for assistive tech.
-     *
-     * Hidden rather than dropped: it is a `rowheader`, and a row header with no
-     * name is worse than a quiet one. The eye gets an uncluttered hour column;
-     * a screen reader still gets "09:15" for the row it is reading across.
+     * An unlabelled row keeps its cell and its TIME for assistive tech: it is a
+     * row header, and one with no name is worse than a quiet one.
      */
     &_time--quiet > * {
         position: absolute;
@@ -458,11 +421,8 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         }
     }
 
-    /*
-     * A break is inert by construction — no handler, no tabindex — so placement
-     * mode cannot target it. A Session may not START in a gap: there is no
-     * block index for it, and `fitsGrid()` would have nothing to validate.
-     */
+    /* Inert by construction, so placement mode cannot target it. A Session may
+       not START in a gap: there is no block index for it. */
     &_gap {
         overflow: hidden;
         display: flex;
@@ -497,27 +457,15 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         gap: 2px;
 
         /*
-         * IN FLOW, and that is load-bearing.
+         * IN FLOW, and that is load-bearing. `min-height` is a floor, and the
+         * row is `minmax(<true minutes>, auto)`, so a stack needing more than its
+         * block lasts takes the space and the row takes it with it. As
+         * `position: absolute` it contributed nothing to its row's height and a
+         * crowded block silently overflowed.
          *
-         * Offset and extent come from `bandWithin` as a `margin-top` and a
-         * `min-height` in pixels at a constant minute scale — so an hour is the
-         * same height everywhere on the grid, and a slot is exactly as tall as
-         * its session lasts.
-         *
-         * WHAT HAPPENS WHEN A BLOCK CANNOT FIT ITS SESSIONS: the row grows.
-         * `min-height` is a floor, not a ceiling, and the row is
-         * `minmax(<true minutes>, auto)` — so a stack that needs more than its
-         * block lasts takes the space and the row takes it with it. Nothing is
-         * hidden, nothing scrolls, nothing overlaps, and the time column moves
-         * with it because it shares the row. It was briefly `position: absolute`,
-         * which broke exactly this: an out-of-flow slot contributes nothing to
-         * its row's height, so a crowded block silently overflowed instead.
-         *
-         * `align-self: start` is the other half. A grid item stretches to its
-         * area by default, so a slot in a row that some OTHER column made tall
-         * was stretched to match — a single session rendered as a chip the full
-         * height of the container with one line of text in it. Starting at the
-         * top leaves the unused time visibly empty, which is what it is.
+         * `align-self` here is only the fallback — `bandWithin` sets it per slot,
+         * because a slot spanning several rows whole must `stretch` to bridge the
+         * 1px gaps interior to it.
          */
         align-self: start;
 
@@ -526,25 +474,16 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         > * { pointer-events: auto; }
 
-        /*
-         * A crowded cluster stacks under itself instead of fanning into
-         * slivers. The row it sits in grows to fit (`minmax(var(--row-height),
-         * auto)`), so nothing overflows and nothing is hidden — see
-         * `clusterSlots`.
-         */
+        /* A crowded cluster stacks instead of fanning into slivers; its row
+           grows to fit. See `clusterSlots`. */
         &--compact {
             flex-direction: column;
             gap: 1px;
 
             /*
-             * THE COMPACT CHIP — the same chip, one line high.
-             *
-             * `:deep` because the chip owns its own scoped styles and this is a
-             * layout decision the CONTAINER makes: the same component is a tall
-             * card when it has a column to itself and a single line when it is
-             * one of six sharing a slot. Nothing is removed — title, kind, lock
-             * and violation icons all survive, laid out inline and ellipsised
-             * rather than stacked.
+             * The same chip, one line high. `:deep` because this is a layout
+             * decision the CONTAINER makes. Nothing is removed — title, kind,
+             * lock and violation icons survive, inline and ellipsised.
              */
             :deep(.chip) {
                 flex: none;
@@ -581,14 +520,9 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         /*
          * While PLACING, chips stop intercepting clicks so the cell beneath is
-         * reachable. Without this a chip covers its own cell, so an occupied
-         * slot could not be chosen as a destination at all — measured at 26 of
-         * 40 target cells unreachable — and clicking one selected that session
-         * and silently cancelled the move instead.
-         *
-         * This is the other half of the mode rule: in `place` the CELLS are the
-         * targets, so chips must be inert. In `swap` the chips ARE the targets,
-         * so they stay live and the cells are the disabled ones.
+         * reachable — without this a chip covered its own cell and 26 of 40
+         * targets were unreachable. The mirror of the mode rule: in `place` the
+         * CELLS are targets so chips are inert; in `swap` the chips are.
          */
         .grid--placing & > * { pointer-events: none; }
     }

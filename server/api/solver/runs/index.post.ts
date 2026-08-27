@@ -90,18 +90,14 @@ export default defineEventHandler(async (event) => {
         });
 
         /**
-         * TWO SCOPES, because they address different things.
+         * TWO SCOPES. `offeringIds` is STORED and later compared against
+         * `session.offering_id` — real database ids. `wireOfferingIds` is what the
+         * SOLVER is given, which for a split multi-group Offering are synthetic
+         * `offering::group` ids.
          *
-         * `offeringIds` is what gets STORED and later read by
-         * `planMaterialization`, which compares it against `session.offering_id`
-         * — real database ids. `wireOfferingIds` is what the SOLVER is given,
-         * and once a multi-group Offering is split into per-group series those
-         * are synthetic `offering::group` ids.
-         *
-         * Using one list for both breaks in one direction or the other: wire
-         * ids stored means no existing Session is ever in scope and nothing is
-         * ever deleted; real ids sent means the split series are outside scope
-         * and nothing is ever placed.
+         * One list for both breaks in one direction or the other: wire ids stored
+         * means no existing Session is ever in scope and nothing is deleted; real
+         * ids sent means the split series are out of scope and nothing is placed.
          */
         const scope = {
             offeringIds: body.offeringIds ?? assembled.scopeOfferingIds.real,
@@ -130,15 +126,12 @@ export default defineEventHandler(async (event) => {
             return { run, assembled, scope };
         } catch (error) {
             /**
-             * 23505 here can only be solver_run_one_active_per_term: it is the
-             * sole unique constraint on this table beyond the primary key.
+             * 23505 here can only be solver_run_one_active_per_term — the sole
+             * unique constraint beyond the primary key.
              *
-             * NOTHING MAY QUERY THIS TRANSACTION AFTER THIS POINT. A failed
-             * statement aborts the whole Postgres transaction, and every
-             * subsequent command returns `25P02 current transaction is aborted`.
-             * Looking up the conflicting run here — the obvious thing to do —
-             * turned a clean 409 into a 500, and only a genuinely concurrent
-             * test surfaced it. The lookup happens outside, below.
+             * NOTHING MAY QUERY THIS TRANSACTION AFTER THIS POINT: a failed statement
+             * aborts the whole Postgres transaction, so looking up the conflicting
+             * run here turned a clean 409 into a 500. It happens outside, below.
              */
             if (findPgCodeIsUniqueViolation(error)) {
                 throw new ActiveRunConflict();
@@ -251,15 +244,12 @@ export default defineEventHandler(async (event) => {
 
         /**
          * A solver that ANSWERS — even to reject the input — is reachable, and
-         * saying "could not reach" sends the reader to check containers and
-         * ports instead of the thing the solver actually told them. This cost a
-         * real troubleshooting session: an INVALID_ARGUMENT naming the exact
-         * Session and slot that no longer existed in the tenant's grid was
-         * reported as a network fault.
+         * "could not reach" sends the reader to check containers and ports. This cost
+         * a real troubleshooting session: an INVALID_ARGUMENT naming the exact
+         * Session and slot missing from the grid was reported as a network fault.
          *
-         * 422, not 502: the request was delivered and understood, and the
-         * problem is the tenant's data. The solver's own message is the payload,
-         * because this app cannot say it better.
+         * 422, not 502: the request was delivered and understood, and the problem is
+         * the tenant's data. The solver's own message is the payload.
          */
         if (error instanceof SolverRejectedError) {
             throw createError({

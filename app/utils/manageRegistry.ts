@@ -3,22 +3,16 @@ import { resourcePermissions } from '#shared/permissions';
 
 /**
  * The management area's entity registry — a client mirror of the server's
- * `RESOURCES` (server/utils/resources.ts).
+ * `RESOURCES`.
  *
- * WHY A MIRROR AND NOT A FETCH: the server registry holds zod schemas, which
- * do not serialise. What the UI needs is different anyway — labels, column
- * order, help text, which field is a reference to what. The server stays the
- * authority on *validity*; this file is the authority on *presentation*, and a
- * mismatch surfaces as a 400 with a per-field message rather than silent
- * corruption.
+ * A MIRROR AND NOT A FETCH because the server registry holds zod schemas, which
+ * do not serialise, and what the UI needs is different anyway. The server stays
+ * the authority on validity; this file on presentation.
  *
- * THIS IS ALSO THE NAVIGATION SOURCE. `useNavEntries()` projects the manage
- * section straight out of this array, so adding an entity here puts it in the
- * sidebar, the index page, the header and the Ctrl+K palette in one edit.
- * There is no second list to keep in sync because there is no second list.
- *
- * Entities appear here only once they have a working editor. An entry whose
- * detail page cannot actually edit the entity would be a nav item that lies.
+ * ALSO THE NAVIGATION SOURCE: `useNavEntries()` projects the manage section out
+ * of this array, so adding an entity here puts it in the sidebar, index, header
+ * and palette in one edit. Entities appear only once they have a working editor —
+ * an entry whose detail page cannot edit the entity is a nav item that lies.
  */
 
 export type EntityRow = Record<string, unknown>;
@@ -43,18 +37,13 @@ export interface FieldDef {
     /** Shown under the control. Use it for domain meaning, not restating the label. */
     help?: string;
     /**
-     * A read-only value COMPUTED server-side for this row, shown beneath the
-     * control while editing.
+     * A read-only value COMPUTED server-side, shown beneath the control while
+     * editing. Exists because `Offering.requiredCapacity` promised to derive from
+     * the attached Groups when left blank and nothing did — the gap survived
+     * because the real number was never on screen.
      *
-     * Exists because `Offering.requiredCapacity` promised — in its schema
-     * comment AND in this registry's own help text — to derive from the
-     * attached Groups when left blank, and nothing derived. The gap survived
-     * because the real number was never on screen: a field whose BLANK state
-     * means something should be able to show what it means.
-     *
-     * Generic on purpose. Making Offering a bespoke detail component for one
-     * read-only line would contradict the standing decision that it renders on
-     * the generic scaffold because its complexity is registry data.
+     * Generic on purpose: making Offering bespoke for one read-only line would
+     * contradict the standing decision that it renders on the generic scaffold.
      */
     derived?: {
         /** Path with `:id` substituted for the row being edited. */
@@ -139,20 +128,16 @@ export interface RelationDef {
     };
     emptyHint?: string;
     /**
-     * What makes this relation EDITABLE. Absent means the parent's `.update`,
-     * which is what the PUT requires by default.
+     * What makes this relation EDITABLE. Absent means the parent's `.update`.
      *
-     * Separate from VISIBILITY, which is derived rather than declared — see
-     * `relationReadRequirement` below. They are separate facts: seeing which
-     * roles somebody holds rides on `person.read`, while granting one is
-     * `person_access_role.assign`. Collapsing them would either hide
-     * information a person editor may legitimately see, or offer them a control
-     * whose every change answers 403.
+     * Separate from VISIBILITY (derived — see `relationReadRequirement`): seeing
+     * which roles somebody holds rides on `person.read`, while granting one is
+     * `person_access_role.assign`. Collapsing them would either hide information
+     * a person editor may see or offer a control whose every change answers 403.
      *
-     * Declared rather than derived because it is not derivable: nothing about
-     * `resource: 'access-roles'` says that WRITING this join needs a capability
-     * from a different part of the catalogue. Only the server's
-     * `RelationConfig.writePermission` knows, and this mirrors it.
+     * Declared because it is not derivable: nothing about `resource:
+     * 'access-roles'` says that writing this join needs a capability from a
+     * different part of the catalogue.
      */
     writeRequiresPermissions?: PermissionRequirement;
     /**
@@ -179,18 +164,14 @@ export interface ManageEntity {
     /**
      * Actions whose permission is NOT `<permissionPrefix>.<action>`.
      *
-     * `access-roles` is the only entity that needs it: the catalogue has held
-     * `access_role.manage` — one capability covering all four verbs — since long
-     * before this section existed, and inventing four CRUD permissions to fit
-     * the naming convention would mean a catalogue edit, a re-seed and a
-     * backfill on every tenant, to arrive at `access_role.manage` still checked
-     * by nothing.
+     * `access-roles` is the only entity that needs it: `access_role.manage` covers
+     * all four verbs, and inventing four CRUD permissions would mean a catalogue
+     * edit, a re-seed and a backfill on every tenant to arrive at
+     * `access_role.manage` still checked by nothing.
      *
-     * Mirrors the server's own RESOURCE_PERMISSIONS, with one deliberate
-     * difference: the server also accepts `person_access_role.assign` for the
-     * READ, so the Person page's role picker works for a registrar. The manage
-     * SECTION stays `access_role.manage`-only — a registrar has no business in a
-     * screen whose every button they would be refused.
+     * Mirrors the server's RESOURCE_PERMISSIONS with one difference: the server
+     * also accepts `person_access_role.assign` for the READ, so a registrar's role
+     * picker works, while the manage SECTION stays `access_role.manage`-only.
      */
     permissionOverrides?: Partial<Record<'read' | 'create' | 'update' | 'delete', string>>;
     label: string;
@@ -994,27 +975,18 @@ export function relationOptionResources(def: RelationDef): string[] {
 }
 
 /**
- * What a caller needs in order to be OFFERED this relation — derived, never
- * declared.
+ * What a caller needs to be OFFERED this relation — derived, never declared.
  *
- * WHY DERIVED. Every relation's option list is fetched in ONE `Promise.all`, so
- * a single 403 inside it takes down the whole wave — and because
- * `useEntityRelations` awaits the useAsyncData handle, which RESOLVES rather
- * than rejects, the result is not a blank page but every picker on the page
- * rendering an empty option list. Measured, not assumed: with this gating
- * removed, a person editor's Person page says "No roles defined yet" over a
- * tenant that has them. A page-wide lie, and indistinguishable from an
- * unconfigured tenant.
+ * Every relation's option list is fetched in ONE `Promise.all`, so a single 403
+ * takes down the whole wave — and because `useEntityRelations` awaits a
+ * useAsyncData handle that RESOLVES rather than rejects, the result is not a blank
+ * page but every picker rendering empty. Measured: without this gating a person
+ * editor's Person page says "No roles defined yet" over a tenant that has them.
  *
- * A DECLARED field would have to be right on every relation, forever, including
- * the six that already had it wrong before anyone noticed. Deriving it from the
- * resources the wave actually touches means a new relation is gated by
- * construction, and a relation that changes what it fetches cannot drift from
- * its own gate.
- *
- * The result is an AND of ORs: every endpoint must be reachable (AND), and one
- * endpoint may accept several permissions (OR). `lecturers` is why both levels
- * are needed — it fetches persons AND roles.
+ * Derived rather than declared so a new relation is gated by construction and one
+ * that changes what it fetches cannot drift from its own gate. The result is an
+ * AND of ORs: every endpoint must be reachable, and one may accept several
+ * permissions — `lecturers` fetches persons AND roles.
  */
 export function relationReadRequirement(def: RelationDef): PermissionRequirement {
     return relationOptionResources(def).map((resource) => {

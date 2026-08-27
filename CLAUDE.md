@@ -434,16 +434,59 @@ Both week grids (`ScheduleGrid`, `ScheduleReviewGrid`) share `useGridGeometry` +
 - **Placement inside a row is px at a CONSTANT scale**, never a percentage of the
   row. A percentage stretched with the row, so a minute was worth more pixels in
   a busy row than a quiet one, and a lone session rendered as tall as the crowded
-  day beside it. Slots also need `align-self: start` or the grid stretches them.
+  day beside it. Slots also need `align-self: start` or the grid stretches them
+  — **except a slot spanning several rows whole, which needs `stretch`**. Its
+  grid area also contains the row gaps between those rows and any height a row
+  gained from another column's crowding; neither is a minute, so `min-height`
+  always falls short and a two-block session drew as ending early. `bandWithin`
+  sets this per slot; only the browser can measure it.
 
 Past three abreast a cluster stacks as one-line chips rather than fanning into
 slivers, and **nothing is ever hidden** — a collapse-past-three rule turned 17 of
-20 slots in a real week into "+N more" buttons. Shared rows cost per-day drift:
+20 slots in a real week into "+N more" buttons. **A crowded cluster emits one
+slot per START BLOCK, each confined to that block's row**, and every member of
+such a cluster goes compact even where its own block is quiet (a fanned member
+spanning rows would be drawn over a compact stack). One slot for the whole
+cluster put members at their list index rather than their time, and inflated
+every row it spanned — a grid item whose content exceeds its spanned `auto`
+tracks makes the browser distribute the excess across all of them, so a
+30-minute break drew as tall as a 45-minute block and chips landed on the break
+band. Safe only because compact mode already gives up drawing duration, so there
+is no overlap left to avoid. Shared rows cost per-day drift:
 a day whose own breaks move its blocks is NAMED (`dayDiffers` → "own breaks")
 rather than drawn, and every chip and cell label resolves its own day's clock
 time via `blockTime(grid, index, dayOfWeek)`. **Below a 30-minute block the
 gutter labels on the hour** — a 15-minute grid is 44 rows and 44 stacked times is
 not a time column; unlabelled rows keep their cell and their accessible name.
+
+## The schedule toolbar's height is invariant, and that is load-bearing
+
+`.bar` is a **grid with two named rows** (`'scope scope'` / `'view actions'`),
+not a wrapping flex row — one row per group, so each row is sized by one group
+and nothing else. Verified 146px at 1440/1280/1024 and 303px at 390 across
+idle, live-solver and long-tenant-name states. One row does not fit: scope
+621 + view 231 + actions 507 + gaps is 1407px of a 1408px row, so every
+variable in it decided the bar's height.
+
+Two things depend on that invariance and will break it if undone:
+
+- **The solver's tall states are anchored panels** (`position: absolute` on
+  `.solver_advanced`/`.solver_panel`/`.solver_error`, anchored to `.bar`, which
+  carries `position: relative` + `z-index: 2` so they clear the sticky side
+  column). In flow the bar went 142px → **321px** and the actions group's
+  bottom alignment moved "Add event"/"Proposals" **190px down the page** for
+  the duration of a run. Only the one-line status stays in the bar.
+- **`align-items: end`** is what puts buttons on the selects' optical line
+  rather than the labels' (measured 16px off before). It was `flex-start`
+  precisely because a tall in-flow solver dragged every select down to meet it;
+  it is safe only while nothing in that row can grow past a control's height.
+
+**`.bar_select` is capped** (`max-width: 220px` + `text-overflow: ellipsis`,
+and `max-width: 100%` under `mobileOnly` where 220px is half the row). A
+`<select>` sizes itself to its widest option and every option here is tenant
+free text — uncapped, realistic German names took Term 132px → 367px and the
+bar to three rows. The four tenant-data selects carry a `:title` so a truncated
+value stays recoverable by mouse.
 
 ## Academic calendar periods
 

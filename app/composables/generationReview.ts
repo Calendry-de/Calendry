@@ -1,18 +1,14 @@
+import { statusCodeOf } from '~/composables/httpError';
 import { weekCountOf } from '#shared/academicCalendar';
 import type { NamedRow, TimeGrid } from '~/composables/schedule';
 
 /**
- * Everything the review screen reads and decides with.
- *
- * OWNERSHIP BOUNDARY: one proposal, under review. The preview it is judged by,
- * the week and filters currently being looked at, and the two actions that end
- * the review. It owns no live schedule state — this screen deliberately never
- * shows the applied timetable, because the whole point is that applying has not
- * happened yet.
+ * Everything the review screen reads and decides with: one proposal under review,
+ * the preview it is judged by, and the two actions that end it. It owns no live
+ * schedule state — the point is that applying has not happened yet.
  *
  * SYNCHRONOUS, like every composable here that calls useAsyncData: an `await`
- * before the last Nuxt-context call detaches everything after it. The page holds
- * the single top-level await.
+ * before the last Nuxt-context call detaches everything after it.
  */
 
 export type DiffAction = 'create' | 'move' | 'unchanged' | 'delete';
@@ -84,12 +80,9 @@ export interface ReviewPreview {
 }
 
 /**
- * Termination reason as a sentence, because the token is the single field that
- * most changes the decision and nobody should have to know what it means.
- *
- * `null` is its own case, not folded into any other: runs captured before Stage
- * 6a have no reason recorded, and claiming reproducibility there would be a
- * guess (see the no-backfill decision in CLAUDE.md).
+ * Termination reason as a sentence — the single field that most changes the
+ * decision. `null` is its own case: runs captured before Stage 6a have no reason
+ * recorded, and claiming reproducibility there would be a guess.
  */
 export function terminationSentence(reason: string | null): string {
     switch (reason) {
@@ -107,16 +100,10 @@ export function terminationSentence(reason: string | null): string {
 }
 
 /**
- * Why the preview could not be read, as something renderable.
- *
- * The screen used to have no such concept. The primary fetch is the one thing
- * here that is NOT tolerant — a proposal whose preview cannot be read is not a
- * degraded page, it is no page — so a rejection nulled `summary.data`, `preview`
- * computed to `null`, and the template fell through to its two "this proposal
- * proposes nothing" branches. A 403, a 404, a dropped connection and a genuine
- * manual-baseline Generation all rendered the same sentence, and that sentence
- * asserted a fact about the data. Naming the failure is what makes the four
- * distinguishable.
+ * Why the preview could not be read. The primary fetch is the one thing here that
+ * is NOT tolerant, so a rejection nulled `summary.data` and the template fell
+ * through to "this proposal proposes nothing" — a 403, a 404, a dropped
+ * connection and a genuine manual baseline all rendered the same false claim.
  */
 export interface ReviewLoadError {
     kind: 'forbidden' | 'notFound' | 'failed';
@@ -124,17 +111,6 @@ export interface ReviewLoadError {
     detail: string;
     /** Whether retrying could plausibly succeed. A 403 will not fix itself. */
     retryable: boolean;
-}
-
-/** `useAsyncData`'s error, narrowed without trusting its shape. */
-function statusCodeOf(error: unknown): number | null {
-    if (typeof error !== 'object' || error === null) {
-        return null;
-    }
-
-    const code = (error as { statusCode?: unknown }).statusCode;
-
-    return typeof code === 'number' ? code : null;
 }
 
 function describeLoadError(error: unknown): ReviewLoadError {
@@ -172,12 +148,9 @@ function describeLoadError(error: unknown): ReviewLoadError {
 }
 
 /**
- * How each diff state is named and drawn.
- *
- * Here rather than in a component because BOTH presentations render it — the
- * week grid and the mobile agenda — and a chip labelled "Added" in one and
- * "Created" in the other, or carrying a different icon, is the drift that makes
- * two views of one dataset look like two datasets.
+ * How each diff state is named and drawn. Here rather than in a component because
+ * BOTH presentations render it, and a chip labelled "Added" in one and "Created"
+ * in the other is what makes two views of one dataset look like two datasets.
  */
 export const DIFF_TAG: Record<DiffAction, string> = {
     create: 'Added',
@@ -199,12 +172,9 @@ export function shownAt(item: ReviewPlacement): Placement {
 }
 
 /**
- * The whole placement as one sentence.
- *
- * The grid encodes WHEN in `grid-column` and `grid-row` — inline geometry, which
- * no assistive technology reads. A moved chip announced its action, its
- * offering, its room and where it came FROM, and never said when it now is: the
- * one fact a move actually consists of.
+ * The grid encodes WHEN in `grid-column`/`grid-row`, which no assistive
+ * technology reads — a moved chip said its action, offering, room and origin, and
+ * never when it now is: the one fact a move consists of.
  */
 export function describePlacement(
     item: ReviewPlacement,
@@ -351,13 +321,10 @@ export function useGenerationReview(generationId: string) {
     });
 
     /**
-     * How many weeks the term has — not how many the proposal touches.
-     *
-     * `weekSummary` only carries weeks that RECEIVE placements, so a proposal
-     * that pulls 258 sessions into weeks 1–5 of 13 left weeks 6–13 unselectable:
-     * precisely the weeks a reviewer needs to look at, because those are the ones
-     * being emptied. Null when the term cannot be read (a tolerant fetch may
-     * have degraded), and the page falls back to the weeks it does know.
+     * How many weeks the TERM has, not how many the proposal touches:
+     * `weekSummary` carries only weeks that receive placements, so a proposal
+     * pulling 258 sessions into weeks 1–5 of 13 left 6–13 unselectable —
+     * precisely the weeks being emptied.
      */
     const weekCount = computed<number | null>(() => {
         const value = term.value;
@@ -421,14 +388,9 @@ export function useGenerationReview(generationId: string) {
     });
 
     /**
-     * TWO flags, not one.
-     *
-     * A single `applying` ref drove both actions, so discarding a proposal
-     * relabelled the Apply button to "Applying…" and rendered "Writing
-     * placements — a large proposal takes a few seconds." The two operations
-     * mean opposite things; a reviewer watching the destructive-sounding message
-     * during the safe action has been told something false about what the system
-     * is doing.
+     * TWO flags: a single `applying` ref relabelled Apply to "Applying…" and
+     * showed "Writing placements" while DISCARDING, telling the reviewer
+     * something false about what the system was doing.
      */
     const applying = ref(false);
     const discarding = ref(false);
@@ -436,25 +398,17 @@ export function useGenerationReview(generationId: string) {
     const actionError = ref<string | null>(null);
 
     /**
-     * What just happened, once something has.
-     *
      * `apply()` used to end in `navigateTo('/schedule')` — the highest-stakes
-     * action in the product finishing as a silent screen change, with no
-     * confirmation that it worked and no statement of what it did. The outcome
-     * is held here instead, and the page stays put to say so: the proposal's own
-     * status becomes APPLIED, which the screen already knows how to render.
+     * action in the product finishing as a silent screen change. The outcome is
+     * held here and the page stays put to say so.
      */
     const outcome = ref<{ action: 'applied' | 'discarded'; version: number } | null>(null);
 
     /**
-     * What to say when a write fails and we do not know how far it got.
-     *
-     * The server's own message is used whenever there IS one: a 4xx means the
-     * request was understood and refused, so "nothing happened" is true and the
-     * route already says why. Without one — a dropped connection, a timeout, a
-     * proxy — the request may well have been executed and only the answer lost,
-     * and claiming the schedule is unchanged would be a guess presented as a
-     * fact. The reviewer is told to look instead.
+     * The server's message is used whenever there IS one: a 4xx means the request
+     * was understood and refused, so "nothing happened" is true. Without one the
+     * request may have been executed and only the answer lost, so claiming the
+     * schedule is unchanged would be a guess presented as a fact.
      */
     function describeWriteFailure(error: unknown, verb: 'apply' | 'discard'): string {
         const stated = (error as { statusMessage?: string }).statusMessage;
@@ -485,12 +439,10 @@ export function useGenerationReview(generationId: string) {
         }
 
         /*
-         * THE RE-READ IS NOT PART OF THE WRITE, and it used to be inside the
-         * same `try`. A refresh that failed AFTER a successful apply was caught
-         * by the write's handler and reported as "Could not apply this proposal.
-         * The schedule is unchanged." — a flat falsehood about the highest-stakes
-         * action in the product, at the moment the reviewer most needs the
-         * truth. Its failure is now its own, smaller problem.
+         * THE RE-READ IS NOT PART OF THE WRITE. Inside the same `try`, a refresh
+         * that failed after a SUCCESSFUL apply was reported as "Could not apply
+         * this proposal. The schedule is unchanged." — a flat falsehood at the
+         * moment the reviewer most needs the truth.
          */
         try {
             await summary.refresh();

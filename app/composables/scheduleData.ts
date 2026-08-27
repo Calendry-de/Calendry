@@ -2,45 +2,35 @@ import type { ComputedRef, Ref } from 'vue';
 import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
 import { isOnGrid, sessionLabel } from '~/composables/schedule';
 import { slotDate, weekCountOf } from '#shared/academicCalendar';
+import { describeScheduleFailure } from '~/composables/httpError';
 import { DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 import { useHasPermission } from '~/composables/session';
 
 /**
  * Everything the schedule view reads from the server, plus what is derived from
- * it: grid geometry, the on/off-grid partition, and name lookups.
- *
- * OWNERSHIP BOUNDARY: server state and its derivations. No selection, no
- * placement mode, no view preferences.
+ * it. Server state only — no selection, placement mode or view preferences.
  */
 export function useScheduleData(filters: {
     termId: Ref<string>;
     query: ComputedRef<Record<string, unknown>>;
 }) {
-    /**
-     * CRITICAL: resolved at setup time, not inside a fetch callback.
+    /*
+     * Resolved at setup time, not inside the fetch handler: `useRequestFetch()`
+     * needs the Nuxt request context to forward the cookie during SSR, and
+     * without it every authenticated call 401s and the page renders its empty
+     * state — indistinguishable from a tenant with no data.
      *
-     * `useRequestFetch()` needs the Nuxt request context to forward the
-     * browser's cookie during SSR. Called lazily inside `useAsyncData`'s handler
-     * it loses that context, every authenticated call 401s on the server, and
-     * the page renders its *empty state* — indistinguishable from a tenant with
-     * no data. That exact bug shipped once already; keep this line here.
-     *
-     * For the same reason this composable is SYNCHRONOUS. An `await` here would
-     * detach every later useAsyncData/watchEffect from the Nuxt instance, which
-     * fails at runtime with "a composable ... was called outside of a Vue setup
-     * function". The single await belongs to the page.
+     * For the same reason this composable stays SYNCHRONOUS; the single await
+     * belongs to the page.
      */
     const request = useRequestFetch();
 
     const canReadViolations = useHasPermission('violation.read');
 
-    /**
-     * One request wave, not three. Beyond being fewer round trips, it removes an
-     * ordering hazard: the sessions query keys off termId, which is only known
-     * after the reference data lands. Resolving both inside one handler means
-     * the server never issues a sessions fetch with an empty term and renders an
-     * empty grid.
+    /*
+     * One wave: the sessions query keys off termId, which is only known after
+     * the reference data lands, so splitting it risks a fetch with an empty term.
      */
     const asyncData = useAsyncData('schedule', async () => {
         const [terms, timeGrids, groupRows, roomRows, personRows, kindRows] = await Promise.all([
@@ -50,21 +40,11 @@ export function useScheduleData(filters: {
             request<{ id: string; name: string; code: string; isVirtual: boolean }[]>('/api/rooms'),
             request<{ id: string; givenName: string; familyName: string }[]>('/api/persons'),
             /*
-             * Joins the SAME wave rather than being fetched when the inspector
-             * opens — but INDIVIDUALLY TOLERANT, which the others do not need
-             * to be.
-             *
-             * `/schedule` is gated on `session.read`, and `session_kind.read` is
-             * a different permission the `viewer` role does not hold. Inside a
-             * bare `Promise.all` that 403 rejected the whole handler and
-             * rendered a COMPLETELY BLANK page — not an error, not a partial
-             * view. CLAUDE.md records this exact failure from Stage 6c and the
-             * rule it left: enumerate every endpoint a page calls and confirm
-             * each is covered by the permission the page is gated on.
-             *
-             * Degrading to an empty list is the honest fallback: a caller who
-             * cannot read kinds also cannot be offered a kind picker, and the
-             * schedule itself does not need them.
+             * INDIVIDUALLY TOLERANT: `session_kind.read` is a different
+             * permission from the `session.read` this page is gated on, and
+             * inside a bare `Promise.all` that 403 blanked the whole page. A
+             * caller who cannot read kinds cannot be offered a kind picker
+             * either, so an empty list is the honest fallback.
              */
             request<{ id: string; name: string }[]>('/api/session-kinds').catch(() => []),
         ]);
@@ -88,10 +68,9 @@ export function useScheduleData(filters: {
             groups: groupRows,
             rooms: roomRows.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
             /*
-             * Virtual rooms, by id. Online delivery is a virtual ROOM and never
-             * a flag on Session (TAXONOMY.md), so marking an online session on
-             * the schedule means asking which of its rooms are virtual — and a
-             * Set is what turns that from a lookup per chip per render into one.
+             * Online delivery is a virtual ROOM, never a flag on Session
+             * (TAXONOMY.md), so a Set here turns "is this online" from a lookup
+             * per chip per render into one.
              */
             virtualRoomIds: roomRows.filter((r) => r.isVirtual).map((r) => r.id),
             people: personRows.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
@@ -114,13 +93,9 @@ export function useScheduleData(filters: {
     });
 
     /**
-     * The term the fetch actually used, correct at FIRST RENDER.
-     *
-     * `filters.termId` is seeded by the watchEffect above, and Vue does not
-     * flush watchers during SSR — so on the server it is still `''` while the
-     * page renders. Anything that must be right server-side has to read this
-     * instead, or it renders as though no term existed. That is what hid the
-     * solver control on first paint until hydration corrected it.
+     * Correct at FIRST RENDER, unlike `filters.termId`, which a watchEffect
+     * seeds and Vue never flushes during SSR. Anything that must be right
+     * server-side reads this.
      */
     const resolvedTermId = computed(() => (
         filters.termId.value || reference.value?.resolvedTermId || ''
@@ -134,14 +109,9 @@ export function useScheduleData(filters: {
     const virtualRoomIds = computed(() => new Set(reference.value?.virtualRoomIds ?? []));
 
     /**
-     * How this tenant wants the schedule drawn.
-     *
-     * A SEPARATE, TOLERANT fetch rather than a member of the reference wave: it
-     * is gated on `session.read` like the page itself, so it cannot 403 where
-     * the page does not — but it is also the one thing here whose absence is
-     * harmless. A tenant that has never opened the Display page has no row, the
-     * route answers with defaults, and if the request fails outright the
-     * schedule still draws with the same defaults rather than not drawing.
+     * A separate, tolerant fetch: its absence is harmless, so a tenant that has
+     * never opened the Display page — or a failed request — still draws with
+     * `DISPLAY_DEFAULTS` rather than not drawing.
      */
     const display = useAsyncData(
         'schedule-display-settings',
@@ -152,36 +122,17 @@ export function useScheduleData(filters: {
     const displaySettings = computed<DisplaySettings>(() => display.data.value ?? DISPLAY_DEFAULTS);
 
     /**
-     * Resolved through `resolvedTermId`, NOT `filters.termId`.
-     *
-     * `filters.termId` is seeded by the watchEffect above, which Vue never
-     * flushes during SSR — so on the server it is `''`, this computed is null,
-     * and `totalWeeks` below falls back to 1. That made the toolbar render
-     * `Week 1 / 1` with `disabled="true"` on the week buttons.
-     *
-     * The text was patched on hydration; the ATTRIBUTE was not. Vue does not
-     * rectify attribute mismatches ("this mismatch is check-only. The DOM will
-     * not be rectified"), so the buttons stayed disabled in the DOM forever and
-     * week navigation was dead on every page load — not a flash, a permanently
-     * broken control.
+     * Through `resolvedTermId`, not `filters.termId`: on the server the latter
+     * is still `''`, which made `totalWeeks` fall back to 1 and rendered the
+     * week buttons `disabled`. Vue does not rectify attribute mismatches on
+     * hydration, so they stayed dead for the life of the page.
      */
     const term = computed(() => terms.value.find((t) => t.id === resolvedTermId.value) ?? null);
     /**
-     * `weekCountOf`, the SAME function the week classifier, the solver calendar
-     * and `POST /api/sessions`'s validation already use.
-     *
-     * This used to call a local `weeksInTerm`, which computed the raw span
-     * (`ceil((end - start) / 7)`) instead of counting Monday-anchored weeks.
-     * The two disagree on roughly half of all terms, always by one, and the
-     * toolbar was the only thing reading the local version — so the schedule
-     * capped a term one week short of what the server would accept, and the
-     * final week was unreachable. Measured on a Saturday-start term: the
-     * toolbar said `Week 1 / 12` and disabled the next button there, while the
-     * classifier, the solver and the API all said 13.
-     *
-     * `POST /api/sessions` already carried the warning in a comment — that
-     * computing this locally "would be a fourth definition of which week is
-     * this" — written after the local version already existed.
+     * `weekCountOf` — the same definition the week classifier, the solver
+     * calendar and `POST /api/sessions` use. A local `ceil((end - start) / 7)`
+     * disagrees by one on about half of all terms, which capped the schedule a
+     * week short of what the server accepts.
      */
     const totalWeeks = computed(() => (term.value
         ? weekCountOf(new Date(term.value.startDate), new Date(term.value.endDate))
@@ -201,6 +152,16 @@ export function useScheduleData(filters: {
     });
 
     const pending = computed(() => asyncData.pending.value);
+
+    /**
+     * Why the schedule could not be read, or null. Without it a network failure
+     * fell through to the "No time grid configured" empty state, sending the
+     * reader to create a TimeGrid they already have.
+     */
+    const loadError = computed(() => (asyncData.error.value
+        ? describeScheduleFailure(asyncData.error.value)
+        : null));
+
     const allSessions = computed(() => reference.value?.sessions ?? []);
     const violations = computed(() => reference.value?.violations ?? []);
 
@@ -288,7 +249,7 @@ export function useScheduleData(filters: {
         allSessions, onGridSessions, offGridSessions,
         violations, violationsBySessionId,
         lookup, sessionTitle, slotDateOf,
-        pending, canReadViolations, refreshAll,
+        pending, loadError, canReadViolations, refreshAll,
         /** The page awaits this — the one await, at setup top level. */
         ready: asyncData,
     };

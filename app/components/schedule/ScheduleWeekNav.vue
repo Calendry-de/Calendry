@@ -1,16 +1,16 @@
 <template>
     <!--
-        THE WEEK, CENTRED OVER THE WEEK.
-        It used to sit in the toolbar's left group, beside the Term select and
-        ahead of four filters — the most-changed control on the screen, filed
-        among the least-changed ones. Over the grid it governs, the relationship
-        is drawn rather than remembered, and the two arrows land either side of
-        the thing they move.
+        THE WEEK, CENTRED OVER THE WEEK. It sat in the toolbar's left group ahead
+        of four filters — the most-changed control filed among the least-changed
+        ones. Over the grid it governs, the arrows land either side of the thing
+        they move.
     -->
     <div
         class="weeknav"
+        :class="{ 'weeknav--loading': loading }"
         role="group"
         aria-label="Week"
+        :aria-busy="loading"
         @wheel="stepOnWheel"
     >
         <button
@@ -27,11 +27,9 @@
         </button>
 
         <p class="weeknav_label">
-            <!--
-                Keyed on the week, so Vue replaces the node and the transition
-                has something to animate. The direction comes from which arrow
-                moved it, so the label travels the way the week did.
-            -->
+            <!-- Keyed on the week so Vue replaces the node and the transition
+                 has something to animate; direction comes from which arrow
+                 moved it. -->
             <Transition :name="`weeknav-${direction}`">
                 <span
                     :key="week"
@@ -66,16 +64,20 @@
 import { useWheelStep } from '~/composables/wheelStep';
 
 /**
- * Week navigation, lifted out of the toolbar.
- *
- * Its own component rather than markup in the page because it owns three things
- * that belong together: the two bounds-aware arrows, the wheel gesture, and the
- * direction the label animates. Left in the page, the direction ref would sit
- * beside unrelated editing state and the wheel binding would be the page's
- * third.
+ * Week navigation: its own component because it owns three things that belong
+ * together — the bounds-aware arrows, the wheel gesture, and the direction the
+ * label animates.
  */
 const props = defineProps<{
     totalWeeks: number;
+    /**
+     * The week's sessions are being refetched.
+     *
+     * Shown ON the control that caused it, because that is where the reader is
+     * looking. The frame no longer unmounts while this is true, so without a
+     * signal here a slow step would look like nothing happened.
+     */
+    loading?: boolean;
     /**
      * The dates this week covers, already formatted. Optional and resolved by
      * the caller: turning a term week into a calendar date needs the Term, and
@@ -116,15 +118,29 @@ const stepOnWheel = useWheelStep({
 
 <style scoped lang="scss">
 .weeknav {
+    /*
+     * NO CARD. It carried `$surface1` at `--radius-xl` — byte-identical chrome
+     * to the toolbar, 14px above it — so at a squint it read as a second toolbar
+     * row, which is exactly what moving it out of the toolbar was meant to stop.
+     * Unframed, it reads as the grid's caption, which is what it is.
+     */
+    position: relative;
+
     display: flex;
     gap: var(--space-4);
     align-items: center;
     justify-content: center;
 
     padding: var(--space-2);
-    border-radius: var(--radius-xl);
 
-    background: $surface1;
+    /*
+     * A hairline under the label only, so the week visually sits ON the grid
+     * rather than beside it. Drawn on the label's stage, not the whole row: the
+     * arrows are controls, not part of the caption.
+     */
+    &--loading &_label::after {
+        transform: scaleX(1);
+    }
 
     &_step {
         cursor: pointer;
@@ -175,27 +191,66 @@ const stepOnWheel = useWheelStep({
      * the one motion nobody asked for. `min-width` is generous enough for the
      * longest form the label takes.
      */
+
+    /*
+     * A STAGE THAT CAN GROW.
+     *
+     * It was a fixed `min-width: 22ch` with `overflow: hidden` and absolutely
+     * positioned children — which meant text longer than 22ch was silently
+     * CLIPPED mid-word. English fits; "Woche 1 von 19 · 5. Okt – 9. Okt" does
+     * not, and German runs ~30% longer as a rule. A control that truncates its
+     * own value without saying so is worse than one that shifts a few pixels.
+     *
+     * Both label nodes now occupy the same GRID AREA instead of being absolute,
+     * so the stage sizes to the wider of them and nothing is cut. `min-width`
+     * stays as a floor — that is what stops the arrows twitching between "Week
+     * 9" and "Week 10" — and the box grows past it only when the content
+     * genuinely needs more. `overflow: hidden` is kept for the transition: it
+     * clips the ±8px slide, which is the wipe.
+     */
     &_label {
-        position: relative;
-
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: grid;
+        grid-template-areas: 'label';
+        place-items: center center;
 
-        min-width: 22ch;
-        height: 44px;
+        min-width: 24ch;
+        min-height: 44px;
     }
 
     &_value {
-        position: absolute;
-
         display: flex;
+        grid-area: label;
         gap: var(--space-3);
         align-items: baseline;
         justify-content: center;
 
         white-space: nowrap;
+    }
+
+    /*
+     * A determinate-looking bar would be a lie — the fetch reports no progress.
+     * A 2px rule that simply appears under the label says "this is being
+     * replaced" and nothing more, and it appears on the element whose value is
+     * about to change.
+     */
+    &_label::after {
+        content: '';
+
+        position: absolute;
+        bottom: var(--space-3);
+        left: 50%;
+        transform-origin: center;
+        transform: scaleX(0);
+        translate: -50% 0;
+
+        width: 40%;
+        height: 2px;
+        border-radius: 2px;
+
+        background: $primary500;
+
+        transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     &_number {
@@ -231,8 +286,24 @@ const stepOnWheel = useWheelStep({
         transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.weeknav-next-enter-from { transform: translateX(8px); opacity: 0; }
-.weeknav-next-leave-to { transform: translateX(-8px); opacity: 0; }
-.weeknav-prev-enter-from { transform: translateX(-8px); opacity: 0; }
-.weeknav-prev-leave-to { transform: translateX(8px); opacity: 0; }
+.weeknav-next-enter-from {
+    transform: translateX(8px);
+    opacity: 0;
+}
+
+.weeknav-next-leave-to {
+    transform: translateX(-8px);
+    opacity: 0;
+}
+
+.weeknav-prev-enter-from {
+    transform: translateX(-8px);
+    opacity: 0;
+}
+
+.weeknav-prev-leave-to {
+    transform: translateX(8px);
+    opacity: 0;
+}
+
 </style>

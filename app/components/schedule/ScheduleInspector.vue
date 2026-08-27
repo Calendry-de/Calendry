@@ -18,12 +18,9 @@
 
         <template v-else>
             <header class="inspector_head">
-                <!--
-                    An EVENT's name is editable in place; an Offering-linked
-                    Session's comes from its Offering and stays a heading. Same
-                    rule the whole panel follows: no control exists where there
-                    is nothing the user may change.
-                -->
+                <!-- An EVENT's name is editable in place; an Offering-linked
+                     Session's comes from its Offering. No control exists where
+                     there is nothing the user may change. -->
                 <input
                     v-if="editable"
                     class="inspector_title inspector_title--edit"
@@ -56,12 +53,8 @@
                 <div>
                     <dt>When</dt>
                     <dd>
-                        <!--
-                            The full date, not just the weekday. "Tuesday,
-                            09:00–12:15" leaves the reader to work out WHICH
-                            Tuesday from the week number beside it; the date is
-                            the thing they were looking for.
-                        -->
+                        <!-- The full date: "Tuesday, 09:00–12:15" leaves the
+                             reader to work out WHICH Tuesday. -->
                         <template v-if="sessionDate">
                             {{ formatSlotDate(sessionDate, locale, 'full') }},
                         </template>
@@ -94,14 +87,10 @@
                                 :selected="session.rooms.some(r => r.roomId === room.id)"
                             >{{ room.name }}</option>
                         </select>
-                        <!--
-                            The limit stated where the choice is made. The schema
-                            is many-to-many, but the solver wire carries ONE
-                            room_id per session, so a second room is kept here
-                            and silently narrowed on the next run. Saying so is
-                            the same discipline as reporting dropped equipment
-                            quantities instead of quietly sending less.
-                        -->
+                        <!-- The limit stated where the choice is made: the
+                             schema is many-to-many but the solver wire carries
+                             ONE room_id, so a second room is silently narrowed
+                             on the next run. -->
                         <p
                             v-if="session.rooms.length > 1"
                             class="inspector_hint"
@@ -130,11 +119,10 @@
                 </div>
 
                 <!--
-                    ALWAYS RENDERED, even when empty.
-                    A row that disappears when it has nothing in it makes "no
-                    lecturer is assigned" indistinguishable from "this panel does
-                    not track lecturers" — and the first is a schedule defect
-                    somebody needs to see, while the second is not a thing.
+                    ALWAYS RENDERED, even when empty: a row that disappears makes
+                    "no lecturer is assigned" indistinguishable from "this panel
+                    does not track lecturers", and only the first is a defect
+                    somebody needs to see.
                 -->
                 <div>
                     <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
@@ -155,21 +143,12 @@
                     <dd v-else-if="!editable">{{ attendees.map(p => lookup.person(p.personId)).join(', ') }}</dd>
                     <dd v-else>
                         <!--
-                            The SAME picker as groups, one field down — add from
-                            a list, remove from chips, current selection always
-                            visible.
-
-                            It replaced a `<select multiple>`, which was the
-                            wrong control for the job in ways that had nothing
-                            to do with scale: the selection was only legible by
-                            scanning for highlighted rows, removing one meant
-                            ctrl-clicking, and a stray plain click silently
-                            cleared every other person on the Event.
-
-                            The list is still every person in the tenant. That
-                            limit is real and tracked as its own follow-up (a
-                            search field), but it is a different problem from
-                            this one having been the wrong shape of control.
+                            The SAME picker as groups. It replaced a
+                            `<select multiple>`, where the selection was only
+                            legible by scanning for highlighted rows and a stray
+                            plain click silently cleared every other person. The
+                            list is still every person in the tenant — a search
+                            field is tracked separately.
                         -->
                         <ManageRelationPicker
                             :def="personRelation"
@@ -287,7 +266,7 @@
                     EVENTS ONLY. An Offering-linked Session cannot be deleted —
                     its Offering's frequency would go unmet and the next solve
                     would place it again — so the action is absent rather than
-                    disabled: there is no state in which pressing it would work.
+                    disabled.
                 -->
                 <template v-if="canDelete && session.offeringId === null">
                     <common-button
@@ -371,19 +350,16 @@ const props = defineProps<{
 }>();
 
 /**
- * Reset whenever the SUBJECT changes, so a confirm armed on one Event cannot
- * be fired at the next one selected. Watching the id rather than the object
- * because the row is refetched after every edit and would otherwise re-arm.
+ * Reset whenever the SUBJECT changes, so a confirm armed on one Event cannot fire
+ * at the next. Watching the id, not the object: the row is refetched after every
+ * edit and would otherwise re-arm.
  */
 const locale = useViewerLocale();
 
 /**
- * Whether THIS Session's identity may be edited here.
- *
- * Two conditions, both required. An Offering-linked Session takes its kind,
- * groups and people from its Offering and from solver output, so an edit would
- * be overwritten by the next apply — the route refuses one, and offering a
- * control the server will reject is worse than showing none.
+ * An Offering-linked Session takes its kind, groups and people from its Offering
+ * and from solver output, so the route refuses an edit — and offering a control
+ * the server will reject is worse than showing none.
  */
 const editable = computed(() => props.canUpdate && props.session?.offeringId === null);
 
@@ -453,11 +429,8 @@ const emit = defineEmits<{
 }>();
 
 /**
- * Sends the COMPLETE desired set every time.
- *
- * `/move` replaces `roomIds` wholesale, so emitting a single id would delete
- * every other room the session has — which is exactly how a single-select
- * control would have destroyed multi-room sessions without saying anything.
+ * The COMPLETE desired set: `/move` replaces `roomIds` wholesale, so emitting a
+ * single id would delete every other room the session has.
  */
 function onRoomsChange(event: Event) {
     const select = event.target as HTMLSelectElement;
@@ -480,13 +453,22 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
 
 <style scoped lang="scss">
 .inspector {
+    /*
+     * SIZED, NOT RESERVED. A flat `width: 320px` was held whether or not anything
+     * was selected — a third of a 1440px screen for a panel that is empty most of
+     * the time, crushing the day columns to ~46px of text each. It now asks for a
+     * comfortable measure and yields, and the empty state shrinks it further.
+     */
     display: flex;
     flex-direction: column;
-    gap: 18px;
 
-    width: 320px;
-    padding: 20px;
-    border-radius: 10px;
+    /* One 18px interval across ~8 sections gave every section equal weight.
+       `--space-6` between them, tighter intervals inside doing the grouping. */
+    gap: var(--space-6);
+
+    width: clamp(240px, 24vw, 300px);
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
 
     background: $surface1;
 
@@ -494,10 +476,19 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
         width: 100%;
     }
 
+    /* Nothing selected: a prompt, not a panel. It keeps a presence — a column
+       that vanishes and returns makes the grid jump on every selection — but
+       stops claiming a reading width for one sentence. */
+    &:has(.inspector_empty) {
+        width: clamp(180px, 16vw, 220px);
+        border: 1px dashed $surface5;
+        background: none;
+    }
+
     &_empty {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: var(--space-4);
         align-items: center;
         justify-content: center;
 
@@ -567,9 +558,9 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
         margin: 0;
 
         dt {
-            margin-bottom: 3px;
+            margin-bottom: var(--space-1);
 
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             font-weight: 600;
             color: $content7;
             text-transform: uppercase;
@@ -577,10 +568,19 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
         }
 
         dd {
+            /*
+             * Every value here is user-supplied, inside a column that cannot grow
+             * to fit it, so an unbroken string overflows the panel horizontally.
+             * `overflow-wrap` breaks only where nothing else can; `min-width: 0`
+             * lets the value shrink inside its flex parent.
+             */
+            min-width: 0;
             margin: 0;
-            font-size: 13px;
+
+            font-size: var(--font-size-md);
             line-height: 1.45;
             color: $content5;
+            overflow-wrap: break-word;
         }
     }
 

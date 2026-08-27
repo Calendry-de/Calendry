@@ -1,3 +1,4 @@
+import { computed } from 'vue';
 import type { Ref } from 'vue';
 import { blockTime, packSpans } from '~/composables/schedule';
 import type { TimeGrid } from '~/composables/schedule';
@@ -6,39 +7,12 @@ import { blockBoundaries, blockSpan, gapsOfDay } from '#shared/timeGrid';
 /**
  * The row structure a week grid is drawn on: one row per block, one per break.
  *
- * OWNERSHIP BOUNDARY: turning a TimeGrid into grid rows and placing things in
- * them. It knows nothing about Sessions, diffs, selection or placement mode —
- * only that some items occupy a range of blocks on a day.
- *
- * WHY ROWS AND NOT MINUTE-ACCURATE OFFSETS
- * ----------------------------------------
- * Both grids used to position each day as its own absolutely-positioned stack,
- * sized from that day's own `blockBoundaries()`. That is minute-true, and it is
- * what let a day with its own breaks visibly drift from the time column.
- *
- * It cannot express a row that grows. A block's height was a function of the
- * density setting alone, so four sessions in one slot either shrank to
- * unreadable slivers side by side or overflowed their block — and when they
- * overflowed, the day columns and the time column disagreed about where 16:15
- * was, because each computed its own offsets independently.
- *
- * Sharing one set of ROWS across every day fixes that by construction: a block's
- * time label and that block's cells are in the same grid row, so whatever makes
- * the row taller moves the label with it. Nothing is computed, so nothing can
- * drift.
- *
- * WHAT IT COSTS, STATED PLAINLY: per-day drift can no longer be DRAWN. A day
- * whose own `time_grid_break` rows move its blocks does not start at the times
- * in the gutter, and `dayDiffers()` exists so the header can say so. Every
- * consumer must resolve its own clock times with `blockTime(grid, index, day)`
- * rather than reading them off the shared row.
- *
- * The block/break WALK is untouched: `blockBoundaries()`, `gapsOfDay()` and
- * `blockTime()` in `shared/timeGrid.ts` remain the single definition, shared
- * with the server. Only the projection into pixels lives here.
- *
- * SYNCHRONOUS AND CONTEXT-FREE — no `useAsyncData`, no `useRequestFetch`, so it
- * composes anywhere in setup.
+ * Knows nothing about Sessions, diffs or selection — only that items occupy a
+ * range of blocks on a day. Every day shares ONE set of rows, so a block's time
+ * label and its cells are structurally aligned and cannot drift. The cost: a day
+ * whose own breaks move its blocks cannot be DRAWN differently, so consumers
+ * must resolve clock times with `blockTime(grid, index, day)` and `dayDiffers()`
+ * exists to name it. Synchronous and Nuxt-free, so it composes anywhere.
  */
 
 export type GridRow =
@@ -64,12 +38,9 @@ export type GridRow =
 
 export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     /**
-     * `line` is the CSS grid line, 1-based, with the header occupying row 1.
-     * Held on the row rather than derived at each use, so the time column, the
-     * cells and the chips cannot disagree about which row a block is.
-     *
-     * The gaps are the UNIVERSAL ones (`gapsOfDay(grid, null)`). A day-specific
-     * break has no row of its own — see the note above.
+     * `line` is the 1-based CSS grid line; the header occupies row 1. Held on
+     * the row so the time column, cells and chips cannot disagree. The gaps are
+     * the UNIVERSAL ones — a day-specific break gets no row of its own.
      */
     const rows = computed<GridRow[]>(() => {
         const gapAfter = new Map(gapsOfDay(grid.value, null).map((gap) => [gap.afterBlockIndex, gap]));
@@ -106,20 +77,9 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     });
 
     /**
-     * Which block rows get a printed clock time.
-     *
-     * A FINE GRID IS THE POINT OF THIS, and it is the cost of it. Adopting a
-     * 15-minute base block is what lets a real timetable's 10:00–12:00 session
-     * land exactly (BACKLOG.md's own recommendation, chosen over adding minute
-     * columns to Session because it changes no schema and no solver contract) —
-     * but it turns a 6-hour teaching day from 3 labels into 44, and 44 stacked
-     * times is not a time column, it is noise with a grid behind it.
-     *
-     * So the gutter labels on the hour when blocks are short, and every block
-     * when they are long enough to read. The threshold is duration, not count:
-     * a grid of 45-minute blocks labels all of them, a grid of 15-minute blocks
-     * labels 09:00, 10:00, 11:00 — and the unlabelled rows are still rows, so
-     * nothing about placement or alignment changes.
+     * Below this block length the gutter labels on the hour instead of every
+     * row: a 15-minute grid is 44 rows a day, and 44 stacked times is noise.
+     * Unlabelled rows are still rows, so placement is unaffected.
      */
     const LABEL_EVERY_BELOW_MINUTES = 30;
 
@@ -138,8 +98,7 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         for (const row of blocks) {
             const hour = Math.floor(row.from / 60);
 
-            // The first row always speaks, whatever hour it starts in — a
-            // column whose top row is blank reads as broken rather than tidy.
+            // The first row always speaks: a blank top row reads as broken.
             if (lastHour === null || hour !== lastHour) {
                 out.add(row.line);
                 lastHour = hour;
@@ -163,27 +122,15 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
 
     const lineOf = (blockIndex: number) => blockLines.value.get(blockIndex) ?? 2;
 
-    /**
-     * Pixels per minute, anchored so a BLOCK is exactly the height the density
-     * control asks for. Everything else — breaks, and the position of anything
-     * inside a row — is measured against the same scale.
-     */
+    /** Anchored so a BLOCK is exactly the height the density control asks for. */
     const perMinute = computed(() => rowHeight.value / Math.max(1, grid.value.blockLengthMinutes));
 
     /**
-     * EVERY ROW'S MINIMUM IS ITS TRUE DURATION; every row may grow past it.
-     *
-     * `minmax(<true minutes>, auto)` is the whole compromise in one line. The
-     * minimum keeps the picture proportional — a 45-minute break is 45 minutes
-     * tall next to a 195-minute block — and `auto` lets a row that cannot fit
-     * its contents at that size take what it needs, which is what stopped
-     * crowded slots overflowing into the row below.
-     *
-     * The rows previously read `minmax(var(--row-height), auto)` for blocks and
-     * `min-content` for breaks, which was correct only because every block on
-     * this grid is the same length. It stated the density setting, not a
-     * duration, so a break was as tall as its label rather than as long as it
-     * lasts, and a grid whose blocks ever differed would have drawn them equal.
+     * `minmax(<true minutes>, auto)`: the minimum keeps the picture
+     * proportional, `auto` lets a row that cannot fit its contents grow instead
+     * of overflowing into the row below. Not `var(--row-height)` — that states
+     * the density setting rather than a duration, so breaks came out as tall as
+     * their label.
      */
     const gridTemplateRows = computed(() => ['auto', ...rows.value.map((row) => (
         `minmax(${(row.minutes * perMinute.value).toFixed(2)}px, auto)`
@@ -199,11 +146,8 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
 
     /**
      * Whether this day's blocks start at the times the shared gutter shows.
-     *
-     * Compared on the resolved BOUNDARIES rather than by looking for a
-     * day-specific break row, because a row that happens to restate the
-     * universal duration changes nothing a viewer can see, and flagging it
-     * would be noise.
+     * Compared on resolved boundaries, not on the presence of a day-specific
+     * break row: a row restating the universal duration changes nothing visible.
      */
     function dayDiffers(day: number): boolean {
         const mine = blockBoundaries(grid.value, day);
@@ -217,24 +161,16 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
 
     /**
      * Where something sits inside the rows it spans, in PIXELS at a constant
-     * minute scale.
+     * minute scale — never a percentage of the row, which resolves against the
+     * row's real height and so makes a minute worth more pixels in a busy row.
      *
-     * WHY PIXELS AND NOT PERCENTAGES OF THE ROW
-     * -----------------------------------------
-     * A percentage resolves against the row's real height, so when one column's
-     * cluster made a row taller, every band in every OTHER column stretched with
-     * it — a lone session in a quiet day rendered as tall as the crowded day
-     * beside it, filling its whole block with one line of text in it. Worse, it
-     * meant a minute was worth more pixels in a busy row than a quiet one, which
-     * is the opposite of minute-accurate.
-     *
-     * At a constant `perMinute`, an hour is the same height everywhere on the
-     * grid. A row that grew simply has empty space under its shorter columns, which
-     * is the honest picture: that time is free.
-     *
-     * The unit is MINUTES, not block indices, so an off-block start needs no
-     * layout change — only a model that can express it. Today `blockSpan()` puts
-     * every Session on a boundary and this returns an offset of 0.
+     * A band covering its rows WHOLE across more than one row gets `stretch`,
+     * because a multi-row grid area also holds the row gaps between those rows
+     * and any height a row gained from another column's crowding; neither is a
+     * minute, so `minHeight` always falls short and the session draws as ending
+     * early. A single-row band must NOT stretch (it would fill a row another
+     * column made tall) and neither may a partial band (it would claim time it
+     * deliberately leaves free).
      */
     function bandWithin(
         day: number | null,
@@ -242,16 +178,20 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         span: number,
         fromMinute?: number,
         toMinute?: number,
-    ): { marginTop: string; minHeight: string } {
+    ): Band {
         const first = blockSpan(grid.value, start, day);
         const last = blockSpan(grid.value, start + Math.max(1, span) - 1, day);
         const from = fromMinute ?? first.start;
         const to = toMinute ?? last.end;
         const ppm = perMinute.value;
 
+        const whole = from === first.start && to === last.end;
+        const crossesRows = lineOf(start + Math.max(1, span) - 1) > lineOf(start);
+
         return {
             marginTop: `${Math.max(0, (from - first.start) * ppm).toFixed(2)}px`,
             minHeight: `${Math.max(0, (to - from) * ppm).toFixed(2)}px`,
+            alignSelf: whole && crossesRows ? 'stretch' : 'start',
         };
     }
 
@@ -268,6 +208,16 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     };
 }
 
+/**
+ * How a slot sits inside the rows it spans: a minute-true offset and extent,
+ * plus whether it fills its grid area. See `bandWithin`.
+ */
+export interface Band {
+    marginTop: string;
+    minHeight: string;
+    alignSelf: 'stretch' | 'start';
+}
+
 export interface GridSlot<T> {
     key: string;
     items: T[];
@@ -279,39 +229,27 @@ export interface GridSlot<T> {
 export interface SlotPlacement {
     column: string;
     rowSpan: (start: number, span: number) => string;
-    /** Minute-true offset and minimum extent within the spanned rows. */
-    band: (start: number, span: number) => { marginTop: string; minHeight: string };
+    /** Minute-true offset and extent within the spanned rows. */
+    band: (start: number, span: number) => Band;
     dayKey: string | number;
 }
 
 /**
- * How many items can sit side by side in one day column and stay readable.
- *
- * Three at a typical column width leaves each about a third of roughly 200px —
- * enough for a code and a room to survive `text-overflow: ellipsis`. A fourth
- * takes every one of them to ~50px, which is not a narrow chip but an
- * unreadable one.
+ * How many items fit side by side in one day column and stay readable. A fourth
+ * takes each to ~50px, which is not a narrow chip but an unreadable one.
  */
 export const FAN_LIMIT = 3;
 
 /**
  * Overlapping items, packed into positioned slots for one day.
  *
- * PAST THE FAN LIMIT THE DENSITY CHANGES, NEVER THE COUNT. Hiding an overlap is
- * wrong on both grids for different reasons: on the live schedule an overlap is
- * usually a defect the timetabler is hunting, and on the review grid it is a
- * placement someone is being asked to accept. A count you must expand is a
- * decision you cannot make at a glance.
+ * PAST THE FAN LIMIT THE DENSITY CHANGES, NEVER THE COUNT — an overlap is either
+ * a defect being hunted or a placement being accepted, and neither survives
+ * being behind a disclosure. A collapse-past-three rule was measured turning 17
+ * of 20 slots in a real week into "+N more" buttons.
  *
- * It was also measured. A collapse-past-three rule turned 17 of 20 slots in a
- * real week into "+2 more" buttons: the grid stopped being a picture of the week
- * and became a list of disclosure controls, which is worse than the crowding it
- * was meant to fix. A TimeGrid with three long blocks a day makes four items in
- * one slot ordinary, not exceptional.
- *
- * So a crowded cluster becomes ONE full-width slot whose members stack under
- * each other on single compact lines, and the row grows to fit them. The caller
- * renders `compact` however its own chip does.
+ * So a crowded cluster becomes full-width compact slots, ONE PER START BLOCK,
+ * each confined to that block's row.
  */
 export function clusterSlots<T>(
     items: T[],
@@ -357,33 +295,53 @@ export function clusterSlots<T>(
             continue;
         }
 
-        // Ordered by start block, so the stack reads in time order rather than
-        // in the packer's column order.
-        const ordered = [...members].sort((a, b) => {
-            const left = read(a.item);
-            const right = read(b.item);
+        /*
+         * ONE SLOT PER START BLOCK, each spanning exactly ONE row.
+         *
+         * One slot for the whole cluster put members at their LIST INDEX rather
+         * than their time, and inflated every row it spanned: a grid item whose
+         * content exceeds its spanned `auto` tracks makes the browser distribute
+         * the excess across all of them, so break rows came out as tall as
+         * blocks. Safe to confine because compact mode already gives up drawing
+         * duration, so there is no overlap left to avoid.
+         *
+         * EVERY member of such a cluster goes compact, even where its own block
+         * is quiet: a fanned member spanning rows would be drawn over a compact
+         * stack. Uniformity is what makes that structurally impossible.
+         */
+        const byStart = new Map<number, typeof members>();
 
-            return left.start - right.start || left.key.localeCompare(right.key);
-        });
-        const first = read(ordered[0]!.item);
-        const end = Math.max(...ordered.map((entry) => {
-            const span = read(entry.item);
+        for (const entry of members) {
+            const { start } = read(entry.item);
+            const list = byStart.get(start) ?? [];
 
-            return span.start + Math.max(1, span.span);
-        }));
+            list.push(entry);
+            byStart.set(start, list);
+        }
 
-        out.push({
-            key,
-            items: ordered.map((entry) => entry.item),
-            compact: true,
-            style: {
-                gridRow: place.rowSpan(first.start, end - first.start),
-                gridColumn: place.column,
-                ...place.band(first.start, end - first.start),
-                width: '100%',
-                marginLeft: '0%',
-            },
-        });
+        for (const [start, group] of [...byStart].sort((a, b) => a[0] - b[0])) {
+            // Must be a TOTAL order: a partial one leaves ties in input order,
+            // which differs between SSR and the client and mismatches hydration.
+            const ordered = [...group].sort((a, b) => {
+                const left = read(a.item);
+                const right = read(b.item);
+
+                return right.span - left.span || left.key.localeCompare(right.key);
+            });
+
+            out.push({
+                key: `${key}:b${start}`,
+                items: ordered.map((entry) => entry.item),
+                compact: true,
+                style: {
+                    gridRow: place.rowSpan(start, 1),
+                    gridColumn: place.column,
+                    ...place.band(start, 1),
+                    width: '100%',
+                    marginLeft: '0%',
+                },
+            });
+        }
     }
 
     return out;

@@ -28,17 +28,15 @@ import {
 } from '../../shared/constraintTypes';
 
 /**
- * Stage 3b/3e — the real SolverInput, assembled from tenant data.
+ * The real SolverInput, assembled from tenant data.
  *
  * THE SOLVER KNOWS ONLY WHAT IS IN HERE. It never touches Postgres, so every
- * omission below is a wrong answer it has no way to detect: a Room left out is
- * a Room it will never use, a Session left out is a slot it thinks is free.
- * That is why the narrowings are counted and returned rather than being quiet.
+ * omission is a wrong answer it has no way to detect: a Room left out is a Room
+ * it will never use, a Session left out is a slot it thinks is free. Hence the
+ * narrowings are counted and returned rather than being quiet.
  *
- * SCOPE (CLAUDE.md, Stages 1–6): single-tenant, non-federated. Federation-owned
- * Rooms and Offerings are EXCLUDED, not included-and-hoped-for — including a
- * shared Room while sending an empty `external_occupancy` is precisely the case
- * that silently double-books across a tenant boundary.
+ * Federation-owned Offerings are EXCLUDED — including a shared resource while
+ * sending empty occupancy is what silently double-books across a tenant boundary.
  */
 
 /** Everything narrowed or dropped on the way to the wire. Returned, never swallowed. */
@@ -53,44 +51,24 @@ export interface AssemblyReport {
     /** Equipment requirements whose quantity the wire cannot carry. */
     droppedEquipmentQuantities: number;
     /**
-     * Offerings whose room-capacity requirement could not be established at
-     * all: `requiredCapacity` unset AND no attached Group with either real
-     * membership or an estimate anywhere in its closure.
-     *
-     * These are sent with `minCapacity: 0`, which the solver reads as "any room
-     * qualifies" — the same silent state this whole derivation exists to fix,
-     * so it is REPORTED rather than merely happening. There is no other value
-     * to send: the wire field is a plain uint32 with no absent case, and
-     * inventing a number would be worse than admitting the gap.
+     * Offerings with no establishable capacity requirement. Sent with
+     * `minCapacity: 0`, which the solver reads as "any room qualifies" — the
+     * silent state this derivation exists to fix, so it is REPORTED. There is no
+     * other value to send: the wire field is a plain uint32 with no absent case.
      */
     offeringsWithNoDerivableCapacity: { id: string; title: string }[];
     /**
-     * Offerings whose derived capacity rests on a roll that looks INCOMPLETE —
-     * materially fewer enrolled people than the attached Groups expect.
-     *
-     * Not an error and not a narrowing: the real count is still used, because
-     * an enrolment list is a fact and a stale estimate is not. What it prevents
-     * is learning that "4 against an expected 96" was the basis only when a
-     * room turns out to hold a twentieth of the cohort.
-     *
-     * Both numbers travel so severity is a human judgement rather than the
-     * threshold's — 4-of-96 and 86-of-96 both appear here and are obviously
-     * different problems.
+     * Offerings whose derived capacity rests on a roll that looks INCOMPLETE.
+     * Not a narrowing — the real count is still used, because an enrolment list is
+     * a fact and a stale estimate is not. Both numbers travel, so 4-of-96 and
+     * 86-of-96 are visibly different problems.
      */
     offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
     /**
-     * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO`
-     * of the teaching week.
-     *
-     * Warn-and-allow, per TAXONOMY.md §3. Heavy unavailability is legitimate and
-     * an administrator already approved it; what it must not do is stay
-     * invisible, because an infeasible term traces back to somebody's calendar
-     * far more often than to anything else in the input, and the solver's output
-     * cannot say so.
-     *
-     * Both numbers travel, so the threshold decides only WHETHER to mention it,
-     * never how bad it is — 20-of-40 and 39-of-40 are obviously different
-     * problems and neither is hidden behind the other.
+     * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO` of
+     * the teaching week. Warn-and-allow (TAXONOMY.md §3): an administrator already
+     * approved it, but an infeasible term traces back to somebody's calendar more
+     * often than to anything else, and the solver's output cannot say so.
      */
     personsWithHeavyVetoLoad: { id: string; name: string; blocked: number; total: number }[];
     /**
@@ -154,16 +132,11 @@ export interface AssembledInput {
 }
 
 /**
- * Turns one stored Constraint row into a wire `ConstraintConfig`, or explains
- * why it cannot be sent.
+ * One stored Constraint row as a wire `ConstraintConfig`, or why it cannot be sent.
  *
- * SKIP-AND-REPORT, never defaults. A constraint missing a required parameter is
- * withheld with a reason rather than transmitted with a guess: a rule the tenant
- * never chose, enforced by a solver and reported to nobody, is worse than one
- * that visibly did not run.
- *
- * The type → wire-field mapping is DATA (`wireField` on the catalogue), not a
- * switch here, so the catalogue stays the one place a type's identity lives.
+ * SKIP-AND-REPORT, never defaults: a rule the tenant never chose, enforced by a
+ * solver and reported to nobody, is worse than one that visibly did not run. The
+ * type → wire-field mapping is DATA on the catalogue, not a switch here.
  */
 export function toWireConstraint(row: {
     id: string;
@@ -180,14 +153,10 @@ export function toWireConstraint(row: {
     }
 
     /*
-     * A catalogue entry whose proto field has not shipped yet. Skipped, and
-     * named in the report, rather than encoded: the config is assembled with an
+     * A catalogue entry whose proto field has not shipped yet: skipped and named
+     * in the report rather than encoded. The config is assembled with an
      * `as ConstraintConfig` cast and ts-proto writes only fields it knows, so a
-     * fabricated field name would leave the request with a ConstraintConfig
-     * carrying no params at all — a rule the tenant enabled, weighted, and that
-     * silently never reached the solver. This is the same refusal the
-     * offering-scope branch below makes for the same reason: when the wire
-     * cannot express it, say so, never approximate.
+     * fabricated field name would send a ConstraintConfig with no params at all.
      */
     if (!type.wireField) {
         return {
@@ -394,15 +363,12 @@ export async function assembleSolverInput(
         ]);
 
     /**
-     * Federation-owned ROOMS are now included (Stage 7b) — they arrive through
-     * the widened RLS read policy and are sent with the other tenants' occupancy
-     * of them, so the solver can place into a shared hall without overlapping
-     * somebody else's event.
+     * Federation-owned ROOMS are included: they arrive through the widened RLS
+     * read policy and are sent with other tenants' occupancy of them.
      *
-     * Federation-owned OFFERINGS remain excluded, deliberately and separately:
-     * placing one raises "which tenant owns the resulting Session?", which is a
-     * placement-ownership question rather than an occupancy one and deserves its
-     * own decision.
+     * Federation-owned OFFERINGS remain excluded — placing one raises "which
+     * tenant owns the resulting Session?", a placement-ownership question rather
+     * than an occupancy one.
      */
     const includedFederationRooms = roomRows.filter((room) => room.federationId !== null).length;
     const federationOfferings = await tx.offering.count({
@@ -426,15 +392,11 @@ export async function assembleSolverInput(
     } as Room));
 
     /**
-     * Only the Groups this Term's problem can involve.
-     *
-     * Derived from what the Offerings and Sessions actually REFERENCE, expanded
-     * to the conflict closure the solver will rebuild from `parent_id`. NOT
-     * filtered by `group_term`: that table is tenant configuration a human sets,
-     * so trusting it here would let a mis-scoped Group produce an input whose
-     * Offerings name a `group_id` the solver was never sent. See solverGroups.ts
-     * for why the closure is exactly sufficient and why it cannot leave a
-     * dangling parent.
+     * Only the Groups this Term's problem can involve: what the Offerings and
+     * Sessions actually REFERENCE, expanded to the conflict closure. NOT filtered
+     * by `group_term` — that is human-set configuration, so trusting it here would
+     * let a mis-scoped Group produce an input whose Offerings name a `group_id`
+     * the solver was never sent. See solverGroups.ts.
      */
     const sentGroupIds = conflictClosure(groupRows, referencedGroupIds(offeringRows, sessionRows));
     const sentGroupRows = groupRows.filter((group) => sentGroupIds.has(group.id));
@@ -445,20 +407,13 @@ export async function assembleSolverInput(
 
     /**
      * APPROVED unavailability only, through the single read path in
-     * `availability.ts`.
+     * `availability.ts`. Until this landed `blackouts` was `[]` unconditionally, so
+     * `lecturer_veto` — a HARD constraint enabled by default — ran against an empty
+     * set in every solve and could never fire, looking healthy throughout.
      *
-     * Until this landed, `blackouts` was `[]` unconditionally — so
-     * `lecturer_veto`, a HARD constraint enabled by default in every tenant, ran
-     * against an empty set in every solve and could never once fire. It looked
-     * healthy the whole time, which is the point of the story rather than an
-     * aside: a rule with no data is indistinguishable from a rule that is
-     * satisfied.
-     *
-     * PENDING and REJECTED windows are excluded, and that filter is the safety
-     * property of the whole feature: an unreviewed veto reaching the wire would
-     * apply a hard constraint nobody approved, and would announce itself only as
-     * unplaced Sessions. Hence one read path, and a test that fails when the
-     * filter is removed.
+     * PENDING and REJECTED are excluded, and that filter is the safety property of
+     * the feature: an unreviewed veto reaching the wire would apply a hard
+     * constraint nobody approved and announce itself only as unplaced Sessions.
      */
     const blackoutsByPerson = await approvedBlackoutsFor(
         tx,
@@ -469,18 +424,9 @@ export async function assembleSolverInput(
     );
 
     /**
-     * People who have blocked out a large share of the teaching week.
-     *
-     * Warn-and-allow, exactly as TAXONOMY.md §3 has it for manual edits: heavy
-     * unavailability is legitimate (a 20% appointment really is unavailable most
-     * of the week) and refusing it would be this layer overruling an
-     * administrator who already approved it. What it must not do is stay
-     * invisible — an infeasible term traces back to a person's calendar far more
-     * often than to anything else in the input, and that is not deducible from
-     * the solver's output.
-     *
-     * Counted against the DEFAULT grid, blanket windows only. See
-     * `blockedSlotSummary`.
+     * Warn-and-allow: refusing heavy unavailability would be this layer overruling
+     * an administrator who already approved it. Counted against the DEFAULT grid,
+     * blanket windows only — see `blockedSlotSummary`.
      */
     const personsWithHeavyVetoLoad: { id: string; name: string; blocked: number; total: number }[] = [];
 
@@ -507,15 +453,10 @@ export async function assembleSolverInput(
         id: person.id,
         roleTags: person.personRoles.map((link) => link.role.key),
         /**
-         * Narrowed to the Groups actually being sent, for the same reason the
-         * Groups themselves are: a `group_id` the solver was never given is a
-         * dangling reference it cannot resolve.
-         *
-         * Dropping the rest loses nothing. A membership only matters if the
-         * Group it names carries a placement in this Term, and a Group with a
-         * placement is by definition referenced — so it is in the sent set,
-         * along with its whole conflict closure. Membership of a Group with no
-         * placements cannot produce a clash for anyone to detect.
+         * Narrowed to the Groups being sent: a `group_id` the solver was never
+         * given is a dangling reference. Dropping the rest loses nothing — a
+         * membership only matters if its Group carries a placement in this Term,
+         * and such a Group is referenced and therefore in the sent set.
          */
         groupIds: person.memberships
             .map((link) => link.groupId)
@@ -550,15 +491,12 @@ export async function assembleSolverInput(
     }[] = [];
 
     /**
-     * Capacity inputs, fetched ONCE for the whole assembly rather than per
-     * Offering: every Offering's closure is walked against the same tenant tree
-     * and the same roll, and twelve Offerings would otherwise mean twelve
-     * identical queries.
+     * Fetched ONCE for the whole assembly: every Offering's closure is walked
+     * against the same tree and roll.
      *
-     * `groupRows` is every Group in the tenant — deliberately NOT the filtered
-     * `sentGroupRows`. That set is narrowed to what the SOLVER needs to reason
-     * about; a Group's real size depends on descendants that may carry no
-     * placement of their own, and dropping them would under-count.
+     * `groupRows` is every Group in the tenant, deliberately NOT `sentGroupRows`:
+     * a Group's real size depends on descendants that may carry no placement of
+     * their own, and dropping them would under-count.
      */
     const capacityGroups = groupRows.map((group) => ({
         id: group.id,
@@ -572,16 +510,10 @@ export async function assembleSolverInput(
     }));
 
     /**
-     * ONE WIRE OFFERING PER SERIES.
-     *
-     * An Offering carrying two or more Groups means an INDEPENDENT series per
-     * Group — each with the full frequency and its own room requirement — not
-     * one combined Session for the union. The solver needs no change to express
-     * that: N wire entries are indistinguishable from N hand-made Offerings,
-     * because it keys everything by wire id and echoes that id straight back.
-     *
-     * A single-group or group-less Offering emits exactly one entry under its
-     * REAL id, so nothing downstream changes for it.
+     * ONE WIRE OFFERING PER SERIES. An Offering carrying two or more Groups means
+     * an INDEPENDENT series per Group, each with the full frequency, not one
+     * combined Session for the union. The solver needs no change: N wire entries
+     * are indistinguishable from N hand-made Offerings.
      */
     const offeringsSplitByGroup: { id: string; title: string; series: number }[] = [];
 
@@ -681,25 +613,15 @@ export async function assembleSolverInput(
     });
 
     /**
-     * EXISTING SESSIONS MUST SPEAK THE SPLIT'S LANGUAGE.
+     * EXISTING SESSIONS MUST SPEAK THE SPLIT'S LANGUAGE. `convert.rs` resolves an
+     * existing Session's Offering by matching `offering_id` against the wire ids,
+     * so one still carrying its REAL id after a split resolves to nothing: it
+     * becomes immovable out-of-scope occupancy, counts toward no series, and the
+     * solver places the full frequency again on top of it.
      *
-     * `convert.rs` resolves an existing Session's Offering by matching its
-     * `offering_id` against the wire ids, and uses that to decide scope, to
-     * count what is `already_realized`, and to reuse Session ids. A Session
-     * still carrying its REAL Offering id after a split would resolve to
-     * nothing: it would become immovable out-of-scope occupancy, count toward
-     * no series, and the solver would place the full frequency again ON TOP of
-     * it. Duplication, silently.
-     *
-     * So a Session of a split Offering is re-pointed at the series whose Group
-     * it carries.
-     *
-     * A LEGACY COMBINED Session — one carrying none or several of the
-     * Offering's Groups — belongs to no series and is OMITTED from the wire
-     * entirely rather than sent as occupancy. It is going to be deleted by the
-     * apply (the app-side scope keeps the real Offering id, so the delete
-     * partition still reaches it), and freezing it as occupancy would block the
-     * very slots its replacements need while it waits to be removed.
+     * A LEGACY COMBINED Session — carrying none or several of the Offering's
+     * Groups — belongs to no series and is OMITTED entirely: the apply will delete
+     * it, and freezing it as occupancy would block the slots its replacements need.
      */
     const splitOfferingGroupIds = new Map<string, Set<string>>();
 

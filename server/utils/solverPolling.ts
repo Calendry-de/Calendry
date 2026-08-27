@@ -45,21 +45,18 @@ export function nextPollAt(startedAt: Date | null, createdAt: Date, now = new Da
 }
 
 /**
- * What a failed GetStatus MEANS, which is the sharpest distinction in Stage 4.
+ * What a failed GetStatus MEANS:
  *
- *   NOT_FOUND (5)    the solver no longer knows this run. Its registry is an
- *                    in-memory map with no persistence, so this means it
- *                    restarted and the run is gone — unrecoverable, and the row
- *                    must be resolved or the one-active-run index blocks that
- *                    term forever.
+ *   NOT_FOUND (5)    the solver's registry is in-memory with no persistence, so
+ *                    it restarted and the run is gone. Unrecoverable, and the row
+ *                    must be resolved or the one-active-run index blocks that term
+ *                    forever.
+ *   UNAVAILABLE (14) the solver is unreachable and the run may still be going.
+ *                    Touching the row would destroy a live run's record on a
+ *                    network blip AND free the index for a second concurrent run.
  *
- *   UNAVAILABLE (14) the solver is unreachable. The run may well still be
- *                    going. Touching the row here would destroy a live run's
- *                    record on a network blip AND free the index for a second
- *                    concurrent run against the same term.
- *
- * Conflating the two breaks one direction or the other, which is why this is a
- * named function with its own test rather than an inline `catch`.
+ * Conflating them breaks one direction or the other, which is why this is a named
+ * function with its own test rather than an inline `catch`.
  */
 export type PollFailure = 'forgotten' | 'unreachable';
 
@@ -123,21 +120,15 @@ export interface RecoveryOutcome {
 }
 
 /**
- * Asks again for the result of a run that succeeded but whose result never
- * arrived.
+ * Asks again for the result of a run that succeeded but whose result never arrived.
  *
- * WHY THIS EXISTS. `pollSolverRun()` records a terminal status even when the
- * result fetch throws — losing the transition would be worse, because the run
- * would look active against a solver that had finished it and the one-active-run
- * index would block that term. But nothing then retried, and the poller claims
- * only active statuses, so such a row was never looked at again: no result, no
- * Generation, and no way to ever get one.
+ * `pollSolverRun()` records a terminal status even when the result fetch throws —
+ * losing the transition would leave the run looking active and block the term — but
+ * nothing then retried, and the poller claims only active statuses, so such a row
+ * was never looked at again: no result, no Generation, no way to get one.
  *
- * WHAT IT WILL NOT DO. Only a SUCCEEDED run is a candidate. CANCELLED and FAILED
- * runs correctly have no result and are never touched — see the claim predicate.
- *
- * The run's `status` is never rewritten. It succeeded; that remains true and
- * remains recorded. Only the CAPTURE outcome is written here.
+ * Only a SUCCEEDED run is a candidate, and the run's `status` is never rewritten;
+ * only the CAPTURE outcome is written here.
  */
 export async function recoverRunResult(tx: Tx, run: {
     id: string;
@@ -301,16 +292,13 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
      */
     let result: unknown;
     /**
-     * Why this is captured into its own column rather than only living inside
-     * `result`: the column's whole purpose is to be QUERYABLE — "which runs are
-     * not reproducible?" is a filter, not a JSON traversal. It went unwritten
-     * until Stage 6a, so it was NULL on every row while its own schema comment
-     * told readers to consult it, and a filter on it returned nothing that read
-     * exactly like "no such runs".
+     * Its own column because the point is to be QUERYABLE — "which runs are not
+     * reproducible?" is a filter, not a JSON traversal. It went unwritten until
+     * Stage 6a, so it was NULL on every row while its schema comment told readers
+     * to consult it, and a filter returned nothing that read like "no such runs".
      *
-     * Rows captured before the fix stay NULL. Nothing backfills them (migrations
-     * here are schema-only), so every reader must treat NULL as UNKNOWN rather
-     * than as "reproducible".
+     * Rows captured before the fix stay NULL, so every reader must treat NULL as
+     * UNKNOWN rather than as "reproducible".
      */
     let terminationReason: string | undefined;
 
@@ -352,14 +340,10 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
 
     /**
      * The Generation is created HERE, by whichever path observed the terminal
-     * transition — not in the poller.
-     *
-     * It lived in the poller first, and the on-demand route silently stole the
-     * transition: a user who opened the run's page before the next tick moved
-     * it to SUCCEEDED, the poller then had nothing left to observe, and NO
-     * Generation was ever created. The result sat captured and unusable. Both
-     * callers share this function precisely so a terminal transition means the
-     * same thing either way.
+     * transition — not in the poller. It lived there first, and the on-demand route
+     * silently stole the transition: a user opening the page before the next tick
+     * left the poller nothing to observe, so NO Generation was ever created and the
+     * result sat captured and unusable.
      */
     let generationId: string | null = null;
 

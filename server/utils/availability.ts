@@ -13,14 +13,11 @@ import { isoDate, overlaps, weekCountOf } from '../../shared/academicCalendar';
 /**
  * Reading and writing person availability.
  *
- * THE SOLVER READ PATH LIVES HERE AND NOWHERE ELSE. `approvedBlackoutsFor` is
- * the only function that turns `person_unavailability` rows into wire
- * blackouts, so there is exactly one place the `status = APPROVED` filter can be
- * wrong — and `tests/person-availability-wire.test.ts` fails if it is removed.
- *
- * That matters more than usual here. A PENDING window reaching the wire would
- * apply a HARD constraint nobody approved, and it would do so silently: the
- * timetable would simply come back with unplaced Sessions.
+ * THE SOLVER READ PATH LIVES HERE AND NOWHERE ELSE: `approvedBlackoutsFor` is the
+ * only function turning rows into wire blackouts, so there is exactly one place the
+ * `status = APPROVED` filter can be wrong. A PENDING window reaching the wire would
+ * apply a HARD constraint nobody approved, and announce itself only as unplaced
+ * Sessions.
  */
 
 /** One veto row as the app reads it back. */
@@ -37,21 +34,15 @@ export interface UnavailabilityRow {
 }
 
 /**
- * APPROVED windows for the given people, in the term being solved.
+ * APPROVED windows for the given people, in the term being solved. The ONLY read
+ * path for solver input — the two filters are the whole safety property, and both
+ * were added because their absence was demonstrated:
  *
- * The ONLY read path into this table for solver input. Callers must not query
- * `personUnavailability` directly — the two filters here are the whole safety
- * property, and both were added because their absence was demonstrated rather
- * than imagined:
+ *   status  a PENDING window applies a HARD rule nobody approved
+ *   term    `weeks` counts ONE term's calendar; a stored `weeks:[2]` reached both
+ *           demo terms, where week 2 begins thirteen months apart
  *
- *   status  a PENDING window on the wire applies a HARD rule nobody approved,
- *           announcing itself only as unplaced Sessions
- *   term    `weeks` counts ONE term's calendar. Sent to every solve, a stored
- *           `weeks:[2]` reached both of the demo tenant's terms, where week 2
- *           begins 2026-09-07 and 2027-10-11 — thirteen months apart
- *
- * `termId IS NULL` means every term, which is what a recurring weekly pattern
- * means and what every row written before the column existed meant.
+ * `termId IS NULL` means every term — what a recurring weekly pattern means.
  */
 export async function approvedBlackoutsFor(
     tx: Tx,
@@ -186,19 +177,13 @@ export async function tenantTerms(tx: Tx, tenantId: string): Promise<TermWindow[
 }
 
 /**
- * Turn a picked date range into the term and week indices it blocks.
+ * Turn a picked date range into the term and week indices it blocks. THE TERM IS
+ * DERIVED FROM THE DATES: a person booking leave knows the dates, and asking which
+ * academic term contains them is asking them to do this lookup.
  *
- * THE TERM IS DERIVED FROM THE DATES, not chosen in the form. A person booking
- * leave knows the dates; asking them which academic term contains them is asking
- * them to do the lookup this function exists to do, and getting it wrong stores
- * week indices against the wrong calendar.
- *
- * Both refusals below are deliberate rather than a best guess, because both
- * "best guesses" are silently wrong:
- *
- *   no term contains it     the row would be stored and be inert forever
- *   it spans two terms      one row cannot say "weeks of A and weeks of B";
- *                           picking either loses half the absence
+ * Both refusals are deliberate, because both best guesses are silently wrong: no
+ * term containing it would store an inert row, and one spanning two terms cannot be
+ * expressed by one row without losing half the absence.
  */
 export function resolveHolidayRange(
     terms: readonly TermWindow[],

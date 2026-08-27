@@ -8,20 +8,15 @@ import { conflictGroupIds, descendantGroupIds } from './groupClosure';
  * Constraint evaluation for manual edits — the warn-and-allow half of
  * TAXONOMY.md §3.
  *
- * SCOPE: this evaluates only the *structural* hard constraints that a manual
- * edit can break — the double-booking rules in STRUCTURAL_CONSTRAINT_TYPES,
- * which are decidable from placement data alone. It is not a solver and never
- * will be. Everything parameterised (online ratios, lecturer vetoes) or
- * preference-shaped (all the soft penalties in §7) belongs to the Rust solver
- * service and is registered below as an explicit TODO rather than silently
- * omitted.
+ * SCOPE: only the STRUCTURAL hard constraints a manual edit can break, which are
+ * decidable from placement data alone. Anything parameterised or preference-shaped
+ * belongs to the Rust solver and is registered below as an explicit TODO rather
+ * than silently omitted.
  *
- * A violation row can only be written against a Constraint the tenant has
- * actually configured, because constraint_violation.constraint_id is a NOT NULL
- * FK. That is the correct behaviour under §1's two-layer principle — constraints
- * are tenant vocabulary — but it means a tenant with no configured
- * `no_double_booking_room` constraint gets no room-collision warnings. Tenant
- * provisioning is responsible for creating the baseline hard constraints.
+ * A violation row can only be written against a Constraint the tenant configured
+ * (`constraint_id` is a NOT NULL FK), so a tenant without
+ * `no_double_booking_room` gets no room-collision warnings. Provisioning is
+ * responsible for the baseline hard constraints.
  */
 
 /**
@@ -105,24 +100,15 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     }
 
     /**
-     * EVERY structural constraint the tenant has, enabled or not — then the
-     * enabled subset.
+     * EVERY structural constraint the tenant has, enabled or not — then the enabled
+     * subset. The distinction is what makes DISABLING take effect:
+     * `clearViolations` removes rows for the ids it is given, so passing only the
+     * enabled ones left a disabled rule's violations in the table with nothing to
+     * delete them, and the toggle looked broken.
      *
-     * The distinction is what makes DISABLING a rule take effect. `clearViolations`
-     * removes rows for the constraint ids it is given, so passing only the
-     * ENABLED ones left a disabled rule's existing violations in the table with
-     * nothing that would ever delete them: the warning stayed on screen forever
-     * and the toggle looked broken.
-     *
-     * It went unnoticed because disabling used to mean editing a rule through
-     * the builder, which is rare. The constraint grid makes it a one-click
-     * action on thirteen rows, so the stale state is now the common case rather
-     * than the odd one.
-     *
-     * Note the pre-existing asymmetry this removes: the `length === 0` branch
-     * below passed an EMPTY id list, and `clearViolations` treats that as "no
-     * constraint filter" and deletes everything session-scoped. So "no rules at
-     * all" cleared correctly while "one rule of several disabled" did not.
+     * Note the asymmetry it removes: the `length === 0` branch passed an EMPTY id
+     * list, which `clearViolations` treats as "no filter" and deletes everything —
+     * so "no rules at all" cleared correctly while "one of several disabled" did not.
      */
     const configured = await tx.constraint.findMany({
         where: {
@@ -188,22 +174,15 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const virtualRoomIds = new Set(virtualRooms.map((room) => room.id));
 
     /**
-     * Virtual rooms host unlimited concurrent sessions — that is what "online"
-     * means, and TAXONOMY.md models online delivery AS a room precisely so
-     * room-assignment logic stays uniform. Two lectures streaming at the same
-     * hour are not a collision.
+     * Virtual rooms host unlimited concurrent sessions — TAXONOMY.md models online
+     * delivery AS a room precisely so room-assignment logic stays uniform.
      *
-     * Excluded HERE, at the construction site, rather than inside
-     * `describeCollision`: `byRoom` is the only input the room check has, so a
-     * future check that reads it cannot forget the exemption. Keyed on the
-     * `is_virtual` FLAG rather than on a well-known "online" room, because
-     * nothing restricts a tenant to a single virtual room.
+     * Excluded at the CONSTRUCTION site rather than inside `describeCollision`, so
+     * a future check reading `byRoom` cannot forget the exemption. Keyed on the
+     * `is_virtual` flag, not a well-known room: nothing restricts a tenant to one.
      *
-     * The solver made the opposite assumption until `calendry-solver@99b41e3`,
-     * which treated a virtual room as capacity-1 and so constrained the SEARCH
-     * to one online Session per slot. Both sides now key on the flag — the
-     * solver via `Room::is_exclusive()`. See CLAUDE.md § "RESOLVED (cross-repo):
-     * the solver treated a VIRTUAL room as capacity-1".
+     * The solver assumed the opposite until `calendry-solver@99b41e3`; both sides
+     * now key on the flag.
      */
     const byRoom = groupBy(
         rooms.filter((row) => !virtualRoomIds.has(row.roomId)),
@@ -214,18 +193,12 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const byGroup = groupBy(groups, 'sessionId', 'groupId');
 
     /**
-     * Who actually ATTENDS each Session — direct participants plus the members
-     * of every group beneath the ones assigned to it.
+     * Who actually ATTENDS each Session — direct participants plus the members of
+     * every group beneath the ones assigned to it.
      *
-     * DESCENDANTS ONLY, not the conflict closure. Membership flows downward:
-     * being in Seminar A1 makes you part of Class A's cohort, but being in
-     * Class A does not put you in Seminar A1. This is the same direction
-     * `descendantGroupIds` already serves for notification fan-out, and the same
-     * one the solver uses (`expand_subtree`) to build its attendee sets.
-     *
-     * Resolved ONCE for all involved sessions, and the membership rows fetched
-     * in a single query — doing either inside the pair loop would be O(n²)
-     * round trips.
+     * DESCENDANTS ONLY, not the conflict closure: membership flows downward, so
+     * being in Seminar A1 makes you part of Class A's cohort but not the reverse.
+     * Same direction the solver's `expand_subtree` uses.
      */
     const attendeeSets = new Map<string, Set<string>>();
 
@@ -390,28 +363,20 @@ export function describeCollision(
              * Nested-group propagation, expanded on ONE side only.
              *
              * A Session booked for a Cohort blocks its child Seminars and vice
-             * versa (TAXONOMY.md §6), so one side must be widened to its
-             * ancestors and descendants. But the other side must be matched by
-             * IDENTITY, against the Groups actually assigned to it.
+             * versa (TAXONOMY.md §6), so one side is widened to its ancestors and
+             * descendants — but the other must be matched by IDENTITY.
              *
-             * Intersecting two EXPANDED sets — which this did until it was
-             * caught during Stage 5 — makes any two Groups sharing a common
-             * ancestor collide, however distantly related. Sibling subtrees each
-             * expand to include their shared root, so the intersection is
-             * non-empty even though neither is an ancestor or descendant of the
-             * other and no person is in both:
+             * Intersecting two EXPANDED sets makes any two Groups sharing a common
+             * ancestor collide, however distantly:
              *
              *     Seminar A1 → {Seminar A1, Class A, Informatics 2026}
              *     Class B    → {Class B,            Informatics 2026}
              *     ∩          = {Informatics 2026}   ← a false positive
              *
-             * Against real demo data that produced 24 phantom violations on a
-             * schedule the solver — which gets this right — reported as clean.
-             *
-             * The test is symmetric in outcome despite looking one-sided: some
-             * Group of `a` is related to some Group of `b` exactly when the
-             * reverse holds. The reported ids are `b`'s own Groups, which is
-             * what a human needs to see rather than an inferred ancestor.
+             * That produced 24 phantom violations against real demo data, on a
+             * schedule the solver reported as clean. The outcome is symmetric
+             * despite looking one-sided; the reported ids are `b`'s own Groups,
+             * which is what a human needs rather than an inferred ancestor.
              */
             const closureA = ctx.conflictSets.get(a.id) ?? new Set<string>();
             const directB = ctx.byGroup.get(b.id) ?? [];
@@ -424,17 +389,11 @@ export function describeCollision(
             /**
              * Catches what the group rule structurally CANNOT: a person in two
              * groups unrelated in the nesting tree, both scheduled at once.
-             * `conflictGroupIds` never connects those groups, so no amount of
-             * group checking will ever see it.
              *
-             * Both sides are expanded all the way down to PEOPLE and then
-             * intersected by identity. Symmetric expansion is safe here — and
-             * would not be for groups — because people are leaves: two people
-             * are the same person or they are not, so the "shares an ancestor"
-             * false positive that broke the group check cannot arise.
-             *
-             * Mirrors the solver's own implementation, which resolves each
-             * session to an attendee set the same way.
+             * Both sides expand all the way down to PEOPLE and intersect by
+             * identity. Symmetric expansion is safe here — and would not be for
+             * groups — because people are leaves, so the "shares an ancestor" false
+             * positive cannot arise.
              */
             const setA = ctx.attendeeSets.get(a.id) ?? new Set<string>();
             const setB = ctx.attendeeSets.get(b.id) ?? new Set<string>();

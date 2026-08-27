@@ -144,15 +144,12 @@ export function formatSlotDate(
 }
 
 /**
- * Clock label for a block index, derived from the grid rather than assumed.
+ * Clock label for a block index, derived from the grid. Walks cumulative
+ * boundaries rather than multiplying by a stride, because a named break override
+ * can replace the default gap at any position — the walk is shared with
+ * `blockOfMinute()`, which asks the inverse question.
  *
- * Blocks are laid end to end with the grid's default gap between them, unless a
- * named break override replaces it at that position — so this walks cumulative
- * boundaries rather than multiplying by a stride. The walk is shared with
- * `blockOfMinute()`, which asks the inverse question; see `shared/timeGrid.ts`.
- *
- * `dayOfWeek` matters once a grid has a day-specific override. It defaults to
- * "no particular day", which sees only universal ones.
+ * `dayOfWeek` defaults to "no particular day", which sees only universal overrides.
  */
 export function blockTime(
     grid: TimeGrid,
@@ -167,16 +164,10 @@ export function blockTime(
 }
 
 /**
- * The one fixed Role key (TAXONOMY.md §2).
- *
- * Every OTHER role name is tenant vocabulary and must never be assumed — this
- * one is schema-level, and it is the same test `server/utils/solverInput.ts`
- * uses to build `lecturerIds`, so the panel, the chip and the solver agree
- * about who is leading a Session.
- *
- * Named here because three client surfaces now split people this way; a fourth
- * copy of a bare `'lecturer'` string literal is how one of them ends up
- * disagreeing with the solver.
+ * The one fixed Role key (TAXONOMY.md §2) — every other role name is tenant
+ * vocabulary. The same test `solverInput.ts` uses for `lecturerIds`, so the panel,
+ * the chip and the solver agree about who leads a Session. Named here because a
+ * fourth bare `'lecturer'` literal is how one of them ends up disagreeing.
  */
 export const LECTURER_ROLE_KEY = 'lecturer';
 
@@ -196,17 +187,13 @@ export function attendeesOf<T extends AssignedPerson>(people: readonly T[]): T[]
 }
 
 /**
- * What to call a Session on screen.
+ * What to call a Session on screen. ONE definition, five consumers — previously
+ * inlined at each with THREE different fallbacks, and the placement banner had
+ * none, so it rendered "Pick a slot for ." for every Event.
  *
- * ONE definition, five consumers — the chip, the inspector, the off-grid tray,
- * the placement banner and the violations panel. It was previously inlined at
- * each of them as `session.offering?.title ?? …`, with THREE different
- * fallbacks: two said "Untitled session", one said "Session", and the banner
- * had none at all, so it rendered "Pick a slot for ." for every Event.
- *
- * The rule: an Event is called what someone named it; anything else is called
- * after its Offering. The two never compete, which is why the create route
- * refuses a title alongside an offeringId.
+ * An Event is called what someone named it; anything else after its Offering. The
+ * two never compete, which is why the create route refuses a title with an
+ * offeringId.
  */
 export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'> | null | undefined): string {
     if (!session) {
@@ -310,18 +297,13 @@ export function describeViolation(violation: Violation, lookup: {
 }
 
 /**
- * Side-by-side layout for anything whose block ranges overlap.
+ * Side-by-side layout for anything whose block ranges overlap. Grouping by
+ * identical start block is not enough: an item starting at block 1 overlaps one
+ * that started at 0 and runs for two, and they land in intersecting grid areas.
  *
- * Grouping by identical start block is not enough: an item starting at block 1
- * overlaps one that started at block 0 and runs for two blocks, and the two land
- * in different grid areas that intersect — so they stack, and the upper chip's
- * hover lift reveals the one underneath.
- *
- * This is the ordinary calendar algorithm. Items that transitively overlap form
- * a cluster; within a cluster each takes the first column free at its start
- * block. Nothing is ever dropped from a cluster: in a timetabling tool an
- * overlap is usually a defect the user is trying to SEE, and on the review
- * screen it is a placement someone is being asked to accept. How a cluster too
+ * The ordinary calendar algorithm — transitively overlapping items form a cluster,
+ * and each takes the first column free at its start block. Nothing is ever dropped:
+ * an overlap is usually a defect the user is trying to SEE. How a cluster too
  * crowded to fan is PRESENTED is `clusterSlots`' decision, not this one.
  */
 /** What the packer needs to know about an item; anything else is the caller's. */
@@ -348,16 +330,11 @@ export interface Packed<T> {
 }
 
 /**
- * The packing itself, over anything that occupies a block range.
- *
- * GENERIC BECAUSE THERE ARE TWO GRIDS. `ScheduleGrid` packs Sessions for the
- * live schedule; `ScheduleReviewGrid` packs ReviewPlacements, which have no
- * Session id at all when the solver proposes a NEW placement. That component
- * previously fanned everything sharing an exact `day:blockIndex` key and split
- * the width evenly, which meant a multi-block placement overlapping a
- * single-block one was drawn on top of it rather than beside it — the very bug
- * described above, reintroduced by a second implementation. One algorithm, two
- * callers, no third copy.
+ * GENERIC BECAUSE THERE ARE TWO GRIDS: `ScheduleGrid` packs Sessions,
+ * `ScheduleReviewGrid` packs ReviewPlacements, which have no Session id at all for
+ * a new placement. That component used to fan everything sharing an exact
+ * `day:blockIndex` key, so a multi-block placement overlapping a single-block one
+ * was drawn on top of it — the same bug, reintroduced by a second implementation.
  */
 export function packSpans<T>(items: T[], read: (item: T) => PackedSpan): Packed<T>[] {
     const spans = items.map((item) => ({ item, ...read(item) }));

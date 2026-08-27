@@ -1,34 +1,17 @@
 /**
- * The fixed permission catalogue (TAXONOMY.md §4).
+ * The fixed permission catalogue (TAXONOMY.md §4). Tenants configure ROLES —
+ * named bundles of these — but never the permissions themselves.
  *
- * Tenants configure ROLES — named bundles of these — but never the permissions
- * themselves, because each one corresponds to a code path and tenants do not
- * write code.
+ * In `shared/` because four consumers must not disagree about the list: the seed
+ * that mirrors it into the `permission` table, the operator CLIs, the API
+ * validator, and the role editor. The editor renders from THIS catalogue, never
+ * from a fetch of the table, so a permission the code implements but the database
+ * lacks is reported rather than silently missing from a list that looks complete.
  *
- * WHY THIS IS IN `shared/` RATHER THAN `server/utils/`
- *
- * Four consumers need the identical list and cannot be allowed to disagree
- * about it: the seed that mirrors it into the `permission` table, the operator
- * CLIs that validate a requested key against it, the API that validates a
- * submitted one, and — since Step 14 — the role editor, which renders a
- * checkbox per permission.
- *
- * That last one is the reason for the move. The editor renders from THIS
- * CATALOGUE, never from a fetch of the `permission` table, for the same reason
- * the constraint grid renders from `shared/constraintTypes.ts`: a permission
- * the code implements but the database has not been seeded with must be
- * REPORTED, not silently missing from a list that looks complete.
- *
- * HOW IT REACHES THE DATABASE. Not by migration — migrations here are
- * schema-only and the `permission` table is created empty on purpose. The rows
- * are written by `prisma db seed` (prisma/seeds/reference/permissions.ts),
- * which both container entrypoints run immediately after `migrate deploy`.
- * Adding a permission is therefore: add it here, run `db seed`, then
- * `bun run grant:permissions -- --role tenant-admin --all-missing` on every
- * EXISTING tenant — provisioning grants the whole catalogue only at creation
- * time, so without that last step the symptom is a 403 on a feature that
- * visibly exists. Removing one is a breaking change for every tenant that
- * assigned it.
+ * Adding one: add it here, run `db seed`, then `bun run grant:permissions --role
+ * tenant-admin --all-missing` on every EXISTING tenant — provisioning grants the
+ * catalogue only at creation time, so without that step the symptom is a 403 on a
+ * feature that visibly exists.
  */
 
 /** Entities served by the generic CRUD routes, and their permission prefix. */
@@ -42,7 +25,8 @@ export const CRUD_RESOURCES = {
     'time-grids': 'time_grid',
     terms: 'term',
     constraints: 'constraint',
-    // Tenant-open vocabulary (TAXONOMY.md §1): the `kind` values an Offering or
+    // Tenant-open vocabulary (TAXONOMY.md §1). `session_kind`, not `session`:
+    // renaming the vocabulary is not the authority to move the timetable.
     // Session can carry. Added in Step 13 because there was no way to create one
     // — provisioning deliberately makes none, so a fresh tenant could not create
     // an Offering at all, its `kindId` being a required FK to a table with no
@@ -53,16 +37,10 @@ export const CRUD_RESOURCES = {
     // authority as being able to move the timetable.
     'session-kinds': 'session_kind',
     /**
-     * Holidays, break weeks and exam periods — the academic calendar
-     * (TAXONOMY.md §2, "FIXED, core from day one").
-     *
-     * Mapped to `term`, NOT a permission of its own. A calendar period is a
-     * child of Term with a mandatory `term_id`, exactly as `time_grid_break` is
-     * a child of TimeGrid, and the same reasoning applies: changing when a
-     * term's exam period falls IS editing the term. A separate
-     * `calendar_period.manage` would be authority over a TABLE rather than over
-     * a capability, and would need a backfill on every existing tenant or the
-     * feature 403s on a screen that visibly exists.
+     * The academic calendar, mapped to `term` rather than a permission of its
+     * own: a calendar period is a child of Term with a mandatory `term_id`, and
+     * changing when an exam period falls IS editing the term. A separate key
+     * would need a backfill on every existing tenant.
      */
     'calendar-periods': 'term',
 } as const;
@@ -70,11 +48,9 @@ export const CRUD_RESOURCES = {
 export type CrudAction = 'read' | 'create' | 'update' | 'delete';
 
 /**
- * Prefixes, DEDUPLICATED — two segments share `term` on purpose (above).
- *
- * `CrudResource` is the segment; `CrudPrefix` is what the permission is named
- * after. They are not the same set and conflating them is what produced the
- * duplicate-key bug this file's history records.
+ * Prefixes, DEDUPLICATED — two segments share `term` on purpose. `CrudResource`
+ * is the segment, `CrudPrefix` what the permission is named after; conflating
+ * them produced the duplicate-key bug below.
  */
 export type CrudResource = keyof typeof CRUD_RESOURCES;
 export type CrudPrefix = (typeof CRUD_RESOURCES)[CrudResource];
@@ -90,10 +66,9 @@ interface PermissionShape {
 /**
  * Everything that is not a CRUD verb on a managed entity.
  *
- * `as const satisfies` rather than a plain annotation: `satisfies` checks the
- * shape without WIDENING the literals, which is what lets `PermissionKey` below
- * be a real union of the keys instead of `string`. An annotation here would
- * type-check identically and silently give up every downstream guarantee.
+ * `as const satisfies`, not an annotation: `satisfies` checks the shape without
+ * WIDENING the literals, which is what lets `PermissionKey` be a real union
+ * instead of `string`.
  */
 const EXPLICIT_PERMISSIONS = [
     // Session editing — explicit verbs, mirroring the routes (TAXONOMY.md §3).
@@ -103,17 +78,9 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'session.swap', category: 'session', description: 'Swap two Sessions' },
     { key: 'session.lock', category: 'session', description: 'Lock or unlock a Session' },
     /**
-     * Its own permission rather than a reuse of `session.create`.
-     *
-     * Deletion is irreversible in a way creation is not: an Event carries no
-     * Offering, so nothing re-creates it and the only record left is the DELETE
-     * event. Separating it lets a tenant grant "put things on the calendar"
-     * without also granting "take them off".
-     *
-     * NOTE the cost, which CLAUDE.md documents: a permission added after a
-     * tenant was provisioned is not held by anyone until
-     * `grant:permissions --all-missing` runs, and the symptom is a 403 on a
-     * feature that visibly exists.
+     * Its own permission: an Event carries no Offering, so nothing re-creates it
+     * and deletion is irreversible in a way creation is not. Lets a tenant grant
+     * "put things on the calendar" without "take them off".
      */
     { key: 'session.update', category: 'session', description: "Edit an Event's title, kind, groups and people" },
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
@@ -125,31 +92,18 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'notification.preview', category: 'notification', description: 'Resolve who a Session change affects' },
 
     /**
-     * Availability — declared unavailability (a HARD constraint) and soft
-     * scheduling preferences.
+     * Availability. `manage_own` covers reading and writing your own settings in
+     * one key — splitting it would allow "may write but not read your own", and
+     * this catalogue has no implication mechanism.
      *
-     * `manage_own` is the SELF-SERVICE capability and covers reading and writing
-     * your own settings in one key. Splitting it would create "may write but not
-     * read your own availability", which is nonsense — and this catalogue has no
-     * implication mechanism, so a nonsense pairing is reachable by grant.
+     * Grantable rather than an inherent right, deliberately: the data is yours,
+     * the CONSEQUENCE is the tenant's, since an unreviewed veto can make a term
+     * infeasible. It carries no "own row only" semantics — that scoping is
+     * structural, because `/api/me/*` takes no person id at all.
      *
-     * It is a granted permission rather than an inherent right, and that was the
-     * load-bearing call in the design. The data is yours; the CONSEQUENCE is the
-     * tenant's, because an unreviewed veto can make a term infeasible. Tenants
-     * genuinely differ on whether staff self-declare or a scheduler collects it,
-     * so it has to be grantable.
-     *
-     * What it does NOT do is carry any "own row only" semantics of its own. The
-     * scoping is structural: `/api/me/*` takes no person id from the URL or the
-     * body, so another Person's row is unnameable rather than merely rejected. A
-     * self-scoped FLAG in this catalogue would mean the generic route machinery
-     * had to understand ownership, and a permission marked self-scoped that one
-     * route forgets to narrow reads as safe while being tenant-wide.
-     *
-     * `manage_any` is deliberately not folded into `person.update`. That
-     * currently means "rename people, change their email"; widening it to
-     * "declare when the timetable may not use them" would be a silent authority
-     * increase for everyone who already holds it.
+     * `manage_any` is not folded into `person.update`: widening "rename people"
+     * to "declare when the timetable may not use them" would be a silent
+     * authority increase for everyone already holding it.
      */
     { key: 'availability.manage_own', category: 'availability', description: 'Set your own unavailability and teaching preferences' },
     { key: 'availability.read_any', category: 'availability', description: "View anyone's unavailability and preferences" },
@@ -161,12 +115,9 @@ const EXPLICIT_PERMISSIONS = [
 ] as const satisfies readonly PermissionShape[];
 
 /**
- * Every permission the code implements, as a UNION rather than `string`.
- *
- * This is what makes the role editor and the write-boundary schema typed
- * against the same thing the seed writes: a checkbox bound to a key that is not
- * in the catalogue, or a zod schema admitting one, is a compile error rather
- * than a foreign-key violation discovered by a tenant.
+ * A UNION rather than `string`, so a checkbox bound to a key outside the
+ * catalogue is a compile error rather than a foreign-key violation found by a
+ * tenant.
  */
 export type PermissionKey = `${CrudPrefix}.${CrudAction}` | (typeof EXPLICIT_PERMISSIONS)[number]['key'];
 
@@ -177,22 +128,10 @@ export interface PermissionDef {
 }
 
 /**
- * Iterated over DISTINCT PREFIXES, not over the entries.
- *
- * Two resource segments deliberately share one prefix: `calendar-periods` maps
- * to `term`. Iterating the entries emitted `term.read/create/update/delete`
- * TWICE — 57 entries where the catalogue has 53 keys.
- *
- * That was not cosmetic. `provision-tenant.ts` inserts this array into
- * `access_role_permission` with a single `createMany` and no `skipDuplicates`,
- * and Postgres rejects duplicate primary keys inside one INSERT — so
- * provisioning a NEW tenant failed outright from the moment `calendar-periods`
- * was added, with the existing tenant unaffected because
- * `grant:permissions --all-missing` computes what is missing and skips
- * duplicates. Anything rendering the catalogue as a list had the same problem
- * one level up: two identical rows under one key.
- *
- * `Set` rather than a dedupe of the OUTPUT, so the duplication never exists.
+ * Over DISTINCT PREFIXES, not entries: `calendar-periods` maps to `term`, so
+ * iterating entries emitted `term.*` twice. `provision-tenant.ts` inserts this
+ * with one `createMany` and no `skipDuplicates`, so provisioning a new tenant
+ * failed outright. A `Set` means the duplication never exists.
  * Pinned by tests/permission-catalogue.test.ts.
  */
 function crudPermissions(): PermissionDef[] {
@@ -218,12 +157,8 @@ export const PERMISSION_KEYS: readonly PermissionKey[] = PERMISSIONS.map((p) => 
 const PERMISSION_KEY_SET: ReadonlySet<string> = new Set<string>(PERMISSION_KEYS);
 
 /**
- * Narrows an untrusted string to a catalogue key.
- *
- * The single place `unknown` becomes `PermissionKey` — used by the API schema
- * and by the role editor when it reads a stored grant. Everything downstream of
- * it is typed, so a key that is not in the catalogue is rejected once, at the
- * boundary, with the key named.
+ * The single place `unknown` becomes `PermissionKey`, so a bad key is rejected
+ * once, at the boundary, with the key named.
  */
 export function isPermissionKey(value: unknown): value is PermissionKey {
     return typeof value === 'string' && PERMISSION_KEY_SET.has(value);
@@ -239,12 +174,8 @@ export interface PermissionCategory {
 }
 
 /**
- * The catalogue grouped for display, in catalogue order.
- *
- * Order comes from the array rather than an alphabetical sort so the editor
- * shows the same shape this file reads in: the managed entities first, then
- * the schedule verbs, then operations, then administration. A sort would put
- * `access_role` at the top, which is the least commonly granted group.
+ * Grouped for display in catalogue order, not sorted: a sort would put
+ * `access_role` first, which is the least commonly granted group.
  */
 export function permissionCategories(): PermissionCategory[] {
     const byKey = new Map<string, PermissionCategory>();
@@ -265,26 +196,17 @@ export function permissionCategories(): PermissionCategory[] {
 /**
  * Resources whose permissions are NOT `<prefix>.<action>`.
  *
- * `access_role` is the case that forced this. The catalogue has held
- * `access_role.manage` and `person_access_role.assign` since the beginning —
- * two capabilities, not eight CRUD verbs — and inventing
- * `access_role.read/create/update/delete` to fit the generic shape would mean
- * editing the catalogue, re-seeding, and backfilling every existing tenant, to
- * end up with `access_role.manage` still checked by nothing. The registry bends
- * to the catalogue, not the other way round.
+ * `access_role` forced this: the catalogue has held `access_role.manage` and
+ * `person_access_role.assign` from the start — two capabilities, not eight CRUD
+ * verbs — and inventing the CRUD shape would mean re-seeding and backfilling
+ * every tenant to end up with `access_role.manage` checked by nothing.
  *
- * ANY of the listed permissions is sufficient, which matters for exactly one
- * entry: reading the role list. The manage SECTION requires
- * `access_role.manage`, but the Person page's role picker needs the same list
- * under `person_access_role.assign` — a tenant may reasonably define a
- * registrar who grants existing roles without being able to invent new ones.
+ * ANY listed permission suffices, which matters for reading the role list: the
+ * manage section needs `access_role.manage`, but the Person page's role picker
+ * needs the same list under `person_access_role.assign`.
  *
- * SHARED, not server-only, and that is the point of it living here. The routes
- * enforce this map; the management UI has to PREDICT it, so that a page never
- * assembles a fetch wave it will be refused. Two copies of "what does reading
- * rooms require" would disagree eventually, and the symptom would be a picker
- * that renders empty instead of being absent — the exact failure this map is
- * now used to prevent.
+ * SHARED, not server-only: the routes enforce this map and the management UI has
+ * to PREDICT it, so a page never assembles a fetch wave it will be refused.
  */
 export const RESOURCE_PERMISSIONS: Record<string, Partial<Record<CrudAction, readonly PermissionKey[]>>> = {
     'access-roles': {

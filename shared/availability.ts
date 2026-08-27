@@ -1,26 +1,17 @@
 import { addDays, isoDate, mondayOf, weekCountOf, weekIndexOf } from './academicCalendar';
 
 /**
- * Declared unavailability and soft preferences — the rules both sides share.
- *
- * One definition, read by the API's write boundary, by `assembleSolverInput`'s
- * report and by the self-service page's "you have blocked N of M" note. Same
- * discipline as `shared/timeGrid.ts` and `shared/groupCapacity.ts`: a page that
- * computed its own version of this would eventually disagree with the number
- * the solve report prints, while looking authoritative.
+ * Declared unavailability and soft preferences — one definition, read by the
+ * API's write boundary, by `assembleSolverInput`'s report and by the
+ * self-service page's "you have blocked N of M" note.
  */
 
 /**
- * One unavailability window, in the wire's own shape.
+ * One unavailability window, `calendry.solver.v1.Unavailability` verbatim.
  *
- * EMPTY MEANS EVERY VALUE ON THAT AXIS — `{days:[5]}` is every Friday,
- * `{blocks:[0]}` is every first block, and all three empty is "never
- * available". This is `calendry.solver.v1.Unavailability` verbatim.
- *
- * `PersonPreference` below INVERTS the convention: there an empty array means
- * "no preference". The two live next to each other and mean opposite things by
- * emptiness, which is exactly the sort of thing that gets misread, so both say
- * so wherever they are declared.
+ * EMPTY MEANS EVERY VALUE ON THAT AXIS — `{days:[5]}` is every Friday, all three
+ * empty is "never available". `PersonPreference` below INVERTS this, where empty
+ * means "no preference"; the two sit next to each other meaning opposite things.
  */
 export interface UnavailabilityWindow {
     days: number[];
@@ -37,23 +28,17 @@ export interface BlockedSlotSummary {
     /** `blocksPerDay × activeDays` — the whole weekly index space. */
     total: number;
     /**
-     * Windows excluded from the count because they name specific weeks.
-     *
-     * Reported rather than folded in: a week-scoped absence ("away at a
-     * conference in week 7") is not a standing block, and counting it against
-     * the weekly grid would inflate the number in a way nobody could reconcile
-     * with what they entered. Saying how many were set aside keeps the summary
-     * honest instead of merely smaller.
+     * Excluded from the count and reported instead: a week-scoped absence is not
+     * a standing block, and counting it against the weekly grid would inflate a
+     * number nobody could reconcile with what they entered.
      */
     weekScopedWindows: number;
 }
 
 /**
- * How much of the weekly grid a person's BLANKET vetoes remove.
- *
- * Blanket only — see `weekScopedWindows`. Counted as distinct (day, block)
- * pairs rather than summed per window, because two windows may overlap and
- * "blocked 14 of 40" has to mean fourteen slots, not fourteen claims.
+ * Blanket vetoes only. Counted as distinct (day, block) pairs, not summed per
+ * window: two windows may overlap, and "blocked 14 of 40" has to mean fourteen
+ * slots rather than fourteen claims.
  */
 export function blockedSlotSummary(
     windows: readonly UnavailabilityWindow[],
@@ -73,7 +58,8 @@ export function blockedSlotSummary(
             continue;
         }
 
-        // Empty = every value on that axis, so an empty `days` expands to the
+        // An empty `days` expands to the grid's ACTIVE days, not all seven: a
+        // Saturday veto in a Mon–Fri tenant blocks nothing that exists.
         // grid's ACTIVE days rather than to all seven: a Saturday veto in a
         // Monday-to-Friday tenant blocks nothing that exists.
         const days = window.days.length ? window.days.filter((day) => activeDays.includes(day)) : activeDays;
@@ -93,15 +79,8 @@ export function blockedSlotSummary(
 
 /**
  * Fraction of the weekly grid above which a solve REPORTS a person's veto load.
- *
- * A threshold decides only WHETHER to mention it, never severity — both numbers
- * travel, so 20-of-40 and 39-of-40 both surface and are obviously different
- * problems. Same reasoning as `ENROLMENT_COMPLETE_RATIO`: flag everything and
- * the report becomes noise people learn to skip.
- *
- * Half the week is not a magic number. It is the point past which "this person
- * is mostly unavailable" is worth an administrator's attention even though the
- * timetable may still be perfectly feasible.
+ * The threshold decides only WHETHER to mention it — both numbers travel, so
+ * 20-of-40 and 39-of-40 both surface as obviously different problems.
  */
 export const HEAVY_VETO_RATIO = 0.5;
 
@@ -113,17 +92,11 @@ export interface WindowProblem {
 /**
  * Write-boundary validation for one window.
  *
- * `blocksPerDay` is the MAXIMUM across the tenant's TimeGrids, not the default
- * grid's. A veto is not term-scoped, so it has to stay expressible for every
- * grid the tenant has; validating against one of them would reject a window
- * that is perfectly meaningful under another.
- *
- * Days are checked against 1..7 rather than against the grid's ACTIVE days.
- * "I am never available on Saturdays" is a legitimate thing to record in a
- * Monday-to-Friday tenant — it blocks nothing today and starts meaning
- * something the moment Saturday is activated. It contributes nothing to
- * `blockedSlotSummary`, which is the honest treatment: stored, and counted as
- * zero.
+ * `blocksPerDay` is the MAXIMUM across the tenant's TimeGrids: a veto is not
+ * term-scoped, so validating against one grid would reject a window meaningful
+ * under another. Days are checked against 1..7, not the ACTIVE days — "never
+ * available on Saturdays" is legitimate to record before Saturday is activated,
+ * and it counts as zero in `blockedSlotSummary`.
  */
 export function validateWindow(
     window: UnavailabilityWindow,
@@ -150,28 +123,22 @@ export function validateWindow(
 }
 
 /**
- * A window naming nothing on any axis means "never available, ever".
- *
- * Legal to store and legal to send — the solver reads it exactly that way — but
- * it is almost always a mis-click, and it is the single most destructive thing
- * a veto can say. So the API refuses it and the form refuses to submit it,
- * rather than routing it through approval where somebody might wave it past.
+ * A window naming nothing on any axis means "never available, ever" — legal to
+ * store and to send, but almost always a mis-click and the most destructive thing
+ * a veto can say, so the API and the form both refuse it rather than routing it
+ * through approval.
  */
 export function isTotalBlackout(window: UnavailabilityWindow): boolean {
     return window.days.length === 0 && window.blocks.length === 0 && window.weeks.length === 0;
 }
 
 /**
- * A Person's soft scheduling preferences.
+ * A Person's soft scheduling preferences. EMPTY MEANS NO PREFERENCE — the
+ * opposite of `UnavailabilityWindow`. An absent row and a row of two empty arrays
+ * are the same state, which is why the write path deletes rather than storing the
+ * second representation.
  *
- * EMPTY MEANS NO PREFERENCE on that axis — the opposite of
- * `UnavailabilityWindow` above. An absent row and a row holding two empty
- * arrays are the same state, which is why the write path deletes rather than
- * storing the second representation.
- *
- * STORED BUT NOT YET SOLVER-EFFECTIVE. No wire field exists for these; see the
- * `PersonPreference` model comment for why that is deliberate here and was a
- * bug for `lecturer_veto`.
+ * STORED BUT NOT YET SOLVER-EFFECTIVE: no wire field exists for these.
  */
 /** A term, as the availability screens need it to resolve and preview dates. */
 export interface TermWindow {
@@ -183,16 +150,12 @@ export interface TermWindow {
 }
 
 /**
- * The clamp on a per-person preference weight, declared ONCE.
+ * Declared ONCE because three places need the same two numbers: the zod schema on
+ * the administrator write path, the control that edits the value, and the database
+ * CHECK (which cannot import this, so the migration restates the range).
  *
- * In `shared/` because three places need the same two numbers and a copy in any
- * of them is a second definition that agrees until it does not: the zod schema
- * on the administrator write path, the control that edits the value, and the
- * database CHECK `person_preference_weight_multiplier_range` (which cannot
- * import this, so the migration states the same range and says why).
- *
- * A multiplier, not an absolute weight — see the `PersonPreference` model
- * comment for why an absolute override rots when the tenant default changes.
+ * A multiplier, not an absolute weight — an absolute override rots when the
+ * tenant default changes.
  */
 export const WEIGHT_MULTIPLIER_MIN = 0.5;
 export const WEIGHT_MULTIPLIER_MAX = 2;

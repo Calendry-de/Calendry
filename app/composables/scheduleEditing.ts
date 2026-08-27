@@ -3,15 +3,12 @@ import type { ScheduleSession } from '~/composables/schedule';
 import { useOverlayActive } from '~/composables/overlay';
 
 /**
- * The editing interaction: what is selected, whether we are placing it, and the
- * two mutations the API exposes.
+ * The editing interaction: what is selected, whether we are placing it, and the two
+ * mutations the API exposes.
  *
- * OWNERSHIP BOUNDARY: this is one state machine, not a bag of flags — selection
- * and placement mode constrain each other, and Escape unwinds them in order.
- * Splitting them across components is how that ordering gets lost.
- *
- * Enforcement stays server-side. Nothing here is a permission check; the page
- * decides which affordances to render.
+ * ONE STATE MACHINE, not a bag of flags — selection and placement mode constrain
+ * each other and Escape unwinds them in order. Enforcement stays server-side;
+ * nothing here is a permission check.
  */
 /**
  * What a click on the grid means right now.
@@ -28,17 +25,12 @@ export function useScheduleEditing(options: {
 }) {
     const selectedId = ref<string | null>(null);
     /**
-     * What a click on the GRID currently means.
+     * What a click on the GRID currently means — which is the whole test for what
+     * belongs here. Editing the room changes nothing about the grid, so it is an
+     * inspector control rather than a fourth value.
      *
-     * A mode exists only when it changes that — which is the whole test for
-     * whether something belongs here. `place` turns a slot into a destination,
-     * `swap` turns a session into a partner. Editing the room changes nothing
-     * about the grid, so it is a control in the inspector rather than a fourth
-     * value here.
-     *
-     * One enum rather than two booleans: `placing` + `swapping` would describe
-     * four states, three of which are meaningless, and would need a guard
-     * somewhere to keep them apart. Mutual exclusion by construction instead.
+     * One enum rather than two booleans: `placing` + `swapping` would describe four
+     * states, three meaningless, needing a guard to keep them apart.
      */
     const mode = ref<EditMode>('idle');
     const busy = ref(false);
@@ -60,17 +52,13 @@ export function useScheduleEditing(options: {
     const creating = computed(() => mode.value === 'create');
 
     /**
-     * The session most recently selected, kept even if it leaves the view.
+     * Kept even if it leaves the view. `sessions` holds only the week on screen, so
+     * deriving `selected` from it alone drops the selection on navigation — fatal
+     * for a cross-week move, where the interaction is "select here, navigate there,
+     * place". The mode survived that transition; the subject did not.
      *
-     * `sessions` holds only the week currently on screen. Deriving `selected`
-     * from it alone means navigating to another week silently drops the
-     * selection — which is fatal for a cross-week move, because the whole
-     * interaction is "select here, navigate there, place". The mode survived
-     * that transition; the subject did not, so `move()` early-returned on a
-     * null selection and the click did nothing at all.
-     *
-     * The snapshot is the fallback, never the primary: while the session IS in
-     * view, the live row wins so edits and violations stay current.
+     * The snapshot is the fallback, never the primary: while the session IS in view
+     * the live row wins, so edits and violations stay current.
      */
     const snapshot = ref<ScheduleSession | null>(null);
 

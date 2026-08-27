@@ -1,26 +1,13 @@
 /**
  * The constraint-type library (TAXONOMY.md §7).
  *
- * WHY `shared/` AND NOT server/utils OR app/utils
- * -----------------------------------------------
- * Two consumers need the same list and must not drift:
+ * In `shared/` because two consumers must not drift: `server/utils/violations.ts`
+ * decides which types it can evaluate, and the rule builder decides which a
+ * tenant may configure. A type in the UI that the evaluator does not know is a
+ * rule that exists, is enabled, shows no violations, and means nothing.
  *
- *   server/utils/violations.ts   decides which types it can evaluate
- *   the rule builder UI          decides which types a tenant may configure
- *
- * If the UI's list ever gained a type the evaluator does not know, a tenant
- * could configure a rule that is silently never checked — a constraint that
- * exists, is enabled, shows no violations, and means nothing. Reading one
- * declaration from both sides makes that unrepresentable rather than merely
- * unlikely. `violations.ts` re-exports the two key lists so nothing else had to
- * change.
- *
- * NOT A DSL, BY DESIGN
- * --------------------
- * TAXONOMY.md §2: constraints are "predefined constraint types + parameters,
- * not a free-form expression DSL". A type here declares its parameters; the
- * builder renders exactly those. Adding a constraint type is a code change,
- * because a type with no evaluator is a promise nothing keeps.
+ * NOT A DSL: constraints are predefined types plus parameters. Adding one is a
+ * code change, because a type with no evaluator is a promise nothing keeps.
  */
 
 /** Structural types the app itself decides, from placement data alone. */
@@ -119,19 +106,11 @@ export interface ConstraintTypeDef {
     /**
      * Which `ConstraintConfig` field this becomes on the wire.
      *
-     * OPTIONAL, for exactly one situation: a type whose catalogue entry lands
-     * before the proto field that carries it. `person_preference_fit` is the
-     * first — the wire field arrives in a later slice, and the alternative was
-     * naming a `ConstraintConfig` field that does not exist. That would not
-     * fail: `toWireConstraint` builds the config with an `as` cast and
-     * ts-proto's encoder writes only fields it knows, so the constraint would
-     * be dropped from the request with nothing reporting it — the tenant sees
-     * a rule that is enabled, weighted, and silently absent from every run.
-     *
-     * A type with no `wireField` is SKIPPED by `toWireConstraint` and named in
-     * the assembly report, which is the same channel offering-scoped rows
-     * already use for "configured, cannot cross". Leave it unset until the
-     * field exists; setting it is what makes the rule live.
+     * OPTIONAL for one situation: a catalogue entry landing before the proto field
+     * that carries it. Naming a field that does not exist would not fail —
+     * `toWireConstraint` casts and ts-proto writes only fields it knows — so the
+     * constraint would be dropped from the request with nothing reporting it.
+     * A type with no `wireField` is SKIPPED and named in the assembly report.
      */
     wireField?: WireConstraintField;
     label: string;
@@ -139,20 +118,13 @@ export interface ConstraintTypeDef {
     description: string;
     evaluator: ConstraintEvaluator;
     /**
-     * HARD when a breach is a defect, SOFT when it is a preference with a
-     * penalty weight. `null` means the tenant chooses.
+     * HARD when a breach is a defect, SOFT when it is a preference with a weight;
+     * `null` means the tenant chooses. Fixed for most types because the severity IS
+     * the meaning. The database CHECK enforces the HARD⇄no-weight pairing
+     * regardless of what the UI offers.
      *
-     * Fixed for most types because the severity IS the meaning: a room being
-     * double-booked is not a preference, and "minimize Saturday" is not a
-     * defect. The database CHECK enforces the HARD⇄no-weight, SOFT⇄weight
-     * pairing regardless of what the UI offers.
-     *
-     * On the SOFT side, note that the weight a tenant attaches is RELATIVE and
-     * has no absolute scale — the solver derives its hard-violation penalty as
-     * `sum(all soft weights) * placements + 1`, so only ratios between enabled
-     * soft rules carry meaning, and no magnitude lets a soft rule outrank a
-     * hard one. Deliberately unbounded above; see the long note on
-     * `RESOURCES.constraints.weight` in server/utils/resources.ts.
+     * A SOFT weight is RELATIVE and unbounded above — see the note on
+     * `RESOURCES.constraints.weight`.
      */
     severity: 'HARD' | 'SOFT' | null;
     /**
@@ -249,18 +221,12 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         key: 'online_onsite_same_day_exclusion',
         wireField: 'onlineOnsiteSameDay',
         /*
-         * SOFT since the reclassification, and the label had to move with it.
+         * SOFT since the reclassification, and the label moved with it: the solver
+         * used to eliminate a mixing placement and now prices one, so "No mixing…"
+         * would be the control asserting the opposite of the behaviour.
          *
-         * "No mixing…" was a promise the solver stopped keeping: it used to
-         * eliminate a mixing placement outright, and now prices one, so a
-         * schedule may legitimately come back with a mixed day when every
-         * alternative cost more. A label that still said "No" would be the
-         * control asserting the opposite of the behaviour — the same reason
-         * MinimizeRoomRank's label had to change when its direction became
-         * configurable.
-         *
-         * The KEY is unchanged and must stay unchanged: `type` is createOnly,
-         * so renaming it would orphan every stored row rather than migrate it.
+         * The KEY must stay unchanged: `type` is createOnly, so renaming it would
+         * orphan every stored row rather than migrate it.
          */
         label: 'Minimize online/on-site switching in a day',
         description: 'Prefer not to ask a group to be on campus and online on the same day.',
@@ -433,24 +399,13 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             type: 'boolean',
             required: false,
             /*
-             * DEFAULTS TO TRUE, which is also what a newly provisioned tenant
-             * gets, because `defaultConstraintRow` seeds params from exactly
-             * these defaults.
+             * DEFAULTS TO TRUE, expressed ONCE here rather than as a catalogue
+             * default of false with a provisioning override — two defaults for one
+             * field agree until something distinguishes them, and then the form
+             * prefills one thing while provisioning writes another.
              *
-             * The product's opinion is "use the good rooms for teaching rather
-             * than leaving them empty", and it is expressed ONCE here rather
-             * than as a catalogue default of false with a provisioning override
-             * of true. Two defaults for one field is the same two-implementations
-             * shape as `weeksInTerm`: they agree until something distinguishes
-             * them, and then the form prefills one thing while provisioning
-             * writes another.
-             *
-             * EXISTING tenants are untouched. Their stored params carry no
-             * `invert` key, and an absent key reads as false through
-             * `Boolean()` — so every rule already configured keeps sparing the
-             * best rooms until someone deliberately changes it. This default
-             * governs new rows only, which is the same restraint
-             * `defaultConstraintRow` already applies to `isEnabled`.
+             * EXISTING tenants are untouched: their stored params carry no
+             * `invert` key, which reads as false. This governs new rows only.
              */
             default: true,
             help: 'Off — discourage rooms AT OR ABOVE the boundary, keeping premium rooms free. '
@@ -513,29 +468,17 @@ export function findConstraintType(key: string | undefined): ConstraintTypeDef |
 /**
  * A constraint type as a human label, whichever of its three names arrives.
  *
- * WHY THREE NAMESPACES REACH THE SAME UI
- * --------------------------------------
- * The review screen renders two violation breakdowns side by side, and they
- * arrive keyed differently:
+ * The review screen renders two violation breakdowns side by side, keyed
+ * differently: this app's evaluator by `detail.reason` (room_double_booked), the
+ * catalogue by `key` (no_double_booking_room), the solver by proto constraint
+ * (RoomDoubleBooking). Rendered raw, one panel showed a wire enum.
  *
- *   this app's evaluator  `detail.reason`      room_double_booked
- *   this catalogue        `key`                no_double_booking_room
- *   the solver's report   proto constraint     RoomDoubleBooking
+ * The solver's names are DERIVED from `wireField` (`maxOnlineShare` →
+ * `MaxOnlineShare`) rather than listed again, so a new type gets its label the
+ * moment it gets a wire field.
  *
- * Rendered raw, two adjacent lists used two naming conventions and one of them
- * was a wire enum ("4 × MaxOnlineShare"). Resolving all three through the
- * catalogue is what makes the two panels speak one language.
- *
- * The solver's names are DERIVED from `wireField` rather than listed again:
- * `maxOnlineShare` → `MaxOnlineShare` is the proto's own convention, so a new
- * type gets its label the moment it gets a wire field, instead of needing a
- * second table somebody has to remember.
- *
- * UNKNOWN KEYS ARE SPACED, NOT NAMED. A token this catalogue does not know
- * renders as itself, readably — never as a guessed label. `unknown` is the
- * evaluator's own placeholder for a violation row with no reason recorded and
- * gets said plainly, because inventing a rule name for it would be the exact
- * "confidently wrong" failure this file exists to prevent.
+ * UNKNOWN KEYS ARE SPACED, NOT NAMED: a token this catalogue does not know
+ * renders as itself, readably, never as a guessed label.
  */
 const CONSTRAINT_LABEL_INDEX: Record<string, string> = (() => {
     const index: Record<string, string> = {};
@@ -660,35 +603,19 @@ export interface ConstraintShapeProblem {
 
 /**
  * Write-boundary validation for a constraint row: the two rules the catalogue
- * knows and the generic CRUD schema cannot express by itself.
+ * knows and the generic CRUD schema cannot express.
  *
- * WHY ONE FUNCTION FOR TWO RULES
- * ------------------------------
- * Severity-contradicts-the-catalogue and weight-is-negative are the same
- * category of gap — the rule builder honours a constraint the API does not — and
- * they are checked from two different places (a zod refinement on create, the
- * `beforeUpdate` hook on update, which have different information available).
- * Two rules times two call sites is four chances to drift; one function called
- * twice is none.
+ * One function for both, because severity-contradicts-the-catalogue and
+ * weight-is-negative are checked from two places with different information — two
+ * rules times two call sites is four chances to drift.
  *
- * ABSENT MEANS UNCHECKED, AND THAT IS THE POINT
- * ---------------------------------------------
- * `severity` and `weight` are only examined when they are `undefined`-free, so a
- * caller passes exactly the fields it is actually setting. On create that is
- * everything; on update it is whatever the PATCH contains.
+ * ABSENT MEANS UNCHECKED, deliberately: validating the MERGED row on update would
+ * make an existing bad row UNEDITABLE, refusing the very person trying to disable
+ * it. Checking only what is being changed means a legacy row can always be
+ * repaired while no new bad value gets in.
  *
- * That asymmetry is deliberate and load-bearing. Validating the MERGED row on
- * update would make an existing bad row **uneditable** — someone trying to
- * disable the very row the guard is protecting them from would be refused by
- * the guard. That is not hypothetical: CLAUDE.md records a mislabelled
- * constraint that "could never be corrected by editing — only deleted and
- * recreated", because `type` is create-only. Checking only what is being
- * changed means a legacy row can always be renamed, disabled, or repaired,
- * while no new bad value gets in.
- *
- * `null` weight is NOT absent: it is the explicit "this is HARD, it has no
- * weight" value, and passes because the HARD ⇄ NULL pairing is the database
- * CHECK's job, not this function's.
+ * `null` weight is NOT absent — it is the explicit "this is HARD" value, and the
+ * HARD ⇄ NULL pairing is the database CHECK's job.
  */
 export function validateConstraintShape(input: {
     /** The row's type. On update this is the STORED value — `type` is create-only. */
@@ -770,19 +697,14 @@ export function defaultConstraintTypes(): ConstraintTypeDef[] {
 /**
  * The row a tenant's default for `type` should be created with.
  *
- * ENABLED-BY-DEFAULT IS LIMITED TO THE STRUCTURAL RULES, deliberately:
- *
- *  - the four structural types are evaluated by THIS app
- *    (`refreshViolations`), and they are what produces the double-booking
- *    warnings a user expects to see without configuring anything. Three of them
- *    were already enabled by `provision-tenant.ts`, so this is parity plus
- *    `no_double_booking_person`, which had been unreachable.
- *  - the other nine steer the SOLVER. Enabling them on upgrade would silently
- *    change the timetable every existing tenant gets from their next run, which
- *    is not a change a backfill script is entitled to make on their behalf.
+ * ENABLED-BY-DEFAULT IS LIMITED TO THE STRUCTURAL RULES: those are evaluated by
+ * THIS app and produce the double-booking warnings a user expects without
+ * configuring anything. The other nine steer the SOLVER, and enabling them on
+ * upgrade would silently change the timetable every existing tenant gets from
+ * their next run.
  *
  * A disabled row is not a dormant rule — it is a rule the tenant can see and
- * switch on. That distinction is the point of the whole default-row model.
+ * switch on.
  */
 export function defaultConstraintRow(type: ConstraintTypeDef): {
     type: string;

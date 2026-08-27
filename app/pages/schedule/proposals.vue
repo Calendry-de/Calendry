@@ -1,15 +1,6 @@
 <!--
-    THESIS: a proposal is a decision waiting for someone, so it needs a place to
-    wait. This page exists because `/schedule/review/:id` had exactly one link in
-    the entire codebase — inside the solver toolbar's transient `finished` state,
-    which a page reload destroys. A colleague could not open a proposal you asked
-    them to review, and the department head PRODUCT.md names as the reviewer had
-    no entry point at all, while 39 READY proposals sat in the database.
-    STORY: the visitor sees what is awaiting a decision, sees which one scored
-    best among the runs that solved the SAME input — the only comparison this
-    data actually supports — and opens it.
-    FORM: a list, not a grid. Each row is one decision, and the score is the
-    column that ranks them, but only within a comparable group.
+    Every proposal the solver has produced for this tenant, so a decision is not
+    lost when the run that made it scrolls away. Design intent lives in DESIGN.md.
 -->
 <template>
     <div class="props">

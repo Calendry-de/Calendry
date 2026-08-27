@@ -6,19 +6,16 @@ import {
 } from '../../shared/academicCalendar';
 
 /**
- * Stage 3a — the grid and the academic calendar, and the one genuinely hard
- * computation in the whole integration: `reference_slot`.
- *
- * Everything the solver places is addressed as (week, day, block) against the
- * calendar built here. If this is wrong, every placement is wrong in a way that
- * still looks like a valid timetable — so the arithmetic is kept in pure
+ * The grid and the academic calendar, and the one genuinely hard computation in the
+ * integration: `reference_slot`. Everything the solver places is addressed as
+ * (week, day, block) against the calendar built here, so an error makes every
+ * placement wrong in a way that still looks like a valid timetable — hence pure
  * functions over primitives, testable without a database.
  *
- * ALL DATE ARITHMETIC IS UTC-ANCHORED. `@db.Date` columns come back from Prisma
- * as UTC-midnight Dates, and doing day arithmetic in the server's local zone
- * shifts them by a day either side of midnight. The only place a real timezone
- * is consulted is `localNow`, which converts an instant into the TENANT's
- * calendar day — never the requester's (TAXONOMY.md §8).
+ * ALL DATE ARITHMETIC IS UTC-ANCHORED: `@db.Date` columns come back as UTC-midnight
+ * Dates, and local-zone day arithmetic shifts them either side of midnight. The
+ * only place a real timezone is consulted is `localNow`, which uses the TENANT's
+ * calendar day, never the requester's (TAXONOMY.md §8).
  */
 
 /**
@@ -55,20 +52,13 @@ export function toWireTimeGrid(grid: AppTimeGrid, institutionTimezone: string): 
 }
 
 /**
- * Block index containing `minutesSinceMidnight`, or the count of blocks already
- * finished when the time falls in a break or past the last block.
+ * Block index containing `minutesSinceMidnight`, or the count of blocks finished
+ * when the time falls in a break or past the last block. The one calculation that
+ * MUST include breaks: it converts a wall-clock instant into a grid index, and a
+ * 15-minute gap really does shift when block 3 starts.
  *
- * This is the one calculation that MUST include breaks: it converts a wall-clock
- * instant into a grid index, and a 15-minute gap between blocks really does
- * shift when block 3 starts.
- *
- * Delegates to the shared walk, which `blockTime()` also uses. The two answer
- * inverse questions about one timeline and must never disagree — see
- * `shared/timeGrid.ts`.
- *
- * `dayOfWeek` is optional and defaults to "no particular day", which sees only
- * universal break overrides. Callers that know the day should pass it, because
- * a day-specific override changes the answer.
+ * Delegates to the shared walk that `blockTime()` uses — the two answer inverse
+ * questions about one timeline and must never disagree.
  */
 export function blockOfMinute(
     grid: AppTimeGrid,
@@ -92,23 +82,20 @@ export interface AppCalendarPeriod {
 
 
 /**
- * Weeks are MONDAY-ANCHORED, per the proto's `start_date` = "that week's
- * Monday". A term rarely starts on a Monday, so week 0 begins at the Monday on
- * or before `term.startDate` — which means the first week may contain days
- * before the term itself. That is correct: the week index has to be derivable
- * from any date by the same rule, or `reference_slot` and Session weeks would
- * disagree.
+ * Weeks are MONDAY-ANCHORED, per the proto's `start_date`. A term rarely starts on
+ * a Monday, so week 0 begins at the Monday on or before `term.startDate` and the
+ * first week may contain days before the term — correct, because the week index has
+ * to be derivable from any date by the same rule or `reference_slot` and Session
+ * weeks would disagree.
  *
- * WEEK-KIND PRECEDENCE (policy, not derivation — confirmed before building):
- *   EXAM     if any exam period touches the week at all
+ * WEEK-KIND PRECEDENCE (policy, not derivation):
+ *   EXAM     if any exam period touches the week
  *   BREAK    if a break period covers the ENTIRE week
  *   HOLIDAY  if a holiday period covers the ENTIRE week
  *   TEACHING otherwise
  *
- * Holidays that do NOT swallow a whole week are emitted as individual dates in
- * `holidays[]`, matching the proto's "single days that are holidays inside
- * otherwise-teaching weeks". A week already marked HOLIDAY does not also list
- * its days — that would be the same fact twice.
+ * Holidays that do not swallow a whole week are emitted as individual dates. A week
+ * already marked HOLIDAY does not also list its days.
  */
 export function buildAcademicCalendar(
     termId: string,

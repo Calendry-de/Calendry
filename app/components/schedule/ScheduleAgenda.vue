@@ -1,10 +1,8 @@
 <template>
     <div class="agenda">
-        <!--
-            A week grid does not survive a phone, so the mobile presentation is a
-            day agenda over the same data rather than a scaled-down grid. Days
-            come from the TimeGrid, so this never assumes a five-day week either.
-        -->
+        <!-- A week grid does not survive a phone, so the mobile presentation is
+             a day agenda over the same data. Days come from the TimeGrid, so this
+             never assumes a five-day week. -->
         <div
             class="agenda_days"
             role="tablist"
@@ -29,19 +27,11 @@
         </div>
 
         <!--
-            THE MOBILE PRESENTATION HAS TO BE ABLE TO EDIT.
-
-            Below 1365px — which includes an ordinary 1280px laptop — the week
-            grid is hidden and this is the only surface. It had no cell targets,
-            so pressing the inspector's "Move…" entered placement mode, rendered
-            "Pick a slot… Press Escape to cancel", and offered nothing to pick.
-            `Add event` was the same dead end.
-
-            PRODUCT.md commits to genuine mobile and says a week grid on a phone
-            "rules out drag-and-drop as the only editing gesture" — click-a-cell
-            was desktop-only in exactly the same way. These are the same targets
-            the grid emits, in the shape this presentation can carry: one row per
-            block, stating its own clock time.
+            THE MOBILE PRESENTATION HAS TO BE ABLE TO EDIT. Below 1365px — which
+            includes an ordinary 1280px laptop — this is the only surface, and
+            without cell targets "Move…" entered placement mode and offered
+            nothing to pick. Same targets the grid emits, in the shape this
+            presentation can carry.
         -->
         <ol
             v-if="placing"
@@ -142,7 +132,21 @@ defineEmits<{
     place: [target: { dayOfWeek: number; blockIndex: number }];
 }>();
 
+/**
+ * Opens on the SELECTED session's day, not on Monday. Both presentations are
+ * always in the DOM and the 1365px swap is a `display` toggle, so crossing the
+ * breakpoint always landed on `activeDays[0]` — the inspector said Friday while
+ * the agenda said Monday.
+ */
 const activeDay = ref(props.grid.activeDays[0] ?? 1);
+
+watch(() => props.sessions.find((session) => session.id === props.selectedId)?.dayOfWeek,
+    (day) => {
+        if (day !== undefined && props.grid.activeDays.includes(day)) {
+            activeDay.value = day;
+        }
+    },
+    { immediate: true });
 
 const daySessions = computed(() => props.sessions
     .filter((s) => s.dayOfWeek === activeDay.value)
@@ -217,11 +221,8 @@ function countFor(day: number): number {
         background: $content7;
     }
 
-    /*
-     * The placement targets. Full-width rows, 44px minimum, stating the clock
-     * time they commit to — this is the primary editing gesture on the only
-     * surface below 1365px, and it is reached with a thumb.
-     */
+    /* The placement targets: full-width rows, 44px minimum, stating the clock
+       time they commit to. The primary editing gesture below 1365px. */
     &_targets {
         display: flex;
         flex-direction: column;
@@ -298,8 +299,12 @@ function countFor(day: number): number {
 
         li {
             display: grid;
-            grid-template-columns: 58px 1fr;
-            gap: 10px;
+
+            /* `minmax(0, 1fr)`, not `1fr`: a track's default minimum is its
+               min-content width, so a long title pushed the track wider than its
+               share and the row overflowed instead of ellipsising. */
+            grid-template-columns: 58px minmax(0, 1fr);
+            gap: var(--space-4);
             align-items: stretch;
 
             min-height: 58px;

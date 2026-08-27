@@ -5,36 +5,18 @@ import { fromWireWeek } from './solverSessions';
 import { parseWireOfferingId } from './offeringSplit';
 
 /**
- * Stage 5 — turning a solver result into real Session rows.
- * Stage 6a — split into a PLAN (reads only) and an EXECUTE (writes).
+ * Turning a solver result into real Session rows, split into a PLAN (reads only)
+ * and an EXECUTE (writes).
  *
- * WHY THIS HAPPENS AT APPLY AND NOT AT CAPTURE
+ * AT APPLY, NOT AT CAPTURE: `/api/sessions` never filters by generation, so a
+ * Session appears on the live schedule the moment it exists. Writing placements
+ * at capture would mean "review before apply" reviews a schedule that has already
+ * changed. Placements stay in `solver_run.result` until someone applies.
  *
- * `/api/sessions` filters by term, week, group, room and person — never by
- * generation or `is_current`. A Session row therefore appears on the live
- * schedule the moment it exists. Writing placements when the Generation is
- * created would mean "review before apply" reviews a schedule that has already
- * changed, which is the opposite of what it is for.
- *
- * So placements stay in `solver_run.result` until someone applies the
- * Generation. Nothing is copied — the payload can be megabytes — and the
- * Generation reaches its run through `solver_run.generation_id`.
- *
- * WHY THE PLAN IS A SEPARATE STEP (Stage 6a)
- *
- * The review screen has to answer "what will applying this do?" before anything
- * is written. Computing that answer with different code than the apply uses
- * would let the preview and the apply disagree — the preview would eventually
- * lie, and nothing would catch it. So `planMaterialization()` decides
- * everything and writes nothing; `executePlan()` performs exactly what the plan
- * says. Both callers consume the same object.
- *
- * Same reasoning as `pollSolverRun()` in Stage 4: one function, two callers,
- * because two implementations of one rule is one implementation too many.
- *
- * The plan is a SNAPSHOT, not a promise. A manual edit between preview and
- * apply legitimately changes the outcome; `computedAt` on the preview response
- * is what lets a UI say so.
+ * THE PLAN IS SEPARATE so the review screen can answer "what will this do?" with
+ * the same code the apply uses — computing it twice would let the preview lie with
+ * nothing to catch it. It is a SNAPSHOT, not a promise: a manual edit in between
+ * legitimately changes the outcome, which is what `computedAt` is for.
  */
 
 /** One placement the solver returned, resolved against what already exists. */
@@ -122,22 +104,18 @@ function samePlacement(a: Placement, b: Placement): boolean {
 /**
  * Decides what applying this output would do. Reads the database; writes nothing.
  *
- * THE THREE-WAY PARTITION, and the one that is destructive:
+ * THE THREE-WAY PARTITION:
  *
  *   session_id empty            create — the solver invented this Session
  *   session_id matches a row    move   — same Session, new placement
  *   existing in-scope, absent   DELETE — the solver chose not to place it
  *
- * That last case is deliberate and confirmed. If ExactFrequency could not place
- * all six Sessions of an Offering, the output holds four; leaving the other two
- * where they were would mean the applied schedule contains placements the
- * solver rejected while `frequency` appears satisfied. It is recoverable
- * through the event log, which is why deleting is safe to prefer over a
- * silently wrong schedule.
+ * That last case is deliberate: leaving unreturned Sessions where they were would
+ * mean the applied schedule contains placements the solver rejected while
+ * `frequency` appears satisfied. It is recoverable through the event log.
  *
- * LOCKED SESSIONS ARE NEVER TOUCHED. They were sent to the solver as immovable
- * fixtures (TAXONOMY.md §3), so honouring that here is not a policy choice —
- * the answer was computed on the assumption they would not move.
+ * LOCKED SESSIONS ARE NEVER TOUCHED — they were sent as immovable fixtures, so the
+ * answer was computed on the assumption they would not move.
  */
 export async function planMaterialization(tx: Tx, options: {
     tenantId: string;
@@ -153,17 +131,13 @@ export async function planMaterialization(tx: Tx, options: {
     const inScope = new Set(scopeOfferingIds);
 
     /**
-     * TWO SETS, deliberately (Stage 7c).
+     * TWO SETS: `visible` is everything this tenant can see, including
+     * Federation-shared Sessions, so the plan is aware of them; `existing` is the
+     * tenant-owned subset and the only thing the plan may move or delete.
      *
-     * `visible` is everything this tenant can see, INCLUDING Federation-shared
-     * Sessions — needed so the plan is aware of them. `existing` is the strictly
-     * tenant-owned subset, and is the only thing the plan may move or delete.
-     *
-     * Widening this to one set would have been the dangerous version: a member
-     * tenant's solver run would treat a shared Session it did not return as an
-     * "orphan" and delete another tenant's event. RLS would refuse the write, so
-     * the visible failure would be a 500 mid-apply — but the intent would
-     * already have been wrong, and a future privileged path would make it real.
+     * One set would be the dangerous version: a member tenant's run would treat a
+     * shared Session it did not return as an orphan and delete another tenant's
+     * event. RLS would refuse the write, but the intent would already be wrong.
      */
     const visible = await tx.session.findMany({
         where: {
@@ -202,18 +176,12 @@ export async function planMaterialization(tx: Tx, options: {
 
     for (const placed of output.sessions) {
         /**
-         * UN-SPLIT FIRST, ALWAYS.
-         *
-         * A multi-group Offering is sent to the solver as one wire Offering PER
-         * GROUP, under a synthetic `offering::group` id, and the output echoes
-         * that id back. Every id from here on must be the REAL one: a Session
-         * points at the real Offering row, and no Offering row is ever created
-         * by a split.
-         *
-         * Reversal happens here and in the violation mapper below, and nowhere
-         * else — the same discipline the wire's other synthetic identity needs.
-         * An id that cannot be reversed with confidence is counted as unmapped
-         * rather than attached to a guess.
+         * UN-SPLIT FIRST, ALWAYS. A multi-group Offering is sent as one wire
+         * Offering per Group under a synthetic `offering::group` id and the output
+         * echoes it back; every id from here on must be the REAL one. Reversal
+         * happens here and in the violation mapper, nowhere else, and an id that
+         * cannot be reversed with confidence is counted as unmapped rather than
+         * attached to a guess.
          */
         const parsed = parseWireOfferingId(placed.offeringId);
 
@@ -451,22 +419,15 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
         /**
          * A DELETE event PER Session, written BEFORE the rows go.
          *
-         * Until now materialize deleted Sessions silently: the only record was
-         * the `deleted` count riding on the single APPLY_GENERATION event, so
-         * "what was removed, and from where" had no answer at all. That
-         * contradicts TAXONOMY.md §3 — a Session may not be mutated without the
-         * corresponding event — and it is the half of the log that rollback
-         * would need, since a delete is the one change the Generation snapshot
-         * cannot describe on its own.
+         * Materialize used to delete silently — the only record was a `deleted`
+         * count on the APPLY_GENERATION event, so "what was removed, and from
+         * where" had no answer. A delete is also the one change the Generation
+         * snapshot cannot describe on its own.
          *
-         * Order matters. `session_event.session_id` is ON DELETE SET NULL, and
-         * the append-only trigger permits exactly that detach (migration
-         * 20260816180000). So the event is written pointing at a live Session,
-         * and the delete then NULLs the pointer while leaving the payload — the
-         * placement, the offering, the reason — intact. Writing the event
-         * afterwards would mean writing a row that points at nothing, which is
-         * indistinguishable from the detached case and loses which Session it
-         * was.
+         * Order matters: `session_event.session_id` is ON DELETE SET NULL and the
+         * append-only trigger permits exactly that detach, so the event is written
+         * against a live Session and the delete then NULLs the pointer while
+         * leaving the payload intact. Writing it afterwards would point at nothing.
          */
         for (const deleted of plan.deletes) {
             await appendEvent(tx, { tenantId, actorPersonId }, {

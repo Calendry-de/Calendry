@@ -194,26 +194,18 @@ import { CONSTRAINT_TYPES, defaultConstraintTypes, findConstraintType } from '#s
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
  *
- * WHY THIS IS A BESPOKE LIST AND NOT THE GENERIC SCAFFOLD
+ * BESPOKE because the generic list answers "which rows exist?", and for
+ * constraints the catalogue is fixed with one default row per type per tenant —
+ * so the interesting state is which are ON and how they are tuned. A table with
+ * an "Add" button framed thirteen switches as a collection you populate, which
+ * is how tenants ended up with types silently unevaluated.
  *
- * The generic list answers "which rows exist?". For constraints that is the
- * wrong question: the CATALOGUE is fixed and every live type has exactly one
- * default row per tenant (TAXONOMY.md §2), so the interesting state is not
- * which rules exist but which are ON and how they are tuned. A table with an
- * "Add" button framed a fixed set of thirteen switches as a collection you
- * populate, which is why tenants ended up with some types configured and others
- * silently unevaluated.
+ * Rows are driven by the CATALOGUE, not the fetch: every live type gets a row
+ * whether or not the tenant has one, and a missing one is reported LOUDLY. That
+ * omission is what hid `no_double_booking_person`.
  *
- * The rows are therefore driven by the CATALOGUE, not by the fetch: every live
- * type gets a row whether or not the tenant has one, and a type with no row is
- * reported LOUDLY rather than omitted. Omitting it is precisely the failure
- * mode that hid `no_double_booking_person` — a rule nobody could see was
- * missing, in a list that looked complete.
- *
- * HARD AND SOFT ARE SEPARATED because they are not comparable. A hard rule's
- * breach is a defect; a soft rule's is a preference with a weight that only has
- * meaning relative to the other enabled soft rules. Interleaving them invites
- * reading the weight column as a severity ranking.
+ * HARD AND SOFT ARE SEPARATED because they are not comparable — interleaving
+ * them invites reading the weight column as a severity ranking.
  */
 const props = defineProps<{
     entity: ManageEntity;
@@ -264,16 +256,10 @@ const variants = computed(() => rows.value
     .filter((entry): entry is { type: ConstraintTypeDef; row: ConstraintRow } => entry !== null));
 
 /*
- * Kind names for the scope summary.
- *
- * `useAsyncData` + `useRequestFetch`, NOT an `onMounted` fetch. A client-only
- * hook does not run on the server, so the first render showed raw uuids where
- * kind names belong — the same shape as every other SSR trap recorded in
- * CLAUDE.md, and caught here only because the check read the rendered TEXT
- * rather than counting elements.
- *
- * `useRequestFetch` because a bare `$fetch` carries no cookie server-side and
- * would 401 into an empty list, which renders identically to a tenant with no
+ * `useAsyncData` + `useRequestFetch`, NOT an `onMounted` fetch: a client-only hook
+ * does not run on the server, so the first render showed raw uuids where kind names
+ * belong. `useRequestFetch` because a bare `$fetch` carries no cookie server-side
+ * and would 401 into an empty list, which renders identically to a tenant with no
  * kinds.
  */
 const kindRequest = useRequestFetch();
@@ -290,13 +276,9 @@ const kindsData = useAsyncData(
 const kinds = computed(() => kindsData.data.value?.rows ?? []);
 
 /**
- * Whether the kinds list being empty means anything.
- *
- * The fetch above degrades to `[]` on failure so one missing permission cannot
- * blank the page (the 6c rule). That is right, and it makes "this tenant has no
- * session kinds" and "you may not read session kinds" render identically — the
- * exact indistinguishable-failure shape CLAUDE.md keeps recording. The row uses
- * this to say which one it is instead of asserting the wrong one.
+ * The fetch above degrades to `[]` so one missing permission cannot blank the page,
+ * which makes "no session kinds" and "you may not read session kinds" render
+ * identically. The row uses this to say which one it is.
  *
  * A UI gate only; the server decides what is actually readable.
  */
@@ -304,14 +286,12 @@ const canReadKinds = useHasPermission('session_kind.read');
 
 /**
  * Catalogue types with no row for this tenant. Surfaced, never hidden: the
- * evaluator only considers types the tenant has a row for, so this list is
- * exactly the set of rules that are silently not running.
+ * evaluator only considers types the tenant has a row for, so this is exactly the
+ * set of rules silently not running.
  *
- * This one DOES use `defaultConstraintTypes()`, unlike `entriesFor` above, and
- * the difference is deliberate rather than an oversight: a deprecated type with
- * no row is not MISSING. `backfill:constraints` will never create one, so
- * reporting it would send an operator to run a repair command that correctly
- * does nothing.
+ * This one DOES use `defaultConstraintTypes()`, unlike `entriesFor`: a deprecated
+ * type with no row is not MISSING, and `backfill:constraints` will never create
+ * one, so reporting it would send an operator to run a no-op repair.
  */
 const missingTypes = computed(() => defaultConstraintTypes()
     .filter((type) => !defaultByType.value.has(type.key)));
@@ -330,24 +310,15 @@ const unknownTypeRows = computed(() => rows.value.filter((row) => !findConstrain
 interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
 
 /**
- * Catalogue entries of one severity that this tenant holds a default row for.
+ * DRIVEN BY `CONSTRAINT_TYPES`, NOT `defaultConstraintTypes()`. The latter excludes
+ * deprecated types, correctly, because it answers "which types should a tenant be
+ * SEEDED a row for?". Borrowing it here made a deprecated row invisible to every
+ * branch at once: measured with one legacy `minimize_first_block` row,
+ * `/api/constraints` returned 14 rows and the page rendered 13, while the rule was
+ * still enabled and still being sent to the solver.
  *
- * DRIVEN BY `CONSTRAINT_TYPES`, NOT `defaultConstraintTypes()`, AND THAT IS THE
- * WHOLE FIX. The latter EXCLUDES deprecated types — correctly, because it
- * answers "which types should a tenant be SEEDED a row for?", and seeding a
- * superseded rule would resurrect it as a first-class option.
- *
- * This function asks a different question: "which rows does this tenant have,
- * and how do I show them?" Borrowing the seeding predicate to answer it made a
- * deprecated row invisible to every branch at once — filtered out here, skipped
- * by `variants` (which takes only `!isDefault`), and not counted by
- * `missingTypes` (same seeding predicate). Measured before the fix, with one
- * legacy `minimize_first_block` row present: `/api/constraints` returned 14
- * rows, the page rendered 13, and the type appeared nowhere in the rendered
- * body — while the rule was still enabled and still being sent to the solver.
- *
- * A deprecated type with NO row stays hidden, which is the other half of the
- * rule: show what a tenant HAS, never invite them to adopt what is superseded.
+ * A deprecated type with NO row stays hidden — show what a tenant HAS, never invite
+ * them to adopt what is superseded.
  */
 function entriesFor(severity: 'HARD' | 'SOFT', deprecated: boolean): Entry[] {
     return CONSTRAINT_TYPES
@@ -451,35 +422,16 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
 
 <style scoped lang="scss">
 /*
- * COLOURS COME FROM THE GENERATED TOKEN SET, NOT FROM NAMES THIS FILE INVENTED.
+ * COLOURS COME FROM THE GENERATED TOKEN SET, not names invented here. This block
+ * used `--error-color`, `--primary-color`, `--border-color` and
+ * `--text-secondary-color`; none exist. `background: var(--primary-color)` had no
+ * fallback, so the declaration was invalid and resolved to `transparent` — under
+ * `color: #fff` the SOFT badge was white text on the page background, and the one
+ * label distinguishing preferences from defects was unreadable.
  *
- * This block used `--error-color`, `--primary-color`, `--border-color` and
- * `--text-secondary-color`. None of them exist: `useLayout()` emits one custom
- * property per generated colour (`--surface0`, `--content7`, `--primary500`…),
- * and `--primary-color` is only ever set INLINE on a CommonButton's own element,
- * so it never reached anything here.
- *
- * Two consequences, one of them visible. `var(--error-color, #b3261e)` fell
- * back to a hardcoded literal that does not follow the theme; and
- * `background: var(--primary-color)` had NO fallback, so the declaration was
- * invalid at computed-value time and resolved to `transparent` — under
- * `color: #fff` that made the SOFT badge white text on the page background.
- * The one label distinguishing preferences from defects was unreadable.
- *
- * The severity pair is now the one ManageConstraintBuilder already uses, so the
- * two screens stop describing the same concept in different colours.
- *
- * NOTE THE FUNCTION NAME: `varToRgba`, not `vartorgba`. Sass function lookup is
- * case-sensitive, so the lowercase spelling does not resolve — it survives as a
- * literal `vartorgba(...)` in the emitted CSS, which is an unknown CSS function,
- * which makes the whole declaration invalid and the background transparent.
- * Proven by compiling both spellings against this repo's own colors.scss:
- *
- *   varToRgba('error500', 0.16)  ->  rgba(var(--error500, 187, 88, 102), 0.16)
- *   vartorgba('error500', 0.16)  ->  vartorgba("error500", 0.16)
- *
- * The lowercase spelling is used in nine other components and is inert in every
- * one of them — see the note handed over with this change.
+ * NOTE `varToRgba`, not `vartorgba`: Sass lookup is case-sensitive, so the lowercase
+ * spelling survives into the emitted CSS as an unknown function and invalidates the
+ * declaration. It is used in nine other components and is inert in every one.
  */
 .cgrid {
     display: flex;

@@ -18,18 +18,11 @@
         @click="$emit('select')"
     >
         <!--
-            TIME AND ROOM, and they are not decoration.
-
-            In the grid a chip's POSITION carried its time — but a crowded
-            cluster stacks its members on one line each, and a stack has no
-            position to read. Measured on the live tenant, 5 of 7 occupied slots
-            render that way, so the stacked form is the norm, not the exception:
-            without these two facts the common case answers neither "when" nor
-            "where", and resolving a single clash costs one inspector open per
-            session.
-
-            Rendered for every chip and hidden by the container in the roomy
-            case, so the two forms cannot say different things.
+            TIME AND ROOM. In the grid a chip's POSITION carries its time, but a
+            crowded cluster stacks its members one line each and a stack has no
+            position to read — 5 of 7 occupied slots on the live tenant. Rendered
+            for every chip and hidden by the container in the roomy case, so the
+            two forms cannot say different things.
         -->
         <span
             v-if="startTime"
@@ -75,16 +68,21 @@
         </span>
 
         <!--
-            WHO AND WHICH — shown only when the filters are not already saying it.
-            With a Group or Person filter set, every chip on screen belongs to
-            that group or that person, and repeating it on all of them spends the
-            chip's scarcest resource to say something the toolbar already said.
-            Unfiltered, it is the one thing the chip could not otherwise answer:
-            two sessions of the same offering at the same hour differ by cohort.
+            WHO AND WHICH — only when the filters are not already saying it. With
+            a Group or Person filter set every chip belongs to it, and repeating
+            it spends the chip's scarcest resource on what the toolbar just said.
+        -->
+        <!--
+            ALWAYS RENDERED, even when empty: conditional, this line made the
+            chip's HEIGHT depend on whether a session had a resolvable cohort, so
+            a row grew from data rather than crowding — and the three-line
+            intrinsic height (~62px) exceeded both Compact and Comfortable,
+            collapsing two density settings into one.
         -->
         <span
-            v-if="whoLabel || whichLabel"
+            v-if="!dense"
             class="chip_who"
+            :class="{ 'chip_who--empty': !whoLabel && !whichLabel }"
         >
             <span
                 v-if="whichLabel"
@@ -112,9 +110,8 @@ const props = defineProps<{
     /** In swap mode every OTHER chip is a pick target. */
     targetable?: boolean;
     /**
-     * The grid it sits in, so the chip can state its own start time. Optional
-     * because the agenda already prints the time in its own gutter column and
-     * would otherwise say it twice.
+     * Optional: the agenda prints the time in its own gutter and would otherwise
+     * say it twice.
      */
     grid?: TimeGrid | null;
     /** Resolves a room id to a name; without it the room is omitted, not guessed. */
@@ -126,26 +123,24 @@ const props = defineProps<{
     /** Resolvers for the who/which line. Absent means the fact is omitted, not guessed. */
     groupName?: (id: string) => string;
     personName?: (id: string) => string;
-    /**
-     * Whether the Group / Person filters are OFF. The chip says which cohort and
-     * whose session only when the toolbar is not already saying it for every
-     * chip on screen.
-     */
+    /** Group/Person filters OFF — the chip only says what the toolbar does not. */
     showGroup?: boolean;
     showPerson?: boolean;
+    /**
+     * Compact drops the third line: three lines are ~62px intrinsic, which
+     * exceeded both Compact (44px) and Comfortable (60px) and made the density
+     * control inert. The accessible name is assembled separately and unaffected.
+     */
+    dense?: boolean;
 }>();
 
 defineEmits<{ select: [] }>();
 
 /**
- * COLOUR IS RESOLVED, NOT READ OFF ONE FIELD.
- *
- * It used to be `session.kind?.color ?? primary500` — which meant every session
- * without a kind colour claimed the brand accent, the one colour DESIGN.md
- * reserves for "where a session may land". Measured on real data, every chip on
- * the screen carried it. Now the order is the tenant's (`colorSourceOrder`) and
- * the fallback is null, so an unset colour renders as the neutral surface the
- * stylesheet already owns rather than as an accent nobody chose.
+ * COLOUR IS RESOLVED, NOT READ OFF ONE FIELD. It was `kind?.color ?? primary500`,
+ * so every session without a kind colour claimed the accent DESIGN.md reserves
+ * for "where a session may land". The order is the tenant's and the fallback is
+ * null, so an unset colour renders as the neutral surface.
  */
 const settings = computed(() => props.display ?? DISPLAY_DEFAULTS);
 
@@ -156,14 +151,9 @@ const resolvedColor = computed(() => resolveSessionColor(props.session, settings
  * a session in a hall and a virtual room is streamed rather than either.
  */
 /**
- * The tenant's online colour, emitted as a custom property ONLY when set.
- *
- * Omitted rather than passed as null, so the stylesheet's `var(--online-color,
- * <neutral>)` fallback is what decides the unset case — and omitted entirely on
- * an on-site chip, which is every chip that never reads it. Setting the property to
- * an empty string would suppress that fallback and paint nothing — and the
- * property was referenced by the CSS from the start while nothing ever set it,
- * so the marking was always the neutral grey no matter what the tenant chose.
+ * Emitted ONLY when set, so the stylesheet's `var(--online-color, <neutral>)`
+ * fallback decides the unset case — an empty string would suppress it and paint
+ * nothing. The CSS referenced this property from the start while nothing set it.
  */
 const onlineColor = computed(() => settings.value.onlineColor ?? '');
 
@@ -192,31 +182,19 @@ const roomLabel = computed(() => {
 });
 
 /**
- * The room's CODE for the visible chip, its full name for the accessible one.
- *
- * `lookup.room` returns "code · name", which on real data reads "A102 · A102"
- * when a room has no name distinct from its code — a stutter that costs a third
- * of a compact chip's width to say one thing twice. The screen reader keeps the
- * unabbreviated form, where width is not the constraint.
+ * CODE on the chip, full name in the accessible label: `lookup.room` returns
+ * "code · name", which reads "A102 · A102" when a room has no distinct name.
  */
 const roomCode = computed(() => roomLabel.value.split(' · ')[0] ?? '');
 
 /**
- * The accessible name, assembled rather than inherited.
- *
- * Read from the rendered document, the name was the title glued straight to the
- * kind — "ProjectLecture", "KryptoLecture" — with no separator and no day, time
- * or room, so 31 chips announced as run-together words with nothing to tell
- * them apart. Everything the sighted reader gets from position now reaches the
- * accessible name as words.
+ * Assembled rather than inherited: the name was the title glued to the kind —
+ * "ProjectLecture" — with no day, time or room, so 31 chips announced as
+ * run-together words. Everything position gives the sighted reader is words here.
  */
 /**
- * The cohort, and "+N" rather than a list.
- *
- * A Session can carry many Groups — the elective/track merging case — and a
- * chip that lists four cohort names is a chip with no room for anything else.
- * The first plus a count is the honest summary; the inspector has the full list
- * and is one click away.
+ * "+N" rather than a list: a Session can carry many Groups, and a chip listing
+ * four cohort names has room for nothing else. The inspector has the full list.
  */
 const whichLabel = computed(() => {
     if (!props.showGroup || !props.groupName) {
@@ -235,12 +213,8 @@ const whichLabel = computed(() => {
 });
 
 /**
- * Who is leading it, falling back to who is attending.
- *
- * Lecturer first because that is the fixed Role key and the question a
- * timetabler is usually asking; a Session with no lecturer but named attendees
- * still has someone worth naming, and saying nothing there would read as "no
- * one is involved".
+ * Lecturer first — the fixed Role key and the question usually being asked — but
+ * a Session with no lecturer and named attendees still has someone worth naming.
  */
 const whoLabel = computed(() => {
     if (!props.showPerson || !props.personName) {
@@ -311,20 +285,16 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     display: flex;
     flex: 1 1 0;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
     justify-content: space-between;
 
     min-width: 0;
-    padding: 5px 7px;
+    padding: var(--space-3) var(--space-4);
 
     /*
-     * THE CHIP MUST SEPARATE FROM THE CELL IT SITS IN.
-     *
-     * Measured at 1.16:1 against `$surface0` — the primary figure/ground pair
-     * on the whole screen, and the one that answers "is this slot occupied".
-     * Raising the fill alone cannot fix it without flattening the surface ramp,
-     * so occupancy gets an EDGE: a hairline at 1px is a non-text UI boundary and
-     * carries the separation the fill could not.
+     * Measured at 1.16:1 against `$surface0`, the pair that answers "is this slot
+     * occupied". The fill cannot be raised without flattening the surface ramp,
+     * so occupancy gets an EDGE instead.
      */
     border: 1px solid $surface5;
     border-radius: 6px;
@@ -346,13 +316,10 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     }
 
     /*
-     * INSET outlines, and a raised stacking order.
-     *
-     * With `outline-offset: 1px` the ring is drawn OUTSIDE the border box —
-     * into the grid's 1px gap, where it was overpainted along the bottom edge.
-     * It looked complete only while hovered, because the hover `translateY`
-     * promotes the chip to its own stacking context and lifts the ring clear.
-     * Drawn inside its own box it cannot be clipped or overpainted by anything.
+     * INSET outlines: at `outline-offset: 1px` the ring is drawn into the grid's
+     * 1px gap and overpainted along the bottom edge — it looked complete only
+     * while hovered, because the hover `translateY` lifts it into its own
+     * stacking context.
      */
     &:focus-visible {
         z-index: 3;
@@ -360,12 +327,9 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
         outline-offset: -2px;
     }
 
-    /*
-     * Hidden in the roomy form, where the chip's POSITION already says when it
-     * is; revealed by the container in the stacked form, where it does not.
-     * Rendered either way so the accessible name never diverges from the two
-     * presentations.
-     */
+    /* Hidden in the roomy form, where position already says when it is; revealed
+       by the container in the stacked form. Rendered either way so the accessible
+       name never diverges from the two presentations. */
     &_time {
         display: none;
         flex: none;
@@ -376,20 +340,24 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
         color: $content6;
     }
 
-    /*
-     * The who/which line. Ellipsised per part rather than as a whole, so a long
-     * cohort name cannot eat the lecturer's — each says as much as it can and
-     * then stops, which is the readable failure.
-     */
+    /* Ellipsised per part rather than as a whole, so a long cohort name cannot
+       eat the lecturer's. */
     &_who {
         display: flex;
-        gap: 6px;
+        gap: var(--space-3);
         align-items: baseline;
 
         min-width: 0;
 
-        font-size: 11px;
+        /* Holds its line whether or not it has content, so every chip is the
+           same height. `1lh`, not a magic pixel value: one line of THIS font at
+           THIS size. */
+        min-height: 1lh;
+
+        font-size: var(--font-size-xs);
         color: $content7;
+
+        &--empty { visibility: hidden; }
     }
 
     &_group,
@@ -438,12 +406,8 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     // a dot survives a 44px row where a 3px edge just adds noise.
 
     /*
-     * ONLINE: a dashed edge and an inset rule, never colour alone.
-     *
-     * It has to survive greyscale and it has to survive the tenant leaving
-     * `onlineColor` empty — so the SHAPE carries the meaning and any colour is
-     * an amplifier. Same rule as violations: no fact on this screen is signalled
-     * by hue alone.
+     * ONLINE: a dashed edge, never colour alone — it has to survive greyscale and
+     * the tenant leaving `onlineColor` empty. Same rule as violations.
      */
     &--online {
         border-color: var(--online-color, #{$content6});

@@ -1,32 +1,12 @@
 <!--
-    THESIS: the schedule is a place, not a list of records — one week held still
-    so a timetabler can see where a session sits and put it somewhere better. It
-    refuses the admin-CRUD-table arrangement this category defaults to.
-    OWN-WORLD: a restrained neutral ground (surface0-5) with the violet primary
-    reserved almost entirely for one thing — where a session may land. Density
-    and rhythm carry the design; colour is spent on state, not decoration. Built
-    against a near-black ground, rebased to light in Step 11 for a data reason
-    (see DESIGN.md); the composition is ground-agnostic and both themes render it.
-    STORY: the visitor sees the week, spots what is wrong by its shape and icon
-    rather than its hue, selects it, and moves it knowing the consequence.
-    FIRST VIEWPORT: filter bar across the top; time column left; the week filling
-    the remaining width; inspector docked right, empty until something is chosen.
-    The primary action lives in the inspector, next to the thing it acts on.
-    FORM: week grid with docked inspector — composition A of three offered; the
-    dice script that would have dealt these produced no output (see CLAUDE.md),
-    so the choice was made explicitly with the user instead.
-    FINISH: unreviewed and undocumented is unfinished; this build ends with the
-    finish review, the verdict, and DESIGN.md.
+    The schedule is a place, not a list of records: one week held still so a
+    timetabler can see where a session sits and put it somewhere better. Design
+    intent and the palette rationale live in DESIGN.md.
 -->
 <template>
     <main class="schedule">
-        <!--
-            The served document had no heading of any level and no `main`.
-            Visually hidden because the week itself is the title — a rendered
-            "Schedule" above a screen whose nav already says Schedule is noise
-            for the sighted reader and the only orientation there is for anyone
-            navigating by heading.
-        -->
+        <!-- Visually hidden: the week itself is the title, but a document with
+             no heading and no `main` leaves nothing to navigate by. -->
         <h1 class="schedule_sr">Schedule</h1>
 
         <ScheduleToolbar
@@ -81,8 +61,32 @@
             role="alert"
         >{{ editing.error.value }}</p>
 
+        <!--
+            THE FAILURE BRANCH COMES FIRST. "No time grid configured" is a claim
+            about the TENANT and may only be made once the tenant has been read;
+            below this, a dropped connection told the reader to create a TimeGrid
+            they already have.
+        -->
+        <div
+            v-if="data.loadError.value"
+            class="schedule_failure"
+            role="alert"
+        >
+            <Icon
+                name="material-symbols:cloud-off-outline"
+                aria-hidden="true"
+            />
+            <h2>{{ data.loadError.value.title }}</h2>
+            <p>{{ data.loadError.value.detail }}</p>
+            <CommonButton
+                v-if="data.loadError.value.retryable"
+                type="secondary"
+                @click="data.refreshAll"
+            >Try again</CommonButton>
+        </div>
+
         <ScheduleEmptyState
-            v-if="!data.pending.value && !data.grid.value"
+            v-else-if="!data.pending.value && !data.grid.value"
             title="No time grid configured"
         >
             A schedule needs a TimeGrid — how long a block is, how many run per day,
@@ -96,31 +100,37 @@
             Create a term to place sessions into.
         </ScheduleEmptyState>
 
-        <div
-            v-else-if="data.pending.value"
-            class="schedule_loading"
-        >
-            <common-loader/>
-        </div>
+        <!--
+            PENDING IS A STATE ON THE GRID, NOT A BRANCH THAT REPLACES THE BODY.
+            `week` is a member of `filters.query`, this page's fetch watch source,
+            so as a sibling branch it destroyed the whole frame on every week step
+            — losing focus to `<body>` and killing the label's transition with its
+            parent. Only the chips change with the query, so the frame stays
+            mounted and reports its own staleness.
 
+            The empty states below stay branches: genuinely different screens,
+            unreachable by stepping a week.
+        -->
         <div
             v-else-if="data.grid.value"
             class="schedule_body"
+            :aria-busy="data.pending.value"
         >
-            <div class="schedule_main">
+            <div
+                class="schedule_main"
+                :class="{ 'schedule_main--pending': data.pending.value }"
+            >
                 <ScheduleWeekNav
                     v-model="filters.week.value"
                     class="schedule_week"
                     :total-weeks="data.totalWeeks.value"
                     :range-label="weekRangeLabel"
+                    :loading="data.pending.value"
                 />
 
-                <!--
-                    A flick of the wheel steps a week — bound HERE and on the
-                    agenda and the week stepper, never on the page. Over the
-                    off-grid tray or the violations panel a wheel is an ordinary
-                    scroll, because those lists have their own content to move.
-                -->
+                <!-- Wheel-to-step is bound here, on the agenda and on the week
+                     stepper, never on the page: over the tray or the violations
+                     panel a wheel is an ordinary scroll. -->
                 <ScheduleGrid
                     class="schedule_grid"
                     :grid="data.grid.value"
@@ -177,6 +187,47 @@
                     @place="placeAt"
                 />
 
+            </div>
+
+            <!--
+                THE SIDE COLUMN IS THE SELECTION'S COLUMN. The tray and the
+                violations panel were below a 600–810px grid, so the toggle that
+                opens the panel sat top-right and its effect appeared ~700px
+                down: pressing it looked like nothing happened. Every row in both
+                lists feeds the inspector, so they belong in its column.
+            -->
+            <aside class="schedule_side">
+                <ScheduleInspector
+                    :session="editing.selected.value"
+                    :grid="data.grid.value"
+                    :violations="editing.selected.value
+                    ? (data.violationsBySessionId.value.get(editing.selected.value.id) ?? [])
+                    : []"
+                    :can-move="canMove"
+                    :can-lock="canLock"
+                    :placing="editing.placing.value"
+                    :swapping="editing.swapping.value"
+                    :can-swap="canSwap"
+                    :can-delete="canDeleteSession"
+                    :can-update="canUpdateSession"
+                    :kinds="data.kinds.value"
+                    :people="data.people.value"
+                    :groups="data.groups.value"
+                    :session-date="editing.selected.value
+                    ? data.slotDateOf(editing.selected.value.termWeek, editing.selected.value.dayOfWeek)
+                    : null"
+                    :rooms="data.rooms.value"
+                    :busy="editing.busy.value"
+                    :lookup="data.lookup"
+                    @close="editing.clearSelection"
+                    @toggle-place="editing.togglePlacing"
+                    @toggle-swap="editing.toggleSwapping"
+                    @set-rooms="editing.setRooms"
+                    @toggle-lock="editing.toggleLock"
+                    @delete="deleteSelectedEvent"
+                    @set-details="saveEventDetails"
+                    />
+
                 <ScheduleOffGridTray
                     v-if="data.offGridSessions.value.length"
                     :sessions="data.offGridSessions.value"
@@ -191,44 +242,14 @@
                     :session-title="data.sessionTitle"
                     @select="editing.select"
                 />
-            </div>
-
-            <ScheduleInspector
-                :session="editing.selected.value"
-                :grid="data.grid.value"
-                :violations="editing.selected.value
-                    ? (data.violationsBySessionId.value.get(editing.selected.value.id) ?? [])
-                    : []"
-                :can-move="canMove"
-                :can-lock="canLock"
-                :placing="editing.placing.value"
-                :swapping="editing.swapping.value"
-                :can-swap="canSwap"
-                :can-delete="canDeleteSession"
-                :can-update="canUpdateSession"
-                :kinds="data.kinds.value"
-                :people="data.people.value"
-                :groups="data.groups.value"
-                :session-date="editing.selected.value
-                    ? data.slotDateOf(editing.selected.value.termWeek, editing.selected.value.dayOfWeek)
-                    : null"
-                :rooms="data.rooms.value"
-                :busy="editing.busy.value"
-                :lookup="data.lookup"
-                @close="editing.clearSelection"
-                @toggle-place="editing.togglePlacing"
-                @toggle-swap="editing.toggleSwapping"
-                @set-rooms="editing.setRooms"
-                @toggle-lock="editing.toggleLock"
-                @delete="deleteSelectedEvent"
-                @set-details="saveEventDetails"
-            />
+            </aside>
         </div>
     </main>
 </template>
 
 <script setup lang="ts">
 import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
+import CommonButton from '~/components/common/CommonButton.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
 import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
 import { formatSlotDate, sessionLabel } from '~/composables/schedule';
@@ -259,9 +280,9 @@ useHead({ title: 'Schedule' });
 // them reaches an endpoint that returns 403.
 // Every solver route requires this one, so it gates the whole control.
 /**
- * Gated on every permission the reference wave needs, not just `session.read`.
- * See `app/utils/schedulePermissions.ts` — the page renders nothing useful
- * without all six, and used to render nothing AT ALL.
+ * Gated on every permission the reference wave needs, not just `session.read`
+ * (`app/utils/schedulePermissions.ts`): without all six the page used to render
+ * nothing at all.
  */
 definePageMeta({ middleware: 'schedule' });
 
@@ -269,40 +290,26 @@ const locale = useViewerLocale();
 
 const canTriggerSolver = useHasPermission('solver.trigger');
 /**
- * The proposals list, not the solver. Reviewing what the solver produced needs
- * `session.read`; producing it needs `solver.trigger`. A department head
- * typically holds the first and not the second, and used to have no route to a
- * proposal at all.
+ * The proposals list, not the solver: reviewing needs `session.read`, producing
+ * needs `solver.trigger`, and a department head typically holds only the first.
  */
 const canReviewProposals = useHasPermission('session.read');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
 const canUpdateSession = useHasPermission('session.update');
 /**
- * A placement carries the week currently on screen.
- *
- * The grid shows one week and has no idea which, so the page — which owns
- * `filters.week` — supplies it. That is what makes a cross-week move possible:
- * enter placement mode, step to another week, click a slot.
+ * A placement carries the week on screen — the grid does not know which week it
+ * shows, so the page supplies it. That is what makes a cross-week move possible.
  */
 /**
- * ONE grid click, routed by the mode that made the cells targets.
- *
- * `create` opens the form seeded with the slot rather than issuing a request:
- * a new Session needs a kind, which no click can supply. `place` still moves
- * the selection immediately, because everything a move needs is already known.
+ * ONE grid click, routed by the mode that made the cells targets. `create` opens
+ * the form seeded with the slot rather than issuing a request: a new Session
+ * needs a kind, which no click can supply.
  */
 /**
- * The dates this week covers — "13–17 Oct".
- *
- * A week NUMBER is an abstraction over the term; the dates are what someone
- * checks against a calendar, an email or a room booking. Resolved from the
- * grid's own active days, so a Saturday-teaching institution gets a span that
- * ends on Saturday rather than an assumed Friday.
- *
- * Empty until a term resolves, rather than guessed: `slotDateOf` returns null
- * before then, and a date range invented from today would be wrong in exactly
- * the way this codebase keeps refusing to be.
+ * The dates this week covers — "13–17 Oct". A week number is an abstraction over
+ * the term; the dates are what someone checks against a calendar. Resolved from
+ * the grid's own active days, and empty until a term does rather than guessed.
  */
 const weekRangeLabel = computed(() => {
     const days = data.grid.value?.activeDays ?? [];
@@ -324,11 +331,8 @@ const weekRangeLabel = computed(() => {
 });
 
 /**
- * A wheel over the WEEK GRID or the DAY AGENDA steps the week.
- *
- * The week stepper in the toolbar carries the same gesture, through the same
- * composable, so the cooldown and the give-the-gesture-back-at-the-ends rule
- * cannot drift between the two places that offer it.
+ * A wheel over the grid or the agenda steps the week, through the same composable
+ * as the toolbar's stepper so the cooldown cannot drift between them.
  */
 const stepWeekOnWheel = useWheelStep({
     canStep: (direction) => {
@@ -359,19 +363,13 @@ function cancelCreate() {
 }
 
 /**
- * Deletes the selected EVENT.
- *
  * Routed through the page rather than `useScheduleEditing` because deletion is
- * not a grid MODE — it changes nothing about what a click on the grid means,
- * which is the composable's own stated test for what belongs there.
+ * not a grid MODE — it changes nothing about what a click on the grid means.
  */
 /**
- * One request per control, matching how rooms already save.
- *
- * Not a form with a Save button: the inspector edits a live row, and a single
- * button spanning four independent fields could half-succeed with one error
- * message covering all of them — the same objection the relations panel records
- * for PUT-set sub-resources.
+ * One request per control, matching how rooms already save. Not a form with a
+ * Save button: a single button over four independent fields could half-succeed
+ * with one error message covering all of them.
  */
 async function saveEventDetails(patch: Record<string, unknown>) {
     const target = editing.selected.value;
@@ -435,28 +433,33 @@ const editing = useScheduleEditing({
     onMutated: data.refreshAll,
 });
 
-/**
- * View state, deliberately page-local: neither value reaches the API query, so
- * neither belongs in useScheduleFilters.
- */
+/** Page-local: neither value reaches the API query. */
 const rowHeight = ref(60);
 const showViolations = ref(false);
 </script>
 
 <style scoped lang="scss">
 .schedule {
+    /*
+     * THREE INTERVALS, NOT ONE. Every region was separated by the same 14px, so
+     * the screen had two levels of hierarchy: the grid, and everything else.
+     * `--space-7` between REGIONS, `--space-5` between members of a region,
+     * `--space-3/4` inside a group — all steps on the documented scale, which
+     * 14 / 20 / 10 / 18 were not.
+     */
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: var(--space-7) 24px var(--space-8);
+    gap: var(--space-7);
+    padding: var(--space-7) var(--space-7) var(--space-8);
 
-    @include mobile() { padding: 14px; }
+    @include mobile() { padding: var(--space-5); }
 
-    // Centred over the thing it governs, and given room above the grid so the
-    // pairing reads as "this week" rather than as another toolbar row.
+    /* The week belongs to the GRID, so the interval goes above it and none
+       below: proximity assigns ownership, and `margin-bottom` assigned it to the
+       toolbar. */
     &_week {
         align-self: center;
-        margin-bottom: var(--space-2);
+        margin-top: calc(var(--space-5) - var(--space-7));
     }
 
     &_sr {
@@ -472,13 +475,46 @@ const showViolations = ref(false);
         clip-path: inset(50%);
     }
 
+    /* A load failure is a PAGE state, not a line above an empty grid, so nobody
+       reads an absent grid as the answer. */
+    &_failure {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        align-items: center;
+
+        padding: var(--space-10) var(--space-6);
+        border-radius: var(--radius-lg);
+
+        text-align: center;
+
+        background: $surface1;
+
+        svg {
+            width: 28px;
+            height: 28px;
+            color: $content6;
+        }
+
+        h2 {
+            font-size: var(--font-size-lg);
+            color: $content1;
+        }
+
+        p {
+            max-width: 52ch;
+            font-size: var(--font-size-md);
+            color: $content6;
+        }
+    }
+
     &_placing {
         display: flex;
         gap: var(--space-4);
         align-items: center;
 
         margin: 0;
-        padding: 10px 14px;
+        padding: var(--space-5) var(--space-6);
         border-radius: var(--radius-lg);
 
         font-size: var(--font-size-md);
@@ -493,7 +529,7 @@ const showViolations = ref(false);
 
     &_error {
         margin: 0;
-        padding: 10px 14px;
+        padding: var(--space-4) var(--space-6);
         border-radius: var(--radius-lg);
 
         font-size: var(--font-size-md);
@@ -504,7 +540,7 @@ const showViolations = ref(false);
 
     &_body {
         display: flex;
-        gap: 14px;
+        gap: var(--space-7);
         align-items: flex-start;
 
         @include mobile() { flex-direction: column; }
@@ -514,9 +550,59 @@ const showViolations = ref(false);
         display: flex;
         flex: 1;
         flex-direction: column;
-        gap: 14px;
+        gap: var(--space-5);
 
         min-width: 0;
+
+        /*
+         * STALE, NOT GONE — the frame stays mounted while the week refetches, so
+         * the grid says it is out of date instead of being replaced. Pointer
+         * events go with it: a click on a chip about to be replaced would select
+         * a session the next render may not contain.
+         */
+        &--pending {
+            pointer-events: none;
+
+            .schedule_grid,
+            .schedule_agenda {
+                opacity: 0.45;
+                transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+        }
+    }
+
+    /*
+     * THE SIDE COLUMN EARNS ITS WIDTH OR GIVES IT BACK. A permanent 320px
+     * reservation left ~199px per day column at 1440px, and `FAN_LIMIT = 3` is
+     * calibrated on that number — so a third of the width was held for a panel
+     * that is usually empty. It now sizes to its content and takes none when
+     * there is none.
+     *
+     * STICKY, because the action must stay with the selection: at Spacious the
+     * grid alone is ~810px.
+     */
+    &_side {
+
+        // Thin, because this column is often taller than the viewport and the
+        // scrollbar should not read as a second border.
+        scrollbar-width: thin;
+
+        position: sticky;
+        top: var(--space-5);
+
+        overflow-y: auto;
+        display: flex;
+        flex: 0 0 auto;
+        flex-direction: column;
+        gap: var(--space-5);
+
+        max-height: calc(100vh - var(--space-9));
+
+        @include mobile() {
+            position: static;
+            overflow: visible;
+            max-height: none;
+        }
     }
 
     &_grid {
@@ -529,10 +615,5 @@ const showViolations = ref(false);
         @include mobile() { display: flex; }
     }
 
-    &_loading {
-        display: flex;
-        justify-content: center;
-        padding: 60px 0;
-    }
 }
 </style>

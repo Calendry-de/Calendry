@@ -6,53 +6,31 @@ import { defaultConstraintRow, defaultConstraintTypes } from '#shared/constraint
 /**
  * Every page a role can reach must actually RENDER for that role.
  *
- * WHY THIS FILE EXISTS, AND WHY IT IS A TEST RATHER THAN A LINT RULE
+ * A page's data arrives as one `Promise.all` of reference fetches carrying their
+ * OWN permissions, which need not be the one the page is gated on — and a single
+ * 403 inside `Promise.all` rejects the whole handler, so the page renders as
+ * NOTHING. Not an error, not a partial view: blank, and indistinguishable from a
+ * page that legitimately has no data.
  *
- * A page's data usually arrives as one `Promise.all` of reference fetches. Those
- * endpoints carry their OWN permissions, which are not necessarily the one the
- * page is gated on — and a single 403 inside `Promise.all` rejects the whole
- * handler, so the page renders as NOTHING. Not an error, not a partial view:
- * blank. It is the least diagnosable failure a UI has, because it looks
- * identical to a page that legitimately has no data.
+ * It has happened twice, both to `/schedule`: `/api/offerings` needing
+ * `offering.read`, then `/api/session-kinds` needing `session_kind.read`. The rule
+ * was written down after the first and did not prevent the second, because prose is
+ * checked by nobody. A lint rule cannot know which permission an endpoint needs.
  *
- * This has now happened twice, both times to `/schedule`:
- *
- *   Stage 6c  `/schedule/review/[id]` was gated on `session.read` and fetched
- *             `/api/offerings`, which needs `offering.read`.
- *   Later     the same page's reference wave gained `/api/session-kinds`,
- *             which needs `session_kind.read`.
- *
- * The rule was written down after the first and did not prevent the second,
- * because prose is checked by nobody. A custom lint rule was considered and
- * rejected: it could spot a `.catch`-less fetch inside `Promise.all`, but it
- * cannot know which permission an endpoint needs or which the page is gated on,
- * so it would fire on every correct reference wave and be suppressed into
- * uselessness.
- *
- * The symptom, though, is trivially checkable — so this renders each page as
- * each role and asserts it came back. A new fetch that a role cannot reach
- * fails here immediately, whoever adds it and whether or not they read
- * CLAUDE.md.
- *
- * ADDING A PAGE: add a row. The marker should be a structural element that
- * only exists once the data resolved — NOT merely "200 OK", because a blanked
- * page returns 200 with an empty body, which is exactly how both incidents
- * escaped review.
+ * ADDING A PAGE: add a row. The marker must be a structural element that exists
+ * only once the data resolved — NOT "200 OK", because a blanked page returns 200
+ * with an empty body, which is how both incidents escaped review.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
 /**
  * A role that may READ constraints and not change them.
  *
- * Local to this file rather than added to tests/helpers/seed.ts, and that is a
- * deliberate call rather than laziness. The read-only assertion needs the
- * tenant to hold a default constraint row per live catalogue type — otherwise
- * the page renders zero rows and "no editable toggles" passes for the wrong
- * reason. Seeding those into the SHARED fixture would break two suites that
- * use the same tenant: `constraint-scopes-api` creates its own `isDefault`
- * row, which `constraint_one_default_per_type` would then reject, and
- * `constraint-defaults` counts default rows. Suites run serially
- * (`fileParallelism: false`), so a file-local fixture cannot race them.
+ * File-local rather than in tests/helpers/seed.ts: the read-only assertion needs a
+ * default constraint row per live catalogue type, and seeding those into the SHARED
+ * fixture would break `constraint-scopes-api` (which creates its own `isDefault`
+ * row) and `constraint-defaults` (which counts them). Suites run serially, so a
+ * file-local fixture cannot race them.
  */
 const CONSTRAINT_VIEWER = 'constraint-viewer@test.local';
 
@@ -68,17 +46,12 @@ const CONSTRAINT_VIEWER = 'constraint-viewer@test.local';
 const PERSON_EDITOR = 'person-editor-page@test.local';
 
 /**
- * Only `person.*` and `room.*` — no role.read, group.read or equipment.read.
+ * Only `person.*` and `room.*` — the systemic case. SIX relation pickers across
+ * four entities fetched options from a resource their page's gate did not cover,
+ * and none was new. The result was not a blank page but every picker rendering an
+ * EMPTY option list: a tenant with groups being told it has none.
  *
- * The systemic case. SIX relation pickers across four entities fetched their
- * options from a resource their page's own gate did not cover, and none of them
- * was new: the Person page has fetched `/api/roles` and `/api/groups` since
- * Step 13, and the Room page `/api/equipment`. What that produced was not a
- * blank page but every picker on the page rendering an EMPTY option list — a
- * tenant with groups being told it has none.
- *
- * One account across two entities on purpose: the point is that this was never
- * about access roles.
+ * One account across two entities on purpose — this was never about access roles.
  */
 const ENTITY_EDITOR = 'entity-editor@test.local';
 
@@ -147,18 +120,11 @@ const PAGES = [
     },
     {
         /*
-         * A proposal that does not exist must say SO.
-         *
-         * This row is the regression pin for Stage 6c's worst failure: the
-         * review page's primary preview fetch is the one thing on it that is
-         * not tolerant, and a rejection nulled `preview`, fell through to the
-         * "this Generation was not produced by a solver run" branch, and
-         * interpolated `undefined` into `terminalMessage`. A 403, a 404, a
-         * dropped connection and a genuine manual-baseline Generation were
-         * indistinguishable, and one of them was asserted as fact.
-         *
-         * The marker is data-dependent by construction — it exists only once
-         * the fetch has come back 404.
+         * A proposal that does not exist must say SO. The review page's preview
+         * fetch is the one thing on it that is not tolerant, and a rejection nulled
+         * `preview`, fell through to the "not produced by a solver run" branch and
+         * interpolated `undefined` into the message — so a 403, a 404, a dropped
+         * connection and a genuine manual baseline were indistinguishable.
          */
         path: '/schedule/review/01a04015-0000-0000-0000-000000000000',
         roles: ['admin'],
@@ -226,23 +192,12 @@ const PAGES = [
     },
     {
         /*
-         * THE OPTION-WAVE TRAP, pinned — and measured rather than assumed.
-         *
-         * The Person page fetches every relation's option list in ONE
-         * `Promise.all`, and one of those is now `/api/access-roles`, which no
-         * person permission reaches. What that does is not a blank page, which
-         * is what the 6c rule describes: `useEntityRelations` awaits the
-         * useAsyncData HANDLE, which resolves rather than rejects, so the page
-         * renders with every picker's options EMPTY. Verified live with the
-         * gate removed — the scheduling-role picker then says "No roles defined
-         * yet" to a tenant that has them.
-         *
-         * Same family, worse symptom in one respect: a page-wide lie instead of
-         * an obvious absence. `requiresAnyPermission` drops the relation before
-         * the wave is assembled.
-         *
-         * The marker is the person's own name, which only exists once the form
-         * seeded from the awaited row.
+         * THE OPTION-WAVE TRAP. The Person page fetches every relation's options in
+         * ONE `Promise.all`, including `/api/access-roles`, which no person
+         * permission reaches. `useEntityRelations` awaits a useAsyncData HANDLE,
+         * which resolves rather than rejects — so the page renders with every
+         * picker EMPTY. Verified live: the role picker says "No roles defined yet"
+         * to a tenant that has them. A page-wide lie instead of an obvious absence.
          */
         path: '/manage/persons/:personEditorId',
         roles: ['personEditor'],
@@ -514,18 +469,13 @@ describe('every page renders for every role that can reach it', () => {
     }
 
     /**
-     * `/schedule/proposals` is reachable on `session.read` ALONE — and that is
-     * the point of it having its own middleware.
+     * `/schedule/proposals` is reachable on `session.read` ALONE, which is why it
+     * has its own middleware. The same `viewer` account is REFUSED `/schedule` (six
+     * reads to draw a grid) and ADMITTED here. Borrowing the schedule's gate would
+     * have denied the department head PRODUCT.md names as the reviewer.
      *
-     * The contrast with the row above is the whole claim: the same `viewer`
-     * account is REFUSED `/schedule` (it needs six reads to draw a grid) and
-     * ADMITTED here (every reference fetch on this page is tolerant). Borrowing
-     * the schedule's gate would have denied the department head PRODUCT.md names
-     * as the reviewer — the exact person this page exists for.
-     *
-     * Asserted on a data-dependent branch rather than on the static header, and
-     * with the failure branch asserted ABSENT, because "the page contained the
-     * heading" passes just as well for a page whose fetch rejected.
+     * Asserted on a data-dependent branch with the failure branch asserted ABSENT:
+     * "contained the heading" passes for a page whose fetch rejected.
      */
     it('admits a session.read-only role to /schedule/proposals', async () => {
         for (const role of ['admin', 'viewer'] as const) {
@@ -583,14 +533,11 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /**
-     * A proposal must be REACHABLE by clicking, from both of its entry points.
-     *
-     * Same failure mode the /my section shipped with, and worse here: before
-     * this, the only link to `/schedule/review/:id` in the entire codebase was
-     * inside `ScheduleSolverControl`'s transient `finished` state, which a page
-     * reload destroys — and `adopt()` re-adopts only runs that are still ACTIVE.
-     * So a proposal was reachable for a few minutes, by one person, while
-     * dozens sat READY in the database. Every page test passed throughout.
+     * A proposal must be REACHABLE by clicking, from both entry points. Before
+     * this, the only link to `/schedule/review/:id` was inside
+     * `ScheduleSolverControl`'s transient `finished` state, which a reload
+     * destroys — so a proposal was reachable for minutes, by one person, while
+     * dozens sat READY. Every page test passed throughout.
      *
      * Asserted in both directions: a link offered to everybody proves nothing.
      */
@@ -711,17 +658,12 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /**
-     * THE SYSTEMIC CASE: a picker whose options come from a resource the page's
-     * own gate does not cover is OMITTED, never rendered empty.
+     * A picker whose options come from a resource the page's gate does not cover is
+     * OMITTED, never rendered empty. Six relations across four entities were in
+     * that state and only one involved access roles, so both pages are checked.
      *
-     * Six relations across four entities were in that state before this, and
-     * only one of them involved access roles. The Person and Room pages are both
-     * checked here because one instance of a systemic bug proves nothing about
-     * the other five.
-     *
-     * Every absence is paired with an admin rendering the SAME page. That
-     * pairing is the whole discipline of this file: "the page does not contain
-     * X" passes just as well for a page that rendered nothing.
+     * Every absence is paired with an admin rendering the SAME page — "does not
+     * contain X" passes just as well for a page that rendered nothing.
      */
     describe('relation pickers whose options are out of reach', () => {
         const body = (path: string, role: string) =>
@@ -811,17 +753,10 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /**
-     * A page nobody can NAVIGATE to might as well not exist.
-     *
-     * Every other assertion in this file fetches a URL directly, which is
-     * exactly how the /my section shipped with working pages, correct gating and
-     * no way to click into it: `ViewMenu` renders only entries carrying
-     * `inHeader`, and the section's two pages deliberately do not. The pages
-     * rendered, the middleware refused the right people, and the whole suite was
-     * green while the feature was unreachable.
-     *
-     * So the header itself is now asserted — in both directions, because "the
-     * link is there" proves nothing if it is there for everybody.
+     * A page nobody can NAVIGATE to might as well not exist. Every other assertion
+     * here fetches a URL directly, which is how the /my section shipped with
+     * working pages, correct gating and no way to click into it. So the header is
+     * asserted too, in both directions.
      */
     it('offers the /my section in the header to exactly the roles that can use it', async () => {
         const header = async (role: string) => {
@@ -889,17 +824,13 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /*
-     * THE READ-ONLY RENDERING PATH.
+     * THE READ-ONLY RENDERING PATH. Step 13's rule: `.read` without `.update` gets
+     * STATIC TEXT, not disabled inputs, which read as "unavailable right now"
+     * rather than "not yours". The constraint grid was the last place still
+     * rendering disabled inputs and nothing pinned the fix.
      *
-     * Step 13's rule is that a role with `.read` and no `.update` gets STATIC
-     * TEXT, not disabled inputs — a disabled control reads as "unavailable
-     * right now" rather than "not yours to change". The constraint grid was the
-     * last place still rendering disabled inputs, and nothing pinned the fix.
-     *
-     * Counting absences is the trap this whole file exists to catch, so every
-     * absence below is paired with the admin rendering the SAME page: zero
-     * toggles for a viewer means nothing unless the page produces toggles for
-     * someone. Without that control, a blank page passes every assertion here.
+     * Every absence below is paired with the admin rendering the SAME page: zero
+     * toggles for a viewer means nothing unless the page produces toggles at all.
      */
     describe('the constraint grid, read-only', () => {
         const constraintPage = (role: string) =>

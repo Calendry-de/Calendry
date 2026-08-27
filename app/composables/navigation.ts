@@ -5,21 +5,13 @@ import { useThemeToggle } from '~/composables/layout';
 import { logout, useSession } from '~/composables/session';
 
 /**
- * The navigation registry — one typed list behind the header, the /manage
- * sidebar, the /manage index and the Ctrl+K palette.
+ * The navigation registry — one typed list behind the header, the /manage sidebar,
+ * the /manage index and the Ctrl+K palette. What places exist, what they are
+ * called, and who may see them; not fetching, not the palette's open/close
+ * machine, not permissions themselves.
  *
- * OWNERSHIP BOUNDARY: what places exist, what they are called, and who may see
- * them. Not fetching, not the palette's open/close machine (that is
- * `useCommandPalette`), not permissions themselves (that is the server).
- *
- * The `manage.*` entries are PROJECTED from MANAGE_ENTITIES rather than
- * retyped. That is the whole reason the sidebar and the palette cannot drift:
- * there is one array, rendered three ways.
- *
- * This file replaced the template's `useHeaderMenu`, which gated on
- * `store.me?.isAdmin` from the `WebUser` stub. That stub had no relationship to
- * the real auth model and is now deleted; gating runs on the permission
- * catalogue like everything else.
+ * The `manage.*` entries are PROJECTED from MANAGE_ENTITIES rather than retyped,
+ * which is why the sidebar and the palette cannot drift.
  */
 export type NavSection = 'schedule' | 'my' | 'manage' | 'account';
 
@@ -118,18 +110,10 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
         },
         {
             /*
-             * IN THE MANAGE SECTION, though the route lives under /schedule.
-             *
-             * Section membership is decided by the id prefix — `useManageSections`
-             * filters on `manage.` — so this entry appears in the /manage
-             * sidebar, the /manage index and the palette, while `to` keeps the
-             * path where it belongs: alongside the schedule routes, sharing
-             * their `review` middleware. Same shape as
-             * `manage.availability-reviews`, which is also a review queue rather
-             * than a managed entity.
-             *
-             * Both menus render `entry.to` directly, so a manage-section entry
-             * pointing outside /manage needs nothing special.
+             * IN THE MANAGE SECTION though the route lives under /schedule:
+             * membership is decided by the id prefix, so this appears in the manage
+             * sidebar, index and palette while `to` keeps the path alongside the
+             * schedule routes, sharing their `review` middleware.
              */
             id: 'manage.proposals',
             label: 'Proposals',
@@ -138,15 +122,10 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'manage',
             keywords: ['proposal', 'proposals', 'generation', 'solver', 'review', 'apply', 'pending'],
             /*
-             * ONE permission, unlike its sibling `/schedule`.
-             *
-             * This page and the review screen it leads to are gated on
-             * `session.read` alone, matching `GET /api/generations`. Their
-             * reference fetches are individually TOLERANT — a caller who cannot
-             * read terms sees "Term unknown" rather than a refusal — so the
-             * six-permission schedule gate would deny people the data allows.
-             * The rule that matters is that the LINK and the ROUTE agree, and
-             * both name this key.
+             * ONE permission, unlike its sibling `/schedule`: this page and the
+             * review screen are gated on `session.read` alone, matching
+             * `GET /api/generations`, and their reference fetches are individually
+             * TOLERANT. What matters is that the LINK and the ROUTE agree.
              */
             permission: 'session.read',
             to: '/schedule/proposals',
@@ -173,22 +152,14 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'my',
             keywords: ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences'],
             /*
-             * IN THE HEADER, and gated on the one permission both of its pages
-             * need.
+             * IN THE HEADER, gated on the one permission both its pages need.
+             * Without this entry the section was unreachable by clicking:
+             * `ViewMenu` renders only entries carrying `inHeader`, and the two
+             * pages deliberately do not. The pages rendered, the middleware gated
+             * correctly, and every test passed while a lecturer had no way in.
              *
-             * Without this entry the whole section was unreachable by clicking:
-             * `ViewMenu` renders `useHeaderNav()`, which is entries carrying
-             * `inHeader`, and the two pages below deliberately do not carry it —
-             * they are section contents, exactly as the manage entities are.
-             * So the pages rendered, the middleware gated them correctly, and
-             * every test passed while a lecturer had no way to get there short
-             * of typing the URL or opening the palette.
-             *
-             * Unlike `manage`, this one DOES name a permission. That hub has
-             * none because "may read at least one section" is not a single key
-             * and has to be derived from the projected entries; here both pages
-             * are behind `availability.manage_own`, so the hub is too, and
-             * deriving it would be a rule with one input.
+             * Unlike `manage`, this hub DOES name a permission — that one has none
+             * because "may read at least one section" is not a single key.
              */
             permission: 'availability.manage_own',
             to: '/my',

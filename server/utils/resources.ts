@@ -118,19 +118,17 @@ export interface ResourceConfig {
         patch: Record<string, unknown>;
     }) => Promise<void>;
     /**
-     * Runs INSIDE the write transaction, AFTER the row and its children have
-     * been written — on create, update AND delete. Throwing rolls the whole
-     * transaction back.
+     * Runs INSIDE the write transaction, AFTER the row and its children — on
+     * create, update AND delete. Throwing rolls the transaction back.
      *
-     * The counterpart to `beforeCreate`/`beforeUpdate`, for an invariant about
-     * the RESULT rather than about the payload. `assertTenantRetainsAdministrator`
-     * is the reason it exists: predicting whether a write leaves a tenant unable
-     * to administer itself means reimplementing the write, and a guard that
-     * models a write can drift from it. Measuring the post-write state cannot.
+     * For an invariant about the RESULT rather than the payload.
+     * `assertTenantRetainsAdministrator` is why it exists: predicting whether a
+     * write leaves a tenant unable to administer itself means reimplementing the
+     * write, and a guard that models a write can drift from it.
      *
-     * Wired into all three routes rather than only the ones that can currently
-     * breach something. A hook that fires on some writes and not others is the
-     * kind of rule that is true when written and quietly false a year later.
+     * Wired into all three routes, not only those that can currently breach
+     * something — a hook that fires on some writes is true when written and
+     * quietly false a year later.
      */
     afterWrite?: (ctx: {
         tx: Tx;
@@ -153,19 +151,14 @@ export interface ResourceConfig {
      */
     systemFlag?: string;
     /**
-     * Declared filters that are NOT plain column equality.
+     * Declared filters that are NOT plain column equality. The list route spreads
+     * `filters` into `where`, which is wrong for a range (`minCapacity` means
+     * `capacity >= n`) and a relation (`groups?termId=` means "scoped to that Term
+     * OR to none").
      *
-     * The list route spreads `filters` straight into `where`, which is right for
-     * the common case and wrong for two: a range (`minCapacity` means
-     * `capacity >= n`) and a relation (`groups?termId=` means "scoped to that
-     * Term OR scoped to none"). Each entry removes its key from the equality
-     * spread and contributes a clause to the AND list instead.
-     *
-     * Keyed PER RESOURCE rather than by filter name, which is the point: the
-     * route previously special-cased `minCapacity` by name, and `termId` cannot
-     * work that way — `offerings` declares a `termId` filter that IS a plain
-     * column, so a name-keyed rule would silently rewrite it into a relation
-     * query against a relation offerings does not have.
+     * Keyed PER RESOURCE, not by filter name: `offerings` declares a `termId`
+     * filter that IS a plain column, so a name-keyed rule would silently rewrite
+     * it into a relation query against a relation offerings does not have.
      */
     relationalFilters?: Record<string, (value: never) => Record<string, unknown>>;
 }
@@ -295,28 +288,17 @@ async function constraintBeforeUpdate(ctx: {
 }
 
 /**
- * A calendar period must fall inside its Term.
+ * A calendar period must fall inside its Term — a REFUSAL, not a warning.
  *
- * WHY THIS IS A REFUSAL AND NOT A WARNING
+ * A period entirely outside the term classifies NO week: the row exists, reads
+ * back, appears in the list and means nothing. That is what "guards must fail
+ * loudly" exists for, and the same shape as the bug that made this feature
+ * necessary.
  *
- * A period entirely outside `[term.startDate, term.endDate]` classifies NO
- * week: every overlap test in `classifyWeeks` fails, so the row exists, reads
- * back correctly, appears in the list, and means nothing. That is precisely the
- * failure mode CLAUDE.md's "guards must fail loudly or match exactly" rule
- * exists for — and it is the same shape as the bug that made this whole feature
- * necessary, where an empty `calendar_period` table left
- * `minimize_exam_week_sessions` reporting zero violations while looking healthy.
- *
- * A PARTIAL overlap is ALLOWED, deliberately. A period running past the end of
- * term is ordinary (an exam week that spills into the following month), only
- * its in-range part classifies anything, and clipping is the natural reading.
- * Refusing it would reject a legitimate configuration to prevent nothing.
- *
- * OVERLAPS BETWEEN PERIODS ARE NOT CHECKED AT ALL, also deliberately. They are
- * meaningful and the precedence rule already resolves them — a holiday inside
- * an exam period is normal, and "EXAM if any exam period touches the week, else
- * whole-week BREAK, else whole-week HOLIDAY" only HAS meaning because periods
- * can overlap. Rejecting them would contradict the resolver already shipped.
+ * A PARTIAL overlap is allowed: an exam week spilling into the next month is
+ * ordinary and clipping is the natural reading. Overlaps BETWEEN periods are not
+ * checked at all — the precedence rule ("EXAM if any exam period touches the week,
+ * else whole-week BREAK, else HOLIDAY") only has meaning because they can overlap.
  */
 async function assertPeriodWithinTerm(
     tx: Tx,
@@ -762,21 +744,14 @@ export const RESOURCES: Record<string, ResourceConfig> = {
 
             /**
              * Break overrides that no longer name a real position are removed,
-             * not refused.
-             *
-             * The asymmetry with Sessions above is deliberate and is the whole
+             * not refused. The asymmetry with Sessions above is the whole
              * distinction: an orphaned Session is DATA that resolves to no time
-             * and breaks the solver, so the edit is refused. An orphaned break
-             * is CONFIGURATION describing a gap between blocks that no longer
-             * exist — nothing references it, nothing renders it, and refusing
-             * the shrink over it would block a legitimate edit to protect a row
-             * whose meaning has already gone.
+             * and breaks the solver, so the edit is refused; an orphaned break is
+             * CONFIGURATION nothing references or renders.
              *
-             * Same transaction as the update, so a failed shrink deletes
-             * nothing. Reported rather than silent: this repo's rule is that a
-             * guard must not have a failure mode indistinguishable from doing
-             * nothing, and quietly discarding a tenant's named lunch would be
-             * exactly that.
+             * Same transaction as the update, so a failed shrink deletes nothing.
+             * Reported rather than silent: quietly discarding a tenant's named
+             * lunch is exactly the failure mode a guard must not have.
              */
             const dangling = await tx.timeGridBreak.findMany({
                 where: {
@@ -821,24 +796,15 @@ export const RESOURCES: Record<string, ResourceConfig> = {
     },
 
     /**
-     * Holidays, break weeks and exam periods.
+     * Holidays, break weeks and exam periods, ON THE GENERIC SCAFFOLD: the row is
+     * four scalars with none of what earned the bespoke editors their slots — no
+     * hierarchy, no arithmetic a form field cannot express, no fields constraining
+     * each other. Only the week PREVIEW is bespoke, as one `custom: true` field.
      *
-     * ON THE GENERIC SCAFFOLD, DELIBERATELY. The row is four scalars — an enum
-     * `kind`, a name, and two dates — with none of what earned the three
-     * bespoke editors their slots: no hierarchy (GroupTree), no arithmetic a
-     * form field cannot express (TimeGridEditor), no fields that constrain each
-     * other (ConstraintBuilder). Offering is the precedent: the hub of the model
-     * renders on the generic scaffold because its complexity is registry data,
-     * not different code. Only the week PREVIEW is bespoke, and it is one
-     * `custom: true` field rather than a page.
-     *
-     * WHY THIS DID NOT EXIST UNTIL NOW, which is worth recording. The table,
-     * the Prisma model, the RLS policy, `buildAcademicCalendar` and the wire
-     * have all been in place since the initial schema — but nothing could WRITE
-     * a row. So `calendar_period` was empty in every tenant, no week was ever
-     * classified EXAM, and `minimize_exam_week_sessions` reported zero
-     * violations while looking like it worked. Raising its weight from 5 to
-     * 1000 multiplied zero by two hundred.
+     * The table, model, RLS policy and wire had been in place since the initial
+     * schema, but nothing could WRITE a row — so `minimize_exam_week_sessions`
+     * reported zero violations while looking like it worked, and raising its
+     * weight from 5 to 1000 multiplied zero by two hundred.
      */
     'calendar-periods': {
         model: 'calendarPeriod',
@@ -907,21 +873,15 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             }
         },
         /**
-         * A NON-DEFAULT constraint of a type that already has a default row must
-         * name at least one scope.
+         * A NON-DEFAULT constraint of a type that already has a default must name
+         * at least one scope. Without it, "Add scoped variant" produces a second
+         * tenant-wide rule of the same type — the duplicate-constraint defect this
+         * project already fixed once, reintroduced through a button promising the
+         * opposite.
          *
-         * Without this, "Add scoped variant" produces a second tenant-wide rule
-         * of the same type — both enabled, both weighted, both sent to the
-         * solver. That is the duplicate-constraint defect this project already
-         * fixed once, reintroduced through a button that promises the opposite.
-         *
-         * NOT a database constraint, and it cannot be one: "has at least one row
-         * in another table" is not expressible as a CHECK, and the partial
-         * unique index only governs how many DEFAULTS exist. Saying so is better
-         * than implying the index covers it.
-         *
-         * The other candidate rule — have the type picker exclude types that
-         * already have a default — is unworkable by construction: every live
+         * Not expressible as a CHECK ("has at least one row in another table"),
+         * and the partial unique index only governs how many DEFAULTS exist.
+         * Excluding such types from the picker instead is unworkable: every live
          * catalogue type has a default row, so the picker would be empty.
          */
         async beforeCreate({ tx, tenantId, data, children }) {
@@ -955,46 +915,18 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * The DB CHECK enforces the HARD/SOFT ⇄ weight pairing; this only
              * shapes the input.
              *
-             * NO CEILING, BY DESIGN — NOT AN OVERSIGHT.
+             * NO CEILING, BY DESIGN. A weight has no absolute meaning: the solver
+             * derives `hard_penalty = sum(soft weights) * placements + 1`, so only
+             * RATIOS matter and raising one weight raises the penalty in the same
+             * step — magnitude can never let a soft rule overrule a hard one. "10"
+             * is neither safer nor more correct than "10000".
              *
-             * A weight has no absolute meaning. The solver derives its
-             * hard-violation penalty from the weights themselves:
-             *
-             *     hard_penalty = sum(all soft weights) * placements + 1
-             *                              (calendry-solver, problem.rs)
-             *
-             * Two consequences follow, and both are why capping the value would
-             * be meaningless rather than merely unnecessary:
-             *
-             *  - Only RATIOS matter. Multiplying every enabled weight by the
-             *    same factor leaves every comparison — soft against soft, and
-             *    hard against soft — exactly where it was.
-             *  - A large weight cannot let a soft rule overrule a hard one.
-             *    Raising one weight raises `total_weight`, which raises
-             *    `hard_penalty` in the same step, so the lexicographic ordering
-             *    (hard first, then soft) survives any magnitude.
-             *
-             * So "10" is not safer than "10000", and neither is more correct;
-             * the only question a tenant can meaningfully answer is how this
-             * rule ranks against their OTHER enabled soft rules. That is what
-             * the `builder_note` block in ManageConstraintBuilder.vue explains,
-             * and the two should not drift.
-             *
-             * WHAT IS NOT ENFORCED HERE, AND SHOULD BE. There is no lower bound
-             * either: `weight: -5` is accepted by this schema and by the
-             * database, verified against the live API (HTTP 201). The builder's
-             * `min: 1` is an HTML input attribute and stops nothing that does
-             * not go through the form. A negative weight is not a harmless
-             * oddity — it SUBTRACTS from `total_weight`, lowering the very
-             * penalty that keeps hard constraints dominant, and it inverts the
-             * rule so the solver prefers what the tenant asked it to avoid.
-             *
-             * Deliberately left unfixed here: this is the same shape as the
-             * tracked "severity is validated too late" gap in CLAUDE.md — the
-             * builder honours a rule the generic CRUD API does not — and both
-             * belong in one write-boundary fix that has `RESOURCES.constraints`
-             * consult `CONSTRAINT_TYPES` in a refinement, rather than another
-             * piecemeal patch.
+             * NO LOWER BOUND EITHER, and that one is a gap: `weight: -5` is
+             * accepted here and by the database (verified, HTTP 201), and a
+             * negative weight SUBTRACTS from `total_weight`, lowering the penalty
+             * that keeps hard constraints dominant. Left with the tracked
+             * "severity validated too late" gap in CLAUDE.md — one write-boundary
+             * fix consulting `CONSTRAINT_TYPES`, not another piecemeal patch.
              */
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
@@ -1062,12 +994,9 @@ export const RESOURCES: Record<string, ResourceConfig> = {
      * AccessRole — a tenant-defined bundle of the FIXED permission catalogue
      * (TAXONOMY.md §4). Not the domain `Role`, which is scheduling vocabulary.
      *
-     * Until Step 14 this table had no route at all: `provision:tenant` minted
-     * one role and the operator CLIs were the only way to make another. It is
-     * an ordinary tenant-scoped table behind `tenant_isolation`, so nothing
-     * about serving it here is special — except the permissions, which are
-     * `access_role.manage` rather than four CRUD verbs (see
-     * RESOURCE_PERMISSIONS), and the grants, which are the child rows below.
+     * An ordinary tenant-scoped table behind `tenant_isolation`; the only
+     * unusual parts are the permissions (`access_role.manage`, not four CRUD
+     * verbs — see RESOURCE_PERMISSIONS) and the grants, which are child rows.
      */
     'access-roles': {
         model: 'accessRole',
@@ -1078,25 +1007,15 @@ export const RESOURCES: Record<string, ResourceConfig> = {
          */
         include: { permissions: true },
         /**
-         * Permissions are CHILD ROWS, not a RELATION, and the distinction is
-         * structural rather than stylistic.
+         * Permissions are CHILD ROWS, not a RELATION. `RELATIONS` is a picker over
+         * existing ENTITIES and needs an API resource to fetch options from; there
+         * is no `/api/permissions` and there must not be one, because the editor
+         * renders from `shared/permissions.ts` so an unseeded permission is
+         * REPORTED rather than silently missing.
          *
-         * `RELATIONS` is a picker over existing ENTITIES — it needs an API
-         * resource to fetch its options from (`resource: 'groups'`). Permissions
-         * are code: there is no `/api/permissions` resource, and there must not
-         * be one, because the editor renders from `shared/permissions.ts` so
-         * that a permission the database has not been seeded with is REPORTED
-         * rather than silently missing.
-         *
-         * They also have to arrive in the same request as the row. A relation is
-         * saved separately, so "create then grant" would leave a window holding
-         * a role that grants nothing — and `create:role` already refuses that
-         * state on the CLI, for the reason it prints: a role holding nothing is
-         * a role that does nothing, and it will be assigned to someone who then
-         * cannot do anything and has no way to tell why.
-         *
-         * Same mechanism `time-grids` uses for `breaks` and `constraints` for
-         * `scopes`, written in one transaction for the same reason.
+         * They also have to arrive in the same request as the row: a relation
+         * saves separately, so "create then grant" would leave a window holding a
+         * role that grants nothing. Same mechanism `time-grids` uses for `breaks`.
          */
         childKeys: ['permissions'],
         async writeChildren({ tx, tenantId, id, children }) {

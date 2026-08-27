@@ -1,41 +1,22 @@
 /**
  * How many people an Offering's attached Groups actually represent.
  *
- * WHY THIS EXISTS
- * ---------------
- * `Offering.requiredCapacity` is nullable, and both the schema comment and the
- * Offering form's help text promised the same thing: "leave unset to derive it
- * from the assigned groups' expected sizes". Nothing derived anything.
- * `assembleSolverInput` mapped `requiredCapacity ?? 0`, and the solver's room
- * filter is `room.capacity < offering.min_capacity` — so 0 meant EVERY room
- * qualified. Measured on the demo tenant: twelve Offerings with 96 attendees
- * each, all twelve with `required_capacity` NULL, and three 24-seat rooms all
- * considered eligible.
+ * `Offering.requiredCapacity` is nullable and both the schema comment and the form
+ * promised to derive it from the assigned groups. Nothing did:
+ * `assembleSolverInput` mapped `requiredCapacity ?? 0` and the solver's filter is
+ * `room.capacity < offering.min_capacity`, so 0 meant EVERY room qualified.
+ * Measured on the demo tenant: twelve Offerings of 96 attendees, all NULL, three
+ * 24-seat rooms all eligible.
  *
- * WHY THE RULE LIVES HERE AND NOT AT THE CALL SITE
- * ------------------------------------------------
- * Two consumers need the identical number and must not drift: the solver input
- * (which decides what is possible) and the Offering form (which tells a human
- * what leaving the field blank will do). A second implementation of "how big is
- * this really" is exactly the divergence `shared/timeGrid.ts` was created to
- * delete. Kept PURE — rows in, number out — so it is testable without a
- * database and callable from either side.
+ * In `shared/` because the solver input (what is possible) and the Offering form
+ * (what leaving the field blank will do) must not drift. Kept PURE — rows in,
+ * number out.
  *
- * THE COUNTING RULE, AND WHY IT IS A UNION RATHER THAN A SUM
- * ---------------------------------------------------------
- * Summing per-Group counts double-counts a person reachable more than once, and
- * there are two independent ways that happens:
- *
- *   1. Membership at a leaf AND at one of its ancestors. The taxonomy permits
- *      direct membership at any level, so this is legal data, not corruption.
- *   2. An Offering carrying BOTH a Group and one of that Group's own
- *      descendants — e.g. "IT Security" (48) and "dIT22 S1" (24) on the demo
- *      tree, which naively sums to 72 where the truth is 48.
- *
- * Both are the same mistake at different levels, so both get the same fix: take
- * the UNION of every attached Group's own-plus-descendants closure, then count
- * DISTINCT people across it. A person reached by four paths is counted once,
- * whatever the shape of the tree.
+ * A UNION, NOT A SUM. Summing per-Group counts double-counts a person reachable
+ * more than once, in two independent ways: membership at a leaf AND an ancestor
+ * (legal data), and an Offering carrying both a Group and its own descendant — "IT
+ * Security" (48) plus "dIT22 S1" (24) sums to 72 where the truth is 48. So: union
+ * of every attached Group's own-plus-descendants closure, then DISTINCT people.
  */
 
 export interface CapacityGroup {
@@ -86,18 +67,12 @@ export interface DerivedCapacity {
 }
 
 /**
- * How much of the expected cohort must be enrolled before the roll is treated
- * as complete.
+ * How much of the expected cohort must be enrolled before the roll counts as
+ * complete. A roll is always slightly short, so flagging any shortfall would train
+ * people to skip the report; ten percent absorbs churn but not a data-entry gap.
  *
- * A roll is ALWAYS slightly short — late enrolment, drops, someone
- * unregistered — so reporting any shortfall at all would flag nearly every
- * Offering and train people to skip the report. Ten percent absorbs ordinary
- * churn without absorbing a data-entry gap.
- *
- * The threshold decides only WHETHER to mention it. Both numbers travel with
- * the report so a human judges severity: 4-of-96 and 86-of-96 both surface, and
- * nobody has to trust this constant to tell them apart. That is also what makes
- * a slightly-wrong threshold degrade into noise rather than into silence.
+ * The threshold decides only WHETHER to mention it — both numbers travel, so a
+ * slightly wrong threshold degrades into noise rather than silence.
  */
 export const ENROLMENT_COMPLETE_RATIO = 0.9;
 
@@ -175,19 +150,13 @@ export function deriveCapacity(
     }
 
     /**
-     * The estimate is computed even when membership wins.
+     * Computed even when membership wins, so the two can be COMPARED: the real
+     * count is still the answer, but "4 people where 96 were expected" is a fact
+     * about that answer which was invisible until a room turned out too small.
      *
-     * It used to be the fallback path only, returned early past. Computing both
-     * is what lets them be COMPARED — the real count is still the answer, but
-     * "4 people where 96 were expected" is a fact about that answer which was
-     * previously invisible until a room turned out to be far too small.
-     *
-     * SAME dedup applied.
-     *
-     * Summing `expectedSize` across attached Groups repeats the double-count
-     * the union avoided — "IT Security" (48) plus its own child "dIT22 S1" (24)
-     * would read 72. So only MAXIMAL attached Groups contribute: one with
-     * another attached Group above it is already represented by that ancestor.
+     * Only MAXIMAL attached Groups contribute to the estimate — one with another
+     * attached Group above it is already represented by that ancestor — which is
+     * the same double-count the union avoids.
      */
     const attachedSet = new Set(attached);
 

@@ -1,16 +1,9 @@
 <template>
     <!--
-        THE OPENER MARKS A CHANGE OF MODE.
-
-        Arriving here is a deliberate, infrequent act — you pressed Review on one
-        proposal — and what follows is the only screen in the product that can
-        replace a whole term's timetable. The veil is the beat between browsing a
-        schedule and deciding about one.
-
-        Faster than the landing page's, because this is a work surface and not an
-        entrance: the same movement, over in about two thirds of the time. It
-        collapses entirely under `prefers-reduced-motion`, which the component
-        handles on mount.
+        THE OPENER MARKS A CHANGE OF MODE. Arriving here is deliberate and
+        infrequent, and what follows is the only screen that can replace a whole
+        term's timetable. Faster than the landing page's — a work surface, not an
+        entrance — and it collapses under `prefers-reduced-motion`.
     -->
     <CommonPageOpener
         v-model="opening"
@@ -79,20 +72,12 @@
             >
                 <template v-if="canApply">
                     <!--
-                        THE COMMIT.
-
-                        Apply used to be an unconfirmed `type="primary"` button,
-                        visually identical to the "Review" button that navigated
-                        here, while the screen's only confirmation guarded
-                        Discard — which sets status SUPERSEDED and deletes
-                        nothing. The friction was on the reversible action and
-                        the danger colour was spent on it too.
-
-                        Now Apply asks, states the consequence in the same words
-                        the plan above shows, and Discard is a quiet link. The
-                        variant is `secondary-black` so that the affirmative
-                        control in the confirm strip is the only primary-weight
-                        button in the flow: nothing gets applied by muscle memory.
+                        THE COMMIT. Apply used to be an unconfirmed primary button
+                        identical to the "Review" one that navigated here, while
+                        the only confirmation guarded Discard — which deletes
+                        nothing. The friction was on the reversible action.
+                        `secondary-black` so the affirmative control in the confirm
+                        strip is the only primary-weight button in the flow.
                     -->
                     <CommonButton
                         type="secondary-black"
@@ -923,16 +908,10 @@ watch(preview, (value) => {
     }
 
     /*
-     * THE AUTHORED MOMENT ON THIS SCREEN.
-     *
-     * DESIGN.md allows one per surface, and on the schedule it is entering
-     * placement mode. Here it is the commit: the strip arrives with weight —
-     * 240ms, rising 10px out of a slight compression — because it is asking the
-     * one irreversible-feeling question the product has. It leaves in 140ms,
-     * the house ease, because backing out should feel like nothing happened.
-     *
-     * Both collapse under `prefers-reduced-motion`, which layout.scss handles
-     * globally for every transition and animation.
+     * THE AUTHORED MOMENT ON THIS SCREEN — DESIGN.md allows one per surface. The
+     * strip arrives with weight (240ms, rising out of a slight compression) because
+     * it asks the one irreversible-feeling question the product has, and leaves in
+     * 140ms so backing out feels like nothing happened.
      */
     &_confirm {
         display: flex;

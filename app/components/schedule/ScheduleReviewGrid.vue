@@ -2,7 +2,7 @@
     <div
         class="rgrid"
         :style="cssVars"
-        role="grid"
+        role="group"
         aria-label="Proposed week"
     >
         <div
@@ -18,9 +18,8 @@
             <span>{{ weekdayShort(day) }}</span>
             <!--
                 Named only where this day's own breaks put its blocks somewhere
-                other than the shared timeline. With one set of rows for every
-                column, that divergence cannot be DRAWN — so it is stated, and
-                each chip carries its own day's real clock time.
+                other than the shared timeline — with one set of rows that
+                divergence cannot be DRAWN, so it is stated.
             -->
             <span
                 v-if="dayDiffers(day)"
@@ -30,21 +29,12 @@
         </div>
 
         <!--
-            THE TIME COLUMN LIVES IN THE SAME ROWS AS THE BLOCKS IT LABELS.
-
-            Two bugs came out of it not doing so. It was one auto-placed div per
-            block in a `grid-auto-rows` grid while the chips were placed
-            EXPLICITLY, so CSS flowed the auto items around them and a single
-            scheduled session wrapped the next time label into a day column — the
-            time appeared on the RIGHT. Rebuilding it as absolute offsets from
-            minutes fixed that and introduced the second: a crowded slot's
-            content outgrew its block, so the day columns and the time column
-            disagreed about where 16:15 was.
-
-            Both are gone for the same reason. Every child is placed EXPLICITLY,
-            so nothing flows; and a block's label shares a grid ROW with that
-            block's cells, so whatever makes the row taller moves the label with
-            it. Alignment is structural rather than computed, and cannot drift.
+            THE TIME COLUMN LIVES IN THE SAME ROWS AS THE BLOCKS IT LABELS, and
+            every child is placed EXPLICITLY. Two bugs came from neither being
+            true: auto-placed labels flowed around the explicitly placed chips and
+            a scheduled session pushed the time into a day column, and computed
+            offsets then disagreed with the columns once a crowded slot outgrew
+            its block.
         -->
         <template
             v-for="row in rows"
@@ -54,7 +44,6 @@
                 v-if="row.kind === 'block'"
                 class="rgrid_time"
                 :class="{ 'rgrid_time--quiet': !labelledLines.has(row.line) }"
-                role="rowheader"
                 :style="{ gridRow: row.line, gridColumn: 1 }"
             >
                 <span>{{ row.start }}</span>
@@ -69,10 +58,9 @@
 
                 <!--
                     One band across every day, because these are the UNIVERSAL
-                    gaps. A break is a real interval, and the row it occupies is
-                    sized to its own content rather than to a share of the block
-                    height: a 45-minute break inside 195-minute blocks came out
-                    19px tall, too short to carry its own label.
+                    gaps. Its row is sized to its own content, not a share of the
+                    block height: a 45-minute break inside 195-minute blocks came
+                    out 19px tall, too short for its label.
                 -->
                 <div
                     class="rgrid_gap"
@@ -106,12 +94,8 @@
                 :aria-label="item.label"
             >
                 <span class="rgrid_chip-tag">
-                    <!--
-                        Three encodings per state, never hue alone (DESIGN.md):
-                        the icon, the left border, and this word. In greyscale, or
-                        with the tint stripped, "added" and "removed" are still
-                        the two things they must never be mistaken for.
-                    -->
+                    <!-- Three encodings per state, never hue alone (DESIGN.md):
+                         icon, left border, and this word. -->
                     <Icon
                         :name="DIFF_ICON[item.action]"
                         class="rgrid_chip-icon"
@@ -154,37 +138,19 @@ import type { Placement, ReviewPlacement } from '~/composables/generationReview'
 /**
  * The proposed timetable, rendered as a diff.
  *
- * A SEPARATE COMPONENT rather than a mode on ScheduleGrid, deliberately.
- * ScheduleGrid is already at the size threshold and carries selection and
- * placement-mode concerns; diff rendering would be a fourth responsibility on
- * it. More to the point the data genuinely differs: a CREATED placement has no
- * Session row and therefore no id, so it cannot be selected, cannot key into the
- * violations map, and does not belong in a component whose whole vocabulary is
- * session ids.
+ * A separate component rather than a mode on ScheduleGrid: the data genuinely
+ * differs — a CREATED placement has no Session row and therefore no id, so it
+ * cannot be selected or key into the violations map, and ScheduleGrid's whole
+ * vocabulary is session ids.
  *
- * WHY ITS GEOMETRY DIFFERS FROM ScheduleGrid's, WHICH IS A REAL TRADE
- * ------------------------------------------------------------------
- * The live grid positions each day in its OWN minute-accurate stack, so a day
- * with its own breaks visibly drifts from the time column. That is right there:
- * a timetabler is reading a week as a shape in time, and proportion is the
- * information.
+ * Its rows are content-sized and shared across days, like the live grid's. Four
+ * placements in one slot is ordinary here and no minute-proportional block is
+ * tall enough for them; the cost is that per-day drift is NAMED in the header
+ * rather than drawn. The block/break walk is still shared via
+ * `shared/timeGrid.ts` and `useGridGeometry`.
  *
- * A reviewer is reading a LIST of changes that happens to be arranged like a
- * week. Four placements in one slot is ordinary here, each carrying four facts,
- * and no minute-proportional block is tall enough for them — so this grid sizes
- * its rows to their CONTENT (`minmax(var(--row-height), auto)`) and shares one
- * set of rows across every day. What that buys is exact alignment between the
- * time column and the cells no matter how much is in them. What it costs is
- * per-day drift, so a day whose own breaks move its blocks is NAMED in its
- * header instead, and every chip states its own day's real clock time.
- *
- * The block/break WALK is still shared — `gapsOfDay()` and `blockTime()` from
- * `shared/timeGrid.ts`, and `useGridGeometry` for the per-day comparison behind
- * that header note. Only the pixel projection differs, because only the pixel
- * projection should.
- *
- * NOT THE MOBILE PRESENTATION. `ScheduleReviewAgenda` renders the same data
- * below 1365px, the way `/schedule` swaps its week grid for `ScheduleAgenda`.
+ * NOT THE MOBILE PRESENTATION — `ScheduleReviewAgenda` renders the same data
+ * below 1365px.
  */
 const props = defineProps<{
     grid: TimeGrid;
@@ -232,11 +198,8 @@ interface ChipView {
 }
 
 /**
- * Every placement, packed against overlaps and placed in its own grid area.
- *
- * The fan/stack rule itself is `clusterSlots` — shared with the live schedule,
- * because both grids answer the same question about a crowded slot and had
- * started answering it twice.
+ * Every placement, packed against overlaps. The fan/stack rule is `clusterSlots`,
+ * shared with the live schedule, which had started answering it twice.
  */
 const slots = computed(() => {
     const views = new Map<string, ChipView>();
@@ -277,10 +240,8 @@ const slots = computed(() => {
 <style scoped lang="scss">
 .rgrid {
     /*
-     * Rows come from `gridTemplateRows` in the inline style, because the row
-     * COUNT is data: one per block, one per break. Nothing here auto-places —
-     * every child names its own row and column — which is what keeps the time
-     * column in column 1 no matter what is scheduled.
+     * Rows come from `gridTemplateRows` inline, because the row COUNT is data.
+     * Nothing auto-places — every child names its own row and column.
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
@@ -332,7 +293,10 @@ const slots = computed(() => {
         color: $content6;
     }
 
-    // A row the gutter chose not to label keeps its cell — the column's rhythm
+    /*
+     * An unlabelled row keeps its cell and its TIME for assistive tech: it is a
+     * row header, and one with no name is worse than a quiet one.
+     */
     // is the grid's, not the label's — and simply says nothing.
 
     /*
@@ -393,11 +357,8 @@ const slots = computed(() => {
         text-transform: uppercase;
         letter-spacing: 0.05em;
 
-        /*
-         * Hatched rather than merely empty. A blank interval is
-         * indistinguishable from a slot nothing was placed in, and this one is
-         * unavailable by configuration — a different fact.
-         */
+        /* Hatched, not blank: a blank interval is indistinguishable from a slot
+           nothing was placed in, and this one is unavailable by configuration. */
         background: repeating-linear-gradient(
             135deg,
             varToRgba('surface5', 0.5) 0,
@@ -434,15 +395,10 @@ const slots = computed(() => {
         padding: var(--space-3);
 
         /*
-         * DETECTOR EXCEPTION, `side-tab`, kept deliberately.
-         *
-         * The mechanical scan flags a >1px coloured side border as the classic
-         * AI-slop accent stripe, and its remedy is to remove it. Here the stripe
-         * is not decoration: it is the diff encoding. Each state overrides only
-         * `border-left-color`/`-style`, so deleting it would delete the signal
-         * this component exists to carry — and a left gutter marking added and
-         * removed lines is the convention every diff tool already taught the
-         * reader. Earned by the brief, not reached for by habit.
+         * DETECTOR EXCEPTION `side-tab`, kept deliberately: the stripe is the
+         * diff encoding, not decoration — each state overrides only
+         * `border-left-color`/`-style`, and a left gutter marking added and
+         * removed lines is the convention every diff tool already taught.
          */
         border-left: 3px solid $surface5;
         border-radius: var(--radius-sm);
@@ -452,20 +408,11 @@ const slots = computed(() => {
         background: $surface3;
 
         /*
-         * THE FOUR STATES, ENCODED TO BE TOLD APART.
-         *
-         * They previously differed only in `border-left-color`, between three
-         * near-blacks: create #18181B against move #202024 measured 1.09:1, and
-         * create against delete 1.36:1 on raw token colour — under the comment
-         * asserting that added and removed must never be mistaken for each
-         * other. The only working signal was the tag text, which was itself the
-         * lowest-contrast text on the screen.
-         *
-         * Colour is spent on the two states with consequences and withheld from
-         * the two without. A proposal typically moves almost everything (256 of
-         * 260 in one measured run), so tinting moves would flood the grid and
-         * leave the four removals no way to stand out. Rarity is what gives the
-         * state colour its force.
+         * THE FOUR STATES, ENCODED TO BE TOLD APART. They differed only in
+         * `border-left-color` between three near-blacks — create against move
+         * measured 1.09:1. Colour is spent on the two states with consequences:
+         * a proposal typically moves almost everything (256 of 260 in one run),
+         * so tinting moves would flood the grid and leave removals nothing.
          */
         &--create {
             border-left-color: $success600;
@@ -491,12 +438,9 @@ const slots = computed(() => {
             border-left-color: $error600;
 
             /*
-             * DASHED, and that is the greyscale channel. Green and red sit at
-             * almost the same luminance (1.29:1), so colour alone cannot tell
-             * "added" from "removed" for a reader who cannot see hue — the exact
-             * pair this grid must never confuse. The stripe style, the icon, the
-             * word and the strikethrough all survive greyscale; the hue is the
-             * redundant fourth cue, not the load-bearing one.
+             * DASHED is the greyscale channel: green and red sit at almost the
+             * same luminance (1.29:1), so hue alone cannot tell "added" from
+             * "removed" — the one pair this grid must never confuse.
              */
             border-left-style: dashed;
             background: varToRgba('error600', 0.12);
@@ -551,12 +495,9 @@ const slots = computed(() => {
     }
 
     /*
-     * THE COMPACT ROW — the same chip, one line high.
-     *
-     * Nothing is removed: state icon, offering, room and the move's origin all
-     * survive, laid out inline and ellipsised at the end rather than stacked four
-     * deep. Four of these fit where one full chip did, which is what lets a
-     * crowded slot show every member instead of a count.
+     * The same chip, one line high. Nothing is removed — state icon, offering,
+     * room and the move's origin survive, inline and ellipsised. Four fit where
+     * one full chip did, which is what shows every member instead of a count.
      */
     &_slot--compact &_chip {
         flex: none;

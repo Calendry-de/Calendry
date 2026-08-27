@@ -5,27 +5,18 @@ import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 /**
  * Registry for the join tables hanging off a core entity.
  *
- * WHY THESE ARE NOT IN `RESOURCES`
- * --------------------------------
- * A membership row is not an independent record. `offering_group` has no
- * identity of its own, nobody links to one, and nothing means anything about it
- * except "this Offering involves that Group". Giving it its own CRUD surface
- * would invite the UI to treat it as a thing, when what the user actually edits
- * is a SET on the parent: pick the groups this offering is for.
+ * NOT IN `RESOURCES` because a membership row is not an independent record:
+ * `offering_group` has no identity, nobody links to one, and what the user edits
+ * is a SET on the parent.
  *
- * SO THE VERB IS PUT-SET, NOT POST/DELETE PER ROW
- * -----------------------------------------------
- * `PUT /api/offerings/:id/groups` replaces the whole collection in one
- * transaction. This matches how a multi-select is actually used, it is
- * idempotent, and it removes an entire class of half-applied state: with
- * per-row calls, a form that adds two and removes one is three requests that
- * can partially fail, leaving a relation set nobody chose.
+ * SO THE VERB IS PUT-SET: `PUT /api/offerings/:id/groups` replaces the whole
+ * collection in one transaction. Idempotent, and it removes a class of
+ * half-applied state — per-row calls make "add two, remove one" three requests
+ * that can partially fail, leaving a set nobody chose.
  *
- * PERMISSION IS THE PARENT'S `.update`
- * ------------------------------------
- * Changing which rooms an Offering needs IS editing the Offering. A separate
- * `offering_equipment.update` permission would be authority over a table rather
- * than over a decision, which is not how the catalogue is organised.
+ * PERMISSION IS THE PARENT'S `.update`: changing which rooms an Offering needs IS
+ * editing the Offering. A per-table permission would be authority over a table
+ * rather than over a decision.
  */
 export interface RelationConfig {
     /** Parent resource segment, e.g. 'offerings'. Must exist in RESOURCES. */
@@ -44,23 +35,16 @@ export interface RelationConfig {
     /** Columns returned on GET, in addition to the parent key. */
     select: Record<string, boolean>;
     /**
-     * Permissions accepted by the PUT, ANY one of which is sufficient.
+     * Permissions accepted by the PUT, ANY one sufficient. Absent means the
+     * parent's `.update`, which is right for every relation describing what the
+     * parent NEEDS.
      *
-     * Absent means the parent's own `.update`, which is the rule stated at the
-     * top of this file and right for every relation that describes what the
-     * parent NEEDS: changing which rooms an Offering requires IS editing the
-     * Offering.
+     * `persons/access-roles` is the case it does not fit: granting authority is not
+     * editing a person, and defaulting it to `person.update` would hand every
+     * person editor the ability to make themselves an administrator.
      *
-     * `persons/access-roles` is the case it does not fit. Granting somebody
-     * authority is not editing a person, and the catalogue already says so —
-     * `person_access_role.assign` is its own capability precisely so a tenant
-     * can let a registrar assign existing roles without also letting them
-     * rename people. Defaulting it to `person.update` would hand every person
-     * editor the ability to make themselves an administrator.
-     *
-     * READS are deliberately not overridable and stay on the parent's `.read`:
-     * seeing who holds which role inside your own tenant is not privileged, and
-     * gating it would blank the Person page for anyone who may edit people.
+     * READS stay on the parent's `.read`: gating them would blank the Person page
+     * for anyone who may edit people.
      */
     writePermission?: readonly string[];
     /**
@@ -70,19 +54,13 @@ export interface RelationConfig {
      */
     tenantColumnNullable?: boolean;
     /**
-     * Advisory notes about what the just-written set IMPLIES, surfaced next to
-     * the control without refusing the write.
+     * Advisory notes about what the just-written set IMPLIES, surfaced next to the
+     * control without refusing the write. Runs inside the transaction AFTER the
+     * replacement, so the notes describe the new set.
      *
-     * Warn-and-allow, matching TAXONOMY.md §3's rule for manual edits: the
-     * consequence is stated, the user's decision stands. Run INSIDE the write
-     * transaction and AFTER the replacement, so the notes describe the new set
-     * rather than the one being replaced.
-     *
-     * THE SHAPE OF THE PUT RESPONSE DEPENDS ON THIS FIELD. A relation that
-     * declares it returns `{ rows, warnings }`; every other relation returns the
-     * bare array it always did. That is the same conditional-shape pattern the
-     * list route uses for `limit`, and it is what keeps this from being a
-     * breaking change for the five relations that do not want warnings.
+     * THE SHAPE OF THE PUT RESPONSE DEPENDS ON THIS FIELD: a relation declaring it
+     * returns `{ rows, warnings }`, every other returns the bare array — which is
+     * what keeps it from being a breaking change for the five that do not want them.
      */
     warnAfterWrite?: (ctx: {
         tx: Tx;
@@ -96,15 +74,9 @@ export interface RelationConfig {
      * An invariant about the state the write LEAVES BEHIND. Runs inside the
      * transaction after the replacement; throwing rolls it back.
      *
-     * Distinct from `warnAfterWrite` deliberately, and not folded into it. That
-     * one means "this landed, and here is what it implies" — advisory, never a
-     * refusal. Conflating the two would make one hook's return value sometimes
-     * advice and sometimes a veto, which is precisely the ambiguity this
-     * codebase keeps writing rules against.
-     *
-     * `persons/access-roles` is the only user: revoking the last assignment is
-     * one of three routes to a tenant that cannot administer itself, and all
-     * three end in the same function.
+     * Not folded into `warnAfterWrite`, which is advisory and never a refusal —
+     * conflating them would make one hook's return value sometimes advice and
+     * sometimes a veto.
      */
     afterWrite?: (ctx: { tx: Tx; tenantId: string; id: string }) => Promise<void>;
 }
@@ -117,26 +89,18 @@ interface OrphanedScope {
 }
 
 /**
- * Terms this Group is no longer scoped to, but whose Offerings or Sessions
- * still reference it.
+ * Terms this Group is no longer scoped to, but whose Offerings or Sessions still
+ * reference it.
  *
- * WHY THIS WARNS RATHER THAN REFUSES
+ * WARNS RATHER THAN REFUSES because nothing breaks: `group_term` is a VISIBILITY
+ * scope and the solver never reads it — `assembleSolverInput` derives the Groups it
+ * needs from what is actually referenced, precisely so tenant configuration cannot
+ * make an input inconsistent. What does change is that the Group stops appearing in
+ * that Term's pickers, so an accidental removal cannot be undone without first
+ * restoring the scope.
  *
- * Nothing breaks. `group_term` is a VISIBILITY scope — which Groups a picker
- * offers — and the solver never reads it: `assembleSolverInput` derives the
- * Groups it needs from what Offerings and Sessions actually reference
- * (solverGroups.ts), precisely so tenant configuration cannot make an input
- * internally inconsistent. So the existing links keep working and the next
- * solve is unaffected either way.
- *
- * What DOES change is that the Group stops appearing in that Term's pickers, so
- * a link removed by accident cannot be re-added without first restoring the
- * scope. That is worth saying out loud and not worth blocking over.
- *
- * The query is the backfill's shape (`groupTermBackfill.ts`) inverted: instead
- * of "which Terms does usage imply", it asks "which Terms does usage imply that
- * the new scope now excludes". Both sources, because a Session can carry a
- * Group its Offering does not.
+ * The query is the backfill's shape inverted. Both sources, because a Session can
+ * carry a Group its Offering does not.
  */
 async function groupTermScopeWarnings(ctx: {
     tx: Tx;
@@ -228,16 +192,9 @@ export const RELATIONS: Record<string, RelationConfig> = {
     },
 
     /**
-     * Which Terms a Group is available in.
-     *
-     * A PUT-set like every other collection here. NO ROWS MEANS EVERY TERM, so
-     * saving an empty list is a meaningful action — it WIDENS the Group back to
-     * universal rather than hiding it everywhere. That is the one thing about
-     * this relation that reads backwards at first glance, and it is why the
-     * editor labels the empty state rather than leaving a blank list.
-     *
-     * Permission is the parent's `group.update`, per the rule above: changing
-     * when a Group applies IS editing the Group.
+     * Which Terms a Group is available in. NO ROWS MEANS EVERY TERM, so saving an
+     * empty list WIDENS the Group back to universal rather than hiding it — the one
+     * thing here that reads backwards, and why the editor labels the empty state.
      */
     'groups/terms': {
         parent: 'groups',
@@ -298,14 +255,8 @@ export const RELATIONS: Record<string, RelationConfig> = {
     },
 
     /**
-     * Which AccessRoles a Person holds — what they may DO, as opposed to what
-     * they ARE (`persons/roles`, immediately above, is the scheduling
-     * vocabulary and grants nothing).
-     *
-     * A PUT-set like every other collection here, and the picker is
-     * `ManageRelationPicker` unchanged: this genuinely is a choice among
-     * existing rows, unlike a role's own permissions, which are code and live
-     * on the role's payload instead.
+     * Which AccessRoles a Person holds — what they may DO, as opposed to what they
+     * ARE (`persons/roles` above is scheduling vocabulary and grants nothing).
      *
      * Behind `person_access_role.assign` rather than `person.update` — see
      * `writePermission`.

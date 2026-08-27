@@ -1,39 +1,25 @@
 /**
  * Week classification: the one definition of what kind of week a week is.
  *
- * WHY `shared/` AND NOT server/utils
- * ----------------------------------
- * Two consumers need identical arithmetic and must not drift:
+ * In `shared/` because the solver's calendar and the calendar-period editor's
+ * preview must not drift — a preview disagreeing with the wire would state the
+ * opposite of the truth while looking authoritative.
  *
- *   server/utils/solverCalendar.ts   what the SOLVER is told each week is
- *   the calendar-period editor       what the tenant is SHOWN it will be
+ * A preview is needed because the mapping is genuinely not obvious: an exam period
+ * of 2027-09-27 → 2027-10-18 marks FOUR weeks EXAM, not three, since the rule is
+ * "touches" and the week beginning 10-18 counts on its Monday alone.
  *
- * A preview that disagrees with the wire is worse than no preview: it would
- * state the opposite of the truth while looking authoritative, which is exactly
- * the failure `<select>` without `:selected` produced on the schedule page.
- * Same reasoning, and the same fix, as `shared/timeGrid.ts`.
- *
- * WHY A PREVIEW IS NEEDED AT ALL
- * ------------------------------
- * Because the mapping from dates to week kinds is genuinely not obvious. An
- * exam period of 2027-09-27 → 2027-10-18 marks FOUR weeks EXAM, not three: the
- * precedence rule below is "touches", so the week beginning 2027-10-18 counts
- * even though only its Monday falls inside. Nobody predicts that from two date
- * fields, and getting it wrong means a term's teaching weeks silently move.
- *
- * THE PRECEDENCE RULE (policy, not derivation)
- * --------------------------------------------
- *   EXAM     if any exam period TOUCHES the week at all
+ * THE PRECEDENCE RULE (policy, not derivation):
+ *   EXAM     if any exam period TOUCHES the week
  *   BREAK    if a break period covers the ENTIRE week
  *   HOLIDAY  if a holiday period covers the ENTIRE week
  *   TEACHING otherwise
  *
- * The asymmetry is deliberate and predates this file: an exam anywhere in a
- * week makes the whole week unattractive for teaching, while a two-day break
- * does not stop the other three days being taught. Holidays that do not swallow
- * a whole week are emitted as individual dates instead.
+ * The asymmetry is deliberate: an exam anywhere in a week makes the whole week
+ * unattractive for teaching, while a two-day break does not stop the other three
+ * days. Holidays not swallowing a whole week are emitted as individual dates.
  *
- * This is a VISIBILITY and SCHEDULING-PREFERENCE model, not a hard rule —
+ * A VISIBILITY and PREFERENCE model, not a hard rule —
  * `minimize_exam_week_sessions` is SOFT.
  */
 
@@ -85,22 +71,15 @@ export function isoDate(date: Date): string {
 }
 
 /**
- * The calendar date a `(termWeek, dayOfWeek)` slot falls on.
+ * The calendar date a `(termWeek, dayOfWeek)` slot falls on. ONE definition of an
+ * arithmetic that existed three times, including in SQL in
+ * `calendry_internal.federation_room_occupancy()`.
  *
- * ONE definition of an arithmetic that already existed three times: in
- * `buildAcademicCalendar` (`addDays(firstMonday, week * 7)` then `addDays(
- * weekStart, day)`), in `computeReferenceSlot` reading it back, and in SQL in
- * `calendry_internal.federation_room_occupancy()`, whose comment notes it uses
- * `date_trunc('week', …)` precisely so both sides anchor identically.
+ * UTC-ANCHORED: a slot's date is a calendar fact about the TENANT's timetable,
+ * never a moment shifted by whoever is looking at it. A viewer's locale changes how
+ * it is written, never which date it is.
  *
- * UTC-ANCHORED, like everything else here. `mondayOf` builds from
- * `Date.UTC(...)` so a slot's date is a calendar fact about the TENANT's
- * timetable, never a moment shifted by whoever is looking at it. A viewer's
- * locale changes how this date is written, never which date it is — CLAUDE.md's
- * rule that timezone is display-only, applied at the one place that could
- * violate it.
- *
- * `termWeek` is 1-based and `dayOfWeek` is an ISO weekday (1 = Monday).
+ * `termWeek` is 1-based, `dayOfWeek` an ISO weekday (1 = Monday).
  */
 export function slotDate(termStart: Date, termWeek: number, dayOfWeek: number): Date {
     return addDays(mondayOf(termStart), (termWeek - 1) * 7 + (dayOfWeek - 1));
@@ -132,23 +111,13 @@ export function weekCountOf(termStart: Date, termEnd: Date): number {
 }
 
 /**
- * Which week of a term a DATE falls in — 0-based, Monday-anchored.
+ * Which week of a term a DATE falls in — 0-based, Monday-anchored. The inverse of
+ * `slotDate`, anchored the same way `weekCountOf` counts, so a date's index and the
+ * term's total agree by construction.
  *
- * The inverse of `slotDate`, and the same anchoring `weekCountOf` counts with:
- * both measure from the Monday on or before the term start, so a date's index
- * and the term's total agree by construction rather than by coincidence.
- *
- * NEGATIVE for a date before that Monday, and deliberately not clamped here.
- * The two callers want different things from that case — the occupancy mapper
- * filters it out as outside the term, `computeReferenceSlot` clamps it to 0 —
- * and a helper that picked one would silently impose it on the other.
- *
- * Extracted because this arithmetic existed twice, in `solverInput.ts` and
- * `solverCalendar.ts`, written identically both times. They agreed, so nothing
- * was broken — but `weeksInTerm` also agreed with `weekCountOf` on every
- * Monday-start term right up until it did not, and that one shipped a schedule
- * that could not reach its own final week. Two copies of one arithmetic is the
- * precondition, not the symptom.
+ * NEGATIVE before that Monday and deliberately not clamped: the occupancy mapper
+ * filters it out, `computeReferenceSlot` clamps it to 0, and a helper picking one
+ * would impose it on the other.
  */
 export function weekIndexOf(termStart: Date, date: Date): number {
     const first = mondayOf(termStart).getTime();
