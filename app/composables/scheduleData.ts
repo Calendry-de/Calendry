@@ -2,6 +2,8 @@ import type { ComputedRef, Ref } from 'vue';
 import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
 import { isOnGrid, sessionLabel } from '~/composables/schedule';
 import { slotDate, weekCountOf } from '#shared/academicCalendar';
+import { DISPLAY_DEFAULTS } from '#shared/sessionColor';
+import type { DisplaySettings } from '#shared/sessionColor';
 import { useHasPermission } from '~/composables/session';
 
 /**
@@ -45,7 +47,7 @@ export function useScheduleData(filters: {
             request<Term[]>('/api/terms'),
             request<TimeGrid[]>('/api/time-grids'),
             request<{ id: string; name: string; parentGroupId: string | null }[]>('/api/groups'),
-            request<{ id: string; name: string; code: string }[]>('/api/rooms'),
+            request<{ id: string; name: string; code: string; isVirtual: boolean }[]>('/api/rooms'),
             request<{ id: string; givenName: string; familyName: string }[]>('/api/persons'),
             /*
              * Joins the SAME wave rather than being fetched when the inspector
@@ -85,6 +87,13 @@ export function useScheduleData(filters: {
             timeGrids,
             groups: groupRows,
             rooms: roomRows.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
+            /*
+             * Virtual rooms, by id. Online delivery is a virtual ROOM and never
+             * a flag on Session (TAXONOMY.md), so marking an online session on
+             * the schedule means asking which of its rooms are virtual — and a
+             * Set is what turns that from a lookup per chip per render into one.
+             */
+            virtualRoomIds: roomRows.filter((r) => r.isVirtual).map((r) => r.id),
             people: personRows.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
             kinds: kindRows,
             sessions,
@@ -122,6 +131,25 @@ export function useScheduleData(filters: {
     const rooms = computed(() => reference.value?.rooms ?? []);
     const people = computed(() => reference.value?.people ?? []);
     const kinds = computed(() => reference.value?.kinds ?? []);
+    const virtualRoomIds = computed(() => new Set(reference.value?.virtualRoomIds ?? []));
+
+    /**
+     * How this tenant wants the schedule drawn.
+     *
+     * A SEPARATE, TOLERANT fetch rather than a member of the reference wave: it
+     * is gated on `session.read` like the page itself, so it cannot 403 where
+     * the page does not — but it is also the one thing here whose absence is
+     * harmless. A tenant that has never opened the Display page has no row, the
+     * route answers with defaults, and if the request fails outright the
+     * schedule still draws with the same defaults rather than not drawing.
+     */
+    const display = useAsyncData(
+        'schedule-display-settings',
+        () => request<DisplaySettings>('/api/display-settings').catch(() => DISPLAY_DEFAULTS),
+        { default: () => DISPLAY_DEFAULTS },
+    );
+
+    const displaySettings = computed<DisplaySettings>(() => display.data.value ?? DISPLAY_DEFAULTS);
 
     /**
      * Resolved through `resolvedTermId`, NOT `filters.termId`.
@@ -255,6 +283,7 @@ export function useScheduleData(filters: {
 
     return {
         terms, groups, rooms, people, kinds, resolvedTermId,
+        virtualRoomIds, displaySettings,
         term, totalWeeks, grid,
         allSessions, onGridSessions, offGridSessions,
         violations, violationsBySessionId,

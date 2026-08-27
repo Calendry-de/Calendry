@@ -96,6 +96,8 @@
                 <ScheduleSessionChip
                     :grid="grid"
                     :room-name="roomName"
+                    :virtual-room-ids="virtualRoomIds"
+                    :display="display"
                     :session="session"
                     :violations="violations.get(session.id) ?? []"
                     :selected="session.id === selectedId"
@@ -109,6 +111,7 @@
 
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
+import type { DisplaySettings } from '#shared/sessionColor';
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
@@ -122,6 +125,8 @@ const props = defineProps<{
     /** "Move to" or "Add event at" — the same promise the grid makes. */
     targetVerb?: string;
     roomName?: (id: string) => string;
+    virtualRoomIds?: Set<string>;
+    display?: DisplaySettings;
 }>();
 
 defineEmits<{

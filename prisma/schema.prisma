@@ -247,7 +247,7 @@ model Federation {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   tenants   Tenant[]
-  sessions   Session[]
+  sessions  Session[]
   rooms     Room[]
   equipment Equipment[]
   offerings Offering[]
@@ -273,40 +273,41 @@ model Tenant {
 
   federation Federation? @relation(fields: [federationId], references: [id], onDelete: Restrict)
 
-  people               Person[]
-  roles                Role[]
-  groups               Group[]
-  groupTerms           GroupTerm[]
-  memberships          Membership[]
-  personRoles          PersonRole[]
-  rooms                Room[]
-  equipment            Equipment[]
-  roomEquipment        RoomEquipment[]
-  timeGrids            TimeGrid[]
-  timeGridBreaks       TimeGridBreak[]
-  terms                Term[]
-  calendarPeriods      CalendarPeriod[]
-  sessionKinds         SessionKind[]
-  offerings            Offering[]
-  offeringGroups       OfferingGroup[]
-  offeringLecturers    OfferingLecturer[]
-  offeringEquipment    OfferingEquipment[]
-  sessions             Session[]
-  sessionGroups        SessionGroup[]
-  sessionPeople        SessionPerson[]
-  sessionRooms         SessionRoom[]
-  constraints          Constraint[]
-  constraintScopes     ConstraintScope[]
-  generations          Generation[]
-  sessionEvents        SessionEvent[]
-  constraintViolations ConstraintViolation[]
-  groupClosures        GroupClosure[]
-  accessRoles          AccessRole[]
+  people                Person[]
+  roles                 Role[]
+  groups                Group[]
+  groupTerms            GroupTerm[]
+  memberships           Membership[]
+  personRoles           PersonRole[]
+  rooms                 Room[]
+  equipment             Equipment[]
+  roomEquipment         RoomEquipment[]
+  timeGrids             TimeGrid[]
+  displaySettings       TenantDisplaySettings?
+  timeGridBreaks        TimeGridBreak[]
+  terms                 Term[]
+  calendarPeriods       CalendarPeriod[]
+  sessionKinds          SessionKind[]
+  offerings             Offering[]
+  offeringGroups        OfferingGroup[]
+  offeringLecturers     OfferingLecturer[]
+  offeringEquipment     OfferingEquipment[]
+  sessions              Session[]
+  sessionGroups         SessionGroup[]
+  sessionPeople         SessionPerson[]
+  sessionRooms          SessionRoom[]
+  constraints           Constraint[]
+  constraintScopes      ConstraintScope[]
+  generations           Generation[]
+  sessionEvents         SessionEvent[]
+  constraintViolations  ConstraintViolation[]
+  groupClosures         GroupClosure[]
+  accessRoles           AccessRole[]
   accessRolePermissions AccessRolePermission[]
-  personAccessRoles    PersonAccessRole[]
-  solverRuns           SolverRun[]
-  personUnavailability PersonUnavailability[]
-  personPreferences    PersonPreference[]
+  personAccessRoles     PersonAccessRole[]
+  solverRuns            SolverRun[]
+  personUnavailability  PersonUnavailability[]
+  personPreferences     PersonPreference[]
 
   @@index([federationId])
   @@map("tenant")
@@ -350,11 +351,11 @@ model Person {
   solverRuns        SolverRun[]
 
   /// Unavailability declared ABOUT this person (TAXONOMY.md §7, LecturerVeto).
-  unavailability PersonUnavailability[] @relation("PersonUnavailabilitySubject")
+  unavailability          PersonUnavailability[] @relation("PersonUnavailabilitySubject")
   /// Rows this person SUBMITTED — their own, or somebody else's as an admin.
   unavailabilitySubmitted PersonUnavailability[] @relation("PersonUnavailabilityAuthor")
   /// Rows this person approved or rejected.
-  unavailabilityDecided PersonUnavailability[] @relation("PersonUnavailabilityDecider")
+  unavailabilityDecided   PersonUnavailability[] @relation("PersonUnavailabilityDecider")
 
   preference PersonPreference?
 
@@ -434,7 +435,7 @@ model PersonUnavailability {
   personId String @map("person_id")
 
   /// ISO weekday numbers, 1 = Monday. Empty = every day.
-  days Int[]
+  days   Int[]
   /// 0-based block index within the day. Empty = every block.
   blocks Int[]
   /// Index into the term's calendar weeks. Empty = every week.
@@ -442,7 +443,7 @@ model PersonUnavailability {
   /// Only meaningful alongside `termId`, because the index counts weeks of ONE
   /// term's calendar — the same index is thirteen months apart between this
   /// tenant's two terms. A database CHECK enforces the pairing.
-  weeks Int[]
+  weeks  Int[]
 
   /// Which term's weeks `weeks` counts, and which solves this row applies to.
   ///
@@ -469,7 +470,7 @@ model PersonUnavailability {
   decidedByPersonId String?   @map("decided_by_person_id")
   decidedAt         DateTime? @map("decided_at") @db.Timestamptz(3)
   /// Shown to the submitter on rejection, so a refusal is never silent.
-  decisionNote String? @map("decision_note")
+  decisionNote      String?   @map("decision_note")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -521,7 +522,7 @@ model PersonPreference {
 
   /// ISO weekday numbers, 1 = Monday. EMPTY MEANS NO PREFERENCE — the opposite
   /// of `person_unavailability` above, where empty means every value.
-  preferredDays Int[] @map("preferred_days")
+  preferredDays   Int[] @map("preferred_days")
   /// 0-based block index within the day. Empty means no preference.
   preferredBlocks Int[] @map("preferred_blocks")
 
@@ -791,8 +792,8 @@ model TimeGridBreak {
 
   /// The gap FOLLOWS this 0-based block index. A row naming the final block is
   /// inert — there is no later block for it to push.
-  afterBlockIndex Int @map("after_block_index")
-  durationMinutes Int @map("duration_minutes")
+  afterBlockIndex Int    @map("after_block_index")
+  durationMinutes Int    @map("duration_minutes")
   label           String
 
   /// NULL = every active day, unless a day-specific row exists for the same
@@ -829,13 +830,13 @@ model Term {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   timeGrid TimeGrid? @relation(fields: [timeGridId], references: [id], onDelete: Restrict)
 
-  calendarPeriods CalendarPeriod[]
+  calendarPeriods      CalendarPeriod[]
   /// Week-scoped absences whose week indices count THIS term's calendar.
   personUnavailability PersonUnavailability[]
-  offerings       Offering[]
-  sessions        Session[]
-  solverRuns      SolverRun[]
-  groups          GroupTerm[]
+  offerings            Offering[]
+  sessions             Session[]
+  solverRuns           SolverRun[]
+  groups               GroupTerm[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -942,6 +943,14 @@ model Offering {
   code   String?
   title  String
 
+  /// Display colour for every Session of this Offering, or null to inherit.
+  ///
+  /// NULL IS THE MEANINGFUL VALUE, not a missing one: it means "take the Session
+  /// kind's colour", which is what makes the resolution order stated rather than
+  /// hardcoded. A default here would have every Offering claiming a colour it
+  /// never chose. Same shape as `SessionKind.color`.
+  color String?
+
   /// How many Sessions must exist for this Offering (hard constraint: exact
   /// frequency). The prototype's `lectures[lecture]` count.
   frequency Int @default(1)
@@ -999,6 +1008,41 @@ model Offering {
 /// Offering ↔ Group. Many-to-many: a cross-enrolled elective serves groups
 /// from more than one tenant, and collapsing this to a single FK would be a
 /// migration to undo later.
+/// What this tenant's schedule highlights, and where a colour comes from.
+///
+/// A SINGLETON per tenant — `tenantId` is the primary key, with no surrogate
+/// `id`, so "at most one settings row per tenant" is unrepresentable-otherwise
+/// rather than enforced by a constraint someone could drop.
+///
+/// An ABSENT row means defaults. Provisioning deliberately does not seed one, so
+/// a tenant that has never opened the page behaves exactly like one that opened
+/// it and changed nothing — there is no third state where settings exist but say
+/// nothing.
+///
+/// It stores no copy of any fact it displays: online delivery is a virtual Room
+/// (TAXONOMY.md), and this decides only how that is DRAWN.
+model TenantDisplaySettings {
+  tenantId String @id @map("tenant_id")
+
+  /// Whether a Session in a virtual Room is marked on the schedule.
+  highlightOnline Boolean @default(true) @map("highlight_online")
+  onlineColor     String? @map("online_color")
+
+  /// Ordered colour sources, most specific first. A list rather than a boolean
+  /// so the tenant states a precedence instead of the renderer assuming one.
+  colorSourceOrder String[] @default(["offering", "kind"]) @map("color_source_order")
+
+  /// The chip colour when nothing else supplies one.
+  defaultColor String? @map("default_color")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_display_settings")
+}
+
 model OfferingGroup {
   offeringId String @map("offering_id")
   groupId    String @map("group_id")
@@ -1130,7 +1174,7 @@ model Session {
   rooms      SessionRoom[]
   violations ConstraintViolation[]
 
-  events           SessionEvent[] @relation("EventSubject")
+  events            SessionEvent[] @relation("EventSubject")
   counterpartEvents SessionEvent[] @relation("EventCounterpart")
 
   @@index([tenantId])
@@ -1230,7 +1274,7 @@ model Constraint {
   /// Rule-builder parameters, shape determined by `type`.
   params Json @default("{}")
 
-  isEnabled Boolean  @default(true) @map("is_enabled")
+  isEnabled Boolean @default(true) @map("is_enabled")
 
   /// The tenant's single always-present row for this catalogue type
   /// (TAXONOMY.md §2). Exactly one per (tenant, type), enforced by the partial
@@ -1241,7 +1285,7 @@ model Constraint {
   /// False marks a kind/offering-scoped VARIANT of the same type. A default row
   /// is never deleted through the UI: disabling it is how a tenant opts out,
   /// because deleting it would make the rule unreachable rather than off.
-  isDefault Boolean  @default(false) @map("is_default")
+  isDefault Boolean @default(false) @map("is_default")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1313,14 +1357,14 @@ model Generation {
   /// Populated instead of placements when the solver reports infeasibility.
   infeasibilityReport Json? @map("infeasibility_report")
 
-  createdById String?  @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   appliedAt   DateTime? @map("applied_at") @db.Timestamptz(3)
 
-  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parentGeneration Generation? @relation("GenerationLineage", fields: [parentGenerationId], references: [id], onDelete: SetNull)
+  tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parentGeneration Generation?  @relation("GenerationLineage", fields: [parentGenerationId], references: [id], onDelete: SetNull)
   children         Generation[] @relation("GenerationLineage")
-  createdBy        Person?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy        Person?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   sessions   Session[]
   events     SessionEvent[]
@@ -1363,11 +1407,11 @@ model SessionEvent {
   reason        String?
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  tenant              Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  generation          Generation  @relation(fields: [generationId], references: [id], onDelete: Cascade)
-  session             Session?    @relation("EventSubject", fields: [sessionId], references: [id], onDelete: SetNull)
-  counterpartSession  Session?    @relation("EventCounterpart", fields: [counterpartSessionId], references: [id], onDelete: SetNull)
-  actor               Person?     @relation(fields: [actorPersonId], references: [id], onDelete: SetNull)
+  tenant             Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  generation         Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  session            Session?   @relation("EventSubject", fields: [sessionId], references: [id], onDelete: SetNull)
+  counterpartSession Session?   @relation("EventCounterpart", fields: [counterpartSessionId], references: [id], onDelete: SetNull)
+  actor              Person?    @relation(fields: [actorPersonId], references: [id], onDelete: SetNull)
 
   violations ConstraintViolation[]
 
@@ -1387,7 +1431,7 @@ model ConstraintViolation {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
-  constraintId String @map("constraint_id")
+  constraintId String  @map("constraint_id")
   /// Nullable: a violation may be about an OFFERING rather than a placed
   /// Session. ExactFrequency ("needs 6, placed 4") has no session to name, and
   /// that is exactly the case warn-and-allow was decided around. A CHECK
@@ -1396,7 +1440,7 @@ model ConstraintViolation {
 
   /// Set for offering-scoped violations. Without it "constraint X is violated,
   /// no session" says nothing actionable.
-  offeringId   String? @map("offering_id")
+  offeringId String? @map("offering_id")
 
   severity ConstraintSeverity
 

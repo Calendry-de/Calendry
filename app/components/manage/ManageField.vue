@@ -80,36 +80,12 @@
             >{{ option.label }}</option>
         </select>
 
-        <!--
-            Swatch plus text, not a bare colour picker. The stored value is a CSS
-            colour string the schedule reads directly, so it has to stay
-            readable and clearable — a native picker alone cannot express "no
-            colour", and this field is nullable.
-        -->
-        <div
+        <!-- One implementation, shared with the display-settings page. -->
+        <ManageColorField
             v-else-if="field.type === 'color'"
-            class="field_color"
-        >
-            <input
-                type="color"
-                :value="(model as string) || '#7c59bc'"
-                :aria-label="`${field.label} picker`"
-                @input="emitValue(($event.target as HTMLInputElement).value)"
-            >
-            <input
-                :id="controlId"
-                class="field_control"
-                type="text"
-                :value="(model as string) ?? ''"
-                placeholder="#7c59bc"
-                @input="emitValue(($event.target as HTMLInputElement).value)"
-            >
-            <common-button
-                v-if="model"
-                type="secondary"
-                @click="emitValue(null)"
-            >Clear</common-button>
-        </div>
+            :model-value="(model as string) ?? null"
+            @update:model-value="emitValue($event)"
+        />
 
         <input
             v-else
@@ -155,6 +131,7 @@
 </template>
 
 <script setup lang="ts">
+import ManageColorField from '~/components/manage/ManageColorField.vue';
 import type { EntityRow, FieldDef } from '~/utils/manageRegistry';
 
 /**

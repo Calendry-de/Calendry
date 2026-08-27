@@ -396,6 +396,55 @@ Verification detail (the `paramField()` divergence, invisible-deprecated-
 types bug, ten-file `vartorgba` styling bug, read-only-path test):
 DECISIONS.md § "Management area (Step 13)".
 
+## Schedule display standards
+
+`tenant_display_settings` is a **singleton keyed by `tenant_id`** — no surrogate
+`id`, so a second row per tenant is unrepresentable rather than constrained. An
+**absent row means defaults** (`DISPLAY_DEFAULTS` in `shared/sessionColor.ts`);
+provisioning deliberately does not seed one, so "never configured" and
+"configured, unchanged" render identically. Read gated on `session.read`, write
+on `session_kind.update` — an existing permission, chosen over minting one
+because a new permission needs the catalogue, its migration mirror AND a
+`grant:permissions` backfill before existing tenant-admins stop 403ing.
+
+**Colour is RESOLVED, never read off one field.** `resolveSessionColor()` walks
+the tenant's `colorSourceOrder` (default `offering` → `kind`) and returns
+**null** when nothing supplies one — never a fallback accent. The chip previously
+read `kind?.color ?? primary500`, so every session without a kind colour claimed
+the colour reserved for "where a session may land". `null` at any level means
+INHERIT, which is why every colour column is nullable.
+
+**Online delivery stays a virtual Room** (TAXONOMY.md). `isOnlineSession()` asks
+the rooms; the setting decides only whether that is drawn. Marked with a dashed
+edge, so it survives greyscale and an unset colour — same rule as violations.
+
+## Grid geometry is minute-true and rows grow
+
+Both week grids (`ScheduleGrid`, `ScheduleReviewGrid`) share `useGridGeometry` +
+`clusterSlots`. Three properties, each of which replaced a bug:
+
+- **Rows are `minmax(<true minutes × perMinute>px, auto)`.** The minimum keeps
+  the picture proportional; `auto` is what lets a crowded block grow instead of
+  overflowing. **A slot must stay IN FLOW** — it was briefly `position:
+  absolute`, and an out-of-flow slot contributes nothing to its row's height, so
+  a block that could not fit its sessions silently overflowed.
+- **A block's time label shares its grid ROW with that block's cells.** Alignment
+  is structural, not computed, so the gutter cannot drift from the columns. Two
+  separate bugs came from it not being so.
+- **Placement inside a row is px at a CONSTANT scale**, never a percentage of the
+  row. A percentage stretched with the row, so a minute was worth more pixels in
+  a busy row than a quiet one, and a lone session rendered as tall as the crowded
+  day beside it. Slots also need `align-self: start` or the grid stretches them.
+
+Past three abreast a cluster stacks as one-line chips rather than fanning into
+slivers, and **nothing is ever hidden** — a collapse-past-three rule turned 17 of
+20 slots in a real week into "+N more" buttons. Shared rows cost per-day drift:
+a day whose own breaks move its blocks is NAMED (`dayDiffers` → "own breaks")
+rather than drawn, and every chip and cell label resolves its own day's clock
+time via `blockTime(grid, index, dayOfWeek)`. **Below a 30-minute block the
+gutter labels on the hour** — a 15-minute grid is 44 rows and 44 stacked times is
+not a time column; unlabelled rows keep their cell and their accessible name.
+
 ## Academic calendar periods
 
 `calendar_period` is a managed resource on the generic scaffold, gated on

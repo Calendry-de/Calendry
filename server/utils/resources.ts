@@ -610,6 +610,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             kindId: id,
             code: z.string().nullish(),
             title: z.string().min(1),
+            // Free-form, and NULL means "inherit the Session kind's colour"
+            // rather than "no colour" — the resolution order in
+            // `shared/sessionColor.ts` is what gives that null a meaning.
+            color: z.string().nullish(),
             frequency: z.number().int().min(1).optional(),
             durationBlocks: z.number().int().min(1).optional(),
             requiredRoleId: optionalId,
@@ -622,6 +626,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             kindId: id.optional(),
             code: z.string().nullish(),
             title: z.string().min(1).optional(),
+            color: z.string().nullish(),
             frequency: z.number().int().min(1).optional(),
             durationBlocks: z.number().int().min(1).optional(),
             requiredRoleId: optionalId,

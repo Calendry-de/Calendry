@@ -2,6 +2,8 @@
     <div
         class="rgrid"
         :style="cssVars"
+        role="grid"
+        aria-label="Proposed week"
     >
         <div
             class="rgrid_corner"
@@ -51,6 +53,8 @@
             <div
                 v-if="row.kind === 'block'"
                 class="rgrid_time"
+                :class="{ 'rgrid_time--quiet': !labelledLines.has(row.line) }"
+                role="rowheader"
                 :style="{ gridRow: row.line, gridColumn: 1 }"
             >
                 <span>{{ row.start }}</span>
@@ -200,7 +204,7 @@ const slotLabel = (placement: Placement) => (
     + `${blockTime(props.grid, placement.blockIndex, placement.dayOfWeek).start}`
 );
 
-const { rows, rowSpan, bandWithin, dayDiffers, cssVars } = useGridGeometry(
+const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );
@@ -326,6 +330,30 @@ const slots = computed(() => {
         // Without this the time column shivers row to row (DESIGN.md).
         font-variant-numeric: tabular-nums;
         color: $content6;
+    }
+
+    // A row the gutter chose not to label keeps its cell — the column's rhythm
+    // is the grid's, not the label's — and simply says nothing.
+
+    /*
+     * A row the gutter chose not to label keeps its cell — the column's rhythm
+     * is the grid's, not the label's — and keeps its TIME for assistive tech.
+     *
+     * Hidden rather than dropped: it is a `rowheader`, and a row header with no
+     * name is worse than a quiet one. The eye gets an uncluttered hour column;
+     * a screen reader still gets "09:15" for the row it is reading across.
+     */
+    &_time--quiet > * {
+        position: absolute;
+
+        overflow: hidden;
+
+        width: 1px;
+        height: 1px;
+
+        white-space: nowrap;
+
+        clip-path: inset(50%);
     }
 
     &_time-end { color: $content7; }

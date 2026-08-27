@@ -105,6 +105,50 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         return out;
     });
 
+    /**
+     * Which block rows get a printed clock time.
+     *
+     * A FINE GRID IS THE POINT OF THIS, and it is the cost of it. Adopting a
+     * 15-minute base block is what lets a real timetable's 10:00–12:00 session
+     * land exactly (BACKLOG.md's own recommendation, chosen over adding minute
+     * columns to Session because it changes no schema and no solver contract) —
+     * but it turns a 6-hour teaching day from 3 labels into 44, and 44 stacked
+     * times is not a time column, it is noise with a grid behind it.
+     *
+     * So the gutter labels on the hour when blocks are short, and every block
+     * when they are long enough to read. The threshold is duration, not count:
+     * a grid of 45-minute blocks labels all of them, a grid of 15-minute blocks
+     * labels 09:00, 10:00, 11:00 — and the unlabelled rows are still rows, so
+     * nothing about placement or alignment changes.
+     */
+    const LABEL_EVERY_BELOW_MINUTES = 30;
+
+    const labelledLines = computed(() => {
+        const blocks = rows.value.filter((row): row is Extract<GridRow, { kind: 'block' }> => (
+            row.kind === 'block'
+        ));
+
+        if (grid.value.blockLengthMinutes >= LABEL_EVERY_BELOW_MINUTES) {
+            return new Set(blocks.map((row) => row.line));
+        }
+
+        const out = new Set<number>();
+        let lastHour: number | null = null;
+
+        for (const row of blocks) {
+            const hour = Math.floor(row.from / 60);
+
+            // The first row always speaks, whatever hour it starts in — a
+            // column whose top row is blank reads as broken rather than tidy.
+            if (lastHour === null || hour !== lastHour) {
+                out.add(row.line);
+                lastHour = hour;
+            }
+        }
+
+        return out;
+    });
+
     const blockLines = computed(() => {
         const map = new Map<number, number>();
 
@@ -218,7 +262,10 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
         gridTemplateRows: gridTemplateRows.value,
     }));
 
-    return { rows, lineOf, rowSpan, bandWithin, gridTemplateRows, dayDiffers, cssVars, perMinute };
+    return {
+        rows, lineOf, rowSpan, bandWithin, gridTemplateRows,
+        dayDiffers, cssVars, perMinute, labelledLines,
+    };
 }
 
 export interface GridSlot<T> {

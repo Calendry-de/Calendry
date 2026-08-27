@@ -179,6 +179,22 @@ const PAGES = [
         why: 'a stated denial, not a sentence about the data',
     },
     {
+        /*
+         * The display-settings page is NOT a registry entity — no list, no row
+         * form, no `/api/display` resource — so it is gated inline rather than
+         * by the `manage` middleware, which resolves `to.params.entity` against
+         * the registry and 404s a static path that has no entity param at all.
+         * It shipped that way first; this row is what would catch it again.
+         *
+         * The marker is the resolved settings form, not the page title: the
+         * title renders from a shell that does not need the fetch.
+         */
+        path: '/manage/display',
+        roles: ['admin', 'viewer'],
+        marker: 'Where a session',
+        why: 'the settings form, present only once /api/display-settings resolved',
+    },
+    {
         path: '/manage',
         roles: ['admin', 'viewer'],
         marker: 'Manage',

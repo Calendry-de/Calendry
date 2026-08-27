@@ -7,8 +7,12 @@
             `chip--${severity}`,
             { 'chip--selected': selected, 'chip--dimmed': dimmed,
             'chip--targetable': targetable, 'chip--locked': session.isLocked },
+            `chip--${delivery}`,
         ]"
-        :style="{ '--kind-color': session.kind?.color ?? $colors.primary500 }"
+        :style="{
+            '--kind-color': resolvedColor ?? 'transparent',
+            ...(delivery !== 'onsite' && onlineColor ? { '--online-color': onlineColor } : {}),
+        }"
         :aria-pressed="selected"
         :disabled="dimmed"
         @click="$emit('select')"
@@ -75,7 +79,8 @@
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
 import { blockTime, sessionLabel, weekdayName } from '~/composables/schedule';
-import { colorsList } from '~/utils/styles';
+import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/sessionColor';
+import type { DisplaySettings } from '#shared/sessionColor';
 
 const props = defineProps<{
     session: ScheduleSession;
@@ -92,11 +97,48 @@ const props = defineProps<{
     grid?: TimeGrid | null;
     /** Resolves a room id to a name; without it the room is omitted, not guessed. */
     roomName?: (id: string) => string;
+    /** Virtual room ids, for the online treatment. Absent means "do not mark". */
+    virtualRoomIds?: Set<string>;
+    /** The tenant's display standards; defaults when the fetch degraded. */
+    display?: DisplaySettings;
 }>();
 
 defineEmits<{ select: [] }>();
 
-const $colors = colorsList;
+/**
+ * COLOUR IS RESOLVED, NOT READ OFF ONE FIELD.
+ *
+ * It used to be `session.kind?.color ?? primary500` — which meant every session
+ * without a kind colour claimed the brand accent, the one colour DESIGN.md
+ * reserves for "where a session may land". Measured on real data, every chip on
+ * the screen carried it. Now the order is the tenant's (`colorSourceOrder`) and
+ * the fallback is null, so an unset colour renders as the neutral surface the
+ * stylesheet already owns rather than as an accent nobody chose.
+ */
+const settings = computed(() => props.display ?? DISPLAY_DEFAULTS);
+
+const resolvedColor = computed(() => resolveSessionColor(props.session, settings.value));
+
+/**
+ * Delivery is a property of the ROOMS, so this asks them. Three states, because
+ * a session in a hall and a virtual room is streamed rather than either.
+ */
+/**
+ * The tenant's online colour, emitted as a custom property ONLY when set.
+ *
+ * Omitted rather than passed as null, so the stylesheet's `var(--online-color,
+ * <neutral>)` fallback is what decides the unset case — and omitted entirely on
+ * an on-site chip, which is every chip that never reads it. Setting the property to
+ * an empty string would suppress that fallback and paint nothing — and the
+ * property was referenced by the CSS from the start while nothing ever set it,
+ * so the marking was always the neutral grey no matter what the tenant chose.
+ */
+const onlineColor = computed(() => settings.value.onlineColor ?? '');
+
+const delivery = computed(() => deliveryMode(
+    props.session.rooms.map((room) => ({ isVirtual: props.virtualRoomIds?.has(room.roomId) })),
+    settings.value,
+));
 
 /**
  * Severity drives shape and icon as well as colour — a violation must not be
@@ -277,6 +319,20 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     // Kind reads as a dot beside its name rather than a colored edge stripe:
     // the stripe is the category's most recognizable tell, and at grid density
     // a dot survives a 44px row where a 3px edge just adds noise.
+
+    /*
+     * ONLINE: a dashed edge and an inset rule, never colour alone.
+     *
+     * It has to survive greyscale and it has to survive the tenant leaving
+     * `onlineColor` empty — so the SHAPE carries the meaning and any colour is
+     * an amplifier. Same rule as violations: no fact on this screen is signalled
+     * by hue alone.
+     */
+    &--online {
+        border-color: var(--online-color, #{$content6});
+        border-style: dashed;
+    }
+
     &_dot {
         flex: none;
 

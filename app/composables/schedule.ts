@@ -56,7 +56,8 @@ export interface ScheduleSession {
     groups: { groupId: string }[];
     people: { personId: string; roleId: string | null; role: { key: string } | null }[];
     rooms: { roomId: string }[];
-    offering: { id: string; title: string; code: string | null } | null;
+    /** `color` is nullable and null means INHERIT — see `shared/sessionColor.ts`. */
+    offering: { id: string; title: string; code: string | null; color?: string | null } | null;
     kind: { id: string; key: string; name: string; color: string | null } | null;
 }
 

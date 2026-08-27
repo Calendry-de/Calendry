@@ -257,6 +257,7 @@ export const OFFERING_ENTITY: ManageEntity = {
     columns: [
         { key: 'code', label: 'Code', format: 'code' },
         { key: 'title', label: 'Title' },
+        { key: 'color', label: 'Colour', format: 'swatch' },
         { key: 'frequency', label: 'Sessions', format: 'number' },
         { key: 'durationBlocks', label: 'Blocks', format: 'number' },
         { key: 'isActive', label: 'Active', format: 'boolean' },
@@ -264,6 +265,13 @@ export const OFFERING_ENTITY: ManageEntity = {
     fields: [
         { key: 'title', label: 'Title', type: 'text', required: true },
         { key: 'code', label: 'Code', type: 'text' },
+        {
+            key: 'color',
+            label: 'Colour',
+            type: 'color',
+            help: 'Tints every session of this offering. Leave it empty to inherit the '
+                + 'session kind\'s colour — empty means inherit, not grey.',
+        },
         {
             key: 'termId',
             label: 'Term',

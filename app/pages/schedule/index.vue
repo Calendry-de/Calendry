@@ -110,6 +110,12 @@
             class="schedule_body"
         >
             <div class="schedule_main">
+                <!--
+                    A flick of the wheel steps a week — bound HERE and on the
+                    agenda and the week stepper, never on the page. Over the
+                    off-grid tray or the violations panel a wheel is an ordinary
+                    scroll, because those lists have their own content to move.
+                -->
                 <ScheduleGrid
                     class="schedule_grid"
                     :grid="data.grid.value"
@@ -120,11 +126,14 @@
                     :swapping="editing.swapping.value"
                     :row-height="rowHeight"
                     :room-name="data.lookup.room"
+                    :virtual-room-ids="data.virtualRoomIds.value"
+                    :display="data.displaySettings.value"
                     :term-week="filters.week.value"
                     :slot-date-of="data.slotDateOf"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @select="editing.select"
                     @place="placeAt"
+                    @wheel="stepWeekOnWheel"
                 />
 
                 <ScheduleEventForm
@@ -147,7 +156,10 @@
                     :selected-id="editing.selectedId.value"
                     :placing="editing.placing.value || editing.creating.value"
                     :room-name="data.lookup.room"
+                    :virtual-room-ids="data.virtualRoomIds.value"
+                    :display="data.displaySettings.value"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
+                    @wheel="stepWeekOnWheel"
                     @select="editing.select"
                     @place="placeAt"
                 />
@@ -216,6 +228,7 @@ import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
 import { useScheduleFilters } from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
+import { useWheelStep } from '~/composables/wheelStep';
 
 /**
  * Composition only. Three composables own the state, seven components own the
@@ -262,6 +275,24 @@ const canUpdateSession = useHasPermission('session.update');
  * a new Session needs a kind, which no click can supply. `place` still moves
  * the selection immediately, because everything a move needs is already known.
  */
+/**
+ * A wheel over the WEEK GRID or the DAY AGENDA steps the week.
+ *
+ * The week stepper in the toolbar carries the same gesture, through the same
+ * composable, so the cooldown and the give-the-gesture-back-at-the-ends rule
+ * cannot drift between the two places that offer it.
+ */
+const stepWeekOnWheel = useWheelStep({
+    canStep: (direction) => {
+        const next = filters.week.value + direction;
+
+        return next >= 1 && next <= data.totalWeeks.value;
+    },
+    step: (direction) => {
+        filters.week.value += direction;
+    },
+});
+
 function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
     if (editing.creating.value) {
         pendingSlot.value = target;

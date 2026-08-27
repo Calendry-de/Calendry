@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
                 // client would otherwise need a second round trip per view just
                 // to name what it is drawing. Both are read-only and already
                 // tenant-scoped by the same transaction.
-                offering: { select: { id: true, title: true, code: true } },
+                offering: { select: { id: true, title: true, code: true, color: true } },
                 kind: { select: { id: true, key: true, name: true, color: true } },
             },
         });

@@ -225,6 +225,23 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
         ...manageEntries(),
 
         {
+            id: 'manage.display',
+            label: 'Display',
+            description: 'How the schedule is drawn — colour sources, online marking, fallbacks.',
+            icon: 'material-symbols:palette-outline',
+            section: 'manage',
+            keywords: ['display', 'colour', 'color', 'theme', 'highlight', 'online', 'appearance', 'palette'],
+            /*
+             * READ is `session.read`, and that is what gates the entry: the page
+             * is meaningful to anyone who looks at a schedule, and it renders
+             * read-only without `session_kind.update`. Gating the link on the
+             * WRITE permission would hide from most people a page that explains
+             * why their schedule looks the way it does.
+             */
+            permission: 'session.read',
+            to: '/manage/display',
+        },
+        {
             id: 'manage.availability-reviews',
             label: 'Unavailability review',
             description: 'Approve or reject unavailability people have declared for themselves.',

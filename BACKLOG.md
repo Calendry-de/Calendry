@@ -413,8 +413,28 @@ across a 15-minute break — direct, concrete confirmation of the already-tracke
 "Session whose duration spans a break" question in Undecided, not a
 hypothetical edge case.
 
-**Promising direction worth testing first, before assuming a bigger
-rearchitecture is needed:** every boundary in the real example is a multiple of
+**DECIDED 2026-08-27, and the rendering side is built.** The finer-grid
+direction below was chosen over adding minute columns to Session, on the grounds
+stated here: it changes no schema and no solver contract. What shipped to make it
+viable is the grid geometry, not the grid data —
+
+- every grid row's minimum height is now its TRUE duration
+  (`minmax(<minutes × perMinute>px, auto)`), so a 15-minute block is a quarter
+  the height of an hour one and a break is exactly as tall as it lasts;
+- placement inside a row is minute-derived at a CONSTANT scale, so an hour is the
+  same height everywhere on the grid and a slot is exactly as tall as its session
+  runs (`bandWithin` in `app/composables/gridGeometry.ts`);
+- the gutter labels on the hour once blocks fall below 30 minutes, because 44
+  stacked clock times is not a time column. Unlabelled rows keep their cell and
+  their accessible name, so the row header still announces its time.
+
+**What remains before a tenant can actually adopt a 15-minute grid:** (a) the
+solver benchmark below — unmeasured and the real risk; (b) a "type a time"
+affordance on the Event form, which is a mapping from a clock time to a block
+index and only becomes exact at a fine granularity.
+
+**The original reasoning, kept because the benchmark still has to answer to
+it:** every boundary in the real example is a multiple of
 15 minutes. If so, this might be solvable by adopting a much finer base
 `blockLengthMinutes` (e.g. 15) rather than needing arbitrary/continuous-time
 placement — a "long" or "short" period then becomes an ordinary Session with a
@@ -429,8 +449,14 @@ scored per repair), directly working against the careful performance tuning
 already measured (slice 5/6 benchmarks). Whether that cost is acceptable at
 real institution scale needs actual measurement, not assumption.
 
-**Working answer for the break-spanning question (B), reasoned through but not
-yet verified against real code:** the solver never needs to care — it only
+**Working answer for the break-spanning question (B) — VERIFIED IN CODE
+2026-08-27.** `blockTime(grid, blockIndex + durationBlocks - 1, dayOfWeek).end`
+walks `blockBoundaries()` for the LAST block rather than multiplying, so a break
+inside a Session's span is already absorbed into a longer wall-clock duration.
+The agenda and the review agenda were both calling it without the `dayOfWeek`
+argument, which resolves the universal timeline and is wrong by that day's break
+minutes on a grid with day-specific overrides; both now pass it. The original
+reasoning: the solver never needs to care — it only
 ever reasons in block indices, regardless of what wall-clock gap sits between
 them. The likely fix lives entirely on the rendering side: a Session's
 *wall-clock* end time should be computed by walking forward `durationBlocks`
@@ -441,12 +467,12 @@ into a longer wall-clock duration, with `durationBlocks` continuing to count
 teaching blocks only. Reuses existing infrastructure rather than inventing a
 new concept.
 
-**Working answer for visual grouping (C):** likely resolves for free once (B)
-is fixed, since row heights are already proportional to real minutes — the
-one thing actually worth checking is whether the grid currently draws a
-divider line at every fine block boundary regardless of whether anything
-changes there, versus only at real Session/break boundaries. If it's the
-former, that's a small, contained fix, not a redesign.
+**Visual grouping (C) — ANSWERED 2026-08-27.** It was the former: the grid drew
+a cell per block per day regardless, so a fine grid would have drawn 44 identical
+horizontal bands. It still draws every cell — the cells are the placement targets
+and dropping them would drop the ability to move a session there — but the TIME
+COLUMN now labels on the hour below a 30-minute block, which is where the visual
+noise actually came from. Contained fix, as predicted, in `useGridGeometry`.
 
 **(D) solver performance at finer granularity is unresolved and can't be
 reasoned to an answer — needs real benchmarking once (A) is investigated.**
@@ -472,6 +498,39 @@ support for both.
 ---
 
 # Features not built
+
+## Schedule display standards — BUILT 2026-08-27
+
+`/manage/display` (`app/pages/manage/display/index.vue`), a per-tenant SINGLETON
+backed by `tenant_display_settings` — `tenant_id` is the primary key with no
+surrogate `id`, so a second settings row per tenant is unrepresentable rather
+than merely constrained. An ABSENT row means defaults, which is why provisioning
+does not seed one: a tenant that has never opened the page must behave exactly
+like one that opened it and changed nothing.
+
+- **Colour source order** — `['offering', 'kind']` by default, stated by the
+  tenant rather than hardcoded by the renderer, and validated at the write
+  boundary against the known sources (an unknown one would be silently skipped by
+  the resolver: a setting that saves, displays and does nothing).
+- **Online marking** — reads `room.isVirtual` and stores no second copy of it.
+  Online delivery is a virtual Room and never a flag on Session (TAXONOMY.md);
+  the setting decides how that fact is DRAWN, never whether it is true. Drawn as
+  a dashed edge so it survives greyscale and an unset colour.
+- **`offering.color`** — nullable, and null means INHERIT rather than "no
+  colour", which is what gives the resolution order meaning. Same shape as
+  `session_kind.color`.
+
+Read is gated on `session.read` (anyone who sees a schedule needs to know how it
+is drawn); write on `session_kind.update` — an existing permission and the
+closest true sibling, chosen over minting `display_settings.manage` because a new
+permission means the catalogue constant, its migration mirror, AND a
+`grant:permissions` backfill before any existing tenant-admin stops 403ing.
+
+One rule pinned by `tests/session-color.test.ts`: `resolveSessionColor` returns
+NULL when nothing supplies a colour, never a fallback accent. The chip used to
+read `kind?.color ?? primary500`, so every session without a kind colour claimed
+the one colour DESIGN.md reserves for "where a session may land" — measured on
+real data, every chip on the screen carried it.
 
 ## Manual Session creation ("Events") — mostly built, one gap remains
 

@@ -58,6 +58,7 @@
             <div
                 v-if="row.kind === 'block'"
                 class="grid_time"
+                :class="{ 'grid_time--quiet': !labelledLines.has(row.line) }"
                 role="rowheader"
                 :style="{ gridRow: row.line, gridColumn: 1 }"
             >
@@ -115,6 +116,8 @@
                 :key="session.id"
                 :grid="grid"
                 :room-name="roomName"
+                :virtual-room-ids="virtualRoomIds"
+                :display="display"
                 :session="session"
                 :violations="violations.get(session.id) ?? []"
                 :selected="session.id === selectedId"
@@ -133,6 +136,7 @@ import {
 } from '~/composables/schedule';
 import { useViewerLocale } from '~/composables/locale';
 import { clusterSlots, useGridGeometry } from '~/composables/gridGeometry';
+import type { DisplaySettings } from '#shared/sessionColor';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
 /**
@@ -185,6 +189,9 @@ const props = defineProps<{
     slotDateOf: (termWeek: number, dayOfWeek: number) => Date | null;
     /** Resolves a room id to its name, for the chip's room label. */
     roomName?: (id: string) => string;
+    /** Virtual room ids and the tenant's display standards, for chip colour. */
+    virtualRoomIds?: Set<string>;
+    display?: DisplaySettings;
     /**
      * What choosing a cell will DO, for the slot's accessible name. `place` and
      * `create` both make cells the targets, and a blind user pressing one
@@ -204,7 +211,7 @@ const locale = useViewerLocale();
 /** This column's calendar date, in the week currently shown. */
 const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
 
-const { rows, rowSpan, bandWithin, dayDiffers, cssVars } = useGridGeometry(
+const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );
@@ -339,6 +346,27 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         min-width: 62px;
 
         background: $surface1;
+    }
+
+    /*
+     * A row the gutter chose not to label keeps its cell — the column's rhythm
+     * is the grid's, not the label's — and keeps its TIME for assistive tech.
+     *
+     * Hidden rather than dropped: it is a `rowheader`, and a row header with no
+     * name is worse than a quiet one. The eye gets an uncluttered hour column;
+     * a screen reader still gets "09:15" for the row it is reading across.
+     */
+    &_time--quiet > * {
+        position: absolute;
+
+        overflow: hidden;
+
+        width: 1px;
+        height: 1px;
+
+        white-space: nowrap;
+
+        clip-path: inset(50%);
     }
 
     &_time {
