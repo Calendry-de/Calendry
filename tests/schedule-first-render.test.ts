@@ -84,11 +84,19 @@ describe('/schedule first render', () => {
     it('renders the real week count, not the fallback of 1', async () => {
         const html = await renderSchedule();
 
-        // The fixture term spans October to February — many weeks, never one.
-        const label = html.match(/Week\s*1<[^>]*>\s*\/\s*(\d+)/)
-            ?? html.match(/\/\s*(\d+)\s*<\/span>/);
+        /*
+         * The fixture term spans October to February — many weeks, never one.
+         *
+         * Anchored on `weeknav_total`, the class that exists only to carry this
+         * number. It was `Week 1</span> / N`, which broke when the stepper moved
+         * out of the toolbar and became `ScheduleWeekNav` — a positional match
+         * on adjacent markup, which is exactly the kind that goes red on a
+         * layout change and says nothing about the invariant. The invariant is
+         * unchanged: the total is the real week count, never the fallback of 1.
+         */
+        const label = html.match(/weeknav_total[^>]*>\s*of\s*(\d+)/);
 
-        expect(label, 'no "Week 1 / N" label in the rendered page').not.toBeNull();
+        expect(label, 'no week total in the rendered page').not.toBeNull();
 
         const totalWeeks = Number(label![1]);
 
@@ -146,9 +154,9 @@ describe('/schedule first render', () => {
             .not.toBe(expected);
 
         const html = await renderSchedule();
-        const label = html.match(/Week\s*1<[^>]*>\s*\/\s*(\d+)/);
+        const label = html.match(/weeknav_total[^>]*>\s*of\s*(\d+)/);
 
-        expect(label, 'no "Week 1 / N" label in the rendered page').not.toBeNull();
+        expect(label, 'no week total in the rendered page').not.toBeNull();
         expect(Number(label![1])).toBe(expected);
     });
 

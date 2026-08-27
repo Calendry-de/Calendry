@@ -30,42 +30,6 @@
                 </select>
             </label>
 
-            <!--
-                The week stepper carries the wheel gesture too — it is the
-                control the arrows are on, so it is the one place a reader would
-                try it first. Same composable as the grid, so the two cannot
-                drift apart.
-            -->
-            <div
-                class="bar_week"
-                role="group"
-                aria-label="Week"
-                @wheel="stepWeekOnWheel"
-            >
-                <button
-                    type="button"
-                    :disabled="weekModel <= 1"
-                    aria-label="Previous week"
-                    @click="weekModel = Math.max(1, weekModel - 1)"
-                >
-                    <Icon
-                        name="material-symbols:chevron-left"
-                        aria-hidden="true"
-                    />
-                </button>
-                <span class="bar_week-label">Week {{ weekModel }}<span class="bar_muted"> / {{ totalWeeks }}</span></span>
-                <button
-                    type="button"
-                    :disabled="weekModel >= totalWeeks"
-                    aria-label="Next week"
-                    @click="weekModel = Math.min(totalWeeks, weekModel + 1)"
-                >
-                    <Icon
-                        name="material-symbols:chevron-right"
-                        aria-hidden="true"
-                    />
-                </button>
-            </div>
         </div>
 
         <div class="bar_group">
@@ -199,14 +163,12 @@
 <script setup lang="ts">
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
 import type { NamedRow, Term } from '~/composables/schedule';
-import { useWheelStep } from '~/composables/wheelStep';
 
-const props = defineProps<{
+defineProps<{
     terms: Term[];
     groups: NamedRow[];
     rooms: NamedRow[];
     people: NamedRow[];
-    totalWeeks: number;
     violationCount: number;
     canReadViolations: boolean;
     canTriggerSolver: boolean;
@@ -224,18 +186,6 @@ defineEmits<{ 'toggle-create': [] }>();
 // Filter values are owned by useScheduleFilters() and reach this component as
 // models — the toolbar renders and edits them, it does not own them.
 const termIdModel = defineModel<string>('termId', { required: true });
-const weekModel = defineModel<number>('week', { required: true });
-
-const stepWeekOnWheel = useWheelStep({
-    canStep: (direction) => {
-        const next = weekModel.value + direction;
-
-        return next >= 1 && next <= props.totalWeeks;
-    },
-    step: (direction) => {
-        weekModel.value += direction;
-    },
-});
 const groupIdModel = defineModel<string>('groupId', { required: true });
 const roomIdModel = defineModel<string>('roomId', { required: true });
 const personIdModel = defineModel<string>('personId', { required: true });
@@ -309,56 +259,6 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
         color: $content6;
 
         input { accent-color: $primary500; }
-    }
-
-    &_week {
-        display: flex;
-        gap: var(--space-1);
-        align-items: center;
-
-        padding: var(--space-1);
-        border: 1px solid $surface5;
-        border-radius: var(--radius-md);
-
-        background: $surface0;
-
-        button {
-            cursor: pointer;
-
-            display: flex;
-            // Centred, and it has to be said: the target is 44px while the icon
-            // is 16px, so without this the glyph sits in the top-left corner of
-            // its own button. Raising a target without centring what is in it
-            // moves the mark off the middle of the thing it marks.
-            align-items: center;
-            justify-content: center;
-
-            // 44px: the week stepper is the most-repeated control on the screen.
-            min-width: 44px;
-            min-height: 44px;
-            padding: var(--space-2);
-            border: 0;
-            border-radius: var(--radius-sm);
-
-            color: $content6;
-
-            background: none;
-
-            &:disabled { cursor: default; color: $surface6; }
-
-            @include hover() {
-                &:not(:disabled):hover { background: $surface3; }
-            }
-
-            &:focus-visible { outline: 2px solid $primary400; }
-        }
-
-        &-label {
-            padding: 0 var(--space-3);
-            font-size: var(--font-size-md);
-            font-variant-numeric: tabular-nums;
-            color: $content5;
-        }
     }
 
     &_muted { color: $content7; }

@@ -134,6 +134,7 @@
             did. It now stays put and says so, and the proposal's own status —
             already rendered by `terminalMessage` above — corroborates it.
         -->
+        <Transition name="review-outcome">
         <div
             v-if="outcome"
             class="review_outcome"
@@ -158,6 +159,7 @@
                 to="/schedule"
             >Open the schedule</CommonButton>
         </div>
+        </Transition>
 
         <p
             v-if="applying"
@@ -194,6 +196,7 @@
             evidence the reviewer is deciding from. Focus moves into it on open
             (which is what announces it), Escape backs out.
         -->
+        <Transition name="review-commit">
         <div
             v-if="confirmApply && preview"
             class="review_confirm review_confirm--apply"
@@ -220,7 +223,9 @@
                 >Keep reviewing</CommonButton>
             </div>
         </div>
+        </Transition>
 
+        <Transition name="review-commit">
         <div
             v-if="confirmDiscard"
             class="review_confirm"
@@ -246,6 +251,7 @@
                 >Keep it</CommonButton>
             </div>
         </div>
+        </Transition>
 
         <!--
             WHY THE LOAD ERROR IS TESTED FIRST.
@@ -633,6 +639,21 @@ const computedAgo = computed(() => {
         : `over ${Math.floor(minutes / 60)}h ago — refresh before applying`;
 });
 
+/**
+ * A confirm strip must not outlive the question it asks.
+ *
+ * If the proposal stops being READY while the strip is open — someone else
+ * applied it, or a re-read landed — the strip would go on asking "replace this
+ * term's timetable?" about something that can no longer be applied, and its
+ * button would fail on a decision the reviewer had every reason to think was
+ * live. Closing it puts the terminal state in its place, which is the answer.
+ */
+watch(isDecidable, (decidable) => {
+    if (!decidable) {
+        closeConfirm();
+    }
+});
+
 /** One confirm at a time, and focus follows it — that is what announces it. */
 async function openConfirm(action: 'apply' | 'discard') {
     confirmApply.value = action === 'apply';
@@ -901,6 +922,18 @@ watch(preview, (value) => {
         margin-top: var(--space-3);
     }
 
+    /*
+     * THE AUTHORED MOMENT ON THIS SCREEN.
+     *
+     * DESIGN.md allows one per surface, and on the schedule it is entering
+     * placement mode. Here it is the commit: the strip arrives with weight —
+     * 240ms, rising 10px out of a slight compression — because it is asking the
+     * one irreversible-feeling question the product has. It leaves in 140ms,
+     * the house ease, because backing out should feel like nothing happened.
+     *
+     * Both collapse under `prefers-reduced-motion`, which layout.scss handles
+     * globally for every transition and animation.
+     */
     &_confirm {
         display: flex;
         flex-direction: column;
@@ -1044,5 +1077,44 @@ watch(preview, (value) => {
         &_field { flex: 1 1 140px; }
         &_select { width: 100%; }
     }
+}
+
+.review-commit-enter-active {
+    transition:
+        opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.review-commit-leave-active {
+    transition:
+        opacity 140ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.review-commit-enter-from {
+    transform: translateY(10px) scale(0.985);
+    opacity: 0;
+}
+
+.review-commit-leave-to {
+    transform: translateY(-4px);
+    opacity: 0;
+}
+
+/*
+ * The outcome SETTLES rather than arrives: it is the end of the movement the
+ * confirm strip started, and the one thing on the screen the reviewer waited
+ * for. Slightly longer, and it comes up rather than down — the decision is
+ * behind them now.
+ */
+.review-outcome-enter-active {
+    transition:
+        opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.review-outcome-enter-from {
+    transform: translateY(-8px) scale(0.99);
+    opacity: 0;
 }
 </style>

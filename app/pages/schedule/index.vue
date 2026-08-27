@@ -31,7 +31,6 @@
 
         <ScheduleToolbar
             v-model:term-id="filters.termId.value"
-            v-model:week="filters.week.value"
             v-model:group-id="filters.groupId.value"
             v-model:room-id="filters.roomId.value"
             v-model:person-id="filters.personId.value"
@@ -42,7 +41,6 @@
             :groups="data.groups.value"
             :rooms="data.rooms.value"
             :people="data.people.value"
-            :total-weeks="data.totalWeeks.value"
             :violation-count="data.violations.value.length"
             :can-read-violations="data.canReadViolations.value"
             :can-trigger-solver="canTriggerSolver"
@@ -110,6 +108,13 @@
             class="schedule_body"
         >
             <div class="schedule_main">
+                <ScheduleWeekNav
+                    v-model="filters.week.value"
+                    class="schedule_week"
+                    :total-weeks="data.totalWeeks.value"
+                    :range-label="weekRangeLabel"
+                />
+
                 <!--
                     A flick of the wheel steps a week — bound HERE and on the
                     agenda and the week stepper, never on the page. Over the
@@ -226,11 +231,13 @@
 import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
 import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
-import { sessionLabel } from '~/composables/schedule';
+import { formatSlotDate, sessionLabel } from '~/composables/schedule';
+import { useViewerLocale } from '~/composables/locale';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
 import ScheduleInspector from '~/components/schedule/ScheduleInspector.vue';
 import ScheduleOffGridTray from '~/components/schedule/ScheduleOffGridTray.vue';
 import ScheduleToolbar from '~/components/schedule/ScheduleToolbar.vue';
+import ScheduleWeekNav from '~/components/schedule/ScheduleWeekNav.vue';
 import ScheduleViolationsPanel from '~/components/schedule/ScheduleViolationsPanel.vue';
 import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
@@ -258,6 +265,8 @@ useHead({ title: 'Schedule' });
  */
 definePageMeta({ middleware: 'schedule' });
 
+const locale = useViewerLocale();
+
 const canTriggerSolver = useHasPermission('solver.trigger');
 /**
  * The proposals list, not the solver. Reviewing what the solver produced needs
@@ -283,6 +292,37 @@ const canUpdateSession = useHasPermission('session.update');
  * a new Session needs a kind, which no click can supply. `place` still moves
  * the selection immediately, because everything a move needs is already known.
  */
+/**
+ * The dates this week covers — "13–17 Oct".
+ *
+ * A week NUMBER is an abstraction over the term; the dates are what someone
+ * checks against a calendar, an email or a room booking. Resolved from the
+ * grid's own active days, so a Saturday-teaching institution gets a span that
+ * ends on Saturday rather than an assumed Friday.
+ *
+ * Empty until a term resolves, rather than guessed: `slotDateOf` returns null
+ * before then, and a date range invented from today would be wrong in exactly
+ * the way this codebase keeps refusing to be.
+ */
+const weekRangeLabel = computed(() => {
+    const days = data.grid.value?.activeDays ?? [];
+    const first = days[0];
+    const last = days[days.length - 1];
+
+    if (first === undefined || last === undefined) {
+        return '';
+    }
+
+    const from = data.slotDateOf(filters.week.value, first);
+    const to = data.slotDateOf(filters.week.value, last);
+
+    if (!from || !to) {
+        return '';
+    }
+
+    return `${formatSlotDate(from, locale.value)} – ${formatSlotDate(to, locale.value)}`;
+});
+
 /**
  * A wheel over the WEEK GRID or the DAY AGENDA steps the week.
  *
@@ -411,6 +451,13 @@ const showViolations = ref(false);
     padding: var(--space-7) 24px var(--space-8);
 
     @include mobile() { padding: 14px; }
+
+    // Centred over the thing it governs, and given room above the grid so the
+    // pairing reads as "this week" rather than as another toolbar row.
+    &_week {
+        align-self: center;
+        margin-bottom: var(--space-2);
+    }
 
     &_sr {
         position: absolute;

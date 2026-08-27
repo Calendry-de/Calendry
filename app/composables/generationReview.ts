@@ -446,6 +446,27 @@ export function useGenerationReview(generationId: string) {
      */
     const outcome = ref<{ action: 'applied' | 'discarded'; version: number } | null>(null);
 
+    /**
+     * What to say when a write fails and we do not know how far it got.
+     *
+     * The server's own message is used whenever there IS one: a 4xx means the
+     * request was understood and refused, so "nothing happened" is true and the
+     * route already says why. Without one — a dropped connection, a timeout, a
+     * proxy — the request may well have been executed and only the answer lost,
+     * and claiming the schedule is unchanged would be a guess presented as a
+     * fact. The reviewer is told to look instead.
+     */
+    function describeWriteFailure(error: unknown, verb: 'apply' | 'discard'): string {
+        const stated = (error as { statusMessage?: string }).statusMessage;
+
+        if (stated) {
+            return stated;
+        }
+
+        return `Lost contact while trying to ${verb} this proposal, so it is not known `
+            + 'whether it went through. Refresh before trying again.';
+    }
+
     async function apply() {
         applying.value = true;
         actionError.value = null;
@@ -456,13 +477,25 @@ export function useGenerationReview(generationId: string) {
             await request(`/api/generations/${generationId}/apply`, { method: 'POST', body: {} });
 
             outcome.value = { action: 'applied', version: preview.value?.generation.version ?? 0 };
-
-            // Re-read rather than navigate: the row is now APPLIED, and the
-            // reviewer should see that stated on the thing they just decided.
-            await summary.refresh();
         } catch (e) {
-            actionError.value = (e as { statusMessage?: string }).statusMessage
-                ?? 'Could not apply this proposal. The schedule is unchanged.';
+            actionError.value = describeWriteFailure(e, 'apply');
+            applying.value = false;
+
+            return;
+        }
+
+        /*
+         * THE RE-READ IS NOT PART OF THE WRITE, and it used to be inside the
+         * same `try`. A refresh that failed AFTER a successful apply was caught
+         * by the write's handler and reported as "Could not apply this proposal.
+         * The schedule is unchanged." — a flat falsehood about the highest-stakes
+         * action in the product, at the moment the reviewer most needs the
+         * truth. Its failure is now its own, smaller problem.
+         */
+        try {
+            await summary.refresh();
+        } catch {
+            actionError.value = 'Applied. The view could not be refreshed — reload to see it.';
         } finally {
             applying.value = false;
         }
@@ -476,10 +509,17 @@ export function useGenerationReview(generationId: string) {
             await request(`/api/generations/${generationId}/discard`, { method: 'POST', body: {} });
 
             outcome.value = { action: 'discarded', version: preview.value?.generation.version ?? 0 };
-            await summary.refresh();
         } catch (e) {
-            actionError.value = (e as { statusMessage?: string }).statusMessage
-                ?? 'Could not discard this proposal. It is still awaiting a decision.';
+            actionError.value = describeWriteFailure(e, 'discard');
+            discarding.value = false;
+
+            return;
+        }
+
+        try {
+            await summary.refresh();
+        } catch {
+            actionError.value = 'Discarded. The view could not be refreshed — reload to see it.';
         } finally {
             discarding.value = false;
         }
