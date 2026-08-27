@@ -163,6 +163,8 @@
                     :target="pendingSlot"
                     :rooms="data.rooms.value"
                     :groups="data.groups.value"
+                    :kinds="data.kinds.value"
+                    :kinds-readable="canReadSessionKinds"
                     @cancel="cancelCreate"
                     @created="onEventCreated"
                 />
@@ -357,9 +359,29 @@ function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
 
 const pendingSlot = ref<{ dayOfWeek: number; blockIndex: number } | null>(null);
 
+/**
+ * Focus goes back to the control that started the flow.
+ *
+ * Closing the event form left `document.activeElement` as `<body>` (verified over
+ * CDP), so a keyboard user's next Tab restarted at the top of the document. The
+ * form cannot fix this itself: the element it was opened from is a grid cell that
+ * becomes `disabled` when create mode ends, so it is connected and unfocusable.
+ *
+ * Found by attribute rather than threaded as a ref through two components: what
+ * matters is that a control still exists to receive focus, and the toolbar's
+ * create toggle is the one thing guaranteed to, since its own permission gate is
+ * what put us here.
+ */
+function restoreCreateFocus() {
+    nextTick(() => {
+        document.querySelector<HTMLElement>('[data-create-toggle]')?.focus();
+    });
+}
+
 function cancelCreate() {
     pendingSlot.value = null;
     editing.endCreating();
+    restoreCreateFocus();
 }
 
 /**
@@ -411,8 +433,16 @@ async function deleteSelectedEvent() {
 async function onEventCreated() {
     pendingSlot.value = null;
     editing.endCreating();
+    restoreCreateFocus();
     await data.refreshAll();
 }
+
+/**
+ * Whether an empty `data.kinds` means "none configured" or "not readable" — the
+ * reference wave degrades to `[]` on a 403 so one missing permission cannot blank
+ * the page, which makes the two indistinguishable at the point of use.
+ */
+const canReadSessionKinds = useHasPermission('session_kind.read');
 
 const canMove = useHasPermission('session.move');
 const canSwap = useHasPermission('session.swap');

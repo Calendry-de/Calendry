@@ -107,6 +107,21 @@ async function main() {
             update: {},
         });
 
+        /*
+         * An exam kind, so the demo vocabulary covers the third thing a timetable
+         * actually holds. Seeded HERE and not in `provision:tenant`, which
+         * deliberately creates no kinds: `kind` is tenant-open vocabulary
+         * (TAXONOMY.md §1) and a real tenant names its own. This is demo data.
+         *
+         * The seed already creates an exam PERIOD on the academic calendar, which
+         * is a different entity — a period marks WEEKS, a kind labels a Session.
+         */
+        await prisma.sessionKind.upsert({
+            where: { tenantId_key: { tenantId: t, key: 'exam' } },
+            create: { tenantId: t, key: 'exam', name: 'Exam', color: '#A8763E' },
+            update: {},
+        });
+
         const grid = await prisma.timeGrid.upsert({
             where: { tenantId_name: { tenantId: t, name: GRID.name } },
             create: { tenantId: t, ...GRID, isDefault: true },

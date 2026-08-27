@@ -1,5 +1,6 @@
 <template>
     <div
+        ref="root"
         class="evform"
         role="dialog"
         aria-modal="false"
@@ -39,6 +40,7 @@
             <label class="evform_field evform_field--wide">
                 <span>Name<i>*</i></span>
                 <input
+                    ref="titleInput"
                     v-model="title"
                     :disabled="busy"
                     maxlength="200"
@@ -50,6 +52,7 @@
             <label class="evform_field">
                 <span>Kind<i>*</i></span>
                 <select
+                    v-if="kinds.length"
                     v-model="kindId"
                     :disabled="busy"
                 >
@@ -57,7 +60,6 @@
                         disabled
                         value=""
                     >Choose…</option>
-                    <!-- `:selected` for the SSR reason ManageField documents. -->
                     <option
                         v-for="kind in kinds"
                         :key="kind.id"
@@ -65,6 +67,22 @@
                         :value="kind.id"
                     >{{ kind.name }}</option>
                 </select>
+
+                <!--
+                    An empty list is not an empty control. `kindId` is required by
+                    the route, so with no kinds this form cannot be completed at
+                    all — and a select holding only "Choose…" says that as a dead
+                    end rather than as a reason. The two causes are worth telling
+                    apart, because only one of them is the reader's to fix.
+                -->
+                <p
+                    v-else
+                    class="evform_blocked"
+                >
+                    {{ kindsReadable
+                        ? 'This tenant has no session kinds yet. One is required, and they are managed under Session kinds.'
+                        : 'Session kinds could not be read, and an event needs one. Ask for the session-kind read permission.' }}
+                </p>
             </label>
 
             <label class="evform_field">
@@ -75,6 +93,7 @@
                     :max="maxDuration"
                     min="1"
                     type="number"
+                    @change="clampDuration"
                 >
             </label>
 
@@ -143,7 +162,7 @@
 
         <footer class="evform_foot">
             <common-button
-                :disabled="!kindId || !title.trim() || busy"
+                :disabled="!kinds.length || !kindId || !title.trim() || busy"
                 type="primary"
                 @click="submit"
             >{{ busy ? 'Creating…' : 'Create event' }}</common-button>
@@ -175,6 +194,18 @@ const props = defineProps<{
     target: { dayOfWeek: number; blockIndex: number };
     rooms: { id: string; name: string }[];
     groups: { id: string; name: string }[];
+    /**
+     * From the page's own reference wave, not fetched again here. This form used
+     * to fetch `/api/session-kinds` on mount, with a comment arguing the page
+     * should not pay for a panel most visits never open — true when it was
+     * written, false since the inspector's kind picker made the page fetch them
+     * anyway. So it was one extra request per open AND a second failure path:
+     * the page degrades to an empty list, the form said "Could not load session
+     * kinds", and the two could disagree about the same fact.
+     */
+    kinds: { id: string; name: string }[];
+    /** Whether an empty `kinds` means "none configured" or "not readable". */
+    kindsReadable: boolean;
 }>();
 
 const emit = defineEmits<{ cancel: []; created: [] }>();
@@ -193,9 +224,49 @@ function onKey(event: KeyboardEvent) {
     }
 }
 
+const titleInput = ref<HTMLInputElement | null>(null);
+
+/**
+ * THE FORM IS SCROLLED TO, THEN FOCUSED — in that order, and both are needed.
+ *
+ * It renders BELOW the week grid, which is 600–810px tall depending on density,
+ * so "press Add event, click a slot" put it off the bottom of the viewport with
+ * nothing moving: measured 92px below the fold at Comfortable and 297px at
+ * Spacious. Pressing a cell looked like nothing had happened.
+ *
+ * `focus()` alone does scroll, but only MINIMALLY — just enough to reveal the
+ * input, which leaves the header above it (`New event · Monday, week 1 · 08:00`)
+ * at or past the top edge. That header is the only thing naming the slot that was
+ * clicked, so it is the part that must be on screen. Hence an explicit scroll to
+ * the form, then `preventScroll` on the focus so the two do not fight.
+ *
+ * Handing focus BACK is the page's job, not this form's — the element that opened
+ * it is a grid cell that becomes `disabled` the moment create mode ends, so a
+ * captured reference here would be connected, unfocusable, and silently do
+ * nothing. Only the page knows a control that still exists afterwards.
+ */
+const root = ref<HTMLElement | null>(null);
+
 onMounted(() => {
     claim();
     window.addEventListener('keydown', onKey);
+
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const box = root.value?.getBoundingClientRect();
+
+    /*
+     * `center` while the form FITS, `start` once it does not. Centring a form
+     * taller than the viewport puts its top edge above zero — at 390×667 that is
+     * the header 46px off-screen, which is the one part that must stay: it names
+     * the slot the click chose. Aligning to the top guarantees it at any height,
+     * and centring keeps the form connected to the grid it came from when there
+     * is room for both.
+     */
+    root.value?.scrollIntoView({
+        behavior: still ? 'auto' : 'smooth',
+        block: box && box.height > window.innerHeight ? 'start' : 'center',
+    });
+    titleInput.value?.focus({ preventScroll: true });
 });
 
 onBeforeUnmount(() => {
@@ -203,8 +274,8 @@ onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKey);
 });
 
-const kinds = ref<{ id: string; name: string }[]>([]);
-const kindId = ref('');
+const kinds = computed(() => props.kinds);
+const kindId = ref(props.kinds[0]?.id ?? '');
 const roomId = ref('');
 const title = ref('');
 const groupIds = ref<string[]>([]);
@@ -251,23 +322,18 @@ const error = ref('');
 const maxDuration = computed(() => Math.max(1, props.grid.blocksPerDay - props.target.blockIndex));
 
 /**
- * Kinds are fetched here rather than threaded through the page's async data:
- * this form only ever exists after a click, so there is no SSR pass to keep
- * consistent, and adding a fetch to every schedule render to serve a panel
- * most visits never open would be the wrong trade.
+ * `max` on a number input is advertised, not enforced — a typed 9 submits, and
+ * `fitsGrid` then refuses it with a 400 the reader has to read to discover a
+ * limit the control already knew. Clamped on commit rather than on every
+ * keystroke, so typing "12" on the way to "1" is not fought.
  */
-onMounted(async () => {
-    try {
-        const res = await $fetch<{ rows: { id: string; name: string }[] }>('/api/session-kinds', {
-            query: { limit: 200 },
-        });
+function clampDuration() {
+    const value = Math.trunc(Number(durationBlocks.value));
 
-        kinds.value = res.rows ?? [];
-        kindId.value = kinds.value[0]?.id ?? '';
-    } catch {
-        error.value = 'Could not load session kinds.';
-    }
-});
+    durationBlocks.value = Number.isFinite(value)
+        ? Math.min(maxDuration.value, Math.max(1, value))
+        : 1;
+}
 
 async function submit() {
     // Name is required — an Event has no Offering to borrow one from, and the
@@ -327,9 +393,9 @@ async function submit() {
 
     &_head {
         display: flex;
-        gap: var(--space-4);
         align-items: flex-start;
         justify-content: space-between;
+        gap: var(--space-4);
 
         h2 {
             margin: 0;
@@ -339,22 +405,35 @@ async function submit() {
 
     &_when {
         margin: var(--space-1) 0 0;
+        color: $content6;
         font-size: var(--font-size-sm);
         font-variant-numeric: tabular-nums;
-        color: $content6;
     }
 
     &_note {
         margin: 0;
+        color: $content6;
         font-size: var(--font-size-sm);
         line-height: 1.5;
+    }
+
+    // Where a control would have been, so the gap reads as an explanation rather
+    // than as a field that failed to render.
+    &_blocked {
+        margin: 0;
+        padding: var(--space-4) var(--space-5);
+        border: 1px dashed $surface5;
+        border-radius: var(--radius-md);
         color: $content6;
+
+        font-size: var(--font-size-xs);
+        line-height: 1.45;
     }
 
     &_grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
         gap: var(--space-5);
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     }
 
     &_field {
@@ -364,8 +443,8 @@ async function submit() {
         font-size: var(--font-size-sm);
 
         i {
-            font-style: normal;
             color: $primary400;
+            font-style: normal;
         }
 
         select,
@@ -374,10 +453,10 @@ async function submit() {
             border: 1px solid $surface5;
             border-radius: var(--radius-md);
 
-            font: inherit;
+            background: $surface0;
             color: inherit;
 
-            background: $surface0;
+            font: inherit;
         }
     }
 
@@ -386,22 +465,22 @@ async function submit() {
     }
 
     &_multi-hint {
+        color: $content6;
         font-size: var(--font-size-xs);
         font-style: normal;
-        color: $content6;
     }
 
     &_lock {
         display: flex;
-        gap: var(--space-4);
         align-items: flex-start;
+        gap: var(--space-4);
         font-size: var(--font-size-sm);
 
         em {
             display: block;
+            color: $content6;
             font-size: var(--font-size-xs);
             font-style: normal;
-            color: $content6;
         }
     }
 
@@ -410,10 +489,10 @@ async function submit() {
         padding: var(--space-4);
         border-radius: var(--radius-md);
 
-        font-size: var(--font-size-sm);
+        background: rgb(179 38 30 / 12%);
         color: $content6;
 
-        background: rgb(179 38 30 / 12%);
+        font-size: var(--font-size-sm);
     }
 
     &_foot {

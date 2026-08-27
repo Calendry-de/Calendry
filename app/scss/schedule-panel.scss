@@ -16,16 +16,16 @@
 
     h2 {
         display: flex;
-        gap: var(--space-3);
         align-items: center;
+        gap: var(--space-3);
 
         margin: 0 0 10px;
+        color: $content6;
 
         font-size: var(--font-size-sm);
         font-weight: 650;
-        color: $content6;
-        text-transform: uppercase;
         letter-spacing: 0.04em;
+        text-transform: uppercase;
 
         svg { width: 15px; height: 15px; }
     }
@@ -44,30 +44,41 @@
     li {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--space-2) 10px;
         align-items: baseline;
+        gap: var(--space-2) 10px;
+        color: $content7;
 
         font-size: var(--font-size-sm);
-        color: $content7;
     }
 
     button {
-        cursor: pointer;
 
         display: flex;
-        gap: 5px;
         align-items: center;
+        gap: 5px;
 
-        padding: 0;
+        /*
+         * A REAL TARGET, not a text run. At `padding: 0` these rows were ~18px
+         * tall — every row in both panels feeds the inspector, so this is the
+         * primary interaction of the side column, and it was the smallest thing
+         * on the screen. Full width and 32px minimum, with the padding inset so
+         * the text still aligns with the heading above it.
+         */
+        width: 100%;
+        min-height: 32px;
+        padding: var(--space-3) var(--space-4);
         border: 0;
+        border-radius: var(--radius-sm);
+
+        background: none;
+        color: $content5;
 
         font-family: inherit;
         font-size: var(--font-size-sm);
         font-weight: 600;
-        color: $content5;
         text-align: left;
-
-        background: none;
+        cursor: pointer;
+        margin-inline: calc(-1 * var(--space-4));
 
         svg { width: 14px; height: 14px; }
 
@@ -75,9 +86,13 @@
         .is-soft { color: $warning700; }
 
         @include hover() {
-            &:hover { color: $primary700; text-decoration: underline; }
+            &:hover { background: $surface2; color: $primary700; text-decoration: underline; }
         }
 
         &:focus-visible { outline: 2px solid $primary400; outline-offset: var(--space-1); }
+
+        // Thumb-reached below 700px, where the side column goes static and these
+        // rows sit in the page flow.
+        @include mobileOnly() { min-height: 44px; }
     }
 }

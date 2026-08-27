@@ -131,6 +131,7 @@
                  "unavailable right now" rather than "not yours". -->
             <common-button
                 v-if="canCreateSession && solverTermId"
+                data-create-toggle
                 :icon="creating ? 'material-symbols:close' : 'material-symbols:add'"
                 :type="creating ? 'secondary' : 'transparent'"
                 @click="$emit('toggle-create')"
@@ -249,7 +250,19 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
 
     background: $surface1;
 
+    /*
+     * 44px ON A PHONE ONLY. The 35px toggle and ~34px selects match each other on
+     * the desktop row and are comfortable mouse targets; forcing 44px there would
+     * make the toggle taller than the select beside it for no one's benefit. Below
+     * 700px the same controls are thumb-reached, which is the condition
+     * `ScheduleAgenda` and `ScheduleWeekNav` already apply it under.
+     */
     @include mobileOnly() {
+        #{&}_select,
+        #{&}_violations-toggle {
+            min-height: 44px;
+        }
+
         /* Tighter rows than the desktop's 16px: on a phone the toolbar already
            costs 303px before any schedule appears. */
         gap: var(--space-5) var(--space-7);

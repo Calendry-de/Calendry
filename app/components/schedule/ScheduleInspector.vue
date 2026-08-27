@@ -540,6 +540,17 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
         border: 0;
         border-radius: 6px;
 
+        /*
+         * The MARK stays 24px; the TARGET reaches 44px. A panel corner cannot
+         * carry a 44px visible button without becoming the loudest thing in a
+         * panel it only dismisses, so the hit area is grown past the box instead.
+         */
+        &::after {
+            content: '';
+            position: absolute;
+            inset: -12px;
+        }
+
         color: $content7;
 
         background: none;
