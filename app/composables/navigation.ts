@@ -5,6 +5,7 @@ import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
 import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { useThemeToggle } from '~/composables/layout';
 import { logout, useSession } from '~/composables/session';
+import { HOME_ROUTE } from '~/utils/routes';
 
 /**
  * The navigation registry — one typed list behind the header, the /manage sidebar,
@@ -100,7 +101,12 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             // the signed-in home, so that keyword would send a Ctrl+K search
             // for the marketing page to the dashboard instead.
             keywords: ['home', 'start', 'dashboard', 'overview'],
-            to: '/dashboard',
+            // HOME_ROUTE, not the literal: it is the single definition of where
+            // a signed-in session belongs, and this entry was the one place that
+            // still spelled it out — so changing it would have moved the
+            // post-login redirect while leaving the Home link pointing at the
+            // old page.
+            to: HOME_ROUTE,
             inHeader: true,
         },
         {

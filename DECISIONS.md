@@ -1892,7 +1892,9 @@ complete.
 sessions, sets flag, audits; login blocks until `POST
 /api/auth/change-password`), gaps in BACKLOG.md § "Password policy gaps".
 Federation-level permissions out of scope (TAXONOMY.md §9.4). Session
-cleanup done — `sessionSweeper.ts` deletes `auth_session` past 30 days,
+cleanup done — `server/plugins/sessionSweeper.ts` (a NITRO PLUGIN, not a util — the
+path was recorded as `server/utils/` until 2026-08-28, where it does not exist)
+deletes `auth_session` past 30 days,
 needs no RLS exception (none exists) and no claim machinery (idempotent
 DELETE).
 

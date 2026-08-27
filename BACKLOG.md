@@ -363,6 +363,36 @@ Sequence to finish: push proto + tag, publish `v0.8.0`, re-pin the solver's
 submodule to the tag, push the solver, rebuild the solver image, then
 `bun run backfill:constraints -- --all-missing` on every existing tenant.
 
+## Auto-detect and SUGGEST a repair run (never auto-run)
+
+From the original solver architecture record's explicitly-open list, and never
+tracked here. The app already refreshes `constraint_violation` whenever relevant
+data changes, so it knows the moment a manual edit creates a clash — but nothing
+surfaces that as an offer. The proposal is a prompt ("N sessions now conflict —
+repair?") that a human accepts, **not** a solve that starts on its own.
+
+The distinction is the decision: auto-DETECT is nearly free and uses machinery
+that exists; auto-RUN would start a job that rewrites a timetable without anyone
+asking, and the standing lean is against it entirely. What was never settled is
+whether ANY situation justifies skipping the confirmation. Until it is, the
+honest scope is detect-and-offer.
+
+Depends on nothing; the violation state and the run API both exist.
+
+## Cross-repo note: the generator's room-tightness prediction counts virtual rooms
+
+`predicted_room_tightness()` in `calendry-solver`'s `crates/gen/src/params.rs`
+divides demand by `rooms() * slots()`, and `rooms()` is
+`physical_rooms + virtual_rooms`. A virtual Room is not an exclusive resource
+(solver ADR-0022), so counting it as capacity inflates the denominator and makes
+the predicted tightness read easier than the exclusive-room reality — about 7% at
+large-university scale.
+
+Low urgency and verified still live on 2026-08-28: this figure only calibrates
+benchmark presets, and the group axis binds first in every preset anyway, so no
+preset's difficulty actually depends on it. Worth fixing when someone is next in
+that file rather than on its own.
+
 ## Compactness / "minimize gaps in the day"
 
 For both students (a Group's day) and tutors (a Person's day): minimize idle
@@ -734,7 +764,13 @@ Step 13 instance survived a whole phase.
 ## Import / Export / Notifications
 
 - CSV/Excel import (onboarding institutions with legacy spreadsheet data) —
-  mapping UX (guided vs. fixed template) still undecided.
+  mapping UX (guided vs. fixed template) still undecided. **A real specimen is
+  in the repo root**: `Stundenplan_3. Sem. dIT22_S1.xlsx`, the dIT22 S1 timetable
+  the scenario work already uses. Untracked, so it survives only on this machine
+  — check it in (or park it under a fixtures directory) before it is the thing
+  everyone remembers having and nobody can find. It is worth more than a
+  hypothetical: the mapping UX decision should be made against a spreadsheet a
+  real institution actually produced, not an invented one.
 - Export — iCal / Google Calendar / Outlook.
 - Notification delivery — audience resolution already exists
   (`affected-persons.get.ts`); nothing actually sends anything.

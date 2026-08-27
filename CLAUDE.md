@@ -206,9 +206,16 @@ Each of these has bitten more than once, in a different disguise each time.
 ### Permissions
 
 - **Per-tenant, tenant-configured roles** — never a hardcoded global role enum.
-- **Permissions are fixed, roles are not.** The catalogue is code
-  (`server/utils/permissions.ts`, mirrored by a migration); tenants bundle them
-  into AccessRoles but cannot invent them. Adding one means editing both.
+- **Permissions are fixed, roles are not.** The catalogue is code —
+  `shared/permissions.ts`, where `PERMISSIONS` is CRUD keys derived from
+  `CRUD_RESOURCES` plus an explicit list. Tenants bundle them into AccessRoles
+  but cannot invent them. **`prisma/seed.ts` mirrors the catalogue into the
+  `permission` table on every deploy**, reporting created/updated and naming any
+  row that exists in the database but not in code — so adding a permission is a
+  one-file change, not a migration. (This said "mirrored by a migration" until
+  2026-08-28; no migration has ever inserted a permission row, and following it
+  would have meant writing one that does nothing.) Granting is still a separate
+  step — see Bootstrap & deploy.
 - **`Role` (TAXONOMY.md §2, scheduling vocabulary) and `AccessRole` (§4,
   authorization) share a word and are different things.** Never merge them;
   never grant permissions via `Role`.
