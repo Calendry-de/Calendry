@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
              * `CANDIDATE_LIMIT` is exported so the form compares against the same
              * number rather than repeating it. A tenant with more unattached
              * people than this needs a search box, not a longer dropdown —
-             * BACKLOG.md § "A searchable person picker".
+             * the project board, "A searchable person picker".
              */
             take: CANDIDATE_LIMIT,
         });

@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH_LEAD } from '../app/utils/landingContent';
 
 /**
  * The public landing page at `/`: it renders for a visitor with no session, and
- * what it claims still matches BACKLOG.md.
+ * what it claims stays consistent with `app/utils/landingContent.ts`, which is
+ * the single source of those claims.
  *
  * TWO KINDS OF CHECK, BOTH NEEDED.
  *
@@ -16,10 +15,12 @@ import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH
  *    names content that only exists once the page actually composed.
  *
  * 2. DRIFT. A marketing page is prose, and prose is checked by nobody — the
- *    failure this repository has hit repeatedly. So the honesty of the roadmap is
- *    pinned mechanically: the unchecked entries in BACKLOG.md's phase checklist
- *    are read from the file and compared against what the page presents as "not
- *    built". Tick a box in BACKLOG without touching the page and this fails.
+ *    failure this repository has hit repeatedly. So the roadmap's claims are not
+ *    prose: they are `app/utils/landingContent.ts`, and the page is asserted to
+ *    render exactly it. See the long note above the roadmap block for what that
+ *    guarantees now and what it stopped guaranteeing when `BACKLOG.md` was
+ *    retired — the honest answer is "less", and it is written down there rather
+ *    than left for somebody to assume.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
@@ -213,69 +214,44 @@ describe('no fabricated social proof', () => {
 });
 
 /**
- * The drift guard. This is the assertion most likely to fail years from now, and
- * failing is what it is for.
+ * The drift guard, and what it can and cannot promise since 2026-08-28.
  *
- * The map is the claim: these are the phase-checklist entries BACKLOG.md marks as
- * NOT done, and this is the landing-page item each one is presented as. If the
- * checklist changes on either side — a box ticked, a new phase added — the first
- * assertion fails and names the mismatch, rather than the page quietly
- * advertising a gap that closed or hiding one that opened.
+ * IT USED TO CROSS-CHECK TWO INDEPENDENT SOURCES: `BACKLOG.md`'s phase checklist
+ * against what this page presents as unbuilt. Tick a box without touching the
+ * page and the test failed, naming the mismatch. That is a genuinely strong
+ * property — the page could not advertise a gap that had closed.
+ *
+ * `BACKLOG.md` was retired in favour of a GitHub project board, which nothing
+ * offline can read: querying it would put a network call and a secret into the
+ * test suite. So THE CROSS-CHECK IS GONE, and it is worth being blunt about the
+ * consequence rather than pretending the replacement is equivalent.
+ *
+ * WHAT STILL HOLDS: `app/utils/landingContent.ts` is the single source of the
+ * page's claims, the page is asserted to render exactly it, ids are unique, and
+ * each list's items carry the state that list means. So the PAGE cannot drift
+ * from the CONTENT MODULE.
+ *
+ * WHAT NO LONGER HOLDS: nothing catches the content module drifting from
+ * reality. If import ships and `NEXT` still lists it, this suite stays green and
+ * the landing page lies. That is now a human step — moving a card to Done on the
+ * board means editing `NEXT`/`BUILT` in the same change — and it is stated in
+ * CLAUDE.md as a rule because a test can no longer state it.
  */
-const UNCHECKED_TO_LANDING: Record<string, string> = {
-    'Import (CSV/Excel)': 'import',
-    'Export (iCal/Google/Outlook)': 'export',
-    'Notifications (delivery; audience resolution already exists)': 'notifications',
-};
-
-function phaseChecklist(): { checked: string[]; unchecked: string[] } {
-    const backlog = readFileSync(join(import.meta.dirname, '..', 'BACKLOG.md'), 'utf8');
-    const section = backlog.split('## Current phase')[1]?.split('\n---')[0] ?? '';
-    const checked: string[] = [];
-    const unchecked: string[] = [];
-
-    // Only the top-level checklist lines: continuation lines are indented.
-    for (const line of section.split('\n')) {
-        const match = /^- \[([ x])\] (.+)$/.exec(line);
-
-        if (!match) {
-            continue;
-        }
-
-        // Bold markers and trailing em-dash detail are formatting, not the title.
-        const title = (match[2] as string).replace(/\*\*/g, '').trim();
-
-        (match[1] === 'x' ? checked : unchecked).push(title);
-    }
-
-    return { checked, unchecked };
-}
-
-describe('the roadmap still matches BACKLOG.md', () => {
-    it('reads the phase checklist at all — the guard must not pass by finding nothing', () => {
-        const { checked, unchecked } = phaseChecklist();
-
-        // Without this, a renamed heading would make every assertion below pass
-        // over an empty list: the "correctly found nothing / broken and found
-        // nothing" failure CLAUDE.md warns about.
-        expect(checked.length).toBeGreaterThan(5);
-        expect(unchecked.length).toBeGreaterThan(0);
+describe('the roadmap is internally consistent', () => {
+    it('has roadmap content at all — the guard must not pass by finding nothing', () => {
+        // Without this, an emptied or renamed export would make every assertion
+        // below pass over nothing: the "correctly found nothing / broken and
+        // found nothing" failure CLAUDE.md warns about.
+        expect(BUILT.length).toBeGreaterThan(5);
+        expect(NEXT.length).toBeGreaterThan(0);
     });
 
-    it('presents exactly the unfinished checklist entries as unfinished', () => {
-        const { unchecked } = phaseChecklist();
-
-        expect(unchecked.sort()).toEqual(Object.keys(UNCHECKED_TO_LANDING).sort());
-    });
-
-    it('carries a "next" item for each unfinished entry, and never a "done" one', () => {
+    it('presents every NEXT item on the page, and none of them as built', () => {
         const doneIds = new Set(BUILT.map((item) => item.id));
 
-        for (const [entry, landingId] of Object.entries(UNCHECKED_TO_LANDING)) {
-            const item = NEXT.find((candidate) => candidate.id === landingId);
-
-            expect(item, `${entry} has no roadmap item on the page`).toBeTruthy();
-            expect(doneIds.has(landingId), `${entry} is advertised as built`).toBe(false);
+        for (const item of NEXT) {
+            expect(doneIds.has(item.id), `${item.id} appears in both lists`).toBe(false);
+            expect(item.title.length, `${item.id} has no title to render`).toBeGreaterThan(0);
         }
     });
 

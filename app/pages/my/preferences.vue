@@ -24,7 +24,7 @@
             (`constraint.read` is an administrator's key), so it names the
             dependency rather than guessing at it. Resolving the real state
             needs a decision about what a lecturer may see of their
-            institution's configuration — BACKLOG.md.
+            institution's configuration — tracked on the project board.
         -->
         <p
             class="note"

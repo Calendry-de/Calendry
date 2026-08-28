@@ -55,7 +55,7 @@ async function reset() {
      * had nothing to refuse. The same pattern already exists in
      * `scripts/seed-demo-schedule.ts`.
      *
-     * Note what this reveals and does not fix — see BACKLOG.md: a tenant or a
+     * Note what this reveals and does not fix — see the project board: a tenant or a
      * generation carrying ANY session_event cannot be deleted through ordinary
      * SQL, because the FKs say CASCADE and the trigger says no. Test fixtures
      * can reach for DISABLE TRIGGER; a production purge cannot.

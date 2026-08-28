@@ -4,14 +4,14 @@
  * WHY CONTENT LIVES HERE AND NOT IN THE TEMPLATES
  *
  * Every claim on a marketing page is a claim about this repository, and the two
- * places that record what is actually true are `BACKLOG.md` § "Current phase"
+ * place that records what is actually true is the project board
  * (what is done, what is not) and `CLAUDE.md` (why it works the way it does).
  * Keeping the copy in one module means a claim can be checked against those two
  * files without reading nine component templates — and it means the page's
  * factual content is testable, which a template is not.
  *
  * THE RULE FOR EDITING THIS FILE: nothing here may describe a capability that
- * `BACKLOG.md`'s phase checklist does not mark complete. If the checklist and
+ * the project board does not have in Done. If the board and
  * this file disagree, the checklist wins and this file is wrong. Each list below
  * names the entry it came from.
  */
@@ -97,9 +97,14 @@ export const FEATURES: LandingFeature[] = [
 ];
 
 /**
- * BUILT SO FAR — every line traces to an `[x]` in BACKLOG.md § "Current phase".
+ * BUILT SO FAR — every line traces to something actually shipped.
+
+ * THIS ARRAY IS THE CLAIM, and since `BACKLOG.md` was retired nothing checks it
+ * against reality: `tests/landing-page.test.ts` proves the page renders exactly
+ * what is here, not that what is here is true. Moving a card to Done on the
+ * project board includes editing this file in the same change.
  *
- * ORDER IS EDITORIAL, NOT THE CHECKLIST'S. It was BACKLOG.md's order, which
+ * ORDER IS EDITORIAL. It was the old checklist's order, which
  * opened on "Multi-tenant data model and API" and buried "Schedule view and
  * editor" third — answering an architecture question first for a reader whose
  * first question is "can it hold my week". The list now runs from what a
@@ -188,7 +193,7 @@ export const BUILT: LandingRoadmapItem[] = [
 ];
 
 /**
- * WHAT'S NEXT — the `[ ]` entries in BACKLOG.md § "Current phase", plus the
+ * WHAT'S NEXT — what the project board has not finished, plus the
  * items from § "Features not built" and § "Needs a decision" that a customer
  * would actually notice.
  *

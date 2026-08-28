@@ -18,6 +18,6 @@
  * settled institution is short. An onboarding tenant that has imported thousands
  * and issued nothing yet will hit it, which is why the form says so instead of
  * presenting 500 of 3,000 as the roster. Proper fix is a searchable picker:
- * BACKLOG.md § "A searchable person picker".
+ * the project board, "A searchable person picker".
  */
 export const CANDIDATE_LIMIT = 500;

@@ -4,7 +4,7 @@
  *
  * WHY A MAIL DRAFT AND NOT A POST ENDPOINT
  *
- * This app has no notification delivery — `BACKLOG.md` § "Import / Export /
+ * This app has no notification delivery — the project board ("Import / Export /
  * Notifications" says so, and it is on the landing page's own roadmap. An
  * endpoint that accepted an enquiry today could only log it to stdout and
  * return 200, which is the exact failure this project keeps writing rules

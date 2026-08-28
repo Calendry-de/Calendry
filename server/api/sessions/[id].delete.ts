@@ -16,7 +16,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * Removing a real Session properly means deciding whether it should be
  * re-placed or held as unplaced-but-tracked, which is the deliberately deferred
- * "cancel to spare bank" feature (BACKLOG.md). This route does not build half
+ * "cancel to spare bank" feature (tracked on the project board). This route does not build half
  * of it.
  *
  * An Event has no demand behind it, so deleting one is final and means exactly

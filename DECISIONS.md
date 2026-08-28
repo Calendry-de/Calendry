@@ -2016,6 +2016,19 @@ already states.
 
 ---
 
+# The 100%-slot-occupancy schedule shape is intentional
+
+Confirmed 2026-08-23 and re-recorded here when BACKLOG.md was retired. The demo
+schedule packs Sessions into fully-occupied weeks — 18 of 18 slots for several
+consecutive weeks — as a side effect of `minimize_day_usage`'s weight relative
+to the other soft rules.
+
+**Not a bug, and deliberately kept as-is.** It is written down only because the
+shape looks alarming: a future session finding it will otherwise spend time
+deciding whether it was intended. It was.
+
+---
+
 # Pre-launch branding sweep
 
 The Step 1 rebrand searched only for the `xxx-changeme` placeholder pattern,

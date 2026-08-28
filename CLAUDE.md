@@ -32,14 +32,20 @@ storing and presenting one is this repo's.
 | `TAXONOMY.md` | The fixed entity model. Authoritative — changes are migrations, not config edits. |
 | `CLAUDE.md` | **Durable rules.** Target 200–300 lines. State a fact once; link the reasoning. |
 | `DECISIONS.md` | **Archive.** Why a decision was taken, what was measured, how a bug was found. |
-| `BACKLOG.md` | **Transient.** Open bugs, deferred work, undecided questions, the phase checklist. |
+| [Project board](https://github.com/users/MindCollaps/projects/4) | **Transient, and the SOURCE OF TRUTH for open work.** Bugs, deferred work, undecided questions. Not in the repo, so nothing offline can check it — see the note below. |
 
 Dividing question: what must not be undone (→ CLAUDE.md), the no-longer-live
-story behind it (→ DECISIONS.md), or what someone might still do (→ BACKLOG.md)?
+story behind it (→ DECISIONS.md), or what someone might still do (→ the board)?
 
-The current phase checklist is **BACKLOG.md § "Current phase"** — and it is
-load-bearing: `tests/landing-page.test.ts` asserts its unchecked entries match
-what the landing page presents as not built.
+**`BACKLOG.md` was retired on 2026-08-28** and its contents migrated to the
+board. One property was lost with it and cannot be recovered offline: the board
+is not readable by a test, so nothing mechanically checks the landing page's
+roadmap against reality any more. `app/utils/landingContent.ts` is now the single
+source of those claims and `tests/landing-page.test.ts` pins the page to it — so
+page and module cannot drift, but module and reality can. **Moving a card to Done
+on the board therefore includes editing `BUILT`/`NEXT` in that file, in the same
+change.** That used to be a test failure; it is now a rule, which is strictly
+weaker, so it is written here.
 
 ## Fixed vs. open taxonomy
 
@@ -157,9 +163,11 @@ Each of these has bitten more than once, in a different disguise each time.
   pin a new consumer with a test that CALLS it
   (`tests/group-availability-api.test.ts`).
 - **A tracked-gap entry can drift from the code silently.** Prose is checked by
-  nobody. Before acting on an entry here or in BACKLOG.md, confirm its claim
+  nobody. Before acting on an entry here or on the board, confirm its claim
   against the code — and measure, if it is about performance. Applies with more
-  force to BACKLOG.md, which nothing references and so nothing contradicts.
+  force to the board, which nothing references and so nothing contradicts: the
+  migration off `BACKLOG.md` found one entry claiming the permission model had no
+  row-level self-scoping, months after `session.read_own` shipped.
 - **`--fix` tooling rewrites files outside your scope, and needs the project's
   own config.** Scope the fixer to your paths and `git checkout --` anything
   else. A bare `stylelint <file>` resolves a *different* ruleset than
@@ -201,10 +209,9 @@ Each of these has bitten more than once, in a different disguise each time.
   `ANONYMOUS_ROUTES` (`/` — needs no session, bounces nobody). `HOME_ROUTE` in
   `app/utils/routes.ts` is the **only** place "where a signed-in session belongs"
   is written. `/` reads no session, calls no API, exposes no tenant data.
-- **The landing page's claims are tested against BACKLOG.md** —
-  `tests/landing-page.test.ts` parses § "Current phase" and asserts unchecked
-  entries match what the page presents as not built. The contact CTA is
-  `mailto:`, not a POST: persisting it would be a fourth RLS exception.
+- **The landing page's claims live in `app/utils/landingContent.ts`** and
+  `tests/landing-page.test.ts` asserts the page renders exactly them. The contact
+  CTA is `mailto:`, not a POST: persisting it would be a fourth RLS exception.
 
 ### Components and styling
 
@@ -284,7 +291,7 @@ solver has no way to detect.
   solver charges the **mean over a placement's lecturers of `multiplier ×
   unmet`**; `PersonPreferenceFit.roles` must stay EMPTY or the run is refused.
   Solver ADR-0026; § "Per-person preferences".
-- **Tracked wire-format gaps** (BACKLOG.md § Solver) each report rather than
+- **Tracked wire-format gaps** (on the board) each report rather than
   narrow silently — do not "fix" one by picking a value: equipment quantity,
   multi-room Sessions, the solver's unbounded run registry, violations naming
   solver-invented Sessions with no join key.
