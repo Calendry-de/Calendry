@@ -123,6 +123,25 @@
             </li>
         </ul>
 
+        <!--
+            NOTHING ASSIGNED. Two renderings, because an empty set is not always
+            the same fact: for most relations it is unremarkable, and for
+            `access-roles` it means this person can sign in and be shown nothing.
+            A relation says which by declaring `emptyWarning` — and when it does,
+            the advisory REPLACES "None assigned." rather than joining it, since
+            the warning already states the emptiness and two lines saying it is
+            empty reads like two separate problems.
+
+            `role="status"`, matching the warnings above: politely announced,
+            nothing is broken. Deliberately shown in read-only mode too — a
+            viewer who cannot fix it is still better off knowing.
+        -->
+        <p
+            v-else-if="def.emptyWarning"
+            class="picker_warning"
+            role="status"
+        >{{ def.emptyWarning }}</p>
+
         <p
             v-else
             class="picker_empty"

@@ -128,6 +128,23 @@ export interface RelationDef {
     };
     emptyHint?: string;
     /**
+     * Advisory shown when NOTHING IS ASSIGNED — a different question from
+     * `emptyHint`, which explains why the option list is empty.
+     *
+     * Exists because an empty set is ambiguous in exactly the way this codebase
+     * keeps getting caught by: "deliberately unprivileged" and "nobody got round
+     * to it" render identically, so the second is invisible. Only `access-roles`
+     * declares one today, because it is the only relation whose empty state means
+     * a person can sign in and be shown nothing.
+     *
+     * Phrase it as a FACT, not an instruction: it renders in read-only mode too,
+     * for a viewer who cannot act on it. And never name a specific role —
+     * AccessRole keys are tenant vocabulary (CLAUDE.md: never hardcode an open
+     * value into logic), so there is no role this string is allowed to assume
+     * exists.
+     */
+    emptyWarning?: string;
+    /**
      * What makes this relation EDITABLE. Absent means the parent's `.update`.
      *
      * Separate from VISIBILITY (derived — see `relationReadRequirement`): seeing
@@ -505,6 +522,8 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 valueKey: 'accessRoleId',
                 optionLabel: (row) => String(row.name ?? row.key),
                 emptyHint: 'No access roles defined yet.',
+                emptyWarning: 'No access role assigned. This person can sign in and will be '
+                    + 'shown an empty application — no schedule, no navigation.',
                 /*
                  * No read gate declared: it is DERIVED from `resource` — see
                  * `relationReadRequirement`. `/api/access-roles` accepts either
