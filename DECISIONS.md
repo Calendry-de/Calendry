@@ -1,25 +1,49 @@
 # DECISIONS.md — Calendry
 
 The **archive** half of this project's persistent memory, split out of CLAUDE.md
-on 2026-08-26 because that file had grown past the point a session can absorb
-in one read (~2,100 lines) — see CLAUDE.md's own "writing effective CLAUDE.md"
-research for why that matters.
+on 2026-08-26 because that file had grown past the point a session can absorb in
+one read (~2,100 lines).
 
-**What lives here vs. what stays in CLAUDE.md:** CLAUDE.md keeps the standing
-rule, the number, the invariant — whatever a session would actually break by
-not knowing. This file keeps the *story*: how a bug was found, what was
-measured, why the obvious fix was wrong, what was verified and how. Deleting
-this content would delete the argument, not just the bug — the same reasoning
-that used to justify keeping it inline in CLAUDE.md still applies; it has just
-moved to a file that isn't read every session, because none of it is needed to
-avoid regressing something CLAUDE.md's live rules don't already state on their
-own.
+**What lives here vs. what stays in CLAUDE.md.** CLAUDE.md keeps the standing
+rule, the number, the invariant — whatever a session would actually break by not
+knowing. This file keeps the *story*: how a bug was found, what was measured, why
+the obvious fix was wrong, what was verified and how. Deleting this content would
+delete the argument, not just the bug.
 
-**Same drift risk as BACKLOG.md, arguably worse.** Nothing in the repo
-references an entry here, so nothing contradicts one when it goes stale.
-Treat everything below as "this is what happened and what we found," not as a
-live claim about current code — verify against the code before relying on a
-specific detail (function name, line count, measurement) for a decision.
+**Read a named section before changing what it covers; do not read this file
+front to back.** CLAUDE.md's rules point here by section name (`§ "…"`), and
+those 24 pointers are a contract — renaming a heading breaks a reference that
+nothing else will catch. The index below is the entry point.
+
+**Treat every entry as "what happened and what we found", not as a live claim
+about current code.** Prose is checked by nobody. Verify a function name, a path,
+a line count or a measurement against the code before relying on it for a
+decision — and if you find one that has drifted, fix it here in the same change.
+Three were found and fixed on 2026-08-28 alone: a `server/utils/` path for a file
+that lives in `server/plugins/`, an instruction to return `{}` where `{}` throws,
+and a claim that `params` accepted arbitrary JSON hours after it stopped doing so.
+
+**This file has been consolidated twice.** On 2026-08-27 detail moved out of
+CLAUDE.md into it, and on 2026-08-28 the seams from that move were removed: 13
+identical provenance stamps, 7 doubled headings (`# X` immediately followed by
+`### X`), 13 references to "DECISIONS.md §" from inside DECISIONS.md, and a
+160-line section that restated ten other sections and pointed at each one. If you
+are adding a section, add it once, and link rather than restate.
+
+## Index
+
+| Area | Sections |
+|---|---|
+| Database, schema, deploy | Database & migrations · The `calendry_internal` schema · Bootstrap & deploy |
+| Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling |
+| Landing page & routing | Landing page / routing |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens |
+| Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
+| Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
+| Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
+| Solver: operations | Solver & proto: operational detail · Solver: Federation scope |
+| Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · Stage 6c: why the review screen shows two panels |
+| Odds and ends | `weekCountOf` vs. `weeksInTerm` · `CommonButton` rendered a `<div>` · Design tooling · The 100%-slot-occupancy schedule shape · Pre-launch branding sweep |
 
 ---
 
@@ -118,14 +142,31 @@ anticipated:
   landing page it found no nav and would have reported every role as
   correctly not offered the `/my` section.
 
-## The landing page ↔ BACKLOG.md test, falsified deliberately
+## The landing page ↔ BACKLOG.md test, falsified deliberately — SUPERSEDED
 
-`tests/landing-page.test.ts` parses the § "Current phase" checklist out of
-`BACKLOG.md` and asserts the unchecked entries are exactly the ones the page
-presents as not built, with a guard that the parse found something (a renamed
-heading would otherwise make every assertion pass over an empty list).
-Falsified deliberately during construction: ticking `Import (CSV/Excel)` in
-BACKLOG.md without touching the page fails it, naming the mismatch.
+**This guard no longer exists.** Kept because the technique is worth copying and
+because what replaced it is strictly weaker, which is a thing to know rather than
+discover.
+
+*What it was:* `tests/landing-page.test.ts` parsed the § "Current phase"
+checklist out of `BACKLOG.md` and asserted the unchecked entries were exactly the
+ones the page presented as not built — with a guard that the parse had found
+something, since a renamed heading would otherwise make every assertion pass over
+an empty list. Falsified deliberately during construction: ticking
+`Import (CSV/Excel)` in `BACKLOG.md` without touching the page failed it and
+named the mismatch.
+
+*Why it is gone:* `BACKLOG.md` was retired on 2026-08-28 in favour of a GitHub
+project board, which no test can read. The test was rewritten to read
+`app/utils/landingContent.ts` instead.
+
+*What that costs, exactly:* it cross-checked **two independent sources**, so it
+could catch the page drifting from reality. It now compares the page against a
+module in the same commit, so it can only prove **page and module agree** — never
+that either matches what is actually built. Module and reality can drift freely
+and silently. That is why editing `BUILT`/`NEXT` when a card moves to Done is now
+a **rule in CLAUDE.md** rather than a test failure: the mechanical check is gone
+and a human promise replaced it.
 
 ---
 
@@ -388,7 +429,9 @@ replays the first one.
 ## Idempotency key — why protobuf, not JSON, and a real trap it caught
 
 `POST /api/solver/runs` sends a SHA-256 of the ENCODED `SolverInput` plus the
-seed as `StartRunRequest.idempotency_key`. The hash is over the encoded
+seed as `StartRunRequest.idempotency_key`. A caller that sent no seed learns
+which one was used from `StartRunResponse.seed`, which is what makes a run
+reproducible after the fact rather than only in advance. The hash is over the encoded
 protobuf, not a JSON rendering: two inputs that encode identically are the
 same problem to the solver, which is exactly the question being asked; a
 JSON hash would also move with key order and with how BigInt happened to
@@ -482,8 +525,8 @@ online Session per slot, tenant-wide, during construction and LNS both.
 
 The fix keys on the flag via a single `Room::is_exclusive()` predicate both
 layers consult. `capacity` still gates eligibility and was deliberately left
-alone — a virtual room with a genuine concurrency limit still cannot be
-expressed.
+alone — there is no `concurrentCapacity` field yet, so a virtual room with a
+genuine concurrency limit still cannot be expressed.
 
 **It exposed a real gap, now tracked in the solver repo rather than here.**
 The bug had been enforcing `MaxOnlineShare` by accident: virtual rooms are
@@ -492,7 +535,8 @@ valve nearly shut. Removing it more than doubled share violations at
 large-university (180 → 455) with structural violations unchanged at exactly
 80 and `unplaced` still 0 — the model is now correct and the search is
 visibly worse at respecting a cap it was never actually respecting. See
-BACKLOG.md § "Needs a decision, not a design pass" for candidate fixes.
+the project board for candidate fixes — the card is
+`MaxOnlineShare is not enforced by the search`.
 
 ---
 
@@ -806,9 +850,7 @@ omitted the select. Worth knowing generally: **prose inside a `<template>` is
 part of the response body**, and a comment that quotes user-facing strings is a
 comment a test can match.
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Two ways to read a schedule, and why the page needs nothing else
+## Two ways to read a schedule, and why the page needs nothing else
 
 `session.read` is the institution's whole timetable. **`session.read_own` is the
 caller's own** — sessions they are attached to, plus sessions assigned to a Group
@@ -1113,15 +1155,13 @@ page's own awaited data, and unioning the client-fetched candidates onto it.
   AccessRole — a login that signs in and sees nothing is the most confusing
   possible outcome, and granting is tenant configuration, not password recovery.
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Accounts: the login plane, which a tenant only half-owns
+## Accounts: the login plane, which a tenant only half-owns
 
 `/manage/accounts` ("Logins") issues credentials over HTTP. This REVERSES the
 earlier "only a CLI may mint accounts" stance — deliberately, on request, because
 creating a Person creates no way to sign in and the CLIs answered an existing
 Person with "already exists" and stopped. Reasoning and what replaced the old
-protection: DECISIONS.md § "Accounts in the management area".
+protection: § "Accounts in the management area".
 
 - **`accounts` is NOT in `CRUD_RESOURCES` and never will be.** `account` carries
   no `tenant_id` and no RLS (exception 2), so the generic routes'
@@ -1213,9 +1253,7 @@ every catalogue rule renders, zero editable toggles, zero weight inputs, no
 deliberately by re-rendering with a disabled checkbox instead of static text
 (fails three of four assertions).
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### The management area (Step 13)
+## The scaffold itself, in one page
 
 `/manage` is one scaffold: three route files render every entity from
 `app/utils/manageRegistry.ts`, which is also the nav source — sidebar,
@@ -1249,9 +1287,9 @@ index, header, palette can't drift from each other or the entity list.
   solver's `convert.rs`) — not "always-on" despite some prose elsewhere
   claiming so.
 
-Verification detail (the `paramField()` divergence, invisible-deprecated-
-types bug, ten-file `vartorgba` styling bug, read-only-path test):
-DECISIONS.md § "Management area (Step 13)".
+The verification behind these — the `paramField()` divergence, the
+invisible-deprecated-types bug, the ten-file `vartorgba` styling bug and the
+read-only-path test — is the first half of this section.
 
 ---
 
@@ -1283,9 +1321,7 @@ zero sessions in weeks 11 and 12, redistributing all 65 into earlier weeks.
 Before this, the same term spread evenly across all 13 weeks including those
 two.
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Academic calendar periods
+## The resource, and the one classifier
 
 `calendar_period` is a managed resource on the generic scaffold, gated on
 `term.update` (child-of-Term, not a new permission), with one bespoke
@@ -1298,7 +1334,7 @@ uses "touches the week," `BREAK`/`HOLIDAY` use "covers the entire week," so
 identical dates can classify differently by `kind`. Closed a dead end: no
 tenant could ever write a `calendar_period` row before this, so
 `minimize_exam_week_sessions` reported zero violations while looking
-healthy. DECISIONS.md § "Academic calendar periods".
+healthy — the measurement is above.
 
 ---
 
@@ -1325,9 +1361,7 @@ already encoding the Term into the Group's name ("dIT22 S1 4.Semester") for
 lack of anywhere else to put it — the requirement asserting itself through a
 text field.
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Group↔Term scoping, and why the solver filter is reference-derived
+## The standing rule, and why the solver filter is reference-derived
 
 `group_term` is **many-to-many**, not `group.term_id` ownership — a leaf
 cohort belongs to one Term, but its parent programme persists across all of
@@ -1346,7 +1380,7 @@ randomised hierarchies against an independent oracle, and a falsification
 test. `group_term` is never allowed near solver input — it exists purely
 for picker UX. Scoping a Group out of a Term that still uses it warns
 after the write (`role="status"`, not `alert`) rather than blocking, since
-nothing breaks (reference-derived). DECISIONS.md § "Group↔Term scoping".
+nothing breaks (reference-derived).
 
 ---
 
@@ -1415,9 +1449,7 @@ Verified with a real live solve after publishing `calendry-proto@0.3.0`:
 against a real encode of the new proto message, not just a unit test against
 a plain object cast.
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### `MinimizeBlockUsage`
+## What replaced the old booleans
 
 Replaced `MinimizeFirstBlock`/`MinimizeLastBlock` (booleans baked to fixed
 `SlotFlags` positions, silently wrong when a TimeGrid's day extends) with
@@ -1545,7 +1577,7 @@ preferences are honoured, and they are honoured only where the tenant enabled
 reassurance the disclaimer existed to prevent, pointing the other way. The page
 now names the dependency, because it cannot read `constraint_def`:
 `constraint.read` is an administrator's key and widening it is a permissions
-decision. Tracked in BACKLOG.md rather than decided in a copy edit.
+decision. Tracked on the project board rather than decided in a copy edit.
 
 **Two comments were corrected mid-feature rather than at stage 7.** The schema
 comment on `PersonPreference` and the type comment in `shared/availability.ts`
@@ -1557,6 +1589,49 @@ for however long the solver work took. A stale comment on a schema column is rea
 as current by whoever finds it next.
 
 ---
+
+## What the solver actually charges, and three ways to write it wrong
+
+Restored 2026-08-28: this reasoning was deleted with the condensed summary in
+§ "Solver & proto: operational detail", which was the only place it lived.
+CLAUDE.md keeps the resulting rule; the argument is archive material and belongs
+here. Both departures from this repo's original design record are solver ADR-0026.
+
+**It charges the unmet fraction, not the fit.** The design record said `1 - fit`
+was interchangeable with `fit`. It is not: a soft term that can go NEGATIVE
+breaks the `hard_penalty` bound, the convergence check and `ruin_worst`'s
+ordering, all three at once. Cost rises with unmet preference; it never pays out.
+
+**It is the MEAN over a placement's counted lecturers of `multiplier × unmet`.**
+Three plausible-looking alternatives are all wrong, and none of them is caught by
+a bound check:
+
+- *the sum* — makes a placement more expensive for having more lecturers, which
+  prices team teaching rather than preference;
+- `mean(multiplier) × mean(unmet)` — the form a reader writes from skimming, and
+  the one to watch for: it decouples each person's multiplier from their own
+  unmet fraction, so a lecturer with a high multiplier and no unmet preference
+  subsidises one with a low multiplier and a lot of it;
+- *the max* — turns a soft preference into a de-facto veto by the least
+  satisfied person.
+
+**A NULL `weight_multiplier` is sent as ABSENT, never 0.** The wire field is
+`optional` precisely because proto3's zero is itself a meaningful multiplier —
+"this person's preferences do not count" — and is not what "unset" means.
+
+**`wireField` had to land in the same change as the solver's evaluator, and this
+is the sharp edge.** Before the evaluator existed, sending the variant made the
+solver answer `UNIMPLEMENTED`, which fails the **entire** StartRun rather than
+skipping the one rule. So a catalogue entry that crosses the wire early is
+strictly worse than one that does not cross at all — it takes every other
+constraint down with it. `Person.preferred` arrived in proto `0.7.0`; the
+evaluator arrived in solver `41f6227` (2026-08-27), and the `wireField` line
+shipped with it, not before.
+
+**The inert case is counted, for the reason `lecturer_veto` went unnoticed.** The
+assembly report reports `placementsWithNoSignal == placementsCounted` — a rule
+that is enabled, crosses the wire and prices nothing at all. Nothing counted that
+for `lecturer_veto`, so nobody knew.
 
 # Constraint `params` at the write boundary
 
@@ -1685,10 +1760,6 @@ records how that was found.
 
 # Schedule display standards
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Schedule display standards
-
 `tenant_display_settings` is a **singleton keyed by `tenant_id`** — no surrogate
 `id`, so a second row per tenant is unrepresentable rather than constrained. An
 **absent row means defaults** (`DISPLAY_DEFAULTS` in `shared/sessionColor.ts`);
@@ -1703,7 +1774,7 @@ it to `tenant.read` and nobody is denied a page — every lecturer's timetable j
 draws in default colours with nothing on screen to say why. The PAGE and the nav
 entry are `tenant.read` alone. Both keys moved off
 `session.read`/`session_kind.update`, which had put an institution's own settings
-in the navigation of everyone who could see a timetable: DECISIONS.md §
+in the navigation of everyone who could see a timetable: §
 "`tenant.read` and `generation.read`".
 
 **Colour is RESOLVED, never read off one field.** `resolveSessionColor()` walks
@@ -1719,11 +1790,7 @@ edge, so it survives greyscale and an unset colour — same rule as violations.
 
 ---
 
-# Grid geometry
-
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Grid geometry is minute-true and rows grow
+# Grid geometry: minute-true, and rows grow
 
 Both week grids (`ScheduleGrid`, `ScheduleReviewGrid`) share `useGridGeometry` +
 `clusterSlots`. Three properties, each of which replaced a bug:
@@ -1766,11 +1833,7 @@ not a time column; unlabelled rows keep their cell and their accessible name.
 
 ---
 
-# The schedule toolbar
-
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### The schedule toolbar's height is invariant, and that is load-bearing
+# The schedule toolbar: its height is invariant, and that is load-bearing
 
 `.bar` is a **grid with two named rows** (`'scope scope'` / `'view actions'`),
 not a wrapping flex row — one row per group, so each row is sized by one group
@@ -1803,10 +1866,6 @@ value stays recoverable by mouse.
 
 # TimeGrid breaks
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### TimeGrid breaks
-
 `time_grid.break_minutes` is the default gap; `time_grid_break` adds sparse
 `{afterBlockIndex, durationMinutes, label, dayOfWeek}` overrides
 (`dayOfWeek NULL` = every day, a day-specific row wins at that position
@@ -1822,16 +1881,13 @@ deleted+reported; orphaned Sessions refuse the edit (DATA vs.
 CONFIGURATION asymmetry).
 
 **OPEN QUESTION** — a Session whose duration spans a break: undecided,
-deliberately, see **[BACKLOG.md](BACKLOG.md) § Undecided**. One branch
+deliberately — the board card is `OPEN QUESTION — a Session whose duration
+spans a break`. One branch
 would overturn "breaks never cross the wire."
 
 ---
 
 # Group availability windows
-
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Group availability windows
 
 `group_term_availability` answers "when inside this Term is this Group around?"
 — a block-placement cohort, a late intake. **One window per (Group, Term), by
@@ -1870,172 +1926,112 @@ required (DB CHECK): a boundless row says exactly what an absent row says.
 
 # Solver & proto: operational detail
 
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
+The four things CLAUDE.md delegates here — installing the proto package, the
+operator CLIs, the test accounts, and constraint-shape validation at the write
+boundary — plus the leftovers that have no better home.
 
-### Solver integration (calendry-solver)
+**This section used to restate ten other sections.** It was the condensed
+CLAUDE.md rule list, moved here wholesale in the 2026-08-27 consolidation, and it
+summarised determinism, warn-and-allow, Stage 2, Stage 4 polling, the virtual-room
+bug, `violations.ts`, per-person preferences, `roles` and `MinimizeRoomRank` —
+each of which has its own full section in this file, and each summary ended by
+pointing at it. Two copies of a claim in one file is the drift hazard this file's
+own preamble warns about, pointing inward. The summaries are gone; the sections
+they pointed at are unchanged and are the only copy.
 
-Three repos: `calendry` (this app, owns Postgres) ↔ `calendry-solver` (Rust
-gRPC optimizer, **stateless**, vendored at `vendor/calendry-solver` — see
-"What this project is" above) ↔ `calendry-proto` (shared schema; consumed
-*here* as the npm package `@mindcollaps/calendry-proto`, **GitHub Packages
-not npmjs.org**; consumed by the Rust side as its own nested submodule
-inside `vendor/calendry-solver`, not checked out separately in this repo).
-Solver is
-functionally complete: 14 constraint types, LNS + simulated annealing,
-`StartRun`/`GetStatus`/`CancelRun`. 27,000-Session instance solves in ~349ms.
+## Installing the proto package — three causes of one opaque 401
 
-**The solver never touches Postgres** — this app assembles a complete
-`SolverInput` and sends it; every gap in the snapshot is a wrong answer the
-solver has no way to detect.
+Credential lives in `~/.bunfig.toml` or a gitignored `./bunfig.toml`, never
+committed; `bun run check:registry-auth` diagnoses it offline. Three independent
+things produce the *same* uninformative 401:
 
-**Per-person preferences are LIVE end to end** (solver `41f6227`, 2026-08-27).
-`assembleSolverInput` populates `Person.preferred` from `person_preference`
-(proto `0.7.0`), narrowed to the solved Term's grid — the write boundary
-validates against the tenant's WIDEST grid, so a stored block can name a slot one
-Term has not got. A NULL `weight_multiplier` is sent as ABSENT, never 0: the wire
-field is `optional` because proto3's zero is itself a meaningful multiplier.
-`person_preference_fit` now carries `wireField: 'personPreferenceFit'`, and that
-line had to land in the SAME change as the solver's evaluator: before it, the
-solver answered the variant with `UNIMPLEMENTED`, which fails the whole StartRun
-rather than skipping the rule — strictly worse than not crossing at all. The
-assembly report counts the inert case (`placementsWithNoSignal ==
-placementsCounted`) for the same reason `lecturer_veto` went unnoticed: nothing
-counted it. Design record and staging: `per-person-preferences-design.md`; what
-the last three stages cost, including two false negatives that each looked like a
-clean answer: DECISIONS.md § "Per-person preferences: stages 5–7".
+1. A bunfig scope token needs that scope entry's own `url`.
+2. An `.npmrc` auth line **overrides** a bunfig token.
+3. GitHub Packages requires a **classic** PAT (`ghp_`) and rejects fine-grained
+   ones.
 
-**The solver charges `1 - fit`, and `roles` must stay EMPTY.** Two departures from
-this repo's design record, both in solver ADR-0026. The cost is the unmet
-fraction, not the fit, because a negative soft term would break the
-`hard_penalty` bound, the convergence check and `ruin_worst`'s ordering at once;
-and it is the **mean over a placement's counted lecturers of `multiplier × unmet`**
-— not the sum, and not `mean(multiplier) × mean(unmet)`, which is the form a
-reader writes from skimming and which a bound check cannot catch. A non-empty
-`roles` is REFUSED (`PreferenceRolesUnsupported`), so `buildVariant` must keep
-returning `{ roles: [] }` for this key — **not `{}`**, which is what this
-sentence said until 2026-08-28 and which throws during encoding; see
-§ "`PersonPreferenceFit.roles`". Empty means "lecturers only", and widening the
-counted set would let a 200-student cohort's aggregate preference outweigh the
-person teaching.
+Scope entries resolve nearest-first and are taken wholesale, not merged — so a
+partial nearer entry silently shadows a complete farther one.
 
-**`MinimizeRoomRank` has a direction parameter, `invert`** (`calendry-proto@0.5.0`):
-`false` (default) penalizes `rank >= threshold` (spare best rooms); `true`
-penalizes `rank <= threshold` (prefer them). New tenants seed `invert: true`
-(direction, not enablement — `enabledByDefault` stays `false`). Full
-reasoning: DECISIONS.md § "`MinimizeRoomRank` gains `invert`".
+## Operator CLIs
 
-**Installing the proto package**: credential in `~/.bunfig.toml`/gitignored
-`./bunfig.toml`, never committed (`bun run check:registry-auth` diagnoses
-offline). Three things producing the same opaque 401: a bunfig scope token
-needs that entry's own `url`; an `.npmrc` auth line overrides a bunfig
-token; GitHub Packages needs a **classic** PAT (`ghp_`), rejects
-fine-grained. Scope entries resolve nearest-first, wholesale not merged.
-
-**Warn-and-allow parity**: a `SUCCEEDED` run with residual hard violations
-is still an applicable Generation (same `constraint_violation` mechanism as
-manual edits) — not discarded, not auto-applied. `GenerationStatus.INFEASIBLE`
-is consequently unused for solver output by design. DECISIONS.md § "Solver:
-warn-and-allow".
-
-**Determinism: only the move budget is reproducible.** `(input, seed, move
-budget)` → byte-identical output, but only when termination was
-`move_budget` or `converged` — `time_budget` is not reproducible.
-`termination_reason` says which. `maxMoves` default **30,000,000** (was
-50,000, stopped ~21% short of convergence); wall-clock cap **30s** (was
-10s, keeps move-budget the binding one). `StartRunResponse.seed` echoes the
-seed used. Measurement: DECISIONS.md § "Solver: determinism & `maxMoves`".
-
-**Idempotency key is `<inputHash>:<seed>`** — SHA-256 of the *encoded*
-`SolverInput` (not JSON), so a repeat start against unchanged data returns
-the same run. Budget is NOT part of the key — restart the solver between
-measurements at different budgets, or you'll replay the first run.
-
-**Staged plan**: all seven stages complete, changelog in
-**[BACKLOG.md](BACKLOG.md) § Staged plan**. What's still live:
-
-- **Stage 2**: concurrency enforced by a partial unique index (not
-  `findFirst`); a failed StartRun resolves its own row to `FAILED`; a poll
-  failure is NOT a run failure (`stale: true`, status untouched). Full
-  verification: DECISIONS.md § "Solver: Stage 2 established".
-- **Stage 4 polling**: background poller owns correctness, on-demand owns
-  latency (both call `pollSolverRun()`). Results captured the moment a run
-  goes terminal — the solver's registry is in-memory, no persistence.
-  `NOT_FOUND` (gRPC 5) = solver lost the run, terminal, row → `FAILED`.
-  Anything else including `UNAVAILABLE` = transient, row untouched. Claim
-  is a **lease** (`FOR UPDATE SKIP LOCKED` + a per-tenant advisory xact
-  lock), not a session lock — reasoning: DECISIONS.md § "Solver: Stage 4
-  polling". During a solver outage, effective retry interval is the 30s
-  claim lease, not adaptive cadence.
-- **Virtual room capacity-1, RESOLVED cross-repo** (`calendry-solver`
-  `99b41e3`). `capacity` still gates eligibility (no `concurrentCapacity`
-  yet). The fix had been accidentally enforcing `MaxOnlineShare` — expect
-  more `MaxOnlineShare` violations post-fix on heavy-online tenants (warn-
-  and-allow working as designed). DECISIONS.md + BACKLOG.md § "Needs a
-  decision, not a design pass".
-- **`violations.ts`: membership flows DOWN, conflict flows BOTH WAYS.**
-  `attendeeSets` uses `descendantGroupIds`, `conflictSets` uses
-  `conflictGroupIds` — swapping either reintroduces an under- or
-  over-reporting bug. DECISIONS.md § "`violations.ts`".
-
-**Tracked wire-format gaps** (all in **[BACKLOG.md](BACKLOG.md) § Solver**,
-each reports rather than narrows silently — don't "fix" by picking a
-value): equipment quantity, multi-room Sessions, the solver's unbounded run
-registry, violations naming solver-invented Sessions with no join key.
-
-**Operator CLIs** — `create:account`/`create:role` for an existing tenant:
+`create:account` / `create:role`, for a tenant that already exists:
 
     bun run create:account -- --tenant test --email x@y.edu --name "…" [--role tenant-admin]
     bun run create:role -- --tenant test --key viewer --name "…" --permissions a.read,b.read [--dry-run]
 
-Owner connection, audited to stdout. Existing email REUSED not duplicated;
-duplicates fail loudly, never upserted; **no `--all`** for `create:role`
-(compose from audited grants, don't mint an unaudited superuser role). Why
-these exist: DECISIONS.md § "Accounts & roles".
+Owner connection, audited to stdout. An existing email is **reused, not
+duplicated**; duplicates fail loudly rather than being upserted; and there is
+deliberately **no `--all`** for `create:role` — a role is composed from audited
+grants, not minted as an unaudited superuser. Why these exist at all:
+§ "Accounts & roles".
 
-Test accounts: `verify@calendry.local` (HTTP verification,
-`VERIFY_ACCOUNT_PASSWORD` in `.env`); `vic@demo.local` /
-`viewer6b@calendry.local` / `cviewer@calendry.local` hold `viewer` (six
-reads, no `solver.trigger`/`generation.apply`) — use for asserting an
-affordance is ABSENT, and also assert the page rendered. A rebuilt dev DB
-has one role/account — recreate with one `create:role` + `create:account`
-per test account.
+## Test accounts
 
-**Constraint shape validated at the write boundary** — severity (must
-match catalogue HARD/SOFT) and weight (`>= 0`, no ceiling) enforced via
-`validateConstraintShape()` on CREATE and UPDATE (`beforeUpdate` validates
-only touched fields, deliberately — merged-row validation would make a bad
-row permanently uneditable). DB CHECK backs the weight floor. Why it
-mattered: negative weight erodes `hard_penalty`'s margin for every rule in
-the tenant. **`params` was closed the same way on 2026-08-28** — validated
-against each parameter's own `ConstraintParamDef`, so the catalogue's
-declaration is the rule and there is no second list to drift. Requiredness
-and unknown keys stay OUT of it on purpose;
+- `verify@calendry.local` — HTTP verification, password in `.env` as
+  `VERIFY_ACCOUNT_PASSWORD`.
+- `vic@demo.local`, `viewer6b@calendry.local`, `cviewer@calendry.local` — hold
+  `viewer` (six reads, no `solver.trigger` / `generation.apply`). Use these to
+  assert an affordance is **absent** — and in the same test assert the page
+  actually rendered, or "hidden" and "blank" are the same result.
+
+A rebuilt dev database has one role and one account; recreate the rest with one
+`create:role` + `create:account` each.
+
+## Constraint shape at the write boundary
+
+Severity (must match the catalogue's HARD/SOFT), weight (`>= 0`, no ceiling) and
+`params` are all enforced by `validateConstraintShape()` on CREATE and UPDATE.
+`beforeUpdate` validates only the fields being touched, deliberately —
+merged-row validation would make an existing bad row permanently uneditable. A
+DB CHECK backs the weight floor. Why the weight floor is not cosmetic: a negative
+weight erodes `hard_penalty`'s margin for every rule in the tenant, not just the
+mistyped one.
+
+`params` was closed the same way on 2026-08-28, driven by each parameter's own
+`ConstraintParamDef` so the catalogue's declaration is the rule and there is no
+second list to drift. Requiredness and unknown keys stay OUT of it on purpose:
 § "Constraint `params` at the write boundary".
 
-**Step 14 — AccessRole management is BUILT** (`RESOURCES['access-roles']`,
-`RELATIONS['persons/access-roles']`, `ManageAccessRoleForm`). The grants are
-`childKeys`, not a relation: there is no `/api/permissions` and must not be,
-because the editor renders from `shared/permissions.ts` so an unseeded
-permission is REPORTED rather than silently missing from a list that looks
-complete.
+## AccessRole management (Step 14) is built
 
-**Auth**: `must_change_password` built (operator `reset:password` — revokes
-sessions, sets flag, audits; login blocks until `POST
-/api/auth/change-password`), gaps in BACKLOG.md § "Password policy gaps".
-Federation-level permissions out of scope (TAXONOMY.md §9.4). Session
-cleanup done — `server/plugins/sessionSweeper.ts` (a NITRO PLUGIN, not a util — the
-path was recorded as `server/utils/` until 2026-08-28, where it does not exist)
-deletes `auth_session` past 30 days,
-needs no RLS exception (none exists) and no claim machinery (idempotent
-DELETE).
+`RESOURCES['access-roles']`, `RELATIONS['persons/access-roles']`,
+`ManageAccessRoleForm`. The grants are `childKeys`, **not** a relation: there is
+no `/api/permissions` and must not be, because the editor renders from
+`shared/permissions.ts` — so an unseeded permission is REPORTED rather than
+silently missing from a list that looks complete.
+
+## Auth leftovers
+
+`must_change_password` is built: the operator `reset:password` revokes sessions,
+sets the flag and audits; login blocks until `POST /api/auth/change-password`.
+Federation-level permissions are out of scope (TAXONOMY.md §9.4).
+
+Session cleanup is done — `server/plugins/sessionSweeper.ts`, **a Nitro plugin,
+not a util**. That path was recorded as `server/utils/` until 2026-08-28, where
+no such file exists. It deletes `auth_session` rows past 30 days, and needs
+neither an RLS exception (there is none) nor claim machinery (the DELETE is
+idempotent).
+
+## Two numbers in this file that disagree with CLAUDE.md
+
+Recorded rather than quietly reconciled, because picking one would invent a
+measurement:
+
+- **Throughput.** This section said a 27,000-Session instance solves in
+  **~349 ms**; CLAUDE.md says **~250 ms**. Both are undated, neither has been
+  re-measured, and the solver has changed twice since (PersonPreferenceFit,
+  GroupVeto). Re-measure before quoting either.
+- **Constraint count.** This section said "14 constraint types". The app
+  catalogue now holds **15 live** types (`defaultConstraintTypes().length`,
+  verified 2026-08-28), and the solver's own `ConstraintType` enum holds 10 —
+  it enumerates only the reporting/hard kinds, with the `Minimize*` family
+  carried as objective terms instead. The two were never counting the same
+  thing, which is why the single number was wrong in both directions.
 
 ---
 
 # Design tooling
-
-_Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
-
-### Design work
 
 - Use the **`design-taste-frontend`** skill (`.claude/skills/`, source
   `Leonxlnx/taste-skill`) for visual/UI work; pair with **`frontend-design`**
