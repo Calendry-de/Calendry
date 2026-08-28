@@ -329,7 +329,7 @@ The rest are area-specific: read the section before working in that area.
 | Accounts | `accounts` is NOT in `CRUD_RESOURCES` (no `tenant_id`, no RLS). Visibility IS the join; `assertSoleTenant` / `assertDetachable` are exact complements. | § "Accounts in the management area" |
 | `/manage` | One scaffold from `manageRegistry.ts`, which is also the nav source. Bespoke means one slot, never a page. `custom: true` or the field is dropped from saves silently. | § "Management area" |
 | Display settings | Singleton keyed by `tenant_id`, absent row = defaults. Colour is RESOLVED and may be **null** — never a fallback accent. | § "Schedule display" |
-| TimeGrid breaks | Never reach the solver. `blockTime()`/`blockOfMinute()` are the single definition of block boundaries. | § "TimeGrid breaks" |
+| TimeGrid breaks | Never reach the solver — a multi-block Session spanning one is LEGAL, drawn honestly, never sent. `blockTime()`/`blockOfMinute()`/`gapsWithinSpan()` are the single definition of block boundaries and of what a span does not teach. | §§ "TimeGrid breaks", "A Session that spans a break" |
 | Calendar periods | `classifyWeeks` is the one classifier; `EXAM` touches the week, `BREAK`/`HOLIDAY` cover it. | § "Academic calendar periods" |
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
 | Schedule toolbar | Height is invariant; the solver's tall states are anchored panels. `.bar_select` is capped. | § "The schedule toolbar" |

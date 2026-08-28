@@ -18,6 +18,33 @@
         @click="$emit('select')"
     >
         <!--
+            THE BREAK INSIDE THE SPAN, drawn where it actually falls.
+
+            PX AT THE GRID'S CONSTANT SCALE, never a percentage of the chip: a
+            row grows when its column is crowded, so a percentage would make a
+            minute worth more pixels in a busy row and slide the band off the
+            break it is marking. Same rule as `bandWithin`.
+
+            The `- 1px` is the chip's border: an absolutely positioned child is
+            placed against the PADDING box, while the minute scale is measured
+            from the border box.
+
+            `aria-hidden` because `interruptionLabel` is already in the
+            accessible name — this is the same decorative-icon-plus-real-text
+            split the meta row below uses.
+        -->
+        <span
+            v-for="gap in (perMinute ? interruptions : [])"
+            :key="gap.afterBlockIndex"
+            class="chip_gap"
+            :style="{
+                top: `calc(${(gap.fromMinute * perMinute!).toFixed(2)}px - 1px)`,
+                height: `${(gap.minutes * perMinute!).toFixed(2)}px`,
+            }"
+            aria-hidden="true"
+        />
+
+        <!--
             TIME AND ROOM. In the grid a chip's POSITION carries its time, but a
             crowded cluster stacks its members one line each and a stack has no
             position to read — 5 of 7 occupied slots on the live tenant. Rendered
@@ -42,6 +69,17 @@
                 v-if="session.isLocked"
                 class="chip_sr"
             >Locked. </span>
+
+            <Icon
+                v-if="interruptions.length"
+                name="material-symbols:coffee-outline"
+                class="chip_icon"
+                aria-hidden="true"
+            />
+            <span
+                v-if="interruptions.length"
+                class="chip_sr"
+            >{{ interruptionLabel }}. </span>
 
             <Icon
                 v-if="severity !== 'none'"
@@ -99,6 +137,7 @@
 <script setup lang="ts">
 import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
 import { attendeesOf, blockTime, lecturersOf, sessionLabel, weekdayName } from '~/composables/schedule';
+import { gapsWithinSpan } from '#shared/timeGrid';
 import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 
@@ -118,6 +157,16 @@ const props = defineProps<{
     roomName?: (id: string) => string;
     /** Virtual room ids, for the online treatment. Absent means "do not mark". */
     virtualRoomIds?: Set<string>;
+    /**
+     * Pixels per minute, from `useGridGeometry`. Present only where the chip is
+     * MINUTE-TRUE — the week grid — and absent in the agenda, which is a list
+     * with no vertical time axis and would have to invent a number.
+     *
+     * Its absence removes the break OVERLAY, never the FACT: the interruption is
+     * still named in the meta row and the accessible name, because a chip that
+     * silently claims two contiguous blocks is wrong in a list too.
+     */
+    perMinute?: number;
     /** The tenant's display standards; defaults when the fetch degraded. */
     display?: DisplaySettings;
     /** Resolvers for the who/which line. Absent means the fact is omitted, not guessed. */
@@ -233,6 +282,36 @@ const whoLabel = computed(() => {
     return fallback.length > 1 ? `${first} +${fallback.length - 1}` : first;
 });
 
+/**
+ * The gaps inside this session's span — the time it occupies but does not teach.
+ *
+ * The WALK lives in `gapsWithinSpan` (shared/timeGrid.ts) so the renderer, the
+ * accessible name and anything that later reports this all ask one function. The
+ * chip's only job is to decide how to show the answer.
+ *
+ * Why it matters here: the grid draws a `durationBlocks: 2` Session as one
+ * contiguous band, which is a claim about the CLOCK that a gap between those
+ * blocks falsifies. One live Session on the dev tenant was already in that state,
+ * rendered identically to a genuine single-stretch one.
+ */
+const interruptions = computed(() => (props.grid
+    ? gapsWithinSpan(props.grid, props.session.blockIndex, props.session.durationBlocks, props.session.dayOfWeek)
+    : []));
+
+/** Stated in minutes, because "spans a break" does not say how much is lost. */
+const interruptionLabel = computed(() => {
+    if (!interruptions.value.length) {
+        return '';
+    }
+
+    const total = interruptions.value.reduce((sum, gap) => sum + gap.minutes, 0);
+    const named = interruptions.value.map((gap) => gap.label).filter(Boolean);
+
+    return named.length
+        ? `Interrupted by ${named.join(' and ')} — ${total} minutes not taught`
+        : `Interrupted by ${total} minutes of break`;
+});
+
 const accessibleName = computed(() => {
     const parts = [sessionLabel(props.session)];
 
@@ -255,6 +334,10 @@ const accessibleName = computed(() => {
 
     if (props.session.kind?.name) {
         parts.push(props.session.kind.name);
+    }
+
+    if (interruptionLabel.value) {
+        parts.push(interruptionLabel.value);
     }
 
     if (props.session.isLocked) {
@@ -280,6 +363,12 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
 <style scoped lang="scss">
 .chip {
     cursor: pointer;
+
+    /*
+     * The containing block for `chip_gap`, which is placed in px against this
+     * chip's own top. No offsets, so nothing moves.
+     */
+    position: relative;
 
     overflow: hidden;
     display: flex;
@@ -436,6 +525,33 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
         height: 13px;
 
         &--violation { color: $warning700; }
+    }
+
+    /*
+     * NOT-TEACHING TIME, inside a chip that would otherwise claim it.
+     *
+     * Opaque over the chip's own fill rather than translucent: the point is that
+     * this stretch is NOT the session, and a tint would read as a variation of
+     * it. The hatch carries the meaning where colour cannot — greyscale, an
+     * unset kind colour, or a violation tint already occupying the background.
+     */
+    &_gap {
+        pointer-events: none;
+
+        position: absolute;
+        z-index: 2;
+        right: 0;
+        left: 0;
+
+        border-block: 1px solid varToRgba('content7', 0.45);
+
+        background:
+            repeating-linear-gradient(
+                135deg,
+                transparent 0 4px,
+                varToRgba('content7', 0.3) 4px 8px
+            ),
+            $surface0;
     }
 
     // Screen-reader-only: the icons above are decorative, so state is also

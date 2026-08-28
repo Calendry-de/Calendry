@@ -42,7 +42,7 @@ are adding a section, add it once, and link rather than restate.
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
 | Solver: operations | Solver & proto: operational detail · Solver: Federation scope |
-| Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · Stage 6c: why the review screen shows two panels |
+| Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · A Session that spans a break · Stage 6c: why the review screen shows two panels |
 | Odds and ends | `weekCountOf` vs. `weeksInTerm` · `CommonButton` rendered a `<div>` · Design tooling · The 100%-slot-occupancy schedule shape · Pre-launch branding sweep |
 
 ---
@@ -1923,6 +1923,108 @@ required (DB CHECK): a boundless row says exactly what an absent row says.
   this; `group_veto` is what it currently reports as missing.
 
 ---
+
+# A Session that spans a break: legal, drawn honestly, not sent to the solver
+
+**Decided 2026-08-28**, closing the tracked OPEN QUESTION. Three answers, and the
+standing rule survives all three: **TimeGrid breaks still never cross the wire.**
+
+1. A multi-block Session spanning a break is **LEGAL**.
+2. The app must **stop drawing it as contiguous teaching**, because that is a
+   false claim about the clock.
+3. Whether a given tenant *wants* it is a tenant policy question, deferred to a
+   constraint — not decided in the renderer and not hardcoded anywhere.
+
+## What was actually wrong
+
+`durationBlocks` counts block INDICES. Every consumer treated two indices as one
+contiguous stretch of clock, and that is false whenever a gap separates them. On
+the dev tenant's `Standard week` grid — 8 × 45min, `breakMinutes: 0`, named
+breaks after blocks 0 (45m), 1 (15m) and 3 (30m) — a two-block Session starting
+at block 3 occupies **120 minutes and teaches 90**, and rendered identically to a
+genuine 90-minute one. Measured, not hypothesised: **one live Session was already
+in that state** (21 Sessions had `durationBlocks: 2`; 20 started at a block with
+no following gap, 1 started at block 3).
+
+Note which grid shape makes this the NORMAL case rather than an edge case. With
+`breakMinutes > 0` every pair of consecutive blocks is separated, so *every*
+multi-block Session spans a gap. This tenant has `breakMinutes: 0` and names each
+gap individually, which is why only one Session was affected — a different tenant
+would have had all of them.
+
+## Why the obvious fix is wrong
+
+The obvious fix is to send breaks to the solver so it can avoid such placements.
+`toWireTimeGrid` argues against it explicitly:
+
+> `breakMinutes` is DELIBERATELY NOT SENT … the solver reasons in block INDICES,
+> so a gap between blocks changes no adjacency and no conflict — it only changes
+> what a block is called on a clock, which is presentation.
+
+That reasoning is **sound for a single-block Session and unsound for a
+multi-block one**: a two-block Session's contiguity IS an adjacency claim about
+wall-clock time. So the comment's conclusion is right and its stated reason is
+incomplete, which is a more dangerous combination than being simply wrong — it
+reads as settled.
+
+The conclusion survives for a different reason: **the app cannot express this to
+the solver anyway, and should not want to.**
+
+- There is no per-Offering slot veto on the wire. `Offering` carries no
+  `veto_slots` field; the solver derives its veto masks from constraints and from
+  per-Person/Group `Unavailability`, neither of which can say "do not START a
+  two-block Session at block 3".
+- Sending breaks would therefore mean a proto field, a solver rule, and a
+  standing rule overturned — to enforce a policy that is not universal. A
+  three-hour lab running through a 15-minute coffee break is ordinary; a lecture
+  through a 45-minute lunch is not. That is exactly the shape CLAUDE.md forbids
+  hardcoding: a tenant-open judgement dressed as a schema fact.
+
+And it could never be *prevented* regardless: manual edits produce this by
+design, since hard-constraint violations from manual edits **warn rather than
+block**. A rule the solver honoured and a human could bypass in one drag still
+needs the honest rendering. So the rendering was the load-bearing fix all along.
+
+## What shipped
+
+`gapsWithinSpan()` in `shared/timeGrid.ts`, alongside `gapAfter`/`breakAfter` —
+one definition of "which gaps fall inside this span", so the renderer, the
+accessible name and any future report ask the same function rather than
+re-deriving the walk. It counts the unnamed default gap as well as named breaks
+(both occupy real time; `label` is null for the unnamed one) and measures
+`fromMinute` from the span's own start, so a caller needs no second boundary walk.
+
+`ScheduleSessionChip` draws each interruption as a hatched band at its true
+position, **in px at the grid's constant scale** — never a percentage of the
+chip, because a row grows when its column is crowded and a percentage would slide
+the marker off the break it marks. Same rule as `bandWithin`. The band is opaque
+over the chip's fill rather than tinted: the point is that the stretch is NOT the
+session, and a tint reads as a variation of it.
+
+The FACT is separate from the PICTURE, and that matters for the agenda, which has
+no vertical time axis: `perMinute` is optional, and without it the overlay is
+omitted while the interruption is still named in the meta row and the accessible
+name. A chip that silently claims two contiguous blocks is wrong in a list too.
+
+## What was deliberately left out
+
+**Reporting it as a violation.** It belongs in the `constraint_violation`
+mechanism as a tenant-toggleable rule, which makes it a new constraint type — and
+a new constraint type is itself a migration (catalogue entry, `backfill:constraints
+--all-missing`, and a decision about whether the solver or the app evaluates it).
+That is its own card, not a rider on a rendering fix.
+
+**A `no_session_spanning_break` constraint.** Same reason, and it needs the
+question above answered first: an app-evaluated rule can see breaks and cannot
+steer the solver; a solver-evaluated one steers but needs breaks on the wire,
+which is the thing this decision declines to do.
+
+## The one thing to not undo
+
+Do not "fix" this by adding a break field to the proto. The rendering is the fix.
+If a future tenant genuinely needs the solver to avoid these placements, that is
+a constraint with a recorded decision reversing this section — not a schema
+change made in passing because the gap looked like missing data.
 
 # Solver & proto: operational detail
 

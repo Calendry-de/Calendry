@@ -113,6 +113,7 @@
                 :show-group="showGroup"
                 :show-person="showPerson"
                 :dense="dense"
+                :per-minute="perMinute"
                 :session="session"
                 :violations="violations.get(session.id) ?? []"
                 :selected="session.id === selectedId"
@@ -194,7 +195,7 @@ const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
  */
 const dense = computed(() => props.rowHeight < 60);
 
-const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines } = useGridGeometry(
+const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines, perMinute } = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );

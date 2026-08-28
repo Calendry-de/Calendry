@@ -116,6 +116,70 @@ export function gapsOfDay(
 }
 
 /**
+ * The gaps that fall INSIDE a multi-block span — the time it occupies but does
+ * not teach.
+ *
+ * WHY THIS IS A SHARED DEFINITION AND NOT A RENDERER DETAIL. A Session with
+ * `durationBlocks: 2` occupies two block INDICES, and every consumer that draws
+ * or measures it treats that as one contiguous stretch. That is a claim about the
+ * clock, and it is false whenever a gap separates those blocks: on an 8 × 45min
+ * grid with a 30-minute break after block 3, a two-block Session starting at
+ * block 3 occupies 120 minutes and teaches 90.
+ *
+ * The solver cannot answer this — `toWireTimeGrid` deliberately sends no breaks,
+ * because the solver reasons in block indices where a gap changes no adjacency.
+ * True of a single-block Session, false of a multi-block one. So the definition
+ * lives here, with `gapAfter`/`breakAfter`, and every consumer asks the same
+ * question of the same function rather than re-deriving the walk.
+ *
+ * Includes the UNNAMED default gap (`grid.breakMinutes`) as well as named breaks,
+ * because both occupy real time; `label` is null for the unnamed one, which is
+ * the only reason it can be absent. `fromMinute` is measured from the START of
+ * the span, so a caller needs no second boundary walk to place it.
+ *
+ * A span of 1 has no interior, and a gap after the span's FINAL block is outside
+ * it — the same boundary `breakAfter` refuses to walk.
+ */
+export function gapsWithinSpan(
+    grid: BlockGrid,
+    blockIndex: number,
+    durationBlocks: number,
+    dayOfWeek: number | null = null,
+): { afterBlockIndex: number; minutes: number; label: string | null; fromMinute: number }[] {
+    /*
+     * A FAST PATH, not a correctness guard — the loop bound below already yields
+     * no iterations for a span of 1, which is why no test can tell this branch
+     * from its absence (checked by mutation). It stays because the single-block
+     * case is the overwhelming majority of chips on a grid and this skips a
+     * boundary walk for each of them. Do not add a test "covering" it; test the
+     * loop bound instead, which is what actually enforces the rule.
+     */
+    if (durationBlocks < 2) {
+        return [];
+    }
+
+    const spanStart = blockSpan(grid, blockIndex, dayOfWeek).start;
+    const out: { afterBlockIndex: number; minutes: number; label: string | null; fromMinute: number }[] = [];
+
+    for (let index = blockIndex; index < blockIndex + durationBlocks - 1; index += 1) {
+        const minutes = gapAfter(grid, index, dayOfWeek);
+
+        if (minutes <= 0) {
+            continue;
+        }
+
+        out.push({
+            afterBlockIndex: index,
+            minutes,
+            label: breakAfter(grid, index, dayOfWeek)?.label ?? null,
+            fromMinute: blockSpan(grid, index, dayOfWeek).end - spanStart,
+        });
+    }
+
+    return out;
+}
+
+/**
  * Start minute of every block, plus a final entry for when teaching ends — always
  * `blocksPerDay + 1` long, so a caller never re-derives the last block's length.
  *
