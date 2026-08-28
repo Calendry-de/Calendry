@@ -289,8 +289,11 @@ solver has no way to detect.
 - **Per-person preferences are live end to end.** A NULL `weight_multiplier` is
   sent as ABSENT, never 0 — proto3's zero is itself a meaningful multiplier. The
   solver charges the **mean over a placement's lecturers of `multiplier ×
-  unmet`**; `PersonPreferenceFit.roles` must stay EMPTY or the run is refused.
-  Solver ADR-0026; § "Per-person preferences".
+  unmet`**; `PersonPreferenceFit.roles` must stay EMPTY — `[]`, not `{}` — or the
+  run is refused. Lecturers-only is a DECIDED scope, not a gap: widening it needs
+  a per-role normalisation rule first, because a Session's attendee set is the
+  whole descendant closure. Solver ADR-0026; §§ "Per-person preferences",
+  "`PersonPreferenceFit.roles`".
 - **Tracked wire-format gaps** (on the board) each report rather than
   narrow silently — do not "fix" one by picking a value: equipment quantity,
   multi-room Sessions, the solver's unbounded run registry, violations naming

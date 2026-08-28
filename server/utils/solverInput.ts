@@ -329,7 +329,9 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
              * Group's descendant closure, so counting attendees would let a
              * 200-student cohort's aggregate preference outweigh the person
              * teaching. So this is the only ACCEPTED value, not a placeholder
-             * for one; sending a role would fail the run. Solver ADR-0026.
+             * for one; sending a role would fail the run. Solver ADR-0026;
+             * DECISIONS.md § "`PersonPreferenceFit.roles`" records the decision
+             * and the three things widening it would require first.
              */
             return { roles: [] };
 

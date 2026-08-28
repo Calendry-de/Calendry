@@ -181,6 +181,107 @@ describe('PATCH — beforeUpdate, and the row it must not trap', () => {
     });
 });
 
+/**
+ * PARAMETERS over HTTP.
+ *
+ * The reason this is not left to the unit suite: the issue has to arrive blamed
+ * on the PARAMETER's key, not on `params`. `params` is a registered `custom`
+ * field the rule builder never renders an error for, so `path: ['params']`
+ * would set `fieldErrors.params` on nothing, `applyError` would skip its orphan
+ * banner, and the save would fail with no visible cause. Only a call can show
+ * which key the response actually names.
+ */
+describe('parameters, on both write paths', () => {
+    it('refuses a weekdays value that is not a list, and blames the parameter', async () => {
+        const res = await create({
+            type: 'minimize_specifc_day',
+            name: 'Bad days',
+            severity: 'SOFT',
+            weight: 2,
+            params: { days: 'monday' },
+        });
+
+        expect(res.status).toBe(400);
+        // `days`, NOT `params` — see this block's note.
+        expect(blamedFields(res.body)).toEqual(['days']);
+    });
+
+    it('refuses a non-numeric percent', async () => {
+        // HARD with a null weight, because the catalogue pins this type HARD and
+        // the DB CHECK pairs HARD with NULL. Getting that wrong made the first
+        // version of this test blame two fields and prove nothing about params.
+        const res = await create({
+            type: 'max_online_ratio_per_group',
+            name: 'Bad ratio',
+            severity: 'HARD',
+            weight: null,
+            params: { maxRatio: 'thirty', window: 'SHARE_WINDOW_PER_TERM' },
+        });
+
+        expect(res.status).toBe(400);
+        expect(blamedFields(res.body)).toEqual(['maxRatio']);
+    });
+
+    it('accepts the same rule with valid parameters', async () => {
+        // The counter-example: without it, a guard rejecting every params
+        // payload would pass both tests above.
+        const res = await create({
+            type: 'max_online_ratio_per_group',
+            name: 'Good ratio',
+            severity: 'HARD',
+            weight: null,
+            params: { maxRatio: 30, window: 'SHARE_WINDOW_PER_WEEK' },
+        });
+
+        expect(res.status).toBe(201);
+    });
+
+    it('refuses bad parameters on PATCH too, reading the STORED type', async () => {
+        // The update path has no `type` in the payload at all, so this only
+        // works if `beforeUpdate` reads the row — the same asymmetry the
+        // severity and weight cases exist to pin.
+        const created = await create({
+            type: 'minimize_specifc_day',
+            name: 'Patchable',
+            severity: 'SOFT',
+            weight: 2,
+            params: { days: [1] },
+        });
+
+        expect(created.status).toBe(201);
+
+        const id = (created.body as { id: string }).id;
+        const res = await api(`/api/constraints/${id}`, {
+            method: 'PATCH', cookie, body: JSON.stringify({ params: { days: [9] } }),
+        });
+
+        expect(res.status).toBe(400);
+        expect(blamedFields(res.body)).toEqual(['days']);
+
+        // And it wrote nothing.
+        const read = await api(`/api/constraints/${id}`, { cookie });
+
+        expect((read.body as { params: unknown }).params).toEqual({ days: [1] });
+    });
+
+    it('lets a row whose params it dislikes still be disabled', async () => {
+        // The legacy-row trap, in the params dimension. A row written before
+        // this guard existed must stay neutralisable: `params` is not in the
+        // patch, so the guard has nothing to say about it.
+        await ownerDb.$executeRawUnsafe(
+            `INSERT INTO constraint_def (id, tenant_id, type, name, severity, weight, params, updated_at)
+             VALUES ($1, $2, 'minimize_specifc_day', 'Legacy params', 'SOFT', 2, '{"days":"monday"}'::jsonb, now())`,
+            'test-legacy-params', TENANT,
+        );
+
+        const res = await api('/api/constraints/test-legacy-params', {
+            method: 'PATCH', cookie, body: JSON.stringify({ isEnabled: false }),
+        });
+
+        expect(res.status).toBe(200);
+    });
+});
+
 describe('the database CHECK backs the API up', () => {
     it('refuses a negative weight written directly, bypassing the API entirely', async () => {
         // `provision-tenant.ts` writes constraints with `tx.constraint.createMany`

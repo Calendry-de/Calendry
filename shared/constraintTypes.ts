@@ -660,17 +660,139 @@ export function severityMismatch(
 
 /** One thing wrong with a proposed constraint row, named by the field it is about. */
 export interface ConstraintShapeProblem {
-    field: 'type' | 'severity' | 'weight';
+    field: 'type' | 'severity' | 'weight' | 'params';
+    /**
+     * Which PARAMETER, when `field` is `'params'`.
+     *
+     * Carried separately so a call site can put the issue on the offending
+     * CONTROL. `params` is a single `custom` column that the rule builder renders
+     * as many controls, so an issue reported against `'params'` itself sets
+     * `fieldErrors.params` on a field nothing displays — the save fails, the
+     * banner says "some fields need attention", and nothing is marked. That is
+     * the least diagnosable outcome a form has, and it is the reason this exists
+     * rather than the field name alone.
+     */
+    paramKey?: string;
     message: string;
 }
 
 /**
- * Write-boundary validation for a constraint row: the two rules the catalogue
- * knows and the generic CRUD schema cannot express.
+ * A parameter value as a number, by the SAME coercion the wire mapper uses.
  *
- * One function for both, because severity-contradicts-the-catalogue and
- * weight-is-negative are checked from two places with different information — two
- * rules times two call sites is four chances to drift.
+ * `buildVariant` reads these with `Number(...)`, so a numeric STRING is a value
+ * that works end to end today. Rejecting one here would be exactly the
+ * builder-stricter-than-API divergence that produced the weight gap — the
+ * validator would refuse a configuration the solver accepts. What is rejected is
+ * what `Number()` cannot turn into a usable figure: `NaN` and the infinities.
+ *
+ * `null` is returned for "not a number", never for a legitimate 0.
+ */
+function numericParamValue(value: unknown): number | null {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
+}
+
+/**
+ * Is this value one the catalogue's declaration for `param` allows?
+ *
+ * DRIVEN ENTIRELY BY THE DECLARATION — `type`, `min`, `max`, `options` — so a
+ * parameter added to the catalogue is validated the moment it is declared, with
+ * no second list to keep in step. That is the same reason `wireField` is data
+ * rather than a switch in the mapper.
+ *
+ * Each branch below closes a way a stored value reaches the solver as something
+ * other than what it says, all of them observed in `buildVariant`:
+ *
+ * - `weekdays` is cast `as number[]` and immediately `.map`ped. A non-array
+ *   there does not disable the rule, it THROWS during assembly and fails the
+ *   whole run — every other constraint included.
+ * - `number`/`percent` go through `Number()`, so `"abc"` becomes `NaN`, encodes
+ *   as a NaN double, and every comparison against it is false. The rule is
+ *   silently inert, which looks identical to a rule that is being satisfied.
+ * - `boolean` goes through `Boolean()`, where the STRING `"false"` is `true`.
+ *   A stored `"false"` therefore means its own opposite.
+ * - `select` is compared against one literal (`params.window ===
+ *   'SHARE_WINDOW_PER_WEEK' ? 2 : 1`), so any typo silently selects the other
+ *   branch — a guard that cannot distinguish "per term" from "matched nothing".
+ */
+function paramProblem(param: ConstraintParamDef, value: unknown): string | null {
+    switch (param.type) {
+        case 'number':
+        case 'percent': {
+            const parsed = numericParamValue(value);
+
+            if (parsed === null) {
+                return `'${param.label}' must be a number.`;
+            }
+
+            if (param.min !== undefined && parsed < param.min) {
+                return `'${param.label}' must be at least ${param.min}.`;
+            }
+
+            if (param.max !== undefined && parsed > param.max) {
+                return `'${param.label}' must be at most ${param.max}.`;
+            }
+
+            return null;
+        }
+
+        case 'boolean':
+            // A real boolean, not anything truthy: `Boolean('false')` is `true`.
+            return typeof value === 'boolean'
+                ? null
+                : `'${param.label}' must be true or false.`;
+
+        case 'text':
+            // A number is fine — the mapper stringifies — but an object becomes
+            // the literal '[object Object]' and is parsed as zero positions.
+            return typeof value === 'string' || typeof value === 'number'
+                ? null
+                : `'${param.label}' must be text.`;
+
+        case 'select': {
+            const allowed = (param.options ?? []).map((option) => option.value);
+
+            return allowed.includes(String(value))
+                ? null
+                : `'${param.label}' must be one of: ${allowed.join(', ')}.`;
+        }
+
+        case 'weekdays': {
+            if (!Array.isArray(value)) {
+                return `'${param.label}' must be a list of weekdays.`;
+            }
+
+            const rejected = value.filter((day) => {
+                const parsed = numericParamValue(day);
+
+                return parsed === null || !Number.isInteger(parsed) || parsed < 1 || parsed > 7;
+            });
+
+            return rejected.length
+                ? `'${param.label}' takes ISO weekdays 1-7 (1 = Monday). `
+                    + `Not a weekday: ${rejected.map((day) => JSON.stringify(day)).join(', ')}.`
+                : null;
+        }
+    }
+}
+
+/**
+ * Write-boundary validation for a constraint row: the rules the catalogue knows
+ * and the generic CRUD schema cannot express.
+ *
+ * One function for all of them, because severity-contradicts-the-catalogue,
+ * weight-is-negative and a-parameter-is-not-what-it-claims are checked from two
+ * places with different information — three rules times two call sites is six
+ * chances to drift.
  *
  * ABSENT MEANS UNCHECKED, deliberately: validating the MERGED row on update would
  * make an existing bad row UNEDITABLE, refusing the very person trying to disable
@@ -685,6 +807,14 @@ export function validateConstraintShape(input: {
     type: string | undefined;
     severity?: string | null;
     weight?: number | null;
+    /**
+     * The row's parameters, as the generic schema accepts them: arbitrary JSON.
+     *
+     * Whole-object, never a patch — `params` is written wholesale by the rule
+     * builder — so validating what arrives IS validating the resulting row for
+     * every key the catalogue declares.
+     */
+    params?: Record<string, unknown> | null;
 }): ConstraintShapeProblem[] {
     const problems: ConstraintShapeProblem[] = [];
     const type = findConstraintType(input.type);
@@ -737,6 +867,49 @@ export function validateConstraintShape(input: {
                 + 'soft rules, and a negative one would invert this rule into a preference FOR what it '
                 + 'is meant to avoid. Use 0 to evaluate and report the rule without steering the schedule.',
         });
+    }
+
+    /**
+     * PARAMETERS, each against its own catalogue declaration.
+     *
+     * TWO THINGS THIS DELIBERATELY DOES NOT DO, and both are the difference
+     * between closing a gap and breaking the screen that repairs one.
+     *
+     * It does not check REQUIREDNESS. `missingConstraintParams()` asks that
+     * question at SOLVE time, where the answer is a reported skip for one rule
+     * rather than a refused save — and a rule someone is still configuring, or
+     * has deliberately left disabled, must stay saveable. Duplicating it here
+     * would mean a half-filled draft could not be written down, and the two
+     * copies could disagree about what "set" means (an empty weekday list is
+     * the case that already differs).
+     *
+     * It does not reject UNKNOWN keys. The builder spreads the stored object on
+     * every edit, so a key left behind by a parameter the catalogue no longer
+     * declares travels with the row — and refusing it would make exactly the
+     * legacy rows that need repairing unrepairable, which is the trap the note
+     * above this function is about. A stale key is inert: `buildVariant` reads
+     * by name. A MISTYPED key is not silent either, because the parameter it
+     * should have been is then unset, and every parameter the mapper reads
+     * unsafely is `required` — so `missingConstraintParams` names it and the
+     * rule is skipped with a reason rather than sent as nonsense.
+     */
+    if (type && input.params !== undefined && input.params !== null) {
+        for (const param of type.params) {
+            const value = input.params[param.key];
+
+            // UNSET, not invalid — see above. `''` counts as unset because that
+            // is what a cleared control sends, and it is what
+            // `missingConstraintParams` already treats as unanswered.
+            if (value === undefined || value === null || value === '') {
+                continue;
+            }
+
+            const message = paramProblem(param, value);
+
+            if (message) {
+                problems.push({ field: 'params', paramKey: param.key, message });
+            }
+        }
     }
 
     return problems;

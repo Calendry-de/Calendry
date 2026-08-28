@@ -1558,6 +1558,131 @@ as current by whoever finds it next.
 
 ---
 
+# Constraint `params` at the write boundary
+
+**Closed 2026-08-28**, the last of the three gaps in the same family: the rule
+builder honoured a rule and the generic CRUD API did not. Severity and weight
+were closed earlier via `validateConstraintShape()`; `params` was left as
+`z.record(z.string(), z.unknown())` — arbitrary JSON — while `buildVariant`
+reads four of those values with no guard at all.
+
+**Driven by the catalogue, not by a list.** Validation reads each parameter's own
+`ConstraintParamDef` (`type`, `min`, `max`, `options`), so a parameter is
+validated the moment it is declared and there is no second list to keep in step.
+Same reasoning as `wireField` being data rather than a switch in the mapper.
+
+**The four failure modes, and why only one of them was ever noticeable.** Every
+one is reachable from `buildVariant` today:
+
+| Stored value | What actually happens |
+|---|---|
+| `days: "monday"` | Cast `as number[]` then `.map`ped — **throws during assembly and fails the whole run**, every other constraint with it. The only loud one. |
+| `maxRatio: "thirty"` | `Number()` → `NaN`, encoded as a NaN double. Every comparison against `NaN` is false, so the rule is inert and **looks like a rule being satisfied**. |
+| `invert: "false"` | `Boolean('false')` is `true`. The stored value means its own opposite. |
+| `window: "SHARE_WINDOW_PER_WEK"` | Compared against one literal (`=== 'SHARE_WINDOW_PER_WEEK' ? 2 : 1`), so a typo silently selects per-term — a guard that cannot distinguish "per term" from "matched nothing", which is the trap CLAUDE.md § "Guards must fail loudly" names. |
+
+**Two things it deliberately does NOT check**, and both are the difference
+between closing a gap and breaking the screen that repairs one:
+
+- **Not requiredness.** `missingConstraintParams()` asks that at SOLVE time,
+  where the answer is one skipped rule with a stated reason rather than a refused
+  save. A rule somebody is still configuring — or has deliberately left disabled
+  — has to be writable. Duplicating the check here would also give two copies a
+  chance to disagree about what "set" means, and they already would: an empty
+  weekday list is unanswered to one and a value to the other.
+- **Not unknown keys.** The builder spreads the stored object on every edit
+  (`{ ...params.value, [key]: value }`), so a key left behind by a parameter the
+  catalogue no longer declares travels with the row. Refusing it would make
+  exactly the legacy rows that need repairing unrepairable — the same reasoning
+  that makes `beforeUpdate` validate only touched fields. A stale key is inert
+  (`buildVariant` reads by name), and a MISTYPED key is not silent either:
+  every parameter the mapper reads unsafely is `required`, so the parameter it
+  should have been is unset, `missingConstraintParams` names it, and the rule is
+  skipped with a reason instead of sent as nonsense.
+
+**Issues are blamed on the PARAMETER's key, never on `params`.** This looks like
+a detail and is not. `params` is a registered field (`manageRegistry.ts`,
+`custom: true`) that the rule builder renders as many controls and never displays
+an error for. So `path: ['params']` sets `fieldErrors.params` on a control that
+shows nothing, and `applyError` — finding a field with that key — skips the
+orphan banner it has for exactly this case. The result is a failed save with
+nothing marked anywhere, the least diagnosable outcome a form has. An
+unregistered key takes the orphan path and names the parameter instead. Pinned
+by an HTTP test, because only a real call reveals which key the response names.
+
+**Falsified rather than trusted.** Four mutations of the new code, each checked
+to fail: disabling the loop (7 tests fail), dropping the `min` bound (1),
+accepting any truthy value as a boolean (1), and treating `''` as a value rather
+than as unset (1). The last one initially appeared to discriminate nothing — its
+anchor also matched a nearly identical line in `missingConstraintParams`, so the
+patch never applied and the suite passed for the wrong reason. Worth
+remembering: a mutation that fails to apply and a mutation the tests cannot see
+both print "all passed".
+
+# `PersonPreferenceFit.roles`: lecturers only, and what widening would cost
+
+**Decided 2026-08-28.** The field stays; the value stays empty. This is an
+answer, not a deferral — the tracked entry that asked the question ("whose
+preferences count") is closed by it.
+
+**The decision.** A `PersonPreferenceFit` term prices the preferences of a
+placement's **lecturers**, and of nobody else. On the wire that is
+`roles: []` — empty, present, and the only value `calendry-solver` accepts
+(`PreferenceRolesUnsupported`, ADR-0026). There is no tenant-facing control for
+it and none is planned.
+
+**Why not simply widen it.** The obvious reading of "count everyone's
+preferences" is wrong in a way that is invisible on any small fixture. A
+Session's attendee set is the **whole descendant closure** of every attached
+Group (`attendeeSets` uses `descendantGroupIds` — CLAUDE.md states the
+membership-flows-DOWN rule for exactly this reason). So "attendees" for a
+first-year lecture is not a handful of people, it is the cohort: two hundred
+students, each contributing a preference the solver would average or sum
+alongside the one person whose Tuesday it actually is. Whatever the aggregation,
+the teacher's preference becomes noise at the third decimal place. The rule
+would still run, still report a cost, and still steer — just not toward anything
+anybody asked for. That is the silent-wrong-answer class this project keeps
+designing against, and it is why the solver refuses the value rather than
+approximating it.
+
+**What widening would actually require** — the bar, so that a future attempt
+starts from it rather than rediscovering it:
+
+1. **A per-role normalisation rule**, decided before any code. Not a weight per
+   role, which merely re-scales the same broken aggregate — a rule that fixes
+   what one role's preferences are worth relative to another's independently of
+   how many people hold it. "Lecturers and students count equally" has to mean
+   something when the ratio is 1:200.
+2. **A redefinition of the charge.** The solver charges the *mean over a
+   placement's counted lecturers* of `multiplier × unmet`. A mean over a mixed
+   role set is not that function with a bigger input; it is a different function,
+   and the `hard_penalty` bound and `ruin_worst` ordering both depend on the
+   current one.
+3. **A decision about whose data a student's preference is.** Lecturer
+   preferences are already visible to whoever schedules. Two hundred students'
+   stated availability is a different disclosure, and the person who can see the
+   resulting schedule is not obviously the person who may see its inputs.
+
+None of the three is blocked by the schema, which is the point of leaving the
+field in place: whoever takes them needs no proto bump, only an answer.
+
+**What holds the decision.** Two guards, and deliberately not a comment:
+
+- `tests/constraint-catalogue.test.ts` asserts `personPreferenceFit` equals
+  `{ roles: [] }` **exactly**, so adding a role in `buildVariant` fails there
+  rather than at `StartRun`.
+- The solver refuses a non-empty value outright, so even if the app sent one it
+  would fail the whole run loudly instead of pricing the wrong set.
+
+**The one trap to keep in view.** `roles: []` is empty *and present*. `{}` —
+the value every other parameterless variant returns, and the value this file
+recommended until 2026-08-28 — throws `message.roles is not iterable` inside
+`hashInput`, before anything is sent, taking the entire assembly with it.
+ts-proto iterates a repeated field with no presence check. So the empty array is
+load-bearing in two independent directions: it is the only value the solver
+accepts, and the only one that encodes. § "Per-person preferences: stages 5–7"
+records how that was found.
+
 # Schedule display standards
 
 _Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one line; this is the detail behind it._
@@ -1787,7 +1912,9 @@ and it is the **mean over a placement's counted lecturers of `multiplier × unme
 — not the sum, and not `mean(multiplier) × mean(unmet)`, which is the form a
 reader writes from skimming and which a bound check cannot catch. A non-empty
 `roles` is REFUSED (`PreferenceRolesUnsupported`), so `buildVariant` must keep
-returning `{}` for this key: empty means "lecturers only", and widening the
+returning `{ roles: [] }` for this key — **not `{}`**, which is what this
+sentence said until 2026-08-28 and which throws during encoding; see
+§ "`PersonPreferenceFit.roles`". Empty means "lecturers only", and widening the
 counted set would let a 200-student cohort's aggregate preference outweigh the
 person teaching.
 
@@ -1879,7 +2006,11 @@ match catalogue HARD/SOFT) and weight (`>= 0`, no ceiling) enforced via
 only touched fields, deliberately — merged-row validation would make a bad
 row permanently uneditable). DB CHECK backs the weight floor. Why it
 mattered: negative weight erodes `hard_penalty`'s margin for every rule in
-the tenant. `params` still accepts arbitrary JSON — BACKLOG.md § Undecided.
+the tenant. **`params` was closed the same way on 2026-08-28** — validated
+against each parameter's own `ConstraintParamDef`, so the catalogue's
+declaration is the rule and there is no second list to drift. Requiredness
+and unknown keys stay OUT of it on purpose;
+§ "Constraint `params` at the write boundary".
 
 **Step 14 — AccessRole management is BUILT** (`RESOURCES['access-roles']`,
 `RELATIONS['persons/access-roles']`, `ManageAccessRoleForm`). The grants are

@@ -186,11 +186,29 @@ function constraintShapeRefinement(
     // `type` is required by the create schema (`z.string().min(1)`), so it is
     // always present here — unlike on the update path, which has no `type` at
     // all and reads the stored one instead.
-    value: { type: string; severity?: string | null; weight?: number | null },
+    value: {
+        type: string;
+        severity?: string | null;
+        weight?: number | null;
+        params?: Record<string, unknown> | null;
+    },
     ctx: z.RefinementCtx,
 ): void {
     for (const problem of validateConstraintShape(value)) {
-        ctx.addIssue({ code: 'custom', path: [problem.field], message: problem.message });
+        /*
+         * A parameter's issue is reported at the PARAMETER's key, not at
+         * `params`. `params` is one `custom: true` field the rule builder
+         * renders as many controls and never displays an error for, so
+         * `path: ['params']` would set `fieldErrors.params` on nothing —
+         * `applyError` would find a registered field, skip its orphan banner,
+         * and leave a failed save with no visible cause. An unregistered key
+         * takes the orphan path and names the parameter in the banner instead.
+         */
+        ctx.addIssue({
+            code: 'custom',
+            path: [problem.paramKey ?? problem.field],
+            message: problem.message,
+        });
     }
 }
 
@@ -247,11 +265,12 @@ async function constraintBeforeUpdate(ctx: {
 
     const touchesSeverity = 'severity' in ctx.patch;
     const touchesWeight = 'weight' in ctx.patch;
+    const touchesParams = 'params' in ctx.patch;
 
     // Nothing this guard is about is being changed, so there is nothing to say.
     // Renaming or disabling a row must never be blocked by the shape of a value
     // the caller is not touching.
-    if (!touchesSeverity && !touchesWeight) {
+    if (!touchesSeverity && !touchesWeight && !touchesParams) {
         return;
     }
 
@@ -270,6 +289,9 @@ async function constraintBeforeUpdate(ctx: {
         type: existing.type,
         ...(touchesSeverity ? { severity: ctx.patch.severity as string | null } : {}),
         ...(touchesWeight ? { weight: ctx.patch.weight as number | null } : {}),
+        ...(touchesParams
+            ? { params: ctx.patch.params as Record<string, unknown> | null }
+            : {}),
     });
 
     if (problems.length) {
@@ -290,7 +312,10 @@ async function constraintBeforeUpdate(ctx: {
             data: {
                 issues: problems.map((p) => ({
                     code: 'custom',
-                    path: [p.field],
+                    // The parameter's own key, for the reason
+                    // `constraintShapeRefinement` documents: an issue placed on
+                    // `params` is an issue placed on a control that shows none.
+                    path: [p.paramKey ?? p.field],
                     message: p.message,
                 })),
             },
@@ -971,12 +996,15 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * step — magnitude can never let a soft rule overrule a hard one. "10"
              * is neither safer nor more correct than "10000".
              *
-             * NO LOWER BOUND EITHER, and that one is a gap: `weight: -5` is
-             * accepted here and by the database (verified, HTTP 201), and a
-             * negative weight SUBTRACTS from `total_weight`, lowering the penalty
-             * that keeps hard constraints dominant. Left with the tracked
-             * "severity validated too late" gap in CLAUDE.md — one write-boundary
-             * fix consulting `CONSTRAINT_TYPES`, not another piecemeal patch.
+             * NO LOWER BOUND HERE EITHER, but not because there isn't one:
+             * `superRefine(constraintShapeRefinement)` below refuses a negative
+             * weight against the catalogue, because a negative one SUBTRACTS from
+             * `total_weight` and erodes the penalty that keeps hard constraints
+             * dominant for every rule in the tenant. Zod could express `min(0)`,
+             * and deliberately does not — the bound, the severity check and the
+             * parameter checks are one function shared with the update path and
+             * the rule builder, and splitting one of the three back out here is
+             * how they start disagreeing.
              */
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
@@ -1001,7 +1029,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         update: z.object({
             name: z.string().min(1).optional(),
             severity: z.enum(['HARD', 'SOFT']).optional(),
-            /** Unbounded above and, currently, below — see `create` above. */
+            /** Unbounded above; bounded below by the shared guard — see `create`. */
             weight: z.number().int().nullish(),
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
