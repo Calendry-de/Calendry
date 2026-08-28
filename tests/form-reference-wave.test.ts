@@ -187,4 +187,34 @@ describe('the row survives a reference list it may not read', () => {
 
         expect(missing.status, 'the row endpoint must still 404').toBe(404);
     });
+
+    it('answers a missing id with the API\'s own status, not an empty form', async () => {
+        /*
+         * The other half, fixed in the same pass: `useAsyncData`'s handle
+         * resolves even when its handler throws, so the page used to answer 200
+         * with every field blank while the API answered 404. The status is
+         * carried through rather than flattened — a 404 and a 403 are different
+         * facts for whoever is looking.
+         */
+        const res = await fetch(`${BASE}/manage/offerings/does-not-exist-at-all`, {
+            headers: { cookie: cookie! },
+        });
+
+        expect(res.status).toBe(404);
+    });
+
+    it('does NOT turn a locked reference into a page error — the boundary', async () => {
+        /*
+         * The counter-example for the throw above, and the reason `loadError` is
+         * the ROW's failure alone. This role's `/api/terms` 403s on every
+         * request; if that reached the page's `createError` the whole screen
+         * would vanish for somebody who may legitimately edit the record, which
+         * is the over-correction this pairing exists to catch.
+         */
+        const res = await fetch(`${BASE}/manage/offerings/${offeringId}`, {
+            headers: { cookie: cookie! },
+        });
+
+        expect(res.status).toBe(200);
+    });
 });

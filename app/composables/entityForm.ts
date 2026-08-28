@@ -99,6 +99,23 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     const unavailableReferences = computed(() => new Set(asyncData.data.value?.unavailable ?? []));
 
     /**
+     * The ROW's own failure, and nothing else's.
+     *
+     * Precise because the wave above swallows reference rejections: by the time
+     * anything reaches `asyncData.error` it can only have come from the rethrow
+     * of `rowResult`. Before that change this would have conflated "the record
+     * is missing" with "one option list needs a permission", which are opposite
+     * problems — one is fatal, the other is a locked field.
+     *
+     * Exposed rather than acted on here because a composable cannot answer with
+     * an HTTP status; only the page can. `useAsyncData`'s handle RESOLVES even
+     * when its handler throws (the same behaviour that keeps a relation's failed
+     * option wave from blanking the page), so a throw inside the handler never
+     * reaches Nuxt's error path on its own.
+     */
+    const loadError = computed(() => asyncData.error.value ?? null);
+
+    /**
      * A field the caller may not edit because the options it chooses from could
      * not be read.
      *
@@ -315,6 +332,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         references,
         unavailableReferences,
         isFieldLocked,
+        loadError,
         fieldErrors,
         formError,
         errorData,

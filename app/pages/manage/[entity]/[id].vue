@@ -93,6 +93,32 @@ const relations = useEntityRelations(entity, id);
 // sequence keeps SSR to one request wave.
 await Promise.all([form.ready, relations.ready]);
 
+/*
+ * A FAILED ROW FETCH IS AN ERROR, not an empty form.
+ *
+ * `useAsyncData`'s handle resolves even when its handler throws, so without this
+ * a mistyped or stale id rendered a form with every field blank and answered
+ * 200 — the API said 404 and the page disagreed. Anyone typing into it was
+ * filling in a record that does not exist.
+ *
+ * Thrown HERE and not in the composable, because only a page can answer with a
+ * status. The underlying status is carried through rather than flattened to 500:
+ * a 404 and a 403 are different facts for whoever is looking at it.
+ *
+ * Deliberately narrow: `loadError` is the ROW's failure alone. A reference list
+ * that 403s is handled by locking that field, and must NOT reach this — see
+ * `isFieldLocked` and `tests/form-reference-wave.test.ts`.
+ */
+if (form.loadError.value) {
+    const cause = form.loadError.value as { statusCode?: number; statusMessage?: string };
+
+    throw createError({
+        statusCode: cause.statusCode ?? 404,
+        statusMessage: cause.statusMessage ?? `This ${entity.label.toLowerCase()} could not be loaded.`,
+        fatal: true,
+    });
+}
+
 const title = computed(() => (form.row.value ? entity.title(form.row.value) : entity.label));
 
 useHead({ title: () => title.value });
