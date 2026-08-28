@@ -25,8 +25,17 @@
             silence fell precisely where the person could not fix it from here.
             Caught by rendering the page rather than by reading the condition.
         -->
+        <!--
+            FOUR STATES, NOT THREE. Whether these dates bind depends on a rule
+            this panel may not be allowed to read, so "there is no such rule" and
+            "I cannot tell" have to be different sentences. They were the same
+            one, and it asserted the first: a group editor without
+            `constraint.read` was told the institution had no rule and an
+            administrator needed to add it, on a tenant where the rule existed
+            and was enabled.
+        -->
         <p
-            v-if="!vetoRule || !vetoRule.isEnabled"
+            v-if="!rulesReadable || !vetoRule || !vetoRule.isEnabled"
             class="avail_note"
             role="status"
         >
@@ -34,7 +43,13 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            <span v-if="vetoRule">
+            <span v-if="!rulesReadable">
+                <strong>Saved.</strong>
+                Whether the scheduler honours these dates depends on a rule this account
+                cannot read, so this panel cannot say. The dates themselves are stored
+                either way.
+            </span>
+            <span v-else-if="vetoRule">
                 <strong>Saved, but not yet enforced.</strong>
                 “{{ vetoRule.name }}” is switched off, so the scheduler currently ignores
                 these dates. Enable it under Constraints to make them binding.
@@ -195,7 +210,17 @@ const asyncData = useAsyncData(
              * rather than the feature. Failing the whole panel over it would
              * hide the editor from exactly the person sent here to use it.
              */
-            request<ConstraintRow[]>('/api/constraints').catch((): ConstraintRow[] => []),
+            request<ConstraintRow[]>('/api/constraints')
+                .then((rows) => ({ rows, readable: true }))
+                /*
+                 * NULL, not an empty list. Returning `[]` on failure made
+                 * "there is no such rule" and "I may not read the rules" the
+                 * same value, and the note below then stated the first as
+                 * fact — telling somebody their dates are ignored and an
+                 * administrator must add a rule, for a tenant where that rule
+                 * exists and is switched on.
+                 */
+                .catch(() => ({ rows: null, readable: false })),
         ]);
 
         return { termList, windows, constraints };
@@ -204,8 +229,11 @@ const asyncData = useAsyncData(
 
 const terms = computed<TermRow[]>(() => asyncData.data.value?.termList ?? []);
 
-const vetoRule = computed(() => asyncData.data.value?.constraints
-    .find((row) => row.type === 'group_veto'));
+/** False when the constraint list could not be read at all — see the fetch. */
+const rulesReadable = computed(() => asyncData.data.value?.constraints.readable ?? false);
+
+const vetoRule = computed(() => asyncData.data.value?.constraints.rows
+    ?.find((row) => row.type === 'group_veto'));
 
 /*
  * Seeded from the AWAITED promise, not from a watcher. Vue does not flush
