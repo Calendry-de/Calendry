@@ -278,6 +278,8 @@ model Tenant {
   groups                Group[]
   groupTerms            GroupTerm[]
   groupAvailability     GroupTermAvailability[]
+  screens               Screen[]
+  screenRooms           ScreenRoom[]
   memberships           Membership[]
   personRoles           PersonRole[]
   rooms                 Room[]
@@ -686,6 +688,7 @@ model Room {
 
   roomEquipment RoomEquipment[]
   sessionRooms  SessionRoom[]
+  screenRooms   ScreenRoom[]
 
   @@index([tenantId])
   @@index([federationId])
@@ -935,6 +938,69 @@ model GroupTermAvailability {
   @@index([termId])
   @@index([tenantId])
   @@map("group_term_availability")
+}
+
+/// A lobby or corridor display. A DEVICE credential, not a person.
+///
+/// Holds no AccessRole and no acting Person, which is what settles the
+/// authority question by construction rather than by policy: `heldPermissions()`
+/// throws 403 the moment `actorPersonId` is null, so a screen key cannot satisfy
+/// any permission check — including ones added later. Its authority is its room
+/// scope and nothing else.
+///
+/// NOT a fourth RLS exception. Resolution goes through
+/// `calendry_internal.screen_identity()`, parameterised by the secret alone
+/// exactly like `session_identity()`; every read after that is an ordinary
+/// `withTenant()` transaction. See the migration for the full reasoning.
+model Screen {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  /// What a human calls it when revoking the right one.
+  name String
+
+  /// SHA-256 of the presented key, never the key itself — same treatment
+  /// `auth_session` gives its token, and unique GLOBALLY because the lookup
+  /// happens before any tenant is known.
+  tokenHash String @map("token_hash")
+
+  /// Revocation without deletion, so a display taken down for a week keeps its
+  /// name and room scope.
+  isActive Boolean @default(true) @map("is_active")
+
+  /// Last successful board fetch — the only way to tell a working display from
+  /// a dark one without walking to it.
+  lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rooms  ScreenRoom[]
+
+  @@unique([tokenHash])
+  @@index([tenantId])
+  @@map("screen")
+}
+
+/// Which Rooms a Screen shows. NO ROWS MEANS EVERY ROOM — fail-open, matching
+/// `GroupTerm`, because a scopeless screen should show the building rather than
+/// a blank wall that looks exactly like a broken display.
+model ScreenRoom {
+  screenId String @map("screen_id")
+  roomId   String @map("room_id")
+  tenantId String @map("tenant_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  screen Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([screenId, roomId])
+  @@index([roomId])
+  @@index([tenantId])
+  @@map("screen_room")
 }
 
 /// Holidays, break weeks and exam periods as structured data.

@@ -10,6 +10,18 @@ const PUBLIC_API_PATHS = [
     // would make the flag unclearable and lock the account out permanently.
     // The handler re-authenticates from the credentials in the body instead.
     '/api/auth/change-password',
+    /*
+     * The board is reachable without an ACCOUNT, never without identity. A
+     * screen key resolves to a real `ScreenIdentity` through the resolver like
+     * any other principal — this exemption only stops the middleware answering
+     * 401 before the handler can say something more useful ("not recognised" vs
+     * "deactivated"), which on a wall-mounted display is the difference between
+     * a fixable message and an apparently dead screen.
+     *
+     * The handler itself calls `requireIdentity`, so a request with no key and
+     * no cookie still gets 401 — one line further down.
+     */
+    '/api/screens/board',
 ];
 
 /**

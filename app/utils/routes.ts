@@ -13,3 +13,10 @@ export const HOME_ROUTE = '/dashboard';
 
 /** The public landing page: the domain root, readable with no session. */
 export const LANDING_ROUTE = '/';
+
+/**
+ * The lobby-display board. Authenticates with a device KEY in its own query
+ * string, never a session cookie — so it is anonymous to the route guard and
+ * gated by its data route instead.
+ */
+export const SCREEN_ROUTE = '/screen';

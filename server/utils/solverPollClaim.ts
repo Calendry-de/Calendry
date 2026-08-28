@@ -95,13 +95,13 @@ export async function tenantsWithDueRuns(): Promise<string[]> {
  */
 export async function claimDueRuns(tenantId: string, limit = 20): Promise<ClaimedRun[]> {
     return withTenant({
+        kind: 'system',
         tenantId,
         federationId: null,
         // The poller acts as no person. Nothing it does is attributed, and
         // nothing it calls requires an actor.
         actorPersonId: null,
-        accountId: '',
-        sessionId: '',
+        reason: 'solver-poller',
     }, async (tx: Tx) => {
         const [lock] = await tx.$queryRaw<{ locked: boolean }[]>`
             SELECT pg_try_advisory_xact_lock(${POLL_LOCK_NAMESPACE}::int, hashtext(${tenantId})) AS locked
@@ -165,10 +165,10 @@ export async function claimDueRuns(tenantId: string, limit = 20): Promise<Claime
 /** Runs `fn` in the tenant's RLS context. Used for writing a poll's outcome. */
 export function inTenant<T>(tenantId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
     return withTenant({
+        kind: 'system',
         tenantId,
         federationId: null,
         actorPersonId: null,
-        accountId: '',
-        sessionId: '',
+        reason: 'solver-poller',
     }, fn);
 }

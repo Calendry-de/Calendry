@@ -59,6 +59,42 @@ export async function resolveSessionToken(token: string): Promise<SessionIdentit
     return row;
 }
 
+export interface ScreenIdentityRow {
+    screen_id: string;
+    tenant_id: string;
+    federation_id: string | null;
+    name: string;
+    is_active: boolean;
+    /** Rooms this screen may show. EMPTY MEANS EVERY ROOM in its tenant. */
+    room_ids: string[];
+}
+
+/**
+ * Resolves a raw screen key to its screen, or null if no screen carries it.
+ *
+ * IN THIS MODULE, which is the only one permitted to query without tenant
+ * context (CLAUDE.md exception 2), because that is exactly what this is: the
+ * tenant is not known until the key has been resolved. The privileged step is
+ * `calendry_internal.screen_identity()`, parameterised by the secret alone.
+ *
+ * The room scope is read here, in the same privileged step, rather than in the
+ * caller's tenant transaction. It could be read either way — but doing it here
+ * keeps "what is this credential" one question with one answer, so a handler
+ * cannot accidentally act on a screen whose scope it has not loaded.
+ *
+ * Returns the row even when `is_active` is false. The caller decides: the
+ * resolver treats it as no identity, while the board route reports "revoked", so
+ * a display can say why it went blank instead of looking broken.
+ */
+export async function resolveScreenKey(key: string): Promise<ScreenIdentityRow | null> {
+    const prisma = getPrisma();
+    const rows = await prisma.$queryRaw<ScreenIdentityRow[]>`
+        SELECT * FROM calendry_internal.screen_identity(${hashToken(key)})
+    `;
+
+    return rows[0] ?? null;
+}
+
 /** The tenants this account can act in. */
 export async function listAccountIdentities(accountId: string): Promise<AccountIdentityRow[]> {
     const prisma = getPrisma();

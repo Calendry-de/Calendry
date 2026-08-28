@@ -274,14 +274,40 @@ a UI gap — the permission model has no concept of row-level self-scoping.
 
 ## Public, unauthenticated access patterns
 
-Two distinct cases, both currently impossible since the whole app sits behind
-login:
+Was two cases. **The kiosk half is BUILT (2026-08-28)** — see § Screens below.
+One remains:
 
 - A student viewing their own (or their Group's) schedule with no account —
   needs a shareable-link or lookup mechanism.
-- A lobby/kiosk display showing live room occupancy — needs a device
-  credential distinct from a real user account, plus a room-centric schedule
-  view (the existing grid is group/person-centric).
+
+The two are less alike than they looked. A display is a DEVICE and could be given
+a credential of its own, which is what made it buildable without touching the
+isolation model. A student is a PERSON the app must recognise without one, so the
+question is identification rather than authority — a link that is itself the
+secret, and therefore what happens when it is forwarded. Do not assume the screen
+solution generalises.
+
+## Screens (lobby displays) — BUILT 2026-08-28
+
+`screen` + `screen_room`, `calendry_internal.screen_identity()`,
+`GET /api/screens/board`, the `/screen` page, and management under
+`/manage/screens` with `screen.read` / `screen.manage`. A key is hashed and shown
+once, generated in the browser; empty room scope means every room. **Not a fourth
+RLS exception** — full reasoning in DECISIONS.md § "Screens".
+
+Deliberately not built, and each for a stated reason:
+
+- **Key rotation** — invalidates the URL on a device somebody has to walk to, so
+  it needs its own action and confirmation rather than living inside a PATCH.
+  Revocation (`isActive: false`) is the recoverable half and is built.
+- **A screen showing anything but today.** Tomorrow, or a week, is a different
+  view with different typography, and nobody asked for it.
+- **Per-screen refresh cadence.** Fixed at 60s, which is the resolution a block
+  boundary needs; making it configurable adds a knob whose wrong setting is
+  invisible.
+- **Any write path.** A display holds no permissions by construction, so
+  "check in here" or "book this room" would need a real principal, not a wider
+  screen.
 
 ## Per-person soft preferences
 
@@ -734,6 +760,7 @@ page's gate does not imply:
                         /api/session-kinds  session_kind.read
                         /api/roles          role.read
     terms form      ->  /api/time-grids     time_grid.read
+    screens form    ->  /api/rooms          room.read
 
 A caller holding `offering.read` but not `term.read` takes down the whole wave.
 Worse than the relation case: the ROW is fetched in that same `Promise.all`, so

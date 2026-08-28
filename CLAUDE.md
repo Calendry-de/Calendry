@@ -93,6 +93,23 @@ values. **Never hardcode an open value into logic** — never assume a Role call
 - **Timezone is per-Person and display-only** — never affects grid resolution,
   constraint evaluation, or "same day" logic. All of that is tenant-local time.
 
+### Three principals, and only one can hold a permission
+
+`RequestIdentity` is a discriminated union — `kind: 'account' | 'screen' |
+'system'` — matching the three ways a request arrives: a human with a session
+cookie, a lobby display with a device key, and the background poller.
+
+**Only `account` has an acting Person, and that is the whole authorization
+model.** `heldPermissions()` throws 403 when `actorPersonId` is null, so a screen
+key and the poller cannot satisfy ANY permission check — including ones added
+later by somebody who has never heard of screens. A device's authority is its own
+scope (`ScreenIdentity.roomIds`) and nothing else, enforced at the one route that
+reads it.
+
+Never give a non-account principal an `actorPersonId` to make a check pass. The
+check is the boundary; widen the route deliberately, or add a scope the way
+screens did.
+
 ### The three deliberate exceptions to tenant isolation
 
 Conscious boundaries, not oversights. **A fourth is a bug** — do not add one
@@ -306,6 +323,7 @@ The rest are area-specific: read the section before working in that area.
 | Calendar periods | `classifyWeeks` is the one classifier; `EXAM` touches the week, `BREAK`/`HOLIDAY` cover it. | § "Academic calendar periods" |
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
 | Schedule toolbar | Height is invariant; the solver's tall states are anchored panels. `.bar_select` is capped. | § "The schedule toolbar" |
+| Screens | A lobby display is a DEVICE credential, not a fourth RLS exception: resolved by secret alone through `screen_identity()`, then ordinary `withTenant()`. Key hashed, shown once, generated in the browser. Empty room scope = every room. | § "Screens" |
 
 ## Bootstrap & deploy sequence
 
@@ -352,8 +370,9 @@ Three kinds of change are **themselves migrations**:
   ships as weight 0 under a SOFT entry — silently disabled.
 
 Owed by any tenant provisioned before them: `account.read`, `account.manage`,
-`tenant.read`, `tenant.update`, `generation.read`, `session.read_own`, the
-`member` role, and a `group_veto` constraint row.
+`tenant.read`, `tenant.update`, `generation.read`, `session.read_own`,
+`screen.read`, `screen.manage`, the `member` role, and a `group_veto` constraint
+row.
 
 Production image and CI specifics: § "Bootstrap & deploy".
 

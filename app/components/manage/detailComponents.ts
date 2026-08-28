@@ -6,6 +6,7 @@ import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder
 import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
 import ManageGroupForm from '~/components/manage/ManageGroupForm.vue';
 import ManageGroupTree from '~/components/manage/ManageGroupTree.vue';
+import ManageScreenForm from '~/components/manage/ManageScreenForm.vue';
 import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
 
 /**
@@ -37,6 +38,7 @@ import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
  */
 export const DETAIL_COMPONENTS: Record<string, Component> = {
     GroupForm: ManageGroupForm,
+    ScreenForm: ManageScreenForm,
     TimeGridEditor: ManageTimeGridEditor,
     ConstraintBuilder: ManageConstraintBuilder,
     CalendarPeriodForm: ManageCalendarPeriodForm,

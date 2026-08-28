@@ -1917,6 +1917,105 @@ _Moved out of CLAUDE.md on 2026-08-27, verbatim. CLAUDE.md keeps the rule in one
 
 ---
 
+# Screens: a lobby display is a device, not a person
+
+The backlog asked for "a lobby/kiosk display showing live room occupancy — needs
+a device credential distinct from a real user account, plus a room-centric
+schedule view". Both halves turned out to be the easy part. The decision worth
+recording is the one that was NOT taken.
+
+## Why this is not a fourth RLS exception
+
+The obvious build is a public unauthenticated read: a URL anybody can open that
+shows a board. That needs either RLS dropped on the tables a board reads, or a
+policy that answers with no tenant context — a fourth exception to the isolation
+model, which `CLAUDE.md` says not to add without a comparably strong reason to
+the existing three.
+
+There was no such reason, because the existing shape already fits. Exception 2
+(the pre-tenant auth plane) is not "auth is special"; it is a general technique:
+**resolve a credential by the unique hash of a secret it presents, never by a
+tenant filter, through a `SECURITY DEFINER` function taking the secret alone.**
+A screen key is exactly that. `calendry_internal.screen_identity()` mirrors
+`session_identity()` line for line, and once it has returned a tenant, every
+subsequent read is an ordinary `withTenant()` transaction under the same RLS as
+any other request. `screen` and `screen_room` are themselves tenant-scoped and
+RLS-protected like everything else.
+
+So the feature that looked like it required relaxing the model required nothing.
+
+## The authority question answers itself
+
+A device that reads a timetable is a principal, and the reflex is to ask which
+permissions it should hold. The better answer is that it holds none and cannot.
+
+`heldPermissions()` already throws 403 when `identity.actorPersonId` is null — a
+guard written for accounts that have not chosen a tenant. A screen has no acting
+Person and never will, so it is refused by every permission check in the app,
+including ones written years from now by somebody who has never heard of screens.
+Verified against five unrelated routes with a LIVE key, not a revoked one: the
+first version of that probe ran after revocation and got 401 everywhere, which
+looks like a pass and proves nothing, since a revoked key is refused before any
+permission is consulted.
+
+Its authority is therefore `ScreenIdentity.roomIds`, read at exactly one route.
+
+## `RequestIdentity` became a discriminated union, and found a lie
+
+Adding `kind` turned up something the flat type had been hiding: the background
+solver poller was constructing an identity with `accountId: ''` and
+`sessionId: ''`. It has no account and no session — it runs when nobody is logged
+in — and the empty strings said something untrue about what was making the
+request. The union made it a compile error; `kind: 'system'` is the honest
+answer, and it holds no permissions either, which it has never needed.
+
+Blast radius was nil: `identity.accountId` and `identity.sessionId` are read
+NOWHERE outside the type. Only `actorPersonId`, `tenantId` and `federationId` are
+ever consulted.
+
+## The key can only be shown once, which is a UI constraint
+
+Only the SHA-256 is stored. `CLAUDE.md`'s account-password rule then decides the
+rest: the create page navigates to the saved row on success, so a
+server-generated secret would be gone before it could be read — which is why an
+account's initial password is generated in the BROWSER. A screen key is the same
+shape and uses the same machinery: `shared/screenKey.ts`, a draft field, the full
+display URL shown with a copy button before saving. The server still generates
+one when a caller sends none, so a script is not forced through a browser.
+
+## Two bugs, both silent, both found by looking at the database
+
+Worth recording because both were self-inflicted instances of rules this repo
+already states.
+
+1. **The liveness stamp matched zero rows.** `last_seen_at` was written with a
+   fire-and-forget `getPrisma().$executeRaw` OUTSIDE the tenant transaction. The
+   app role runs under `FORCE ROW LEVEL SECURITY`, so with no
+   `current_tenant_id()` the UPDATE silently affected nothing — the very first
+   architecture rule in `CLAUDE.md`. The response was identical either way;
+   only reading the column caught it.
+2. **The no-term early return skipped both the rooms and the stamp.** Between
+   terms the board returned `rooms: []`, so a working display in August was
+   indistinguishable from a broken one, and no screen recorded a heartbeat for
+   the whole summer. Now the rooms come back empty with the state NAMED, and the
+   stamp happens before anything that can return early. Caught by the test suite
+   against a fixture with no running term — the manual probe had one, so it
+   passed there.
+
+## What was deliberately left out
+
+- **Key rotation.** Rotating invalidates the URL typed into a device on a wall,
+  and the person clicking is rarely the person who can walk to it. It belongs
+  behind its own explicit action with its own confirmation, not inside a PATCH
+  that also renames things. Revoking (`isActive: false`) is the recoverable half
+  and is built.
+- **The other half of the backlog entry** — a student viewing their own schedule
+  with no account. Same section, genuinely different problem: that one is about
+  identifying a PERSON without a credential, where this was about a device with
+  one. Still open.
+
+---
+
 # Pre-launch branding sweep
 
 The Step 1 rebrand searched only for the `xxx-changeme` placeholder pattern,

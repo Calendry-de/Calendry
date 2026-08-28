@@ -71,6 +71,11 @@ interface PermissionShape {
  * instead of `string`.
  */
 const EXPLICIT_PERMISSIONS = [
+    // Lobby displays. A screen KEY is a credential that reads this tenant's room
+    // timetable with no login, so issuing one is deliberately a separate
+    // authority from merely seeing that screens exist.
+    { key: 'screen.read', category: 'screen', description: 'See the lobby displays and which rooms each shows' },
+    { key: 'screen.manage', category: 'screen', description: 'Create, re-scope, revoke and delete lobby displays, and issue their keys' },
     // Session editing — explicit verbs, mirroring the routes (TAXONOMY.md §3).
     /**
      * THE WHOLE timetable, everybody's sessions included. Sharpened from "View
@@ -319,6 +324,22 @@ export const RESOURCE_PERMISSIONS: Record<string, Partial<Record<CrudAction, rea
         create: ['account.manage'],
         update: ['account.manage'],
         delete: ['account.manage'],
+    },
+    /**
+     * `screens` has its own handlers for a different reason from `accounts`: a
+     * Screen is properly tenant-scoped and RLS-protected, but it carries a
+     * SECRET, and the generic routes return the row they wrote. The key must be
+     * returned exactly once by `POST` and never again by anything, which is a
+     * response shape the scaffold cannot express.
+     *
+     * `read` accepts `screen.manage` too, same reasoning as accounts: whoever
+     * may issue a display key can obviously see the list.
+     */
+    screens: {
+        read: ['screen.read', 'screen.manage'],
+        create: ['screen.manage'],
+        update: ['screen.manage'],
+        delete: ['screen.manage'],
     },
 };
 

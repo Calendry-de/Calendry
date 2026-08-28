@@ -797,6 +797,93 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
     CONSTRAINT_ENTITY,
 
     {
+        /*
+         * Lobby displays. Own handlers under `server/api/screens/`, not the
+         * generic scaffold — a Screen carries a secret, and the scaffold returns
+         * the row it wrote. The gate is still declared in `RESOURCE_PERMISSIONS`
+         * so this registry can predict it, exactly as `accounts` does.
+         */
+        key: 'screens',
+        permissionPrefix: 'screen',
+        permissionOverrides: {
+            read: 'screen.read',
+            create: 'screen.manage',
+            update: 'screen.manage',
+            delete: 'screen.manage',
+        },
+        label: 'Screen',
+        plural: 'Screens',
+        icon: 'material-symbols:cast-outline',
+        description: 'Lobby and corridor displays showing live room occupancy.',
+        keywords: [
+            'screen', 'screens', 'display', 'displays', 'lobby', 'kiosk',
+            'signage', 'board', 'monitor', 'tv', 'corridor', 'occupancy',
+        ],
+        title: (row) => String(row.name ?? 'Screen'),
+        detailComponent: 'ScreenForm',
+        columns: [
+            { key: 'name', label: 'Name' },
+            { key: 'roomSummary', label: 'Shows' },
+            { key: 'isActive', label: 'Active', format: 'boolean' },
+            { key: 'lastSeenAt', label: 'Last seen', format: 'date', secondary: true },
+        ],
+        fields: [
+            {
+                key: 'name',
+                label: 'Name',
+                type: 'text',
+                required: true,
+                help: 'Where the display physically is — "Main entrance", "B-block corridor" — '
+                    + 'so the right one can be revoked without a guess.',
+            },
+            {
+                key: 'isActive',
+                label: 'Active',
+                type: 'boolean',
+                help: 'Turning a screen off stops its key working immediately, and is reversible. '
+                    + 'Deleting it is not.',
+            },
+            /*
+             * `custom`, because both controls are bespoke: the room scope needs
+             * "empty means every room" stated in words rather than inferred from
+             * a blank multi-select, and the key can only ever be shown once.
+             */
+            {
+                key: 'roomIds',
+                label: 'Rooms shown',
+                /*
+                 * `reference`, not `text`, and that is what makes the picker
+                 * work at all: `referencedResources()` builds the form's fetch
+                 * wave from fields carrying one, so a field without it renders
+                 * an empty list reading "No rooms defined yet" in a tenant full
+                 * of rooms. Shipped exactly that way once.
+                 *
+                 * `custom` because the control is a multi-select whose EMPTY
+                 * state means "every room" — a meaning no generic reference
+                 * control can convey, and the opposite of what a blank select
+                 * looks like.
+                 */
+                type: 'reference',
+                custom: true,
+                reference: {
+                    resource: 'rooms',
+                    label: (row) => String(row.name ?? row.code ?? row.id),
+                    nullable: true,
+                    emptyHint: 'No rooms defined yet.',
+                },
+            },
+            /*
+             * The device key, generated in the BROWSER and shown once — the same
+             * shape as an account's initial password, and for the same reason:
+             * the create page navigates away on success, so a server-generated
+             * secret would be gone before it could be read. `custom` because the
+             * control is the display URL with a copy button, not a text input.
+             */
+            { key: 'key', label: 'Display address', type: 'text', custom: true },
+        ],
+    },
+
+    {
         key: 'terms',
         permissionPrefix: 'term',
         label: 'Term',

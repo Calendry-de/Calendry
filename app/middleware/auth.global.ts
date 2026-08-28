@@ -1,5 +1,5 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
-import { HOME_ROUTE, LANDING_ROUTE } from '~/utils/routes';
+import { HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE } from '~/utils/routes';
 
 /**
  * Route guard: every page needs a session except the ones listed here.
@@ -25,8 +25,14 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  *
  * `/` is that page. The authenticated home is `/dashboard`, which is where
  * signing in lands and what a protected page redirects back to.
+ *
+ * `/screen` is the other, for a different reason: it authenticates with a device
+ * KEY in its own URL rather than a session cookie, so a session check here would
+ * bounce a wall-mounted display to a login form nobody is standing at. Its data
+ * route enforces the key; this list only keeps the client-side guard from
+ * intercepting a page that answers to a different credential.
  */
-const ANONYMOUS_ROUTES = [LANDING_ROUTE];
+const ANONYMOUS_ROUTES = [LANDING_ROUTE, SCREEN_ROUTE];
 
 export default defineNuxtRouteMiddleware(async (to) => {
     // Before anything else, and before any session fetch: this page renders the

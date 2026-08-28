@@ -45,6 +45,7 @@ export default defineEventHandler(async (event) => {
 
     const permissions = await withTenant(
         {
+            kind: 'account',
             tenantId: session.tenant_id,
             federationId: session.federation_id,
             actorPersonId: session.person_id,
