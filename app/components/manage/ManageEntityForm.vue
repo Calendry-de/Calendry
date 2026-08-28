@@ -37,9 +37,9 @@
                 v-model="draft[field.key]"
                 :error="form.fieldErrors.value[field.key]"
                 :field="field"
-                :readonly="readonly"
+                :readonly="readonly || form.isFieldLocked(field)"
                 :reference-rows="field.reference ? form.references.value[field.reference.resource] : undefined"
-                :note="derivedNotes[field.key]"
+                :note="noteFor(field)"
             />
         </div>
 
@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import type { useEntityForm } from '~/composables/entityForm';
+import type { FieldDef } from '~/utils/manageRegistry';
 import ManageField from '~/components/manage/ManageField.vue';
 
 /**
@@ -183,6 +184,32 @@ const readonlyReason = computed(() => {
 
     return '';
 });
+
+/**
+ * The field's note, plus the one the FORM has to add.
+ *
+ * A locked reference must say why it is locked, or it reads as a field somebody
+ * decided to freeze. It also has to say what happens on save — the value is left
+ * alone, not cleared — because "read-only" alone does not distinguish the two,
+ * and the difference is a record's data.
+ *
+ * Composed rather than replacing `derivedNotes`: both can apply to the same
+ * field, and dropping the derived one to make room would trade one silence for
+ * another.
+ */
+function noteFor(field: FieldDef): string {
+    const derived = derivedNotes.value[field.key] ?? '';
+
+    if (!props.form.isFieldLocked(field)) {
+        return derived;
+    }
+
+    const locked = 'The list of choices for this field could not be loaded — it needs a '
+        + 'permission this account does not hold. The current value is kept as it is and '
+        + 'will not be changed by saving.';
+
+    return derived ? `${derived} ${locked}` : locked;
+}
 
 const saveLabel = computed(() => (props.mode === 'create' ? 'Create' : 'Save changes'));
 </script>

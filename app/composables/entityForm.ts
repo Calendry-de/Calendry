@@ -39,24 +39,78 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     const asyncData = useAsyncData(`manage-form:${entity.key}:${id ?? 'new'}`, async () => {
         const resources = referencedResources(entity);
 
-        const [row, ...referenceLists] = await Promise.all([
+        /*
+         * `allSettled`, NOT `all`, and this is the whole fix for a real
+         * data-destruction bug.
+         *
+         * These list endpoints carry permissions the page's own gate does not
+         * imply — `offerings` fetches `/api/terms`, `/api/session-kinds` and
+         * `/api/roles`. Under `Promise.all` one 403 rejected the entire wave,
+         * and because the page awaits the useAsyncData HANDLE (which resolves
+         * rather than rejects) it did not blank: `row` stayed null and `seed()`
+         * filled every control with an empty value. The form then showed blank
+         * inputs over a record that has data, and since Save is gated on
+         * `isDirty` alone, editing ONE field PATCHed every field — most of them
+         * blank. Reproduced against a live role holding `offering.read` +
+         * `offering.update` and nothing else.
+         *
+         * The ROW's failure stays fatal. A missing or forbidden row is a real
+         * error and must not degrade into an empty form, which is the same
+         * mistake pointing the other way.
+         */
+        const [rowResult, ...referenceResults] = await Promise.allSettled([
             mode === 'edit' && id
                 ? request<EntityRow>(`/api/${entity.key}/${id}`)
                 : Promise.resolve(null),
             ...resources.map((resource) => request<EntityRow[]>(`/api/${resource}`)),
         ]);
 
+        if (rowResult.status === 'rejected') {
+            throw rowResult.reason;
+        }
+
         const references: Record<string, EntityRow[]> = {};
+        /*
+         * NAMED, not silently empty. An unreadable list and a genuinely empty
+         * one are different facts with different fixes, and a select that is
+         * merely empty cannot tell them apart — so the fields that depend on one
+         * are locked rather than offered against options that never arrived.
+         */
+        const unavailable: string[] = [];
 
         resources.forEach((resource, index) => {
-            references[resource] = (referenceLists[index] ?? []) as EntityRow[];
+            const result = referenceResults[index];
+
+            if (result?.status === 'fulfilled') {
+                references[resource] = (result.value ?? []) as EntityRow[];
+            } else {
+                references[resource] = [];
+                unavailable.push(resource);
+            }
         });
 
-        return { row: row as EntityRow | null, references };
+        return { row: rowResult.value as EntityRow | null, references, unavailable };
     });
 
     const row = computed(() => asyncData.data.value?.row ?? null);
     const references = computed(() => asyncData.data.value?.references ?? {});
+
+    /** Reference resources whose fetch failed — see the note in the wave above. */
+    const unavailableReferences = computed(() => new Set(asyncData.data.value?.unavailable ?? []));
+
+    /**
+     * A field the caller may not edit because the options it chooses from could
+     * not be read.
+     *
+     * Rendered read-only and EXCLUDED FROM THE PAYLOAD, which is the part that
+     * matters: a locked reference left in the body would be sent as whatever
+     * `toPayloadValue` makes of an unresolved value, overwriting a real
+     * reference with a blank. Omitting the key leaves the stored value untouched,
+     * because the server's update schema treats every field as optional.
+     */
+    function isFieldLocked(field: FieldDef): boolean {
+        return Boolean(field.reference && unavailableReferences.value.has(field.reference.resource));
+    }
 
     const draft = ref<Record<string, unknown>>({});
     const fieldErrors = ref<Record<string, string>>({});
@@ -146,6 +200,13 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
             const body: Record<string, unknown> = {};
 
             for (const field of fields) {
+                // A field whose option list never loaded is not the caller's to
+                // change; sending it would overwrite a real reference with a
+                // blank. See `isFieldLocked`.
+                if (isFieldLocked(field)) {
+                    continue;
+                }
+
                 body[field.key] = toPayloadValue(field, draft.value[field.key]);
             }
 
@@ -252,6 +313,8 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         draft,
         row,
         references,
+        unavailableReferences,
+        isFieldLocked,
         fieldErrors,
         formError,
         errorData,

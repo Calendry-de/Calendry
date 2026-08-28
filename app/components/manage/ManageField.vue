@@ -214,7 +214,23 @@ const staticText = computed(() => {
     if (props.field.type === 'reference' || props.field.type === 'select') {
         const match = options.value.find((option) => String(option.value) === String(model.value));
 
-        return match?.label ?? '—';
+        if (match) {
+            return match.label;
+        }
+
+        /*
+         * THE RAW VALUE, not an em dash, when a value exists but cannot be
+         * resolved to a label. Same rule as `ManageRelationPicker.labelFor` —
+         * an unresolvable reference is something to see, not to hide.
+         *
+         * It matters most where the option list failed to load: `'—'` there
+         * claims the field is EMPTY over a record that has a reference, which
+         * is the "no data and fetch failed look identical" trap. An id is ugly
+         * and true.
+         */
+        const value = model.value;
+
+        return value === null || value === undefined || value === '' ? '—' : String(value);
     }
 
     const value = model.value;
