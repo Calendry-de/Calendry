@@ -67,21 +67,28 @@ const ids = {
 export type Fixtures = typeof ids;
 
 /** Removes every fixture row. Append-only guards are lifted for the duration. */
+/**
+ * Removes every fixture row.
+ *
+ * NO LONGER DISABLES THE APPEND-ONLY TRIGGERS, and that is the point rather than
+ * a tidy-up. It used to disable all three, which is how a schema defect survived
+ * a thousand passing tests: deleting a Tenant that had ever produced a
+ * Generation was impossible (`generation_no_delete` refused the FK's cascade),
+ * and deleting a Person who had ever created one was impossible too
+ * (`generation_content_immutable` refused the FK's SET NULL). The fixture worked
+ * around both, so nothing failed and nobody found out.
+ *
+ * Migration 20260828140000 permits exactly those two FK actions and nothing
+ * adjacent. If this function ever needs a `DISABLE TRIGGER` again, that is a
+ * finding about the schema — write the migration, do not restore the workaround.
+ */
 export async function teardown() {
-    await ownerDb.$executeRawUnsafe('ALTER TABLE session_event DISABLE TRIGGER session_event_append_only');
-    await ownerDb.$executeRawUnsafe('ALTER TABLE generation DISABLE TRIGGER generation_no_delete');
-    await ownerDb.$executeRawUnsafe('ALTER TABLE generation DISABLE TRIGGER generation_content_immutable');
-
     const emails = Object.values(ACCOUNTS).map((e) => `'${e}'`).join(',');
 
     await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email IN (${emails})`);
     await ownerDb.$executeRawUnsafe(`DELETE FROM tenant WHERE id IN ('${ids.tenantA}','${ids.tenantB}')`);
     await ownerDb.$executeRawUnsafe(`DELETE FROM room WHERE federation_id = '${ids.federationId}'`);
     await ownerDb.$executeRawUnsafe(`DELETE FROM federation WHERE id = '${ids.federationId}'`);
-
-    await ownerDb.$executeRawUnsafe('ALTER TABLE session_event ENABLE TRIGGER session_event_append_only');
-    await ownerDb.$executeRawUnsafe('ALTER TABLE generation ENABLE TRIGGER generation_no_delete');
-    await ownerDb.$executeRawUnsafe('ALTER TABLE generation ENABLE TRIGGER generation_content_immutable');
 }
 
 export async function seed(): Promise<Fixtures> {
