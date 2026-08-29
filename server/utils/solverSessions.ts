@@ -1,4 +1,5 @@
 import type { Session as WireSession } from '@mindcollaps/calendry-proto';
+import { MAX_WIRE_ROOMS_PER_SESSION } from '../../shared/solverBudget';
 
 /**
  * Stage 3c — already-placed Sessions.
@@ -99,20 +100,18 @@ export function toWireSession(row: AppSessionRow): WireSession {
         // the caller rather than silently discarded here.
         roomId: row.roomIds[0] ?? '',
         /*
-         * EMPTY IS THE CONVENTION, not a withheld value. `Session.room_ids`
-         * arrived with proto v0.10.0 and its own comment says an ordinary
-         * single-room Session leaves it empty because `room_id` above is already
-         * the complete answer — populating it would be redundant duplication.
+         * EMPTY FOR AN ORDINARY SESSION, and that is the wire's own convention
+         * rather than a withheld value: `room_id` above is already the complete
+         * answer for one Room, so a one-element echo here would be redundant
+         * duplication. `partition_sessions` reads this as the AUTHORITATIVE set
+         * when non-empty and derives its extras by filtering out `room_id`.
          *
-         * For the multi-room case it would NOT be redundant, and the app has the
-         * data. It is still sent empty: `partition_sessions` reads `room_id`
-         * alone, so every extra entry is silently dropped rather than honoured,
-         * and filling this would retire `multiRoomSessions` from the assembly
-         * report while changing no answer. The report is the honest state until
-         * the search has a multi-room placement primitive. "Multi-room Sessions"
-         * is the card.
+         * Sent in full for a genuine multi-Room Session, which is the gap this
+         * closes: the solver used to reason about a Session occupying less room
+         * than it really did, and would happily place something else in the Room
+         * the app had dropped.
          */
-        roomIds: [],
+        roomIds: row.roomIds.length > 1 ? row.roomIds : [],
         lecturerIds: row.lecturerIds,
         groupIds: row.groupIds,
         personIds: row.personIds,
@@ -146,7 +145,20 @@ export function toWireSession(row: AppSessionRow): WireSession {
     };
 }
 
-/** Sessions carrying more rooms than the wire can express, for honest reporting. */
-export function multiRoomSessionIds(rows: AppSessionRow[]): string[] {
-    return rows.filter((row) => row.roomIds.length > 1).map((row) => row.id);
+/**
+ * Sessions carrying more Rooms than the wire can express.
+ *
+ * THE REPORT MOVED RATHER THAN RETIRED. This replaced `multiRoomSessionIds`,
+ * which named every Session with more than one Room, because that gap is now
+ * closed — `Session.room_ids` carries the full set and the solver honours it.
+ *
+ * The reason to report has narrowed to the cap: `convert.rs` keeps `room_id`
+ * plus `MAX_ADDITIONAL_ROOMS` extras and TRUNCATES the rest, warn-and-allow,
+ * with nothing on the wire saying it did. Truncation puts the solver back to
+ * reasoning about a Session that occupies less Room than it really does — the
+ * exact failure the plural field exists to fix — so the app names it here or
+ * nobody ever learns of it.
+ */
+export function sessionsOverRoomCap(rows: AppSessionRow[]): string[] {
+    return rows.filter((row) => row.roomIds.length > MAX_WIRE_ROOMS_PER_SESSION).map((row) => row.id);
 }

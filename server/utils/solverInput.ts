@@ -13,7 +13,7 @@ import {
     toWireTimeGrid,
     weekIndexOf,
 } from './solverCalendar';
-import { multiRoomSessionIds, toWireSession } from './solverSessions';
+import { sessionsOverRoomCap, toWireSession } from './solverSessions';
 import { HEAVY_VETO_RATIO, blockedSlotSummary } from '../../shared/availability';
 import { blackedOutWeeks } from '../../shared/academicCalendar';
 import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
@@ -47,8 +47,17 @@ export interface AssemblyReport {
     /** Slots other tenants already occupy on those shared Rooms. */
     externalOccupancySlots: number;
     excludedFederationOfferings: number;
-    /** Sessions whose extra Rooms the wire cannot carry (see CLAUDE.md). */
-    multiRoomSessions: string[];
+    /**
+     * Sessions carrying more Rooms than the wire can express.
+     *
+     * Replaced `multiRoomSessions`, which named every Session with more than
+     * one Room. That gap is closed — `Session.room_ids` now carries the full
+     * set and the solver honours it — so the reason to report has narrowed to
+     * the cap: beyond four Rooms `convert.rs` truncates silently, which puts the
+     * solver back to reasoning about a Session occupying less Room than it
+     * really does.
+     */
+    sessionsOverRoomCap: string[];
     /**
      * Equipment quantity requirements NO sent Room can meet.
      *
@@ -1214,7 +1223,7 @@ export async function assembleSolverInput(
             includedFederationRooms,
             externalOccupancySlots: externalOccupancy.length,
             excludedFederationOfferings: federationOfferings,
-            multiRoomSessions: multiRoomSessionIds(sessionInputs),
+            sessionsOverRoomCap: sessionsOverRoomCap(sessionInputs),
             unsatisfiableEquipmentQuantities,
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,

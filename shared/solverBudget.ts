@@ -67,3 +67,18 @@ export const DEFAULT_MAX_MOVES = 100_000_000;
 
 /** Backstop only — see above. Whichever budget is hit first ends the run. */
 export const DEFAULT_MAX_WALL_MILLIS = 80_000;
+
+/**
+ * How many Rooms one Session can carry across the wire.
+ *
+ * `crates/core/src/solution.rs` stores a primary Room plus
+ * `MAX_ADDITIONAL_ROOMS = 3` extras in a fixed-size array, so four is the whole
+ * capacity. Beyond it `convert.rs` TRUNCATES rather than refusing — warn and
+ * allow, like the rest of that module — and says nothing on the wire about
+ * having done so.
+ *
+ * Declared here rather than as a literal at the one call site for the reason
+ * this file exists at all: it is a fact about the solver, and the next person to
+ * raise `MAX_ADDITIONAL_ROOMS` needs one place to look for what agrees with it.
+ */
+export const MAX_WIRE_ROOMS_PER_SESSION = 4;

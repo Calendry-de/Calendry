@@ -30,6 +30,7 @@ const ids = {
     kind: `${T}-kind`,
     role: `${T}-role`,
     room: `${T}-room`,
+    room2: `${T}-room-2`,
     person: `${T}-person`,
     group: `${T}-group`,
     offeringA: `${T}-offering-a`,
@@ -88,6 +89,7 @@ async function seed() {
     await db.sessionKind.create({ data: { id: ids.kind, tenantId: ids.tenant, key: 'lecture', name: 'Lecture' } });
     await db.role.create({ data: { id: ids.role, tenantId: ids.tenant, key: 'lecturer', name: 'Lecturer' } });
     await db.room.create({ data: { id: ids.room, tenantId: ids.tenant, code: 'R1', name: 'Room 1', capacity: 40 } });
+    await db.room.create({ data: { id: ids.room2, tenantId: ids.tenant, code: 'R2', name: 'Room 2', capacity: 40 } });
     await db.person.create({ data: { id: ids.person, tenantId: ids.tenant, givenName: 'A', familyName: 'B' } });
     await db.group.create({ data: { id: ids.group, tenantId: ids.tenant, name: 'G' } });
 
@@ -239,6 +241,66 @@ describe('materializeGeneration', () => {
         // Lecturers are attributed to the tenant's `lecturer` role.
         expect(people[0]?.roleId).toBe(ids.role);
         expect(groups.map((g) => g.groupId)).toEqual([ids.group]);
+    });
+
+    /*
+     * A multi-Room placement must write EVERY Room, and an ordinary one must
+     * still write exactly its own.
+     *
+     * The wire leaves `PlacedSession.room_ids` empty for a single-Room
+     * placement, so the apply normalises both shapes into one list. Writing
+     * `room_id` alone would silently drop the second hall of a two-hall
+     * lecture — the same under-booking the plural field exists to fix, moved
+     * from the input side to the output side where no test was looking.
+     */
+    it('writes every Room of a multi-Room placement', async () => {
+        await seed();
+
+        await materializeGeneration(db as never, {
+            tenantId: ids.tenant, termId: ids.term, generationId: ids.generation,
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: ids.person,
+            output: output({
+                sessions: [{
+                    sessionId: ids.moveSession, offeringId: ids.offeringA,
+                    startSlot: { week: 2, day: 4, block: 5 }, durationBlocks: 1,
+                    roomId: ids.room, roomIds: [ids.room, ids.room2],
+                    lecturerIds: [], groupIds: [], personIds: [],
+                }],
+            }),
+        });
+
+        const rooms = await db.sessionRoom.findMany({ where: { sessionId: ids.moveSession } });
+
+        expect(rooms.map((r) => r.roomId).sort()).toEqual([ids.room, ids.room2].sort());
+    });
+
+    it('does not duplicate the primary Room when the wire echoes it', async () => {
+        /*
+         * `PlacedSession.room_ids` is the full set INCLUDING `room_id`, so the
+         * naive concatenation writes the primary twice — which `session_room`'s
+         * composite primary key rejects, turning a correct placement into a
+         * failed apply.
+         */
+        await seed();
+
+        await materializeGeneration(db as never, {
+            tenantId: ids.tenant, termId: ids.term, generationId: ids.generation,
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: ids.person,
+            output: output({
+                sessions: [{
+                    sessionId: ids.moveSession, offeringId: ids.offeringA,
+                    startSlot: { week: 2, day: 4, block: 5 }, durationBlocks: 1,
+                    roomId: ids.room, roomIds: [ids.room, ids.room, ids.room2],
+                    lecturerIds: [], groupIds: [], personIds: [],
+                }],
+            }),
+        });
+
+        const rooms = await db.sessionRoom.findMany({ where: { sessionId: ids.moveSession } });
+
+        expect(rooms).toHaveLength(2);
     });
 
     it('leaves out-of-scope sessions alone even when absent from the output', async () => {

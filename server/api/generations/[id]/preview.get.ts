@@ -251,7 +251,10 @@ function filterPlacements(plan: MaterializationPlan, query: {
     const placements = plan.placements.filter((p) => (
         (query.termWeek === undefined || p.placement.termWeek === query.termWeek)
         && matches(p.groupIds, query.groupId)
-        && (!query.roomId || p.roomId === query.roomId)
+        // Against the FULL Room set, not the primary. A reviewer filtering by
+        // the second hall of a two-hall lecture was shown nothing, which reads
+        // as "this room is free" — the same room the placement occupies.
+        && matches(p.roomIds, query.roomId)
         && matches([...p.lecturerIds, ...p.personIds], query.personId)
     ));
 

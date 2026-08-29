@@ -29,6 +29,16 @@ export interface PlannedPlacement {
     /** Where it currently sits. Null for a create; the diff view needs it. */
     previous: Placement | null;
     roomId: string | null;
+    /**
+     * The FULL Room set, `roomId` included.
+     *
+     * The wire leaves `PlacedSession.room_ids` empty for an ordinary
+     * single-Room placement — `room_id` is already the complete answer there —
+     * so this normalises both shapes into one list the apply can write without
+     * a branch. Writing only `roomId` would silently drop the extra Rooms of
+     * every multi-Room placement the solver just learned to produce.
+     */
+    roomIds: string[];
     groupIds: string[];
     lecturerIds: string[];
     personIds: string[];
@@ -235,6 +245,13 @@ export async function planMaterialization(tx: Tx, options: {
             placement,
             previous,
             roomId: placed.roomId || null,
+            // Non-empty ONLY for a genuine multi-Room placement; the singular
+            // field carries the ordinary case. Deduplicated because the wire's
+            // full set includes `room_id`, and a duplicate would violate
+            // `session_room`'s composite primary key.
+            roomIds: [...new Set(
+                placed.roomIds.length > 0 ? placed.roomIds : [placed.roomId],
+            )].filter(Boolean),
             groupIds: placed.groupIds,
             lecturerIds: placed.lecturerIds,
             personIds: placed.personIds,
@@ -396,8 +413,11 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
             tx.sessionGroup.deleteMany({ where: { sessionId } }),
         ]);
 
-        if (planned.roomId) {
-            await tx.sessionRoom.create({ data: { sessionId, roomId: planned.roomId, tenantId } });
+        // EVERY Room, not just the primary. `session_room` is a join table and
+        // always could hold several; until the solver could return several this
+        // loop was indistinguishable from the single write it replaces.
+        for (const roomId of planned.roomIds) {
+            await tx.sessionRoom.create({ data: { sessionId, roomId, tenantId } });
         }
 
         for (const personId of planned.lecturerIds) {
