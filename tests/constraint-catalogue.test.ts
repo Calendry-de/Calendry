@@ -328,6 +328,27 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
+     * EMPTY MEANS BOTH, and that is the whole subtlety of this mapping.
+     *
+     * The proto defines an empty `scope` as "both axes counted independently",
+     * so naming both scopes explicitly is a SECOND spelling of one state. Two
+     * spellings is exactly what `inputHash` cannot see past: the same configured
+     * rule would hash two ways, the idempotency key would stop identifying the
+     * problem, and a retry would launch a fresh run instead of replaying.
+     */
+    it('sends compactness BOTH as an empty scope, and each single axis as itself', () => {
+        const configOf = (scope: string) => (toWireConstraint(
+            row({ type: 'compactness', severity: 'SOFT', weight: 5, params: { scope } }),
+            noKinds,
+        ) as { config: Record<string, unknown> }).config.compactness;
+
+        expect(configOf('BOTH')).toEqual({ scope: [] });
+        // 1 = COMPACTNESS_SCOPE_GROUP, 2 = COMPACTNESS_SCOPE_PERSON.
+        expect(configOf('GROUP')).toEqual({ scope: [1] });
+        expect(configOf('PERSON')).toEqual({ scope: [2] });
+    });
+
+    /*
      * The exam-period direction, which is what makes "push exams INTO the exam
      * weeks" expressible at all rather than only "keep them clear".
      *

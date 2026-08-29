@@ -42,6 +42,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_online_sessions',
     'person_preference_fit',
     'group_veto',
+    'compactness',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -116,7 +117,8 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
-    | 'groupVeto';
+    | 'groupVeto'
+    | 'compactness';
 
 export interface ConstraintTypeDef {
     key: string;
@@ -498,6 +500,38 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
                 + 'On — discourage scheduling OUTSIDE them, so the sessions this rule '
                 + 'applies to are drawn in. Turning this on usually means scoping the '
                 + 'rule to your exam session kind; unscoped, it pulls everything in.',
+        }],
+    },
+    {
+        key: 'compactness',
+        wireField: 'compactness',
+        label: 'Keep the day compact',
+        description:
+            'Discourage idle gaps between the first and last session of a day. A 09:00 '
+            + 'lecture and a 17:00 seminar with nothing between is a bad day this is the '
+            + 'only rule that can see.',
+        evaluator: 'solver',
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            /*
+             * BOTH is the default because the two axes are different sets, not
+             * two views of one: a placement usually sits in a Group's day AND in
+             * several People's, and a rule that counted only one would leave the
+             * other's gaps invisible while looking configured.
+             */
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\'s day and a person\'s day are different sets — a lecturer teaching '
+                + 'three cohorts has gaps none of those cohorts can see.',
         }],
     },
     {

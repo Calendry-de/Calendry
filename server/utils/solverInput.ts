@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { SchedulingPattern, SolverInput } from '@mindcollaps/calendry-proto';
+import { CompactnessScope, SchedulingPattern, SolverInput } from '@mindcollaps/calendry-proto';
 import type {
     ConstraintConfig, ExternalOccupancy, Offering, Person, Room, SlotRef,
 } from '@mindcollaps/calendry-proto';
@@ -312,6 +312,24 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                  * false, so the two agree.
                  */
                 invert: Boolean(params.invert),
+            };
+
+        case 'compactness':
+            /*
+             * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather
+             * than naming both scopes. Not interchangeable in principle — the
+             * proto's own comment defines empty as "both axes counted
+             * independently", so a two-entry list is a second spelling of one
+             * state, and two spellings of one state is what `inputHash` cannot
+             * see past: the same rule would produce two different hashes and a
+             * retry would launch a fresh run.
+             */
+            return {
+                scope: params.scope === 'GROUP'
+                    ? [CompactnessScope.COMPACTNESS_SCOPE_GROUP]
+                    : params.scope === 'PERSON'
+                        ? [CompactnessScope.COMPACTNESS_SCOPE_PERSON]
+                        : [],
             };
 
         case 'minimize_exam_week_sessions':
