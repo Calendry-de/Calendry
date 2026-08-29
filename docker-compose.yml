@@ -31,6 +31,19 @@ services:
   db:
     image: 'postgres:18.1-alpine'
     container_name: calendry-db
+    # Matches calendry-app and solver, which both had it while the database they
+    # depend on did not. That asymmetry is the failure mode, not a missing nicety:
+    # when the db stopped (host sleep, daemon restart, OOM) nothing brought it
+    # back, while the two dependents restarted forever against a database that was
+    # never coming — `Error: P1001: Can't reach database server at db:5432`, on a
+    # loop, indefinitely.
+    #
+    # The loop also has a second-order effect worth knowing, because `up -d` does
+    # NOT fix it: a container that keeps restarting while its network is recreated
+    # ends up with a stale endpoint and NO network at all, and starting an existing
+    # container does not rebuild one. The symptom is identical (P1001) but the
+    # cause is not, and the cure is `up -d --force-recreate <service>`.
+    restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql/18/docker
       - ./.config/db-init:/docker-entrypoint-initdb.d:ro
