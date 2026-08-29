@@ -310,9 +310,12 @@ solver has no way to detect.
   whole descendant closure. Solver ADR-0026; §§ "Per-person preferences",
   "`PersonPreferenceFit.roles`".
 - **Tracked wire-format gaps** (on the board) each report rather than
-  narrow silently — do not "fix" one by picking a value: equipment quantity,
-  multi-room Sessions, the solver's unbounded run registry, violations naming
-  solver-invented Sessions with no join key.
+  narrow silently — do not "fix" one by picking a value: the solver's unbounded
+  run registry, violations naming solver-invented Sessions with no join key.
+  **Equipment quantity and multi-room Sessions were on this list and are not
+  gaps any more** — both are sent and enforced end to end. The list is prose,
+  which nothing checks, so it is exactly the entry this file warns can drift:
+  confirm a gap against the code before acting on it.
 
 Installing the proto package (three causes of the same opaque 401), the operator
 CLIs, the test accounts, and constraint-shape validation at the write boundary:
