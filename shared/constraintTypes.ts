@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'minimize_capacity_waste',
     'minimize_room_churn',
     'room_turnaround_buffer',
     'max_concurrent_online_sessions',
@@ -123,6 +124,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'minimizeCapacityWaste'
     | 'minimizeRoomChurn'
     | 'roomTurnaroundBuffer'
     | 'maxConcurrentOnlineSessions'
@@ -759,6 +761,40 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 2,
             help: 'Past this, each extra room is charged. 2 allows a home room plus one '
                 + 'specialist room; raise it for a university-style timetable.',
+        }],
+    },
+
+    {
+        key: 'minimize_capacity_waste',
+        wireField: 'minimizeCapacityWaste',
+        label: 'Reward a good room-size fit',
+        description:
+            'Discourage putting a seminar of twelve into a 400-seat hall. Room eligibility '
+            + 'only asks whether a room is big ENOUGH; this asks whether it is the right '
+            + 'size.',
+        evaluator: 'solver',
+        /*
+         * GRADED BY RATIO, not a flat charge past a line: the penalty grows with
+         * how far past the threshold a room is, so a 400-seat hall for twelve
+         * costs more than a 60-seat one. A flat charge would make those two
+         * choices identical to the search.
+         *
+         * The threshold is a RATIO of the offering's required capacity, not a
+         * seat count, so one setting works for a tenant whose rooms run from 12
+         * to 400.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
+        params: [{
+            key: 'wasteRatioThreshold',
+            label: 'Tolerated size ratio',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 2,
+            help: '2 means a room up to twice the size needed is fine and anything larger '
+                + 'is charged, more the larger it gets. 1 charges any room bigger than '
+                + 'strictly necessary.',
         }],
     },
 
