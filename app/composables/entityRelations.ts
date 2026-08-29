@@ -1,5 +1,5 @@
 import type { EntityRow, ManageEntity, RelationDef } from '~/utils/manageRegistry';
-import { relationReadRequirement } from '~/utils/manageRegistry';
+import { relationOptionsUrl, relationReadRequirement } from '~/utils/manageRegistry';
 import { satisfiesPermissionRequirement } from '#shared/permissions';
 import { useSession } from '~/composables/session';
 
@@ -70,7 +70,11 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
 
     const asyncData = useAsyncData(`manage-relations:${entity.key}:${id ?? 'new'}`, async () => {
         if (!defs.length || !id) {
-            return { sets: {} as Record<string, RelationRow[]>, options: {} as Record<string, EntityRow[]> };
+            return {
+                sets: {} as Record<string, RelationRow[]>,
+                options: {} as Record<string, EntityRow[]>,
+                parent: null as EntityRow | null,
+            };
         }
 
         /**
@@ -97,7 +101,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
          * resource alone would serve one of them the other's narrowed list,
          * silently.
          */
-        const optionUrls = new Map<string, string>();
+        const optionUrls = new Map<string, string | null>();
 
         const urlFor = (resource: string, scopeBy?: RelationDef['scopeBy']) => {
             const value = scopeBy && parent ? parent[scopeBy.from] : undefined;
@@ -110,22 +114,40 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
                 : `/api/${resource}?${scopeBy!.filter}=${encodeURIComponent(String(value))}`;
         };
 
-        for (const def of defs) {
-            optionUrls.set(`${def.key}:main`, urlFor(def.resource, def.scopeBy));
+        for (const [index, def] of defs.entries()) {
+            /**
+             * A SEARCHABLE relation fetches the rows it has, not the rows it
+             * could have. Its picker asks the server per keystroke, so the only
+             * thing this wave still owes it is a label for each row already
+             * assigned — which is `?ids=`, and which is bounded by the
+             * assignment rather than by the size of the tenant.
+             *
+             * This is the half of the feature that actually removes the cost.
+             * Search alone would still have loaded every Person in the
+             * institution to fill a list nobody then reads.
+             */
+            optionUrls.set(`${def.key}:main`, relationOptionsUrl(
+                def,
+                (sets[index] ?? []).map((row) => String(row[def.valueKey])),
+                urlFor(def.resource, def.scopeBy),
+            ));
 
             if (def.extraReference) {
                 optionUrls.set(`${def.key}:extra`, urlFor(def.extraReference.resource));
             }
         }
 
-        const uniqueUrls = [...new Set(optionUrls.values())];
+        const uniqueUrls = [...new Set([...optionUrls.values()].filter((url): url is string => url !== null))];
         const fetched = await Promise.all(uniqueUrls.map((url) => request<EntityRow[]>(url)));
         const byUrl = new Map(uniqueUrls.map((url, index) => [url, fetched[index] ?? []]));
 
         return {
             sets: Object.fromEntries(defs.map((def, index) => [def.key, sets[index] ?? []])),
+            // Kept so `searchParamsFor` can resolve `scopeBy` without a second
+            // request; already fetched above whenever any relation is scoped.
+            parent,
             options: Object.fromEntries(
-                [...optionUrls].map(([slot, url]) => [slot, byUrl.get(url) ?? []]),
+                [...optionUrls].map(([slot, url]) => [slot, (url === null ? [] : byUrl.get(url)) ?? []]),
             ),
         };
     });
@@ -168,6 +190,27 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
 
     function extraOptionsFor(def: RelationDef): EntityRow[] {
         return def.extraReference ? (options.value[`${def.key}:extra`] ?? []) : [];
+    }
+
+    /**
+     * A searchable relation's `scopeBy`, in the form its picker can send.
+     *
+     * Resolved here because `scopeBy.from` names a field on the PARENT row,
+     * which only this composable fetches. Returned as parameters rather than a
+     * URL so the picker keeps owning `q` and `limit` — the two it varies.
+     *
+     * Empty today, since `persons` is the only searchable relation and it is
+     * unscoped. It exists so that making a scoped relation searchable is one
+     * flag rather than a silently unscoped search, which would offer a 2024
+     * cohort's people on a 2027 Offering exactly the way `scopeBy` was added to
+     * stop.
+     */
+    function searchParamsFor(def: RelationDef): Record<string, string> {
+        const value = def.scopeBy ? asyncData.data.value?.parent?.[def.scopeBy.from] : undefined;
+
+        return def.scopeBy && value !== undefined && value !== null && value !== ''
+            ? { [def.scopeBy.filter]: String(value) }
+            : {};
     }
 
     /** Writes the whole set. The server replaces it in one transaction. */
@@ -253,6 +296,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
         saved,
         optionsFor,
         extraOptionsFor,
+        searchParamsFor,
         add,
         remove,
         setExtra,

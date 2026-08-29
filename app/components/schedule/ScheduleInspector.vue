@@ -144,9 +144,14 @@
                             The SAME picker as groups. It replaced a
                             `<select multiple>`, where the selection was only
                             legible by scanning for highlighted rows and a stray
-                            plain click silently cleared every other person. The
-                            list is still every person in the tenant — a search
-                            field is tracked separately.
+                            plain click silently cleared every other person.
+
+                            Searchable, so a name is typed rather than hunted
+                            for. `options` stays the page's whole directory —
+                            not because this picker needs it, but because the
+                            grid does, to label the attendees of every drawn
+                            Session. Search here removes the scrolling, not that
+                            fetch.
                         -->
                         <ManageRelationPicker
                             :def="personRelation"
@@ -315,6 +320,7 @@ import {
 import { useViewerLocale } from '~/composables/locale';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 import type { RelationDef } from '~/utils/manageRegistry';
+import { personOptionLabel } from '~/utils/manageRegistry';
 
 const props = defineProps<{
     session: ScheduleSession | null;
@@ -368,7 +374,11 @@ const personRelation: RelationDef = {
     resource: 'persons',
     valueKey: 'personId',
     // People are a flat list, not a hierarchy — the one difference from groups.
-    optionLabel: (row) => String(row.name),
+    searchable: true,
+    // Handles BOTH shapes on purpose: `options` below is the page's directory,
+    // where the name is already composed, while a search result comes straight
+    // from `/api/persons` with the parts separate.
+    optionLabel: personOptionLabel,
     emptyHint: 'No people in this institution yet.',
 };
 

@@ -102,6 +102,58 @@ export interface ColumnDef {
  * page. It is the hub of the model, but nothing about editing it is structurally
  * new; only the number of relations is.
  */
+/**
+ * A Person's display name, from either shape it arrives in.
+ *
+ * TWO SOURCES, ONE LABEL, and a searchable picker mixes them in a single list:
+ * `/api/persons` returns the name in parts, while the schedule page's directory
+ * pre-composes `name` for the grid's own lookups. A label function written for
+ * one renders `"undefined undefined"` for the other — silently, since both are
+ * `EntityRow` and neither typechecks the field it reads.
+ */
+export function personOptionLabel(row: EntityRow): string {
+    if (typeof row.name === 'string' && row.name.trim()) {
+        return row.name;
+    }
+
+    const composed = [row.givenName, row.familyName].filter(Boolean).join(' ').trim();
+
+    // An unresolvable row shows its id rather than an empty cell, matching
+    // `ManageRelationPicker.labelFor`: a missing name is something to see.
+    return composed || String(row.id);
+}
+
+/**
+ * Where a relation's option wave should fetch its rows, or `null` for
+ * "make no request at all".
+ *
+ * PURE, AND HERE RATHER THAN INLINE IN `useEntityRelations`, because the
+ * property it encodes is invisible in the DOM: a searchable picker renders
+ * identically whether the parent fetched three rows or three thousand. Nothing
+ * a rendered page can assert would notice the difference, so the decision is
+ * pulled out to where a test can address it directly.
+ *
+ * `assignedIds` is ignored for a non-searchable relation, which fetches the
+ * whole candidate list as it always has.
+ */
+export function relationOptionsUrl(
+    def: RelationDef,
+    assignedIds: string[],
+    fullListUrl: string,
+): string | null {
+    if (!def.searchable) {
+        return fullListUrl;
+    }
+
+    const ids = [...new Set(assignedIds.filter(Boolean))];
+
+    // Nothing assigned means nothing to label, and `?ids=` with an empty list
+    // is a deliberate 400 — so the answer is known without asking.
+    return ids.length
+        ? `/api/${def.resource}?ids=${ids.map(encodeURIComponent).join(',')}`
+        : null;
+}
+
 export interface RelationDef {
     /** Path segment: /api/{entity}/{id}/{key}. Must exist in server RELATIONS. */
     key: string;
@@ -114,6 +166,25 @@ export interface RelationDef {
     optionLabel: (row: EntityRow) => string;
     /** Renders options with their hierarchy visible (Groups). */
     indentTree?: boolean;
+    /**
+     * Choose from a SERVER-SIDE SEARCH instead of a pre-fetched option list.
+     *
+     * Set it when the referenced resource can plausibly hold thousands of rows.
+     * It changes what `options` means for this relation — see the prop's own
+     * comment on `ManageRelationPicker` — so it is not a cosmetic flag: the
+     * parent must supply labels for the assigned rows and nothing else.
+     *
+     * REQUIRES `searchFields` on the resource server-side, or `?q=` answers 400
+     * rather than returning everything. `persons`, `groups`, `rooms`,
+     * `offerings`, `roles` and `equipment` all declare them today.
+     *
+     * NOT COMPATIBLE WITH `indentTree`, and `tests/relation-picker-search.test.ts`
+     * fails if any relation declares both rather than leaving the picker to
+     * silently prefer one: a tree needs every ancestor of a match in order to
+     * draw the match at all, which a `q=` page does not return. Groups stay on
+     * the full list until that query exists.
+     */
+    searchable?: boolean;
     /** Per-row count, for countable equipment. */
     quantity?: { key: string; label: string };
     /**
@@ -416,7 +487,8 @@ export const OFFERING_ENTITY: ManageEntity = {
             help: 'Optionally state the scheduling role each person fills here.',
             resource: 'persons',
             valueKey: 'personId',
-            optionLabel: (row) => `${row.givenName} ${row.familyName}`,
+            searchable: true,
+            optionLabel: personOptionLabel,
             extraReference: {
                 key: 'roleId',
                 resource: 'roles',

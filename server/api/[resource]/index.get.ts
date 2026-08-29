@@ -18,6 +18,28 @@ const LIST_QUERY = z.object({
     limit: z.coerce.number().int().min(1).max(200).optional(),
     offset: z.coerce.number().int().min(0).optional(),
     q: z.string().trim().min(1).max(200).optional(),
+    /**
+     * Resolve exactly these rows, by id — the other half of search.
+     *
+     * A searchable picker never holds the full list, so it cannot label the
+     * rows already assigned to the entity it is editing. It asks for those by
+     * id instead, which is a fundamentally different question from a filter:
+     * "these specific rows" rather than "rows matching this".
+     *
+     * REJECTS EMPTY rather than treating it as absent. `?ids=` is a caller that
+     * meant to name rows and named none — most likely from `[].join(',')` — and
+     * the two readings are "return nothing" and "return everything", one of
+     * which is a silent tenant-wide dump. A 400 makes the mistake impossible to
+     * ship instead of impossible to notice; a caller with nothing to resolve is
+     * expected not to make the request at all.
+     *
+     * Capped at the same 200 as `limit`: this IS a page, addressed by identity
+     * instead of by offset, and it travels in a URL.
+     */
+    ids: z.string()
+        .transform((raw) => raw.split(',').map((value) => value.trim()).filter(Boolean))
+        .pipe(z.array(z.string().min(1)).min(1).max(200))
+        .optional(),
 });
 
 /**
@@ -94,6 +116,13 @@ export default defineEventHandler(async (event) => {
             : { tenantId: identity.tenantId };
 
         const conditions: Record<string, unknown>[] = [ownership, ...relational];
+
+        // AND-ed with everything else, ownership included, so naming an id
+        // cannot reach a row outside the tenant (or its federation) — the id is
+        // a narrowing, never an escape hatch.
+        if (paging.ids !== undefined) {
+            conditions.push({ id: { in: paging.ids } });
+        }
 
         if (paging.q) {
             const fields = config.searchFields ?? [];

@@ -145,6 +145,13 @@ export const BUILT: LandingRoadmapItem[] = [
             + 'its own room, groups and people.',
     },
     {
+        id: 'person-search',
+        state: 'done',
+        title: 'Finding a person by name',
+        note: 'Assigning people searches the institution as you type rather than listing it. '
+            + 'The people already assigned stay on screen while you look for the next one.',
+    },
+    {
         id: 'availability',
         state: 'done',
         title: 'Self-service availability',
@@ -238,13 +245,6 @@ export const NEXT: LandingRoadmapItem[] = [
         title: 'Editing a one-off event after creating it',
         note: 'Its time can be moved, but its room, groups and people cannot be changed — '
             + 'correcting a mistake means deleting and recreating it.',
-    },
-    {
-        id: 'person-search',
-        state: 'next',
-        title: 'A searchable person picker',
-        note: 'The current control lists everyone in the institution. Fine for twenty people, '
-            + 'wrong for two thousand — and the screen says so where it matters.',
     },
     {
         id: 'candidates',
