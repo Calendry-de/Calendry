@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'room_consistency',
     'group_size_fits_room',
     'group_veto',
     'compactness',
@@ -118,6 +119,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'roomConsistency'
     | 'groupSizeFitsRoom'
     | 'groupVeto'
     | 'compactness';
@@ -607,6 +609,30 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * at all. This is the cross-check for when that derivation was wrong.
          */
         severity: 'HARD',
+        params: [],
+    },
+
+    {
+        key: 'room_consistency',
+        wireField: 'roomConsistency',
+        label: 'Keep an offering in the same room',
+        description:
+            'A course\u2019s weekly sessions should reuse one room rather than bouncing '
+            + 'around the building. Every session sitting somewhere other than the '
+            + 'offering\u2019s usual room is charged.',
+        evaluator: 'solver',
+        /*
+         * The Room half of `LecturerConsistency`, and buildable where that one
+         * is not: Room assignment is already a search variable, while lecturer
+         * assignment is gated behind unimplemented pool selection.
+         *
+         * "Usual" is the MODAL room among the offering's currently placed
+         * sessions, recomputed as placements change rather than fixed to
+         * whichever session landed first — so the rule cannot be satisfied by
+         * accident of ordering.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
         params: [],
     },
 
