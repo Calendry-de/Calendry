@@ -381,6 +381,12 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 maxSpanBlocks: Number(params.maxSpanBlocks),
             };
 
+        case 'minimize_location_change':
+            return {
+                scope: compactnessScope(params.scope),
+                maxLocationsPerDay: Number(params.maxLocationsPerDay),
+            };
+
         case 'compactness':
             return { scope: compactnessScope(params.scope) };
 

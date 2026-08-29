@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'minimize_location_change',
     'max_daily_span',
     'max_consecutive_blocks',
     'max_weekly_teaching_load',
@@ -127,6 +128,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'minimizeLocationChange'
     | 'maxDailySpan'
     | 'maxConsecutiveBlocks'
     | 'maxWeeklyTeachingLoad'
@@ -936,6 +938,54 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 8,
             help: 'Counts every block between the first and last session, teaching or not. '
                 + 'Each block past this is charged.',
+        }],
+    },
+
+    {
+        key: 'minimize_location_change',
+        wireField: 'minimizeLocationChange',
+        label: 'Keep a day on one site',
+        description:
+            'Discourage a day that crosses buildings. Uses each room\u2019s Location field, '
+            + 'so it is only as good as those values \u2014 rooms whose location is blank are '
+            + 'not counted.',
+        evaluator: 'solver',
+        /*
+         * THE HELP TEXT CARRIES A DATA WARNING deliberately. `Room.location` is
+         * opaque free text and the solver imposes no format, so "Building A"
+         * and "Bldg A" are two locations and a day using both looks like
+         * cross-campus travel. That is a tenant-data problem this rule cannot
+         * detect, and the only honest place to say so is where somebody enables
+         * it.
+         *
+         * Distinct from `minimize_room_churn`, which counts distinct ROOMS
+         * across a week: a group can change room every block and never leave
+         * the building.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s day and a person\u2019s day are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a day none of those cohorts can see.',
+        }, {
+            key: 'maxLocationsPerDay',
+            label: 'Sites allowed in one day',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 1,
+            help: '1 means any second building is charged. Raise it if two sites in a day '
+                + 'is normal here. Rooms with no location set are ignored.',
         }],
     },
 
