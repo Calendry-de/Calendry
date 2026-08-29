@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'room_turnaround_buffer',
     'max_concurrent_online_sessions',
     'minimize_weekday_imbalance',
     'room_consistency',
@@ -121,6 +122,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'roomTurnaroundBuffer'
     | 'maxConcurrentOnlineSessions'
     | 'minimizeWeekdayImbalance'
     | 'roomConsistency'
@@ -692,6 +694,37 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             required: true,
             help: 'How many online sessions your platform can genuinely host at once. '
                 + 'No default: this is a licence figure, not a preference.',
+        }],
+    },
+
+    {
+        key: 'room_turnaround_buffer',
+        wireField: 'roomTurnaroundBuffer',
+        label: 'Leave a gap between bookings of one room',
+        description:
+            'A room needing reset between uses \u2014 a lab clearing equipment, a hall '
+            + 'being re-laid \u2014 should not be booked back to back. Measured in blocks, '
+            + 'and never across a week boundary.',
+        evaluator: 'solver',
+        /*
+         * SOFT even though it reads like a rule. A tenant enabling this without
+         * a genuine cleanup need makes the instance needlessly harder to solve,
+         * which SOFT absorbs and HARD would turn into unplaceable sessions.
+         *
+         * Genuinely a new shape: pairwise like the four double-booking types,
+         * but keyed by a configurable DISTANCE rather than exact-slot overlap.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'bufferBlocks',
+            label: 'Blocks to leave free',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 1,
+            help: 'One block is the usual answer. This is in BLOCKS, not minutes \u2014 how '
+                + 'long a block is comes from your time grid.',
         }],
     },
 
