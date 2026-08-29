@@ -373,24 +373,31 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
-     * EMPTY MEANS BOTH, and that is the whole subtlety of this mapping.
+     * BOTH IS AN EMPTY SCOPE, for every rule that carries one — not just
+     * `compactness`, which is why the mapping is one shared function.
      *
-     * The proto defines an empty `scope` as "both axes counted independently",
-     * so naming both scopes explicitly is a SECOND spelling of one state. Two
-     * spellings is exactly what `inputHash` cannot see past: the same configured
-     * rule would hash two ways, the idempotency key would stop identifying the
-     * problem, and a retry would launch a fresh run instead of replaying.
+     * The proto defines empty as "both axes counted independently", so naming
+     * both scopes explicitly is a second spelling of one state, and that is what
+     * `inputHash` cannot see past: one configured rule would hash two ways and a
+     * retry would launch a fresh run instead of replaying.
      */
-    it('sends compactness BOTH as an empty scope, and each single axis as itself', () => {
-        const configOf = (scope: string) => (toWireConstraint(
-            row({ type: 'compactness', severity: 'SOFT', weight: 5, params: { scope } }),
+    it.each([
+        'compactness',
+        'max_consecutive_blocks',
+    ])('sends %s BOTH as an empty scope, and each single axis as itself', (key) => {
+        const type = findConstraintType(key)!;
+        const others = Object.fromEntries(
+            type.params.filter((p) => p.key !== 'scope').map((p) => [p.key, p.default ?? p.min ?? 1]),
+        );
+        const scopeOf = (scope: string) => ((toWireConstraint(
+            row({ type: key, severity: 'SOFT', weight: 5, params: { ...others, scope } }),
             noKinds,
-        ) as { config: Record<string, unknown> }).config.compactness;
+        ) as { config: Record<string, Record<string, unknown>> }).config[type.wireField!]!).scope;
 
-        expect(configOf('BOTH')).toEqual({ scope: [] });
+        expect(scopeOf('BOTH')).toEqual([]);
         // 1 = COMPACTNESS_SCOPE_GROUP, 2 = COMPACTNESS_SCOPE_PERSON.
-        expect(configOf('GROUP')).toEqual({ scope: [1] });
-        expect(configOf('PERSON')).toEqual({ scope: [2] });
+        expect(scopeOf('GROUP')).toEqual([1]);
+        expect(scopeOf('PERSON')).toEqual([2]);
     });
 
     /*

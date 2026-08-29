@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'max_consecutive_blocks',
     'max_weekly_teaching_load',
     'minimize_capacity_waste',
     'minimize_room_churn',
@@ -125,6 +126,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'maxConsecutiveBlocks'
     | 'maxWeeklyTeachingLoad'
     | 'minimizeCapacityWaste'
     | 'minimizeRoomChurn'
@@ -843,6 +845,48 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
              */
             help: 'Off \u2014 a double-length lecture counts once. On \u2014 it counts twice, '
                 + 'which is the right reading when the limit is about hours taught.',
+        }],
+    },
+
+    {
+        key: 'max_consecutive_blocks',
+        wireField: 'maxConsecutiveBlocks',
+        label: 'Cap teaching without a break',
+        description:
+            'How many blocks in a row a class or a person may be scheduled with no gap. '
+            + 'The mirror of \u201CKeep the day compact\u201D, which removes gaps \u2014 these two '
+            + 'pull in opposite directions on purpose.',
+        evaluator: 'solver',
+        /*
+         * DELIBERATELY ENABLE-BOTH-ABLE. Compactness alone would happily pack a
+         * group into six unbroken blocks, which is a perfect score and a bad
+         * day. This is the counterweight, and a tenant is meant to run both at
+         * different weights rather than choose between them.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s day and a person\u2019s day are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a day none of those cohorts can see.',
+        }, {
+            key: 'maxConsecutive',
+            label: 'Blocks in a row before it counts',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 4,
+            help: 'Each block past this is charged. In BLOCKS \u2014 how long a block is '
+                + 'comes from your time grid.',
         }],
     },
 

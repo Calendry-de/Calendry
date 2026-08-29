@@ -299,6 +299,32 @@ export function toWireConstraint(row: {
  * the only one that could reach the default, and it did the moment its
  * `wireField` was set.
  */
+/**
+ * The GROUP / PERSON / BOTH selector shared by every whole-day rule.
+ *
+ * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather than
+ * naming both scopes. Not interchangeable in principle — the proto defines
+ * empty as "both axes counted independently", so a two-entry list is a second
+ * spelling of one state, and two spellings is what `inputHash` cannot see past:
+ * the same configured rule would hash two ways and a retry would launch a fresh
+ * run instead of replaying.
+ *
+ * One function rather than one copy per type, because that identity is the
+ * whole reason these rules are comparable to each other — four copies would
+ * agree until one of them was edited.
+ */
+function compactnessScope(value: unknown): CompactnessScope[] {
+    if (value === 'GROUP') {
+        return [CompactnessScope.COMPACTNESS_SCOPE_GROUP];
+    }
+
+    if (value === 'PERSON') {
+        return [CompactnessScope.COMPACTNESS_SCOPE_PERSON];
+    }
+
+    return [];
+}
+
 function buildVariant(typeKey: string, params: Record<string, unknown>): Record<string, unknown> {
     switch (typeKey) {
         case 'max_online_ratio_per_group':
@@ -343,23 +369,14 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 countBlocks: Boolean(params.countBlocks),
             };
 
-        case 'compactness':
-            /*
-             * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather
-             * than naming both scopes. Not interchangeable in principle — the
-             * proto's own comment defines empty as "both axes counted
-             * independently", so a two-entry list is a second spelling of one
-             * state, and two spellings of one state is what `inputHash` cannot
-             * see past: the same rule would produce two different hashes and a
-             * retry would launch a fresh run.
-             */
+        case 'max_consecutive_blocks':
             return {
-                scope: params.scope === 'GROUP'
-                    ? [CompactnessScope.COMPACTNESS_SCOPE_GROUP]
-                    : params.scope === 'PERSON'
-                        ? [CompactnessScope.COMPACTNESS_SCOPE_PERSON]
-                        : [],
+                scope: compactnessScope(params.scope),
+                maxConsecutive: Number(params.maxConsecutive),
             };
+
+        case 'compactness':
+            return { scope: compactnessScope(params.scope) };
 
         case 'minimize_exam_week_sessions':
             /*
