@@ -197,6 +197,7 @@
             -->
             <ScheduleSolverControl
                 v-if="canTriggerSolver && solverTermId"
+                ref="solverControl"
                 :term-id="solverTermId"
             />
         </div>
@@ -261,6 +262,20 @@ const showPersonFilter = computed(() => props.people.length > 1 || Boolean(perso
 // View state, owned by the page: neither affects the API query.
 const rowHeightModel = defineModel<number>('rowHeight', { required: true });
 const showViolationsModel = defineModel<boolean>('showViolations', { required: true });
+
+/**
+ * A pass-through to the solver control, so the violations panel can start a
+ * repair without owning a second `useSolverRun`.
+ *
+ * Forwarded rather than lifted: one poller and one state machine per Term is
+ * the invariant, and the run has to render in this bar wherever it was started
+ * from. `null` when the control is not mounted — no `solver.trigger`, or no
+ * resolved Term — and the caller is gated on the same permission, so this is a
+ * belt-and-braces guard rather than the boundary.
+ */
+const solverControl = useTemplateRef<{ startRepair: () => Promise<void> }>('solverControl');
+
+defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 </script>
 
 <style scoped lang="scss">

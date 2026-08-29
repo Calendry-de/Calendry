@@ -91,9 +91,9 @@
             -->
             <div class="solver_panel">
                 <p
-                    v-if="adopted"
+                    v-if="adoptedNotice"
                     class="solver_hint"
-                >A run was already in progress for this term.</p>
+                >{{ adoptedNotice }}</p>
 
                 <!-- The headline number: whether waiting longer buys anything. -->
                 <p class="solver_objective">
@@ -212,7 +212,7 @@ import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '~~/shared/solverBudg
 const props = defineProps<{ termId: string }>();
 
 const termId = computed(() => props.termId);
-const { run, state, trend, error, adopted, start, cancel, dismiss } = useSolverRun(termId);
+const { run, state, trend, error, adoptedNotice, start, cancel, dismiss } = useSolverRun(termId);
 
 const showAdvanced = ref(false);
 const confirmCancel = ref(false);
@@ -271,6 +271,27 @@ async function startRun() {
     confirmCancel.value = false;
     await start({ maxMoves: maxMoves.value, maxWallMillis: maxWallSeconds.value * 1000 });
 }
+
+/**
+ * Start a REPAIR, from wherever the problem is being looked at.
+ *
+ * Exposed rather than duplicated as a second button here. The one-active-run
+ * index means a repair and a rebuild can never run together, so they are not
+ * peers in a toolbar — and one `useSolverRun` per Term is the whole point: a
+ * second instance would be a second poller and a second state machine over one
+ * run. The violations panel calls this; the run then renders here exactly as a
+ * rebuild does.
+ */
+async function startRepair() {
+    confirmCancel.value = false;
+    await start({
+        mode: 'repair',
+        maxMoves: maxMoves.value,
+        maxWallMillis: maxWallSeconds.value * 1000,
+    });
+}
+
+defineExpose({ startRepair });
 
 async function doCancel() {
     confirmCancel.value = false;

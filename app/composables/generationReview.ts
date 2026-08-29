@@ -57,6 +57,14 @@ export interface ReviewPreview {
     plan: {
         created: number;
         moved: number;
+        /**
+         * The subset of `moved` outside the run's scope. Optional because a
+         * Generation captured before this counter existed has no value for it,
+         * and 0 would be a claim rather than a gap — those runs were all hard
+         * locked, so the honest reading is "the same as none", which `?? 0`
+         * gives without pretending the field was stored.
+         */
+        movedCollateral?: number;
         unchanged: number;
         deleted: number;
         skippedLocked: number;
@@ -224,7 +232,22 @@ export function applyConsequence(
     }
 
     if (plan.moved > 0) {
-        clauses.push(`${plan.moved} moved`);
+        /*
+         * THE COLLATERAL SUBSET IS NAMED, not folded in. A minimize-movement
+         * repair moves Sessions of Offerings the reviewer never selected — that
+         * is the mode working, and it is the one thing about the plan they
+         * cannot infer from "6 moved", which reads as six consequences of what
+         * they asked for. Applying a repair that quietly reshuffles an untouched
+         * cohort is the surprise warn-and-allow exists to prevent.
+         *
+         * Silent under an ordinary rebuild, where the count is always 0 because
+         * out-of-scope Sessions are never returned at all.
+         */
+        const collateral = plan.movedCollateral ?? 0;
+
+        clauses.push(collateral > 0
+            ? `${plan.moved} moved, ${collateral} of them outside what you asked for`
+            : `${plan.moved} moved`);
     }
 
     const changes = clauses.length ? clauses.join(', ') : 'no placement changes';

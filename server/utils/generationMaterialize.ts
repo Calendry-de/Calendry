@@ -39,6 +39,20 @@ export interface PlannedPlacement {
      * every multi-Room placement the solver just learned to produce.
      */
     roomIds: string[];
+    /**
+     * Whether the solver had authority over this Session's attendees.
+     *
+     * FALSE for a Session it moved from OUTSIDE the scope. Such a Session
+     * reaches the solver as a movable `PlacementVar`, which deliberately
+     * carries no lecturer/group/attendee snapshot — the search reads those from
+     * the Offering's current definition. So the lists that come back are the
+     * OFFERING's, not the Session's, and a Session whose attendees were
+     * overridden through `sessions/[id]/details.post.ts` would have that
+     * override silently rewritten by a repair that only meant to move it.
+     *
+     * A repair moves Sessions; it does not re-cast them.
+     */
+    attendeesAreAuthoritative: boolean;
     groupIds: string[];
     lecturerIds: string[];
     personIds: string[];
@@ -67,6 +81,20 @@ export interface PlanCounts {
     created: number;
     /** Returned with a DIFFERENT placement than it had. */
     moved: number;
+    /**
+     * The subset of `moved` the caller did NOT ask for — Sessions of Offerings
+     * outside the run's scope, which only a `LOCK_POLICY_MINIMIZE_MOVEMENT` run
+     * can produce.
+     *
+     * Reported because it is the mode working, not a fault, and therefore the
+     * one thing about a repair a reviewer cannot infer: "6 moved" reads as six
+     * consequences of what they asked for. Applying a repair that quietly
+     * reshuffles an untouched cohort is precisely the surprise warn-and-allow
+     * exists to prevent, so the plan says how many of the moves were the
+     * solver's idea. Always 0 under a hard lock, where out-of-scope Sessions are
+     * never returned at all.
+     */
+    movedCollateral: number;
     /**
      * Returned at the placement it already had.
      *
@@ -245,6 +273,15 @@ export async function planMaterialization(tx: Tx, options: {
             placement,
             previous,
             roomId: placed.roomId || null,
+            /*
+             * KEYED ON SCOPE, not on the run's mode. Under `LOCK_POLICY_HARD` an
+             * out-of-scope Session is never returned at all, so this can only be
+             * false under a minimize-movement run — but writing the test as
+             * "is it a repair?" would put the run's mode into a function that
+             * has never needed it, and would be wrong the moment a rebuild
+             * narrows its scope.
+             */
+            attendeesAreAuthoritative: !current || inScope.has(parsed.offeringId),
             // Non-empty ONLY for a genuine multi-Room placement; the singular
             // field carries the ordinary case. Deduplicated because the wire's
             // full set includes `room_id`, and a duplicate would violate
@@ -304,6 +341,11 @@ export async function planMaterialization(tx: Tx, options: {
         counts: {
             created: placements.filter((p) => p.action === 'create').length,
             moved: placements.filter((p) => p.action === 'move').length,
+            // Derived from the same list as `moved` rather than counted
+            // alongside it, so the subset relationship cannot drift: a
+            // collateral move is a move whose Offering nobody put in scope.
+            movedCollateral: placements
+                .filter((p) => p.action === 'move' && !inScope.has(p.offeringId)).length,
             unchanged: placements.filter((p) => p.action === 'unchanged').length,
             deleted: deletes.length,
             skippedLocked: skippedLocked.length,
@@ -404,14 +446,25 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
                 },
             })).id;
 
-        // Join rows are replaced wholesale rather than diffed: the placement is
-        // the authority on who and what is involved, and a diff would be three
-        // code paths where this is one.
-        await Promise.all([
-            tx.sessionRoom.deleteMany({ where: { sessionId } }),
-            tx.sessionPerson.deleteMany({ where: { sessionId } }),
-            tx.sessionGroup.deleteMany({ where: { sessionId } }),
-        ]);
+        /*
+         * Join rows are replaced wholesale rather than diffed: the placement is
+         * the authority on who and what is involved, and a diff would be three
+         * code paths where this is one.
+         *
+         * EXCEPT WHERE IT IS NOT THE AUTHORITY. Rooms always are — the solver
+         * chose the room, that is what moving a Session means. Attendees are
+         * not, for a Session moved from outside the scope: see
+         * `attendeesAreAuthoritative`. Those rows are left exactly as they were,
+         * which is the only way a per-Session override survives a repair.
+         */
+        await tx.sessionRoom.deleteMany({ where: { sessionId } });
+
+        if (planned.attendeesAreAuthoritative) {
+            await Promise.all([
+                tx.sessionPerson.deleteMany({ where: { sessionId } }),
+                tx.sessionGroup.deleteMany({ where: { sessionId } }),
+            ]);
+        }
 
         // EVERY Room, not just the primary. `session_room` is a join table and
         // always could hold several; until the solver could return several this
@@ -420,18 +473,26 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
             await tx.sessionRoom.create({ data: { sessionId, roomId, tenantId } });
         }
 
-        for (const personId of planned.lecturerIds) {
-            await tx.sessionPerson.create({
-                data: { sessionId, personId, roleId: lecturerRole?.id ?? null, tenantId },
-            });
-        }
+        /*
+         * A BLOCK, not an early `continue`. The attendee writes are the last
+         * thing in this loop today, so a `continue` would be equivalent — and
+         * would silently skip whatever somebody appends here next, for exactly
+         * the placements whose handling is already the subtle case.
+         */
+        if (planned.attendeesAreAuthoritative) {
+            for (const personId of planned.lecturerIds) {
+                await tx.sessionPerson.create({
+                    data: { sessionId, personId, roleId: lecturerRole?.id ?? null, tenantId },
+                });
+            }
 
-        for (const personId of planned.personIds) {
-            await tx.sessionPerson.create({ data: { sessionId, personId, roleId: null, tenantId } });
-        }
+            for (const personId of planned.personIds) {
+                await tx.sessionPerson.create({ data: { sessionId, personId, roleId: null, tenantId } });
+            }
 
-        for (const groupId of planned.groupIds) {
-            await tx.sessionGroup.create({ data: { sessionId, groupId, tenantId } });
+            for (const groupId of planned.groupIds) {
+                await tx.sessionGroup.create({ data: { sessionId, groupId, tenantId } });
+            }
         }
     }
 

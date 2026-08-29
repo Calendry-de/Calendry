@@ -1,6 +1,44 @@
 <template>
     <section class="panel">
-        <h2>Current violations</h2>
+        <div class="panel_head">
+            <h2>Current violations</h2>
+
+            <!--
+                THE OFFER LIVES AT THE PROBLEM. `refreshViolations` runs inside
+                every session mutation, so a clash is known the moment it is
+                made — and this is where the person is already looking at it.
+                Not a peer of "Generate schedule" in the toolbar: the
+                one-active-run index means the two can never run together, so
+                presenting them as siblings would misdescribe what they are.
+
+                Gated on hard violations, not on any: a repair exists to make
+                the timetable legal, and offering it against a soft preference
+                breach would promise something it does not do.
+            -->
+            <CommonButton
+                v-if="canRepair && hardCount > 0"
+                type="secondary"
+                @click="$emit('repair')"
+            >
+                <Icon
+                    name="material-symbols:healing-outline"
+                    aria-hidden="true"
+                />
+                Repair {{ hardCount }}
+            </CommonButton>
+        </div>
+
+        <!--
+            Said out loud rather than left to the button's absence, which reads
+            identically to "there is nothing to fix".
+        -->
+        <p
+            v-if="canRepair && hardCount > 0"
+            class="panel_muted"
+        >
+            A repair moves as little as possible and produces a proposal to review —
+            it never changes the timetable on its own.
+        </p>
 
         <p
             v-if="!violations.length"
@@ -55,19 +93,30 @@
 <script setup lang="ts">
 import type { Violation } from '~/composables/schedule';
 import { describeViolation } from '~/composables/schedule';
+import CommonButton from '~/components/common/CommonButton.vue';
 
 /**
  * The queryable half of warn-and-allow (TAXONOMY.md §3): a violation persists
  * after the edit that caused it, so it has to be findable without clicking
  * every session in the grid.
  */
-defineProps<{
+const props = defineProps<{
     violations: Violation[];
     lookup: { room: (id: string) => string; person: (id: string) => string; group: (id: string) => string };
     sessionTitle: (id: string) => string;
+    /** `solver.trigger`. Absent, never disabled — a control nobody can use is noise. */
+    canRepair?: boolean;
 }>();
 
-defineEmits<{ select: [sessionId: string] }>();
+defineEmits<{ select: [sessionId: string]; repair: [] }>();
+
+/**
+ * Counted from the SAME rows this panel renders, so the offer cannot promise a
+ * number the list does not show. `preview.get.ts` reads the same
+ * `constraint_violation` table for the review screen's baseline, which is what
+ * keeps the offer and the review talking about one quantity.
+ */
+const hardCount = computed(() => props.violations.filter((v) => v.severity === 'HARD').length);
 
 /**
  * What a row is ABOUT. A named function rather than the expression it replaces,
@@ -91,6 +140,15 @@ function subjectOf(violation: Violation): string {
 @use '~/scss/schedule-panel' as *;
 
 .panel {
+    &_head {
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+        justify-content: space-between;
+
+        h2 { margin: 0; }
+    }
+
     @include schedule-panel;
 
     h2 { color: $content6; }

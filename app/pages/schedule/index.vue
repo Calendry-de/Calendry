@@ -18,6 +18,7 @@
         <h1 class="schedule_sr">{{ data.scope.value === 'own' ? 'Your schedule' : 'Schedule' }}</h1>
 
         <ScheduleToolbar
+            ref="toolbar"
             v-model:term-id="filters.termId.value"
             v-model:group-id="filters.groupId.value"
             v-model:room-id="filters.roomId.value"
@@ -250,7 +251,9 @@
                     :violations="data.violations.value"
                     :lookup="data.lookup"
                     :session-title="data.sessionTitle"
+                    :can-repair="canTriggerSolver"
                     @select="editing.select"
+                    @repair="toolbar?.startRepair()"
                 />
             </aside>
         </div>
@@ -299,6 +302,14 @@ definePageMeta({ middleware: 'schedule' });
 const locale = useViewerLocale();
 
 const canTriggerSolver = useHasPermission('solver.trigger');
+
+/*
+ * The toolbar owns the solver control, and therefore the single `useSolverRun`
+ * for this Term. The violations panel starts a repair through it rather than
+ * holding its own, so one run has one poller and renders in one place wherever
+ * it was started from.
+ */
+const toolbar = useTemplateRef<{ startRepair: () => void }>('toolbar');
 /**
  * The proposals list, not the solver: reviewing needs `session.read`, producing
  * needs `solver.trigger`, and a department head typically holds only the first.

@@ -138,7 +138,7 @@ export default defineEventHandler(async (event) => {
 
 function emptyCounts() {
     return {
-        created: 0, moved: 0, unchanged: 0, deleted: 0,
+        created: 0, moved: 0, movedCollateral: 0, unchanged: 0, deleted: 0,
         skippedLocked: 0, placementsUnmapped: 0,
     };
 }

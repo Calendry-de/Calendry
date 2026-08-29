@@ -303,6 +303,100 @@ describe('materializeGeneration', () => {
         expect(rooms).toHaveLength(2);
     });
 
+    /*
+     * A REPAIR MOVES SESSIONS; IT DOES NOT RE-CAST THEM.
+     *
+     * Under `LOCK_POLICY_MINIMIZE_MOVEMENT` a Session outside the scope becomes
+     * a movable `PlacementVar`, which deliberately carries no attendee snapshot
+     * — the search reads lecturers and groups from the OFFERING's current
+     * definition. So the lists that come back describe the Offering, not the
+     * Session, and a Session whose attendees were overridden through
+     * `sessions/[id]/details.post.ts` would have that override silently
+     * rewritten by a run that only meant to move it.
+     *
+     * Nothing about the apply would report the loss, which is why this is
+     * pinned in both directions rather than asserted once.
+     */
+    it('keeps a moved out-of-scope Session\u2019s own attendees', async () => {
+        await seed();
+
+        // An override: this Session's person is NOT the Offering's lecturer.
+        await db.sessionPerson.deleteMany({ where: { sessionId: ids.moveSession } });
+        await db.sessionPerson.create({
+            data: { sessionId: ids.moveSession, personId: ids.person, roleId: null, tenantId: ids.tenant },
+        });
+
+        await materializeGeneration(db as never, {
+            tenantId: ids.tenant, termId: ids.term, generationId: ids.generation,
+            // EMPTY scope — a pure repair. Every Session is out of scope.
+            scopeOfferingIds: [],
+            actorPersonId: ids.person,
+            output: output({
+                sessions: [{
+                    sessionId: ids.moveSession, offeringId: ids.offeringA,
+                    startSlot: { week: 2, day: 4, block: 5 }, durationBlocks: 1,
+                    roomId: ids.room,
+                    // What the solver returns for a movable out-of-scope
+                    // placement: the Offering's attendees, and no groups.
+                    lecturerIds: [], groupIds: [], personIds: [],
+                }],
+            }),
+        });
+
+        const moved = await db.session.findUniqueOrThrow({ where: { id: ids.moveSession } });
+        const people = await db.sessionPerson.findMany({ where: { sessionId: ids.moveSession } });
+
+        // The move happened...
+        expect(moved.dayOfWeek).toBe(4);
+        expect(moved.blockIndex).toBe(5);
+        // ...and the attendees it did not ask about are untouched.
+        expect(people.map((p) => p.personId)).toEqual([ids.person]);
+    });
+
+    it('still replaces attendees for a Session the run was actually placing', async () => {
+        /*
+         * The counter-example, so the assertion above cannot be satisfied by a
+         * build that simply stopped writing attendees. An IN-SCOPE placement is
+         * the solver answering the Offering's demand, and its attendee lists are
+         * authoritative — that is what a rebuild is.
+         */
+        await seed();
+
+        await db.sessionPerson.deleteMany({ where: { sessionId: ids.moveSession } });
+
+        await materializeGeneration(db as never, {
+            tenantId: ids.tenant, termId: ids.term, generationId: ids.generation,
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            actorPersonId: ids.person,
+            output: output(),
+        });
+
+        const people = await db.sessionPerson.findMany({ where: { sessionId: ids.moveSession } });
+
+        expect(people.map((p) => p.personId)).toEqual([ids.person]);
+        expect(people[0]?.roleId).toBe(ids.role);
+    });
+
+    it('counts an out-of-scope move as collateral, and an in-scope one as not', async () => {
+        // What the review screen shows: "6 moved" reads as six consequences of
+        // what the reviewer asked for, so the subset they did NOT ask for is the
+        // one number they cannot infer.
+        await seed();
+
+        const repair = await planMaterialization(db as never, {
+            tenantId: ids.tenant, termId: ids.term, output: output(), scopeOfferingIds: [],
+        });
+        const rebuild = await planMaterialization(db as never, {
+            tenantId: ids.tenant, termId: ids.term, output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+        });
+
+        expect(repair.counts.moved).toBe(1);
+        expect(repair.counts.movedCollateral).toBe(1);
+        expect(rebuild.counts.moved).toBe(1);
+        expect(rebuild.counts.movedCollateral).toBe(0);
+    });
+
     it('leaves out-of-scope sessions alone even when absent from the output', async () => {
         await seed();
 
@@ -459,6 +553,9 @@ describe('planMaterialization', () => {
 
         expect(plan.counts).toEqual({
             created: 1, moved: 1, unchanged: 1, deleted: 1,
+            // Nothing collateral: this run has both Offerings in scope, so
+            // every move is one the caller asked for.
+            movedCollateral: 0,
             // 2 = the locked in-scope Session + the locked Event; see above.
             skippedLocked: 2, placementsUnmapped: 0,
         });

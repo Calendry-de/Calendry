@@ -1,4 +1,5 @@
 import type { Ref } from 'vue';
+import type { SolverMode } from '#shared/solverMode';
 
 /**
  * The solver run in flight, for one Term.
@@ -45,6 +46,12 @@ export interface SolverRunRow {
     generationId: string | null;
     maxMoves: string | null;
     maxWallMillis: number | null;
+    /**
+     * The stored scope, opaque here except for `mode`. Optional because only the
+     * active-run list selects it — the control needs it to say what a 409
+     * adopted it into, and nothing else reads it.
+     */
+    scope?: unknown;
     createdAt: string;
 }
 
@@ -142,6 +149,14 @@ export function deriveTrend(
 export interface StartOptions {
     maxMoves?: number;
     maxWallMillis?: number;
+    /**
+     * What the run is FOR. Omitted is `rebuild`, matching the route's own
+     * default, so every existing caller is unchanged.
+     *
+     * A `repair` sends no scope at all, which is the whole feature: every
+     * Session is then out of scope, movable, and charged for moving.
+     */
+    mode?: SolverMode;
 }
 
 export function useSolverRun(termId: Ref<string>) {
@@ -151,6 +166,8 @@ export function useSolverRun(termId: Ref<string>) {
     const error = ref<string | null>(null);
     /** Set when a POST loses the one-active-run race and we adopt the winner. */
     const adopted = ref(false);
+    /** What the losing POST asked for, so the adoption notice can name both. */
+    const requestedMode = ref<SolverMode>('rebuild');
 
     /** (timestamp, objective) samples for this run only. Reset when the run changes. */
     const series = ref<{ at: number; objective: number }[]>([]);
@@ -273,6 +290,15 @@ export function useSolverRun(termId: Ref<string>) {
         }
     }
 
+    /** What KIND of run this is, for a message that has to name it. */
+    function modeOf(row: SolverRunRow | null): SolverMode {
+        const scope = row?.scope as { mode?: SolverMode } | undefined;
+
+        // Anything unrecognised — including a run stored before `mode` existed —
+        // reads as a rebuild, which is what those runs actually were.
+        return scope?.mode === 'repair' ? 'repair' : 'rebuild';
+    }
+
     async function start(options: StartOptions = {}) {
         starting.value = true;
         error.value = null;
@@ -297,6 +323,10 @@ export function useSolverRun(termId: Ref<string>) {
              * the winner and say so.
              */
             if (status === 409) {
+                // Remembered BEFORE adopting, because adopt() replaces `run`
+                // with the winner: the message has to compare what was asked
+                // for against what was joined.
+                requestedMode.value = options.mode ?? 'rebuild';
                 await adopt();
                 adopted.value = true;
             } else {
@@ -350,8 +380,37 @@ export function useSolverRun(termId: Ref<string>) {
         clearTimeout(timer);
     });
 
+    /**
+     * What to say when a start lost the one-active-run race.
+     *
+     * `null` when nothing was adopted. The two modes are named separately
+     * because joining a REBUILD after asking for a repair is the one case where
+     * "a run was already in progress" is actively misleading: the user asked to
+     * fix three clashes and is now watching something that will replace the
+     * whole term.
+     */
+    const adoptedNotice = computed(() => {
+        if (!adopted.value) {
+            return null;
+        }
+
+        const joined = modeOf(run.value);
+
+        if (joined === requestedMode.value) {
+            return joined === 'repair'
+                ? 'A repair was already running for this term.'
+                : 'A run was already in progress for this term.';
+        }
+
+        return joined === 'rebuild'
+            ? 'A full rebuild was already running for this term, so this is showing that '
+                + 'instead of a repair — it replaces the whole timetable, not just the clashes.'
+            : 'A repair was already running for this term, so this is showing that instead of '
+                + 'a full rebuild — it only moves what it must.';
+    });
+
     return {
-        run, state, trend, error, adopted, isActive,
+        run, state, trend, error, adopted, adoptedNotice, isActive,
         start, cancel, dismiss,
     };
 }

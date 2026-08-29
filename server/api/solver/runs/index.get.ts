@@ -39,7 +39,14 @@ export default defineEventHandler(async (event) => {
             // caller reimplementing the index's definition of "active".
             tx.solverRun.findMany({
                 where: { ...where, status: { in: ACTIVE_RUN_STATUSES } },
-                select: { id: true, termId: true, status: true, createdAt: true },
+                /*
+                 * `scope` travels so a caller can say WHAT it collided with. A
+                 * 409 that adopts the winner otherwise reports "a run was
+                 * already in progress" whatever the user clicked, which is
+                 * wrong in the one case that matters: asking for a repair and
+                 * silently joining somebody's full rebuild.
+                 */
+                select: { id: true, termId: true, status: true, createdAt: true, scope: true },
             }),
         ]);
 
