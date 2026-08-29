@@ -273,44 +273,45 @@ model Tenant {
 
   federation Federation? @relation(fields: [federationId], references: [id], onDelete: Restrict)
 
-  people                Person[]
-  roles                 Role[]
-  groups                Group[]
-  groupTerms            GroupTerm[]
-  groupAvailability     GroupTermAvailability[]
-  screens               Screen[]
-  screenRooms           ScreenRoom[]
-  memberships           Membership[]
-  personRoles           PersonRole[]
-  rooms                 Room[]
-  equipment             Equipment[]
-  roomEquipment         RoomEquipment[]
-  timeGrids             TimeGrid[]
-  displaySettings       TenantDisplaySettings?
-  timeGridBreaks        TimeGridBreak[]
-  terms                 Term[]
-  calendarPeriods       CalendarPeriod[]
-  sessionKinds          SessionKind[]
-  offerings             Offering[]
-  offeringGroups        OfferingGroup[]
-  offeringLecturers     OfferingLecturer[]
-  offeringEquipment     OfferingEquipment[]
-  sessions              Session[]
-  sessionGroups         SessionGroup[]
-  sessionPeople         SessionPerson[]
-  sessionRooms          SessionRoom[]
-  constraints           Constraint[]
-  constraintScopes      ConstraintScope[]
-  generations           Generation[]
-  sessionEvents         SessionEvent[]
-  constraintViolations  ConstraintViolation[]
-  groupClosures         GroupClosure[]
-  accessRoles           AccessRole[]
-  accessRolePermissions AccessRolePermission[]
-  personAccessRoles     PersonAccessRole[]
-  solverRuns            SolverRun[]
-  personUnavailability  PersonUnavailability[]
-  personPreferences     PersonPreference[]
+  people                       Person[]
+  roles                        Role[]
+  groups                       Group[]
+  groupTerms                   GroupTerm[]
+  groupAvailability            GroupTermAvailability[]
+  screens                      Screen[]
+  screenRooms                  ScreenRoom[]
+  memberships                  Membership[]
+  personRoles                  PersonRole[]
+  rooms                        Room[]
+  equipment                    Equipment[]
+  roomEquipment                RoomEquipment[]
+  timeGrids                    TimeGrid[]
+  displaySettings              TenantDisplaySettings?
+  timeGridBreaks               TimeGridBreak[]
+  terms                        Term[]
+  calendarPeriods              CalendarPeriod[]
+  sessionKinds                 SessionKind[]
+  offerings                    Offering[]
+  offeringGroups               OfferingGroup[]
+  offeringLecturers            OfferingLecturer[]
+  offeringEquipment            OfferingEquipment[]
+  sessions                     Session[]
+  sessionGroups                SessionGroup[]
+  sessionPeople                SessionPerson[]
+  sessionRooms                 SessionRoom[]
+  constraints                  Constraint[]
+  constraintScopes             ConstraintScope[]
+  generations                  Generation[]
+  sessionEvents                SessionEvent[]
+  constraintViolations         ConstraintViolation[]
+  groupClosures                GroupClosure[]
+  accessRoles                  AccessRole[]
+  accessRolePermissions        AccessRolePermission[]
+  personAccessRoles            PersonAccessRole[]
+  solverRuns                   SolverRun[]
+  personUnavailability         PersonUnavailability[]
+  personPreferences            PersonPreference[]
+  personPreferenceRoomFeatures PersonPreferenceRoomFeature[]
 
   @@index([federationId])
   @@map("tenant")
@@ -567,8 +568,40 @@ model PersonPreference {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
+  roomFeatures PersonPreferenceRoomFeature[]
+
   @@index([tenantId])
   @@map("person_preference")
+}
+
+/// Which room types this Person would rather teach in — the second axis of
+/// `PersonPreference`, after day/block.
+///
+/// A JOIN with an FK rather than a `String[]` of keys on the parent row.
+/// `preferredDays`/`preferredBlocks` are arrays because they are plain scalars
+/// with nothing behind them; Equipment is an entity, and every other reference
+/// to it in this schema is an `equipmentId`. A key array would be the one place
+/// that is not, and would fail silently: renaming an Equipment's key voids the
+/// preference and leaves an inert string nothing contradicts.
+///
+/// Cascades from the PREFERENCE, not from the Person, so the parent's
+/// delete-when-every-axis-is-empty discipline keeps working — otherwise an
+/// absent preference and an empty one become two states again.
+model PersonPreferenceRoomFeature {
+  personId    String @map("person_id")
+  equipmentId String @map("equipment_id")
+  tenantId    String @map("tenant_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  preference PersonPreference @relation(fields: [personId], references: [personId], onDelete: Cascade)
+  equipment  Equipment        @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([personId, equipmentId])
+  @@index([tenantId])
+  @@index([equipmentId])
+  @@map("person_preference_room_feature")
 }
 
 // ---------------------------------------------------------------------------
@@ -715,6 +748,7 @@ model Equipment {
 
   roomEquipment     RoomEquipment[]
   offeringEquipment OfferingEquipment[]
+  personPreferences PersonPreferenceRoomFeature[]
 
   @@index([tenantId])
   @@index([federationId])

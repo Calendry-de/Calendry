@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
     }
 
-    const [rows, preference, limits, terms] = await Promise.all([
+    const [rows, preference, limits, terms, roomFeatureOptions] = await Promise.all([
         tx.personUnavailability.findMany({
             where: { personId },
             orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
@@ -49,10 +49,26 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         }),
         tx.personPreference.findUnique({
             where: { personId },
-            select: { preferredDays: true, preferredBlocks: true },
+            select: {
+                preferredDays: true,
+                preferredBlocks: true,
+                roomFeatures: { select: { equipmentId: true } },
+            },
         }),
         tenantGridLimits(tx, identity.tenantId),
         tenantTerms(tx, identity.tenantId),
+        /*
+         * The room-type vocabulary this person can choose from — sent WITH the
+         * page rather than fetched from `/api/equipment`, which requires
+         * `equipment.read`. This page's own gate is `availability.manage_own`,
+         * and a page must not depend on a permission its gate does not imply:
+         * one 403 inside the reference fetch renders the whole form empty.
+         */
+        tx.equipment.findMany({
+            orderBy: { name: 'asc' },
+            take: 200,
+            select: { id: true, key: true, name: true },
+        }),
     ]);
 
     /*
@@ -83,7 +99,15 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         vetoes: rows,
         // `null` rather than empty arrays: an absent row IS the "no preference"
         // state, and inventing a row shape here would hide that from the client.
-        preference,
+        //
+        // Flattened to ids so the client never sees the join shape; `null` still
+        // means no row, so the mapping runs only when there is one.
+        preference: preference && {
+            preferredDays: preference.preferredDays,
+            preferredBlocks: preference.preferredBlocks,
+            preferredRoomFeatureIds: preference.roomFeatures.map((link) => link.equipmentId),
+        },
+        roomFeatureOptions,
         blocked: grid
             ? blockedSlotSummary(approved, grid.activeDays, grid.blocksPerDay)
             : null,

@@ -331,11 +331,52 @@ describe('preferences', () => {
         expect(saved.body.preferredBlocks).toEqual([0, 1]);
     });
 
-    it('DELETE the row when both axes are cleared', async () => {
+    /*
+     * The third axis. Two things that only break over HTTP: the id must be one
+     * this tenant can see (the FK cannot tell, because Postgres runs referential
+     * integrity as the referenced table's owner and never consults RLS), and a
+     * preference holding ONLY room types must survive — the row is deleted when
+     * every axis is empty, and "every" now means three.
+     */
+    it('store preferred room types, and refuse an id this tenant cannot see', async () => {
+        const equipment = await ownerDb.equipment.create({
+            data: { tenantId: f.tenantA, key: 'api-lab-bench', name: 'Lab bench' },
+        });
+
+        const saved = await api<{ preferredRoomFeatureIds: string[] }>('/api/me/preferences', {
+            method: 'PUT',
+            cookie: cookies.lecturer,
+            body: JSON.stringify({
+                preferredDays: [], preferredBlocks: [], preferredRoomFeatureIds: [equipment.id],
+            }),
+        });
+
+        expect(saved.status).toBe(200);
+        // Room types alone are a preference, so the row must exist rather than
+        // having been deleted as empty.
+        expect(await ownerDb.personPreference.count({
+            where: { personId: personIds['lecturer-self'] },
+        })).toBe(1);
+
+        const refused = await api('/api/me/preferences', {
+            method: 'PUT',
+            cookie: cookies.lecturer,
+            body: JSON.stringify({
+                preferredDays: [2], preferredBlocks: [], preferredRoomFeatureIds: ['no-such-equipment'],
+            }),
+        });
+
+        // Named, not filtered: a silently narrowed save reports success for a
+        // preference that was not stored.
+        expect(refused.status).toBe(400);
+        expect(JSON.stringify(refused.body)).toContain('no-such-equipment');
+    });
+
+    it('DELETE the row when every axis is cleared, room types included', async () => {
         await api('/api/me/preferences', {
             method: 'PUT',
             cookie: cookies.lecturer,
-            body: JSON.stringify({ preferredDays: [], preferredBlocks: [] }),
+            body: JSON.stringify({ preferredDays: [], preferredBlocks: [], preferredRoomFeatureIds: [] }),
         });
 
         // An absent row IS the "no preference" state. Storing two empty arrays

@@ -1,4 +1,4 @@
-import { preferencesSchema, tenantGridLimits } from '../../utils/availability';
+import { preferencesSchema, replaceRoomFeaturePreferences, tenantGridLimits } from '../../utils/availability';
 import { preferencesAreEmpty } from '../../../shared/availability';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requirePermission } from '../../utils/requirePermission';
@@ -8,13 +8,12 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * Set your OWN soft preferences. No approval, and none is needed.
  *
  * A preference is soft and tenant-weighted: it cannot make a term infeasible
- * the way a veto can, so there is nothing for a reviewer to protect. In THIS
- * slice it additionally has no effect on the solver at all — the wire has no
- * field for it yet — so an approval workflow would be gating something inert.
+ * the way a veto can, so there is nothing for a reviewer to protect.
  *
- * STORED, NOT YET HONOURED. See the `PersonPreference` model comment: unlike
- * the `lecturer_veto` gap this resembles, the absence of a wire mapping here is
- * deliberate, temporary, and stated on the page where the data is entered.
+ * ALL THREE AXES REACH THE SOLVER — days, blocks and preferred room types all
+ * travel as `Person.preferred`. This comment previously said the opposite
+ * ("no effect on the solver at all — the wire has no field for it yet"), which
+ * was true when written and had been wrong since the field shipped.
  */
 export default defineEventHandler(async (event) => {
     const raw = await readBody(event);
@@ -39,7 +38,7 @@ export default defineEventHandler(async (event) => {
         throw createError({
             statusCode: 400,
             statusMessage: 'A preference weight can only be set by an administrator. '
-                + 'Send only preferredDays and preferredBlocks.',
+                + 'Send only preferredDays, preferredBlocks and preferredRoomFeatureIds.',
             data: { field: 'weightMultiplier' },
         });
     }
@@ -75,6 +74,9 @@ export default defineEventHandler(async (event) => {
              * differently.
              */
             if (preferencesAreEmpty(body)) {
+                // The join rows go with it: the FK cascades from
+                // `person_preference`, so clearing every axis leaves nothing
+                // behind to make "absent" and "empty" two states again.
                 await tx.personPreference.deleteMany({ where: { personId, tenantId: identity.tenantId } });
 
                 return null;
@@ -85,12 +87,23 @@ export default defineEventHandler(async (event) => {
                 preferredBlocks: [...new Set(body.preferredBlocks)].sort((a, b) => a - b),
             };
 
-            return tx.personPreference.upsert({
+            const saved = await tx.personPreference.upsert({
                 where: { personId },
                 create: { personId, tenantId: identity.tenantId, ...data },
                 update: data,
                 select: { preferredDays: true, preferredBlocks: true },
             });
+
+            // AFTER the upsert, never before: the join rows reference
+            // `person_preference`, so writing them first would fail the FK for
+            // anyone stating a room preference as their very first one.
+            await replaceRoomFeaturePreferences(tx, {
+                tenantId: identity.tenantId,
+                personId,
+                equipmentIds: body.preferredRoomFeatureIds,
+            });
+
+            return { ...saved, preferredRoomFeatureIds: body.preferredRoomFeatureIds };
         });
     });
 });

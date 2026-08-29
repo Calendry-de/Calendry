@@ -19,7 +19,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     await requireAnyPermission(event, tx, ['availability.manage_any', 'availability.read_any']);
 
-    const [people, limits] = await Promise.all([
+    const [people, limits, roomFeatureOptions] = await Promise.all([
         tx.person.findMany({
             where: { tenantId: identity.tenantId, isActive: true },
             orderBy: [{ familyName: 'asc' }, { givenName: 'asc' }],
@@ -28,11 +28,29 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
                 id: true,
                 givenName: true,
                 familyName: true,
-                preference: { select: { preferredDays: true, preferredBlocks: true, weightMultiplier: true } },
+                preference: {
+                    select: {
+                        preferredDays: true,
+                        preferredBlocks: true,
+                        weightMultiplier: true,
+                        roomFeatures: { select: { equipmentId: true } },
+                    },
+                },
                 personRoles: { select: { role: { select: { key: true, name: true } } } },
             },
         }),
         tenantGridLimits(tx, identity.tenantId),
+        /*
+         * Travels with the page, not fetched from `/api/equipment`. This route's
+         * gate is `availability.manage_any`/`read_any`, which does not imply
+         * `equipment.read` — and one 403 inside a reference fetch blanks the
+         * whole screen with no error, the least diagnosable failure a UI has.
+         */
+        tx.equipment.findMany({
+            orderBy: { name: 'asc' },
+            take: 200,
+            select: { id: true, key: true, name: true },
+        }),
     ]);
 
     return {
@@ -46,7 +64,15 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
             // `null` when no row exists, which IS the "no preference" state —
             // see the model comment. Synthesising empty arrays here would erase
             // the distinction the write path works to keep single-valued.
-            preference: person.preference,
+            // Flattened to ids, so the client never sees the join shape. Still
+            // `null` when there is no row.
+            preference: person.preference && {
+                preferredDays: person.preference.preferredDays,
+                preferredBlocks: person.preference.preferredBlocks,
+                weightMultiplier: person.preference.weightMultiplier,
+                preferredRoomFeatureIds: person.preference.roomFeatures.map((link) => link.equipmentId),
+            },
         })),
+        roomFeatureOptions,
     };
 }));

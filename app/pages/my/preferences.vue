@@ -1,7 +1,7 @@
 <template>
     <CommonPage title="My teaching preferences">
         <p class="intro">
-            Days and times you would rather teach. Unlike unavailability, a preference is a
+            Days, times and kinds of room you would rather teach in. Unlike unavailability, a preference is a
             <strong>soft</strong> wish — it never blocks a placement, so it needs no approval
             and takes effect as soon as you save it.
         </p>
@@ -37,10 +37,10 @@
             <span>
                 <strong>The scheduler can weigh these.</strong>
                 Preferences are saved, visible to administrators, and read by the timetable
-                generator, which tries to place your sessions on the days and blocks you
-                choose. Whether it does is an institution setting, and a preference always
-                loses to a hard requirement — so treat it as a wish that is now heard, not a
-                guarantee.
+                generator, which tries to place your sessions on the days, blocks and kinds of
+                room you choose. Whether it does is an institution setting, and a preference
+                always loses to a hard requirement — so treat it as a wish that is now heard,
+                not a guarantee.
             </span>
         </p>
 
@@ -82,6 +82,14 @@
                 label="Preferred blocks"
             />
 
+            <AvailabilityRoomFeaturePicker
+                v-model="draftRoomFeatures"
+                help="Rooms are matched on what they provide, so this is a wish for a KIND of room
+                      rather than for a particular one. Leave everything unticked if you do not mind."
+                label="Preferred room types"
+                :options="roomFeatureOptions"
+            />
+
             <p
                 v-if="error"
                 class="note note--error"
@@ -115,6 +123,8 @@
 <script setup lang="ts">
 import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
+import AvailabilityRoomFeaturePicker from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
+import type { RoomFeatureOption } from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 
 definePageMeta({ middleware: 'my' });
@@ -123,7 +133,12 @@ useHead({ title: 'My teaching preferences' });
 
 interface Payload {
     grid: TimeGrid | null;
-    preference: { preferredDays: number[]; preferredBlocks: number[] } | null;
+    preference: {
+        preferredDays: number[];
+        preferredBlocks: number[];
+        preferredRoomFeatureIds: string[];
+    } | null;
+    roomFeatureOptions: RoomFeatureOption[];
 }
 
 const request = useRequestFetch();
@@ -134,18 +149,25 @@ const { data, refresh } = await useAsyncData(
 );
 
 const grid = computed(() => data.value?.grid ?? null);
+const roomFeatureOptions = computed(() => data.value?.roomFeatureOptions ?? []);
 
 const draftDays = ref<number[]>([]);
 const draftBlocks = ref<number[]>([]);
+const draftRoomFeatures = ref<string[]>([]);
 const pristine = ref('');
 const busy = ref(false);
 const saved = ref(false);
 const error = ref('');
 
+function snapshot() {
+    return JSON.stringify([draftDays.value, draftBlocks.value, draftRoomFeatures.value]);
+}
+
 function seed() {
     draftDays.value = [...(data.value?.preference?.preferredDays ?? [])];
     draftBlocks.value = [...(data.value?.preference?.preferredBlocks ?? [])];
-    pristine.value = JSON.stringify([draftDays.value, draftBlocks.value]);
+    draftRoomFeatures.value = [...(data.value?.preference?.preferredRoomFeatureIds ?? [])];
+    pristine.value = snapshot();
     saved.value = false;
     error.value = '';
 }
@@ -160,7 +182,7 @@ function seed() {
 seed();
 watch(data, seed);
 
-const dirty = computed(() => JSON.stringify([draftDays.value, draftBlocks.value]) !== pristine.value);
+const dirty = computed(() => snapshot() !== pristine.value);
 
 /*
  * "Saved." is about the last write, so it stops being true the moment there are
@@ -181,7 +203,17 @@ async function save() {
     try {
         await request('/api/me/preferences', {
             method: 'PUT',
-            body: { preferredDays: draftDays.value, preferredBlocks: draftBlocks.value },
+            /*
+             * ALL THREE AXES, EVERY TIME. The PUT replaces the whole preference
+             * state, so a body omitting an axis clears it — which is why this
+             * sends the room types even when the list is empty rather than
+             * conditionally.
+             */
+            body: {
+                preferredDays: draftDays.value,
+                preferredBlocks: draftBlocks.value,
+                preferredRoomFeatureIds: draftRoomFeatures.value,
+            },
         });
 
         await refresh();

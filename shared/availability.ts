@@ -190,16 +190,34 @@ export interface PersonPreferences {
     preferredDays: number[];
     preferredBlocks: number[];
     /**
+     * Equipment IDS, not keys. Ids are this app's vocabulary for a reference;
+     * the assembly resolves them to `equipment.key` at the wire, which is the
+     * vocabulary `Room.feature_tags` speaks.
+     */
+    preferredRoomFeatureIds: string[];
+    /**
      * Administrator-set multiplier on the tenant-wide preference weight.
      * `null`/absent means "use the tenant default". Optional here because
-     * `preferencesAreEmpty` and the self-service page only ever deal in the two
+     * `preferencesAreEmpty` and the self-service page only ever deal in the
      * axes — the weight is not part of what makes a preference exist.
      */
     weightMultiplier?: number | null;
 }
 
+/**
+ * Whether a preference says nothing at all, and so should be a DELETED row
+ * rather than a stored empty one — an absent row is the single representation
+ * of "no opinion".
+ *
+ * ROOM FEATURES COUNT. A person who clears both time axes but still prefers a
+ * lab has stated something, and testing days and blocks alone would delete
+ * their row on the next save: the preference would vanish from the wire with no
+ * error, since an absent `Person.preferred` is a legitimate state.
+ */
 export function preferencesAreEmpty(preferences: PersonPreferences): boolean {
-    return preferences.preferredDays.length === 0 && preferences.preferredBlocks.length === 0;
+    return preferences.preferredDays.length === 0
+        && preferences.preferredBlocks.length === 0
+        && preferences.preferredRoomFeatureIds.length === 0;
 }
 
 /**

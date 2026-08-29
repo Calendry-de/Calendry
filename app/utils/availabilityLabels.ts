@@ -45,10 +45,22 @@ export function describePreferences(
         preferredDays: number[];
         preferredBlocks: number[];
         weightMultiplier?: number | null;
+        preferredRoomFeatureIds?: string[];
     } | null,
     grid: TimeGrid | null,
+    /** Equipment id → display name, so the summary names types rather than ids. */
+    roomFeatureNames?: Map<string, string>,
 ): string {
-    if (!preference || (!preference.preferredDays.length && !preference.preferredBlocks.length)) {
+    const roomFeatureIds = preference?.preferredRoomFeatureIds ?? [];
+
+    /*
+     * ROOM TYPES COUNT AS A PREFERENCE. Testing the two time axes alone reported
+     * "No preferences set" for somebody who had stated one — the collapsed row
+     * would then contradict the editor that opens beneath it, and an
+     * administrator scanning the list for who has spoken would skip them.
+     */
+    if (!preference
+        || (!preference.preferredDays.length && !preference.preferredBlocks.length && !roomFeatureIds.length)) {
         return 'No preferences set';
     }
 
@@ -62,6 +74,13 @@ export function describePreferences(
         parts.push(preference.preferredBlocks
             .map((index) => (grid ? `${index + 1} (${blockTime(grid, index).start})` : String(index + 1)))
             .join(', '));
+    }
+
+    if (roomFeatureIds.length) {
+        // Falls back to the id only when the name map was not supplied or has
+        // gone stale — visibly wrong beats silently omitted, since an omission
+        // here reads as "they stated no room preference".
+        parts.push(roomFeatureIds.map((id) => roomFeatureNames?.get(id) ?? id).join(', '));
     }
 
     /*

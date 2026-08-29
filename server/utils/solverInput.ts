@@ -622,10 +622,22 @@ export async function assembleSolverInput(
 
         droppedOutOfGridValues += (stated.days.length - days.length) + (stated.blocks.length - blocks.length);
 
-        // An empty result is NOT stored: after narrowing it means the same thing
-        // as no row at all, and `Person.preferred` has one representation for
-        // that — absent. Keeping `{days:[],blocks:[]}` would give it two.
-        if (days.length > 0 || blocks.length > 0) {
+        /*
+         * ROOM FEATURES COUNT TOWARD "has stated something".
+         *
+         * A lecturer who states ONLY a room preference has no day and no block,
+         * so a condition testing those two alone drops their row entirely and
+         * their preference never reaches the solver — silently, since an absent
+         * `Person.preferred` is a legitimate state meaning "no opinion". The
+         * solver guards the mirror image of this on its own side (`room_wanted`
+         * is built off `persons[l].preferred` directly rather than off the
+         * day/block `counted` set, for exactly this lecturer).
+         *
+         * An empty result is still NOT stored: after narrowing it means the same
+         * thing as no row at all, and `Person.preferred` has one representation
+         * for that — absent. Keeping `{days:[],blocks:[]}` would give it two.
+         */
+        if (days.length > 0 || blocks.length > 0 || stated.roomFeatures.length > 0) {
             narrowedPreferences.set(personId, {
                 days,
                 blocks,
@@ -639,14 +651,15 @@ export async function assembleSolverInput(
                  */
                 weightMultiplier: stated.weightMultiplier ?? undefined,
                 /*
-                 * EMPTY BECAUSE THE APP HAS NO SUCH PREFERENCE, not because the
-                 * axis is skipped. `Preference.preferred_room_features` arrived
-                 * with proto v0.10.0 and nothing stores a room-type preference
-                 * yet; `PersonPreferenceFit` counts days and blocks only, so an
-                 * empty list is the same answer a reader would get from a person
-                 * who stated none. "Room-type preference kind" is the card.
+                 * NOT GRID-NARROWED, unlike days and blocks, because there is no
+                 * grid to narrow against: the vocabulary is the tenant's own
+                 * Equipment keys, and a key is either in it or the FK would not
+                 * have let the row exist. A preference for a feature no Room
+                 * happens to carry is inert rather than invalid — the solver
+                 * compares it against each candidate room's features and finds
+                 * nothing, which costs the same as having no preference.
                  */
-                preferredRoomFeatures: [],
+                preferredRoomFeatures: stated.roomFeatures,
             });
         }
     }

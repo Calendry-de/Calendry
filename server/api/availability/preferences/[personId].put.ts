@@ -1,4 +1,4 @@
-import { staffPreferencesSchema, tenantGridLimits } from '../../../utils/availability';
+import { replaceRoomFeaturePreferences, staffPreferencesSchema, tenantGridLimits } from '../../../utils/availability';
 import { preferencesAreEmpty } from '../../../../shared/availability';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
@@ -54,6 +54,9 @@ export default defineEventHandler(async (event) => {
              * holding only a weight would be a factor applied to nothing. The
              * axes are therefore what decides existence, and `weightMultiplier`
              * is only ever read on a row that already has something to weight.
+             *
+             * "Both axes" is now three: preferred room types count toward
+             * existence too, and the join rows cascade away with the parent.
              */
             if (preferencesAreEmpty(body)) {
                 await tx.personPreference.deleteMany({ where: { personId: person.id, tenantId: identity.tenantId } });
@@ -67,12 +70,21 @@ export default defineEventHandler(async (event) => {
                 weightMultiplier: body.weightMultiplier,
             };
 
-            return tx.personPreference.upsert({
+            const saved = await tx.personPreference.upsert({
                 where: { personId: person.id },
                 create: { personId: person.id, tenantId: identity.tenantId, ...data },
                 update: data,
                 select: { preferredDays: true, preferredBlocks: true, weightMultiplier: true },
             });
+
+            // AFTER the upsert — the join rows reference `person_preference`.
+            await replaceRoomFeaturePreferences(tx, {
+                tenantId: identity.tenantId,
+                personId: person.id,
+                equipmentIds: body.preferredRoomFeatureIds,
+            });
+
+            return { ...saved, preferredRoomFeatureIds: body.preferredRoomFeatureIds };
         });
     });
 });

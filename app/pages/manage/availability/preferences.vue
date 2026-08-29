@@ -57,7 +57,7 @@
                         v-if="person.roles.length"
                         class="people_roles"
                     >{{ person.roles.join(', ') }}</span>
-                    <span class="people_summary">{{ describePreferences(person.preference, grid) }}</span>
+                    <span class="people_summary">{{ describePreferences(person.preference, grid, roomFeatureNames) }}</span>
                     <!--
                         A plain icon, not CommonChevron: that component renders a
                         BUTTON, and a button inside this row's button is invalid
@@ -87,6 +87,14 @@
                         :grid="grid"
                         help="Nothing ticked means no preference about the time of day."
                         label="Preferred blocks"
+                        :readonly="!canEdit"
+                    />
+
+                    <AvailabilityRoomFeaturePicker
+                        v-model="draftRoomFeatures"
+                        help="Nothing ticked means no preference about the kind of room."
+                        label="Preferred room types"
+                        :options="roomFeatureOptions"
                         :readonly="!canEdit"
                     />
 
@@ -128,6 +136,8 @@
 <script setup lang="ts">
 import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
+import AvailabilityRoomFeaturePicker from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
+import type { RoomFeatureOption } from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import AvailabilityWeightMultiplier from '~/components/availability/AvailabilityWeightMultiplier.vue';
 import ManageShell from '~/components/manage/ManageShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
@@ -164,6 +174,7 @@ interface PersonRow {
         preferredDays: number[];
         preferredBlocks: number[];
         weightMultiplier: number | null;
+        preferredRoomFeatureIds: string[];
     } | null;
 }
 
@@ -171,11 +182,21 @@ const request = useRequestFetch();
 
 const { data, refresh } = await useAsyncData(
     'manage:availability-preferences',
-    () => request<{ grid: TimeGrid | null; people: PersonRow[] }>('/api/availability/preferences'),
+    () => request<{
+        grid: TimeGrid | null;
+        people: PersonRow[];
+        roomFeatureOptions: RoomFeatureOption[];
+    }>('/api/availability/preferences'),
 );
 
 const grid = computed(() => data.value?.grid ?? null);
 const people = computed(() => data.value?.people ?? []);
+const roomFeatureOptions = computed(() => data.value?.roomFeatureOptions ?? []);
+
+// Id → display name for the collapsed summary, which holds ids and shows names.
+const roomFeatureNames = computed(
+    () => new Map(roomFeatureOptions.value.map((option) => [option.id, option.name || option.key])),
+);
 
 const canEdit = useHasPermission('availability.manage_any');
 
@@ -183,6 +204,7 @@ const open = ref<string | null>(null);
 const draftDays = ref<number[]>([]);
 const draftBlocks = ref<number[]>([]);
 const draftMultiplier = ref<number | null>(null);
+const draftRoomFeatures = ref<string[]>([]);
 const busy = ref(false);
 const error = ref('');
 
@@ -196,6 +218,7 @@ watch(open, (personId) => {
 
     draftDays.value = [...(person?.preference?.preferredDays ?? [])];
     draftBlocks.value = [...(person?.preference?.preferredBlocks ?? [])];
+    draftRoomFeatures.value = [...(person?.preference?.preferredRoomFeatureIds ?? [])];
     // `null` is the real default state, and a person with no preference row at
     // all is also on the default — both seed the same way.
     draftMultiplier.value = person?.preference?.weightMultiplier ?? null;
@@ -219,6 +242,7 @@ async function save(personId: string) {
             body: {
                 preferredDays: draftDays.value,
                 preferredBlocks: draftBlocks.value,
+                preferredRoomFeatureIds: draftRoomFeatures.value,
                 weightMultiplier: draftMultiplier.value,
             },
         });
