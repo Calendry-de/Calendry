@@ -1107,6 +1107,12 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              *
              * Kind scopes DO reach the solver, as `appliesToKinds`.
              */
+            /*
+             * NULL = every grid. For rules stated in units the grid defines —
+             * a gap, a block cap, a daily span — which two grids cannot mean
+             * the same numbers by.
+             */
+            timeGridId: optionalId,
             scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
         }).superRefine(constraintShapeRefinement),
         update: z.object({
@@ -1117,6 +1123,12 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             params: z.record(z.string(), z.unknown()).optional(),
             isEnabled: z.boolean().optional(),
             /** Editable after creation too; same kind-only reasoning as create. */
+            /*
+             * NULL = every grid. For rules stated in units the grid defines —
+             * a gap, a block cap, a daily span — which two grids cannot mean
+             * the same numbers by.
+             */
+            timeGridId: optionalId,
             scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
         }),
         beforeUpdate: constraintBeforeUpdate,

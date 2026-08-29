@@ -157,6 +157,51 @@
                     so an offering picker here would be a control whose main
                     effect is to switch the rule off in the next solve.
                 -->
+                <!--
+                    THE GRID SELECTOR EXISTS ONLY WHEN THERE ARE TWO GRIDS.
+
+                    A filter exists when it has more than one option — never
+                    because a flag is set. On a tenant with one grid every rule
+                    is on it, "which grid" has a single answer, and offering the
+                    control would invite a choice that cannot change anything
+                    while making a rule look narrower than it is.
+                -->
+                <fieldset
+                    v-if="grids.length > 1"
+                    class="builder_scopes"
+                >
+                    <legend>TimeGrid</legend>
+
+                    <p
+                        v-if="selectedType?.gridRelative && !draft.timeGridId"
+                        class="builder_hint builder_hint--warn"
+                    >
+                        This rule counts blocks or the gaps between them, and your grids do not
+                        agree on what a block is. Left on every grid it applies the same numbers
+                        to both.
+                    </p>
+
+                    <select
+                        class="builder_control"
+                        :disabled="readonly"
+                        :value="draft.timeGridId ?? ''"
+                        @change="draft.timeGridId = ($event.target as HTMLSelectElement).value || null"
+                    >
+                        <!-- `:selected`, not `:value` on the select: a select's
+                             value is a property, so SSR drops it. -->
+                        <option
+                            :selected="!draft.timeGridId"
+                            value=""
+                        >Every grid</option>
+                        <option
+                            v-for="grid in grids"
+                            :key="grid.id"
+                            :selected="grid.id === draft.timeGridId"
+                            :value="grid.id"
+                        >{{ grid.name }}</option>
+                    </select>
+                </fieldset>
+
                 <fieldset class="builder_scopes">
                     <legend>Applies to</legend>
 
@@ -339,6 +384,19 @@ const existingData = useAsyncData(
 );
 
 const kinds = computed(() => kindsData.data.value?.rows ?? []);
+
+/**
+ * Fetched unconditionally, and cheap: a tenant has a handful of grids. The
+ * decision this drives — whether the selector exists at all — has to be made
+ * during setup, and a watcher-assigned ref is undefined at first render on the
+ * server.
+ */
+const gridsData = useAsyncData(
+    'constraint-builder:grids',
+    () => request<{ rows: { id: string; name: string }[] }>('/api/time-grids', { query: { limit: 200 } }),
+);
+
+const grids = computed(() => gridsData.data.value?.rows ?? []);
 
 /**
  * A type that derives its kinds from their classification rather than from

@@ -717,7 +717,16 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         fields: [
             { key: 'code', label: 'Code', type: 'text', required: true },
             { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'capacity', label: 'Capacity', type: 'number', min: 0 },
+            {
+                key: 'capacity',
+                label: 'Capacity',
+                type: 'number',
+                min: 0,
+                /* Stated, because 0 is the column's DEFAULT: a room saved
+                 * without a capacity gets it, and the reading has to be the one
+                 * that keeps such a room usable. */
+                help: 'Seats. Leave it 0 for no limit — an online room, or one nobody has measured.',
+            },
             { key: 'location', label: 'Location', type: 'text' },
             {
                 key: 'ranking',

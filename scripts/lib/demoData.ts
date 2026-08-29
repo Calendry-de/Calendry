@@ -150,7 +150,11 @@ export const ROOMS = [
     { code: 'B205', name: 'Seminarraum B205', capacity: 30, ranking: 1, location: 'Hauptgebäude' },
     { code: 'C012', name: 'Rechnerlabor C012', capacity: 24, ranking: 2, location: 'Technikum' },
     { code: 'C014', name: 'Rechnerlabor C014', capacity: 24, ranking: 2, location: 'Technikum' },
-    { code: 'ONLINE', name: 'Online', capacity: 999, ranking: 0, isVirtual: true },
+    /* CAPACITY 0 = UNLIMITED, which is what an online room actually is. It also
+     * makes the demo exercise that translation rather than describing it: 999
+     * was a number chosen to be big, and a group of 1000 would have silently
+     * stopped fitting. */
+    { code: 'ONLINE', name: 'Online', capacity: 0, ranking: 0, isVirtual: true },
 ];
 
 /**

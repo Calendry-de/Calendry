@@ -210,6 +210,22 @@ export interface ConstraintTypeDef {
      */
     appliesToKindType?: SessionKindType;
     /**
+     * This rule is stated in units the TimeGrid defines, so a tenant running
+     * more than one grid almost certainly does not mean it tenant-wide.
+     *
+     * A HINT, NOT A RULE. `constraint_def.time_grid_id` is available on every
+     * type and NULL means every grid, which is right for most of them — "no
+     * double-booking" means the same thing on any grid. This marks the ones
+     * where a gap, a block count or a span is being compared against numbers
+     * only one grid produces: a 45-minute grid's "three consecutive blocks" is
+     * 135 minutes and a 60-minute grid's is 180.
+     *
+     * The builder surfaces the grid selector for these when the tenant has more
+     * than one grid, and says nothing when it has one — a filter exists when it
+     * has more than one option, never because a flag is set.
+     */
+    gridRelative?: boolean;
+    /**
      * Weight a tenant's DEFAULT row is seeded with. Required for every SOFT
      * type and meaningless for HARD ones, because `constraint_weight_matches_severity`
      * demands SOFT rows carry a weight even while disabled — so "seed it
@@ -383,6 +399,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Soft, solver-owned --------------------------------------------------
     {
         key: 'minimize_first_block',
+        gridRelative: true,
         wireField: 'minimizeFirstBlock',
         label: 'Avoid the first block',
         description: 'Prefer not to schedule in the earliest block of the day.',
@@ -409,6 +426,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_block_usage',
+        gridRelative: true,
         wireField: 'minimizeBlockUsage',
         label: 'Avoid particular blocks',
         description:
@@ -560,6 +578,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'compactness',
+        gridRelative: true,
         wireField: 'compactness',
         label: 'Keep the day compact',
         description:
@@ -745,6 +764,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'room_turnaround_buffer',
+        gridRelative: true,
         wireField: 'roomTurnaroundBuffer',
         label: 'Leave a gap between bookings of one room',
         description:
@@ -842,6 +862,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_weekly_teaching_load',
+        gridRelative: true,
         wireField: 'maxWeeklyTeachingLoad',
         label: 'Cap a lecturer\u2019s teaching per week',
         description:
@@ -888,6 +909,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_consecutive_blocks',
+        gridRelative: true,
         wireField: 'maxConsecutiveBlocks',
         label: 'Cap teaching without a break',
         description:
@@ -930,6 +952,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_daily_span',
+        gridRelative: true,
         wireField: 'maxDailySpan',
         label: 'Cap how long a day runs',
         description:
@@ -1083,6 +1106,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'protected_block',
+        gridRelative: true,
         wireField: 'protectedBlock',
         label: 'Reserve a slot institution-wide',
         description:

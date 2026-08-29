@@ -835,7 +835,8 @@ model TimeGrid {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  terms    Term[]
+  constraints Constraint[]
+  terms       Term[]
   sessions Session[]
   breaks   TimeGridBreak[]
 
@@ -1513,16 +1514,32 @@ model Constraint {
   /// because deleting it would make the rule unreachable rather than off.
   isDefault Boolean @default(false) @map("is_default")
 
+  /// Restrict this rule to ONE TimeGrid. NULL = every grid.
+  ///
+  /// A COLUMN, NOT A `ConstraintScope` ROW, because the combination rule
+  /// differs: kind scopes are an OR-set ("any of these kinds", none = all),
+  /// while a grid is an AND filter on the rule itself. One table carrying both
+  /// would make a row's meaning depend on which column is set.
+  ///
+  /// For rules stated in units the grid defines — a gap between lessons, a cap
+  /// on consecutive blocks, a daily span — which two grids cannot mean the same
+  /// numbers by. The wire carries nothing for it: `SolverInput.time_grid` is
+  /// singular, so a rule naming a different grid than the run's Term is simply
+  /// not sent.
+  timeGridId String? @map("time_grid_id")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeGrid TimeGrid? @relation(fields: [timeGridId], references: [id], onDelete: Cascade)
 
   scopes     ConstraintScope[]
   violations ConstraintViolation[]
 
   @@index([tenantId])
   @@index([tenantId, isEnabled])
+  @@index([timeGridId])
   @@map("constraint_def")
 }
 

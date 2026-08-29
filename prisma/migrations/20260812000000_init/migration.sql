@@ -3866,3 +3866,46 @@ WHERE EXISTS (
     WHERE cs."kind_id" = k."id"
       AND c."type" IN ('exam_spacing_same_day', 'exam_spacing_window')
 );
+
+
+-- ===========================================================================
+-- A constraint may be scoped to ONE TimeGrid
+-- ===========================================================================
+--
+-- Several rules are stated in units the grid defines: a gap between lessons, a
+-- cap on consecutive teaching blocks, a daily span. An institution running two
+-- grids — a 45-minute academic week and a 60-minute evening one, say — cannot
+-- mean the same numbers by them, so a tenant-wide row is wrong for one of the
+-- two whichever way it is written.
+--
+-- A COLUMN, NOT A `constraint_scope` ROW, and the difference is the combination
+-- rule. Kind scopes are an OR-set: a rule applies to a Session whose kind is
+-- ANY of them, and no rows means every kind. A grid is an AND filter on the
+-- rule itself: this rule, on this grid, in addition to whatever kinds it names.
+-- Putting both in one table would make a row's meaning depend on which column
+-- is set — the `group_term` / `group_term_availability` trap, where one table's
+-- row existence carried two incompatible claims.
+--
+-- NULL MEANS EVERY GRID, matching how every other optional scope here reads,
+-- and it is what every existing row means.
+--
+-- ON DELETE CASCADE, deliberately, and SET NULL would have been the bug. A rule
+-- scoped to a deleted grid is a rule about something that no longer exists;
+-- nulling it would silently WIDEN it from one grid to all of them, which is the
+-- opposite of what its author asked for and invisible until a timetable comes
+-- back wrong. Cascading deletes the rule, which is at worst a rule that stops
+-- applying — the failure direction this codebase prefers.
+--
+-- The wire carries nothing for this. `SolverInput.time_grid` is SINGULAR: a run
+-- is per-Term and a Term has exactly one grid, so the solver never sees two and
+-- has nothing to disambiguate. The filter is applied while assembling — a rule
+-- naming a different grid than the run's is simply not sent.
+-- ---------------------------------------------------------------------------
+ALTER TABLE "constraint_def"
+    ADD COLUMN "time_grid_id" TEXT;
+
+ALTER TABLE "constraint_def"
+    ADD CONSTRAINT "constraint_def_time_grid_id_fkey"
+    FOREIGN KEY ("time_grid_id") REFERENCES "time_grid"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE INDEX "constraint_def_time_grid_id_idx" ON "constraint_def"("time_grid_id");

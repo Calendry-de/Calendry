@@ -20,6 +20,7 @@ import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 import type { SessionKindType } from '../../shared/sessionKindType';
+import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -252,7 +253,8 @@ export function toWireConstraint(row: {
     weight: number | null;
     params: unknown;
     scopes: { offeringId: string | null; kindId: string | null }[];
-}, kindKeyById: Map<string, string>, kindKeysByType?: Map<SessionKindType, string[]>): { config: ConstraintConfig } | { skip: string } {
+    timeGridId?: string | null;
+}, kindKeyById: Map<string, string>, kindKeysByType?: Map<SessionKindType, string[]>, runTimeGridId?: string | null): { config: ConstraintConfig } | { skip: string } {
     const type = findConstraintType(row.type);
 
     if (!type) {
@@ -307,6 +309,28 @@ export function toWireConstraint(row: {
             skip: 'No days and no blocks are set, which would reserve the ENTIRE timetable '
                 + 'rather than nothing — an empty axis means "every value". Name at least '
                 + 'one day or one block.',
+        };
+    }
+
+    /**
+     * A RULE SCOPED TO ANOTHER GRID IS NOT SENT, and this is the one skip here
+     * that is not a defect.
+     *
+     * `SolverInput.time_grid` is SINGULAR — a run is per-Term and a Term has
+     * exactly one grid — so the solver has nothing to disambiguate and no field
+     * to carry this. The filter therefore has to be applied on the way out, and
+     * a rule about the evening grid must simply not appear in a run over the
+     * academic one.
+     *
+     * Reported like every other skip, deliberately, even though it is routine:
+     * a tenant looking for why a rule did not apply gets the answer in the same
+     * place as every other reason, rather than having to know that this one
+     * category is silent.
+     */
+    if (row.timeGridId && runTimeGridId && row.timeGridId !== runTimeGridId) {
+        return {
+            skip: 'Scoped to a different TimeGrid than this term uses, so it does not apply '
+                + 'here. This is ordinary narrowing, not a misconfiguration.',
         };
     }
 
@@ -723,7 +747,12 @@ export async function assembleSolverInput(
         tenantId: room.tenantId ?? '',
         federationId: room.federationId ?? '',
         name: `${room.code} · ${room.name}`,
-        capacity: room.capacity,
+        /*
+         * 0 MEANS UNLIMITED, translated here because the wire cannot say it —
+         * see `UNBOUNDED_ROOM_CAPACITY`. Without this, the column's own default
+         * makes an unmeasured room ineligible for everything.
+         */
+        capacity: room.capacity === 0 ? UNBOUNDED_ROOM_CAPACITY : room.capacity,
         // Same direction on both sides: HIGHER = more premium/scarce.
         rank: Math.max(0, room.ranking),
         isVirtual: room.isVirtual,
@@ -1285,7 +1314,7 @@ export async function assembleSolverInput(
             });
         }
 
-        const mapped = toWireConstraint(row, kindKeyById, kindKeysByType);
+        const mapped = toWireConstraint(row, kindKeyById, kindKeysByType, term.timeGridId);
 
         if ('skip' in mapped) {
             skippedConstraints.push({ id: row.id, type: row.type, reason: mapped.skip });
