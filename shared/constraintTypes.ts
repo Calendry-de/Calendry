@@ -462,14 +462,43 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'minimize_exam_week_sessions',
         wireField: 'minimizeExamWeek',
-        label: 'Keep exam weeks clear',
+        /*
+         * Named for the AXIS, not for one direction along it — the same
+         * correction `minimize_high_ranking_rooms` already carries, and for the
+         * same reason: `key` is `createOnly`, so a row saved under a label that
+         * describes only one setting of its own control cannot be renamed by
+         * changing its type.
+         */
+        label: 'Steer sessions relative to exam periods',
         description:
-            'Prefer not to schedule during exam periods. Resolves against the academic '
-            + 'calendar rather than assuming the last few weeks.',
+            'Bias the solver toward or away from exam periods, resolved against the '
+            + 'academic calendar rather than assuming the last few weeks. Scope the rule '
+            + 'to a session kind to steer only those.',
         evaluator: 'solver',
         severity: 'SOFT',
         defaultWeight: 8,
-        params: [],
+        params: [{
+            key: 'invert',
+            label: 'Pull sessions INTO the exam period instead of away from it',
+            type: 'boolean',
+            required: false,
+            /*
+             * FALSE, unlike `minimize_high_ranking_rooms`'s `invert`, which
+             * defaults to true. Not an inconsistency: that rule's two directions
+             * are both ordinary choices, while this one's inverted direction is
+             * for exam-kind sessions specifically. A new rule created without
+             * thinking about direction should keep exam weeks clear, which is
+             * what this type has always done.
+             *
+             * EXISTING rows are untouched either way — their stored params carry
+             * no `invert` key, which `buildVariant` reads as false.
+             */
+            default: false,
+            help: 'Off — discourage scheduling during exam periods, keeping them clear. '
+                + 'On — discourage scheduling OUTSIDE them, so the sessions this rule '
+                + 'applies to are drawn in. Turning this on usually means scoping the '
+                + 'rule to your exam session kind; unscoped, it pulls everything in.',
+        }],
     },
     {
         key: 'minimize_online_sessions',

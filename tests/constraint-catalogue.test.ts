@@ -328,6 +328,40 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
+     * The exam-period direction, which is what makes "push exams INTO the exam
+     * weeks" expressible at all rather than only "keep them clear".
+     *
+     * The absent-reads-as-false half is sharper here than for room rank. This
+     * type shipped with NO parameters, so every row any tenant already has
+     * carries `params: {}` — and the wire field's own encoder writes the byte
+     * whenever the value is not literally `false`, so a mapper returning `{}`
+     * relies on `undefined` reaching the encoder and landing on zero. Pinning
+     * the value means the direction is something this mapper decided.
+     */
+    it('carries the exam-period direction, and reads an absent one as false', () => {
+        const configOf = (params: Record<string, unknown>) => (toWireConstraint(
+            row({ type: 'minimize_exam_week_sessions', severity: 'SOFT', weight: 8, params }),
+            noKinds,
+        ) as { config: Record<string, unknown> }).config.minimizeExamWeek;
+
+        expect(configOf({ invert: true })).toEqual({ invert: true });
+
+        // Every row written before this parameter existed, which is all of them.
+        expect(configOf({})).toEqual({ invert: false });
+    });
+
+    /*
+     * UNLIKE room rank, this one seeds FALSE. The inverted direction exists for
+     * exam-kind sessions specifically, so a rule created without a thought about
+     * direction should keep exam weeks clear — which is what this type has
+     * always done.
+     */
+    it('provisions the exam-period rule pointing away from exam weeks', () => {
+        expect(defaultConstraintRow(findConstraintType('minimize_exam_week_sessions')!).params)
+            .toEqual({ invert: false });
+    });
+
+    /*
      * A NEW tenant is provisioned preferring its best rooms; an existing row is
      * never rewritten. `defaultConstraintRow` seeds params from the catalogue
      * defaults, so this pins the product's opinion in the one place it lives.

@@ -292,6 +292,19 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 invert: Boolean(params.invert),
             };
 
+        case 'minimize_exam_week_sessions':
+            /*
+             * SENT EXPLICITLY, though `{}` happens to reach the solver as false
+             * too. ts-proto writes this field whenever it is not literally
+             * `false`, so an absent key encodes as `0800` — an explicit zero
+             * rather than nothing — which decodes correctly but makes the bytes,
+             * and therefore `inputHash`, depend on a coincidence rather than on
+             * a value this mapper chose. `Boolean()` for the same reason it is
+             * used on `minimize_high_ranking_rooms` below: a row stored before
+             * this parameter existed keeps the direction it already had.
+             */
+            return { invert: Boolean(params.invert) };
+
         case 'minimize_block_usage':
             return {
                 // Stored 1-based because that is how a human counts blocks in
