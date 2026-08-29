@@ -270,10 +270,25 @@ solver has no way to detect.
   `converged`; a comparison drawn across two `time_budget` runs is not evidence.
   `maxMoves` default **30,000,000**, wall-clock cap **30 s** to keep the move
   budget binding. § "Solver: determinism & `maxMoves`".
-- **Idempotency key is `<inputHash>:<seed>`** — SHA-256 of the *encoded*
-  `SolverInput`, not JSON. The budget is NOT part of it, so restart the solver
-  between measurements at different budgets or you will replay the first run. The
-  registry is in-memory, so a stable key also replays across a code change.
+- **Idempotency key is `<inputHash>:<scopeHash>:<seed>`** — SHA-256 of each
+  *encoded* message, not JSON. **Both halves are needed**: `SolverInput` carries
+  no scope, so keying on it alone made a repair and a rebuild of one unchanged
+  term the same key, and the registry replayed the rebuild's answer for the
+  repair. The budget is in NEITHER, so restart the solver between measurements at
+  different budgets or you will replay the first run. The registry is in-memory,
+  so a stable key also replays across a code change.
+- **A run's mode decides its scope, its lock policy AND its movement weight —
+  derive all three together.** `resolveScope()` in `server/utils/solverScope.ts`
+  is the only place; a `rebuild` defaults to every active Offering under
+  `LOCK_POLICY_HARD`, a `repair` to an EMPTY scope under
+  `LOCK_POLICY_MINIMIZE_MOVEMENT`, which is what makes every Session movable and
+  every move cost. Writing the policy out at a call site is how it came to be
+  hardcoded twice, once into the stored JSON and once onto the wire.
+- **Never assert a proto message's shape with `as`.** ts-proto interfaces
+  require every field; a cast turns that check into a claim, and a field added by
+  a proto bump then compiles clean and throws `"<field> is not iterable"` from
+  `encode()` at runtime. v0.10.0 did exactly this twice (`Room.feature_quantities`,
+  `Session.room_ids`). Construct checked, and let typecheck name the new field.
 - **Warn-and-allow parity**: a `SUCCEEDED` run with residual hard violations is
   still an applicable Generation — not discarded, not auto-applied, and
   `GenerationStatus.INFEASIBLE` is consequently unused for solver output.

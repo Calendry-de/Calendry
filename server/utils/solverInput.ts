@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { SolverInput } from '@mindcollaps/calendry-proto';
+import { SchedulingPattern, SolverInput } from '@mindcollaps/calendry-proto';
 import type {
     ConstraintConfig, ExternalOccupancy, Offering, Person, Room, SlotRef,
 } from '@mindcollaps/calendry-proto';
@@ -464,6 +464,14 @@ export async function assembleSolverInput(
         where: { federationId: { not: null }, tenantId: null, termId: term.id, isActive: true },
     });
 
+    /*
+     * NO `as Room` HERE, deliberately. This literal used to end `} as Room`,
+     * which is an assertion about what the wire wants rather than a check of
+     * it: when v0.10.0 added `feature_quantities` the cast kept typecheck green
+     * and `Room.encode` threw "featureQuantities is not iterable" at runtime,
+     * inside `hashInput`, on every assembly. Checked construction fails at the
+     * edit instead.
+     */
     const rooms: Room[] = roomRows.map((room) => ({
         id: room.id,
         // Ownership reported honestly: a shared hall belongs to the federation,
@@ -475,10 +483,22 @@ export async function assembleSolverInput(
         // Same direction on both sides: HIGHER = more premium/scarce.
         rank: Math.max(0, room.ranking),
         isVirtual: room.isVirtual,
-        // Presence only — RoomEquipment.quantity has nowhere to go on the wire.
+        // Presence only, which is what room eligibility reads: `convert.rs`
+        // matches `Offering.required_room_features` against this list and
+        // nothing else.
         featureTags: room.roomEquipment.map((link) => link.equipment.key),
         location: room.location ?? '',
-    } as Room));
+        /*
+         * EMPTY, AND THE GAP IS STILL REPORTED. `Room.feature_quantities`
+         * arrived with proto v0.10.0, so `RoomEquipment.quantity` finally has
+         * somewhere to go — but the solver does not read it yet (it matches
+         * `feature_tags` membership alone), and filling it here would quietly
+         * retire `droppedEquipmentQuantities` from the assembly report while
+         * changing no answer. The report is the honest state until the search
+         * can act on the numbers. "Equipment quantity" is the card.
+         */
+        featureQuantities: [],
+    }));
 
     /**
      * Only the Groups this Term's problem can involve: what the Offerings and
@@ -526,7 +546,12 @@ export async function assembleSolverInput(
         personRows.map((person) => person.id),
     );
     const activeDays = new Set(grid.activeDays);
-    const narrowedPreferences = new Map<string, { days: number[]; blocks: number[]; weightMultiplier?: number }>();
+    const narrowedPreferences = new Map<string, {
+        days: number[];
+        blocks: number[];
+        weightMultiplier?: number;
+        preferredRoomFeatures: string[];
+    }>();
     let droppedOutOfGridValues = 0;
 
     for (const [personId, stated] of preferencesByPerson) {
@@ -551,6 +576,15 @@ export async function assembleSolverInput(
                  * coercing it to a number would be the silent wrong answer.
                  */
                 weightMultiplier: stated.weightMultiplier ?? undefined,
+                /*
+                 * EMPTY BECAUSE THE APP HAS NO SUCH PREFERENCE, not because the
+                 * axis is skipped. `Preference.preferred_room_features` arrived
+                 * with proto v0.10.0 and nothing stores a room-type preference
+                 * yet; `PersonPreferenceFit` counts days and blocks only, so an
+                 * empty list is the same answer a reader would get from a person
+                 * who stated none. "Room-type preference kind" is the card.
+                 */
+                preferredRoomFeatures: [],
             });
         }
     }
@@ -794,7 +828,29 @@ export async function assembleSolverInput(
             // Empty = any eligible Room. The app has no allow-list.
             allowedRoomIds: [],
             allowOnline: offering.allowOnline,
-            } as Offering;
+            /*
+             * THE STAGED WIRE SURFACE, sent as zero values because this app
+             * models none of it — not because it is being withheld. All three
+             * arrived with proto v0.10.0 and are PROTO ONLY on the solver side
+             * too: no evaluator reads any of them, so what is sent here cannot
+             * change a placement either way.
+             *
+             *   roomFeatureRequirements  no minimum-COUNT room requirement is
+             *                            storable; `requiredRoomFeatures` above
+             *                            carries the presence-only ones.
+             *   requiredRoomCount        0 and 1 both mean today's single-room
+             *                            behaviour, and the app has no column.
+             *   schedulingPattern        no column either; UNSPECIFIED is the
+             *                            honest classification, not a default
+             *                            picked to look decided.
+             *
+             * Each has its own card. Widening one is a data-model change here
+             * first, and only then a different value on this line.
+             */
+            roomFeatureRequirements: [],
+            requiredRoomCount: 0,
+            schedulingPattern: SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
+            };
         });
     });
 
@@ -962,7 +1018,7 @@ export async function assembleSolverInput(
             // Documented as "opaque; diagnostics only" — deliberately carries no
             // identifier, so nothing about the owning tenant leaks through it.
             sourceRef: 'federation-shared',
-        } as ExternalOccupancy));
+        }));
 
     /**
      * Whether the preference rule has anything to say about each placement.

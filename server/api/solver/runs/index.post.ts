@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { LockPolicy } from '@mindcollaps/calendry-proto';
 import { findPgCodeIsUniqueViolation } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
@@ -12,7 +11,9 @@ import {
     toWireU64,
 } from '../../../utils/solverClient';
 import { TermEndedError, assembleSolverInput } from '../../../utils/solverInput';
+import { hashScope, resolveScope, toWireScope } from '../../../utils/solverScope';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '../../../../shared/solverBudget';
+import { SOLVER_MODES } from '../../../../shared/solverMode';
 
 /**
  * Sentinel for "the one-active-run index rejected this insert".
@@ -35,8 +36,15 @@ const bodySchema = z.object({
     /** 0 = let the solver choose; whatever it picks is echoed back and stored. */
     seed: z.coerce.number().int().min(0).optional(),
     /**
-     * Narrows what is actively placed. Omitted = every active Offering in the
-     * term. Everything outside the scope is hard-locked (LOCK_POLICY_HARD).
+     * What this run is FOR, which decides both the lock policy and what an
+     * omitted scope defaults to. See `solverScope.ts`; the two are one decision
+     * and are derived in one place so they cannot disagree.
+     */
+    mode: z.enum(SOLVER_MODES).default('rebuild'),
+    /**
+     * Narrows what is actively placed. Omitted means every active Offering in
+     * the term for a `rebuild` and NOTHING for a `repair` — a repair moves what
+     * already exists rather than placing anything.
      */
     offeringIds: z.array(z.string().min(1)).optional(),
     groupIds: z.array(z.string().min(1)).optional(),
@@ -89,22 +97,14 @@ export default defineEventHandler(async (event) => {
             now: new Date(),
         });
 
-        /**
-         * TWO SCOPES. `offeringIds` is STORED and later compared against
-         * `session.offering_id` — real database ids. `wireOfferingIds` is what the
-         * SOLVER is given, which for a split multi-group Offering are synthetic
-         * `offering::group` ids.
-         *
-         * One list for both breaks in one direction or the other: wire ids stored
-         * means no existing Session is ever in scope and nothing is deleted; real
-         * ids sent means the split series are out of scope and nothing is placed.
-         */
-        const scope = {
-            offeringIds: body.offeringIds ?? assembled.scopeOfferingIds.real,
-            wireOfferingIds: body.offeringIds ?? assembled.scopeOfferingIds.wire,
-            groupIds: body.groupIds ?? [],
-            outsideScopePolicy: 'LOCK_POLICY_HARD',
-        };
+        // Scope, policy and movement weight are ONE derivation — see
+        // `solverScope.ts` for why they cannot be written out separately here.
+        const scope = resolveScope({
+            mode: body.mode,
+            offeringIds: body.offeringIds,
+            groupIds: body.groupIds,
+            assembled: assembled.scopeOfferingIds,
+        });
 
         try {
             const run = await tx.solverRun.create({
@@ -112,7 +112,10 @@ export default defineEventHandler(async (event) => {
                     tenantId: identity.tenantId,
                     termId: term.id,
                     status: 'PENDING',
-                    scope,
+                    // `as object` like `referenceSlot` below: Prisma's JSON input
+                    // type wants an index signature, which a named interface
+                    // deliberately does not carry.
+                    scope: scope as object,
                     seed,
                     maxMoves: BigInt(maxMoves),
                     maxWallMillis,
@@ -187,21 +190,26 @@ export default defineEventHandler(async (event) => {
      */
     const { run: created, assembled, scope } = claimed;
 
+    const wireScope = toWireScope(scope);
+
     try {
         const response = await startRun({
             input: assembled.input,
-            scope: {
-                // The WIRE ids — see the two-scopes note where `scope` is built.
-                offeringIds: scope.wireOfferingIds,
-                groupIds: scope.groupIds,
-                outsideScopePolicy: LockPolicy.LOCK_POLICY_HARD,
-            },
+            scope: wireScope,
             budget: { maxWallMillis: toWireU64(maxWallMillis), maxMoves: toWireU64(maxMoves) },
             seed: toWireU64(seed),
-            // Now meaningful: the hash identifies the PROBLEM, so a retry of the
-            // same snapshot at the same seed returns the same run rather than
-            // launching a second one.
-            idempotencyKey: `${assembled.inputHash}:${seed}`,
+            /**
+             * The hash identifies the PROBLEM, so a retry of the same request
+             * returns the same run rather than launching a second one.
+             *
+             * THE SCOPE IS PART OF THE PROBLEM AND `inputHash` DOES NOT COVER
+             * IT — `SolverInput` carries no scope; `SolveScope` is a separate
+             * argument. Keying on the input alone was correct only while every
+             * run sent the same scope, and a repair is a different scope over an
+             * unchanged snapshot: same input, same seed, same key, and the
+             * solver's registry would replay the rebuild's answer for it.
+             */
+            idempotencyKey: `${assembled.inputHash}:${hashScope(wireScope)}:${seed}`,
         });
 
         const updated = await withRequestTenant(event, (tx) => tx.solverRun.update({

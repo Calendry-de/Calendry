@@ -63,6 +63,12 @@ export function fromWireWeek(week: number): number {
     return week + 1;
 }
 
+/*
+ * NO `as WireSession` ON THE RETURN, deliberately — see the same note on
+ * `rooms` in solverInput.ts. The cast this replaces asserted the shape instead
+ * of checking it, so v0.10.0's new `room_ids` compiled clean and threw
+ * "roomIds is not iterable" from `Session.encode` at runtime.
+ */
 export function toWireSession(row: AppSessionRow): WireSession {
     return {
         id: row.id,
@@ -92,6 +98,21 @@ export function toWireSession(row: AppSessionRow): WireSession {
         // carries one. The first is sent and the rest are reported as dropped by
         // the caller rather than silently discarded here.
         roomId: row.roomIds[0] ?? '',
+        /*
+         * EMPTY IS THE CONVENTION, not a withheld value. `Session.room_ids`
+         * arrived with proto v0.10.0 and its own comment says an ordinary
+         * single-room Session leaves it empty because `room_id` above is already
+         * the complete answer — populating it would be redundant duplication.
+         *
+         * For the multi-room case it would NOT be redundant, and the app has the
+         * data. It is still sent empty: `partition_sessions` reads `room_id`
+         * alone, so every extra entry is silently dropped rather than honoured,
+         * and filling this would retire `multiRoomSessions` from the assembly
+         * report while changing no answer. The report is the honest state until
+         * the search has a multi-room placement primitive. "Multi-room Sessions"
+         * is the card.
+         */
+        roomIds: [],
         lecturerIds: row.lecturerIds,
         groupIds: row.groupIds,
         personIds: row.personIds,
@@ -122,7 +143,7 @@ export function toWireSession(row: AppSessionRow): WireSession {
          * the constraint the app actually enforces.
          */
         isLocked: row.isLocked || row.tenantId === null || row.offeringId === null,
-    } as WireSession;
+    };
 }
 
 /** Sessions carrying more rooms than the wire can express, for honest reporting. */
