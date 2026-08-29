@@ -32,10 +32,15 @@ export default defineNuxtConfig({
         experimental: {
             websocket: true,
         },
+        alias: {
+            // See server/utils/pgNativeStub.ts — pg's optional native addon,
+            // never installed, needs somewhere to resolve at build time.
+            'pg-native': './server/utils/pgNativeStub.ts',
+        },
     },
     css: ['~/scss/tokens-root.scss'],
     compatibilityDate: '2026-01-01',
-    devtools: { enabled: true },
+    devtools: { enabled: false },
     modules: [
         '@nuxt/eslint',
         '@nuxt/devtools',

@@ -177,7 +177,7 @@ export type ColorsList = keyof typeof colorsList;
  * are NOT remapped: they are used as fills and tints, where the light theme's
  * values are already correct against a dark surface.
  *
- * This changes no light-theme value, and adds no custom property: `useLayout()`
+ * This changes no light-theme value, and adds no custom property: `useCalendryLayout()`
  * emits every entry of `colorsList` regardless and merely overrides the ones
  * named here.
  */

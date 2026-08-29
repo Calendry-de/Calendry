@@ -49,7 +49,7 @@ import { HOME_ROUTE } from '~/utils/routes';
 
 defineSlots<{ default: () => VNode[] }>();
 
-useLayout();
+useCalendryLayout();
 </script>
 
 <style lang="scss">

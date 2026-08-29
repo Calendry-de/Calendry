@@ -48,7 +48,7 @@ export function useThemeToggle() {
     };
 }
 
-export const useLayout = () => {
+export const useCalendryLayout = () => {
     const store = useStore();
 
     // Theme handling

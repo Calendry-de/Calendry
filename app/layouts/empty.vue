@@ -15,7 +15,7 @@ import { LANDING_ROUTE } from '~/utils/routes';
 
 defineSlots<{ default: () => VNode[] }>();
 
-useLayout();
+useCalendryLayout();
 
 /**
  * The build stamp is for people working on the product, not for the public page.
