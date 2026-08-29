@@ -384,6 +384,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     it.each([
         'compactness',
         'max_consecutive_blocks',
+        'max_daily_span',
     ])('sends %s BOTH as an empty scope, and each single axis as itself', (key) => {
         const type = findConstraintType(key)!;
         const others = Object.fromEntries(

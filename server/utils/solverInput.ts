@@ -375,6 +375,12 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 maxConsecutive: Number(params.maxConsecutive),
             };
 
+        case 'max_daily_span':
+            return {
+                scope: compactnessScope(params.scope),
+                maxSpanBlocks: Number(params.maxSpanBlocks),
+            };
+
         case 'compactness':
             return { scope: compactnessScope(params.scope) };
 

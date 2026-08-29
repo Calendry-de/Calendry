@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'max_daily_span',
     'max_consecutive_blocks',
     'max_weekly_teaching_load',
     'minimize_capacity_waste',
@@ -126,6 +127,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'maxDailySpan'
     | 'maxConsecutiveBlocks'
     | 'maxWeeklyTeachingLoad'
     | 'minimizeCapacityWaste'
@@ -887,6 +889,53 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 4,
             help: 'Each block past this is charged. In BLOCKS \u2014 how long a block is '
                 + 'comes from your time grid.',
+        }],
+    },
+
+    {
+        key: 'max_daily_span',
+        wireField: 'maxDailySpan',
+        label: 'Cap how long a day runs',
+        description:
+            'From the first session to the last, however much of it is teaching. A day '
+            + 'with one session at 09:00 and one at 17:00 is a long day even though it '
+            + 'is barely any teaching.',
+        evaluator: 'solver',
+        /*
+         * NONE OF THE THREE DAY RULES SUBSUMES THE OTHERS, which is why all
+         * three exist:
+         *
+         *   compactness            the GAPS inside the span
+         *   max_consecutive_blocks the DENSITY of an unbroken run
+         *   this                   the SPAN itself, first slot to last
+         *
+         * A day can have no gaps and low density and still run from eight to
+         * six.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s day and a person\u2019s day are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a day none of those cohorts can see.',
+        }, {
+            key: 'maxSpanBlocks',
+            label: 'Blocks from first to last',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 8,
+            help: 'Counts every block between the first and last session, teaching or not. '
+                + 'Each block past this is charged.',
         }],
     },
 
