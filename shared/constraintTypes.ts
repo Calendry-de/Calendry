@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'minimize_weekday_imbalance',
     'room_consistency',
     'group_size_fits_room',
     'group_veto',
@@ -119,6 +120,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'minimizeWeekdayImbalance'
     | 'roomConsistency'
     | 'groupSizeFitsRoom'
     | 'groupVeto'
@@ -630,6 +632,30 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * sessions, recomputed as placements change rather than fixed to
          * whichever session landed first — so the rule cannot be satisfied by
          * accident of ordering.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
+        params: [],
+    },
+
+    {
+        key: 'minimize_weekday_imbalance',
+        wireField: 'minimizeWeekdayImbalance',
+        label: 'Spread a group\u2019s week evenly',
+        description:
+            'Discourage a class having five sessions on Monday and one on Friday. '
+            + 'Measured across the teaching days this institution actually uses, not an '
+            + 'assumed Monday-to-Friday.',
+        evaluator: 'solver',
+        /*
+         * NO PARAMETERS, and the proto reserved field 1 rather than inventing
+         * one: the variance is read straight off `TimeGrid.active_days`, so
+         * there is nothing for a tenant to state that the grid does not already
+         * say. Adding a knob later is an ordinary field addition.
+         *
+         * Distinct from `minimize_specifc_day`, which targets NAMED weekdays
+         * regardless of what else that group has that week. This is a property
+         * of the whole week.
          */
         severity: 'SOFT',
         defaultWeight: 3,
