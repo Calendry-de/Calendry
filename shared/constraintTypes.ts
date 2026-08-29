@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'max_weekly_teaching_load',
     'minimize_capacity_waste',
     'minimize_room_churn',
     'room_turnaround_buffer',
@@ -124,6 +125,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'maxWeeklyTeachingLoad'
     | 'minimizeCapacityWaste'
     | 'minimizeRoomChurn'
     | 'roomTurnaroundBuffer'
@@ -795,6 +797,52 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             help: '2 means a room up to twice the size needed is fine and anything larger '
                 + 'is charged, more the larger it gets. 1 charges any room bigger than '
                 + 'strictly necessary.',
+        }],
+    },
+
+    {
+        key: 'max_weekly_teaching_load',
+        wireField: 'maxWeeklyTeachingLoad',
+        label: 'Cap a lecturer\u2019s teaching per week',
+        description:
+            'How much one person may teach in a week. Answers a question neither existing '
+            + 'lecturer rule does: unavailability blocks specific TIMES, and nothing caps '
+            + 'the total.',
+        evaluator: 'solver',
+        /*
+         * SOFT, and for the reason ADR-0025 records rather than as a softening.
+         * A hard cap on a count that only becomes fully known as placements
+         * accumulate is the dead-end-construction problem `MaxOnlineShare` ran
+         * into: the search can paint itself into a corner it cannot leave.
+         *
+         * A contract limit is still expressible — set the weight high enough to
+         * dominate — and stays recoverable rather than making the term
+         * infeasible.
+         */
+        severity: 'SOFT',
+        defaultWeight: 8,
+        params: [{
+            key: 'maxPerWeek',
+            label: 'Maximum per week',
+            type: 'number',
+            min: 1,
+            required: true,
+            help: 'No default: a teaching load is a contractual figure, not something to '
+                + 'guess on an institution\u2019s behalf.',
+        }, {
+            key: 'countBlocks',
+            label: 'Count blocks rather than sessions',
+            type: 'boolean',
+            required: false,
+            default: false,
+            /*
+             * FALSE is today's only reading, and the honest one for a tenant
+             * who has not thought about it: "sessions" is what a person
+             * counting their own week says. A double-length lecture counting as
+             * two is a deliberate choice, not a default.
+             */
+            help: 'Off \u2014 a double-length lecture counts once. On \u2014 it counts twice, '
+                + 'which is the right reading when the limit is about hours taught.',
         }],
     },
 

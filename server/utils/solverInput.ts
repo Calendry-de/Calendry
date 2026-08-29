@@ -335,6 +335,14 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
         case 'minimize_capacity_waste':
             return { wasteRatioThreshold: Number(params.wasteRatioThreshold) };
 
+        case 'max_weekly_teaching_load':
+            return {
+                maxPerWeek: Number(params.maxPerWeek),
+                // `Boolean()`, so a row stored before this parameter existed
+                // reads as false — the sessions-not-blocks reading it had.
+                countBlocks: Boolean(params.countBlocks),
+            };
+
         case 'compactness':
             /*
              * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather
