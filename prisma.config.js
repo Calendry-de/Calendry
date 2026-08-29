@@ -16,10 +16,14 @@ export default defineConfig({
     path: "prisma/migrations",
     // Migrations are schema-only; reference data arrives via seed.
     //
-    // `prisma migrate reset` and `migrate dev` run this automatically, so a
-    // rebuilt dev database is never left without its permission catalogue.
-    // `migrate deploy` deliberately does NOT — production calls `prisma db seed`
-    // explicitly, which both container entrypoints do.
+    // DECLARED HERE, AND NOT RELIED ON. `migrate reset` is documented to run
+    // this automatically and, under the pinned Prisma, does not — a reset
+    // leaves `permission` empty, and the next `provision:tenant` fails on the
+    // `access_role_permission` FK with an error naming neither the seed nor the
+    // reset. So `bun run db-reset` calls `db-seed` itself, and this stays as
+    // the declaration of what the seed IS rather than as the thing that runs
+    // it. `migrate deploy` never ran it either, by design: production calls
+    // `prisma db seed` explicitly, which both container entrypoints do.
     seed: "bun run prisma/seed.ts",
   },
   datasource: {
