@@ -41,6 +41,8 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'block_pattern_adherence',
+    'distributed_pattern_adherence',
     'protected_block',
     'exam_spacing_window',
     'exam_spacing_same_day',
@@ -131,6 +133,8 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'blockPatternAdherence'
+    | 'distributedPatternAdherence'
     | 'protectedBlock'
     | 'examSpacingWindow'
     | 'examSpacingSameDay'
@@ -1092,6 +1096,58 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             help: 'Block positions, comma separated, counting from 1 \u2014 e.g. 4 for the '
                 + 'lunch block. Leave empty to reserve the WHOLE of the chosen days.',
         }],
+    },
+
+    {
+        key: 'distributed_pattern_adherence',
+        wireField: 'distributedPatternAdherence',
+        label: 'Hold a weekly slot for spread-out courses',
+        description:
+            'Keep an offering marked \u201CSpread across the term\u201D in ONE weekly slot \u2014 '
+            + 'Mondays at 10, every week \u2014 rather than letting each week land wherever '
+            + 'it fits. Offerings not marked that way are untouched.',
+        evaluator: 'solver',
+        /*
+         * WHICH OFFERINGS THIS PRICES IS NOT CONFIGURED HERE. It reads
+         * `Offering.scheduling_pattern` per offering, so an offering nobody has
+         * classified is untouched — which is EVERY offering until somebody sets
+         * the field, and is why the assembly report counts them.
+         *
+         * That is the `lecturer_veto` shape this codebase already paid for: a
+         * rule enabled by default, fed an empty list, looking healthy and unable
+         * to fire. Here it is opt-in and reported rather than silent.
+         *
+         * Cost is the number of DISTINCT weekly slots used minus one, so it is
+         * zero for a genuinely fixed slot and grows per extra slot regardless of
+         * how many sessions land in each.
+         */
+        severity: 'SOFT',
+        defaultWeight: 8,
+        params: [],
+    },
+
+    {
+        key: 'block_pattern_adherence',
+        wireField: 'blockPatternAdherence',
+        label: 'Keep intensive courses in one window',
+        description:
+            'Keep an offering marked \u201CConcentrated into a window\u201D inside a short run of '
+            + 'weeks rather than trickling across the term. Offerings not marked that way '
+            + 'are untouched.',
+        evaluator: 'solver',
+        /*
+         * The mirror of `distributed_pattern_adherence`, and the two are not
+         * alternatives: each only prices offerings carrying its own pattern, so
+         * a tenant running both kinds of course enables both rules. An offering
+         * left unclassified is untouched by either.
+         *
+         * Cost is the idle WEEKS between the offering's first and last placed
+         * session — the same gap-counting shape as `compactness`, at week
+         * granularity and keyed by offering.
+         */
+        severity: 'SOFT',
+        defaultWeight: 8,
+        params: [],
     },
 
 ];

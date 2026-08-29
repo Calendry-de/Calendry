@@ -59,6 +59,21 @@ export interface AssemblyReport {
      */
     sessionsOverRoomCap: string[];
     /**
+     * How many Offerings carry each scheduling pattern.
+     *
+     * EXISTS TO EXPOSE AN INERT RULE. `distributed_pattern_adherence` and
+     * `block_pattern_adherence` price only the Offerings tagged with their own
+     * pattern, and an Offering nobody has classified is untouched by both —
+     * which is every Offering until somebody sets the field. So a tenant can
+     * enable either rule, weight it, see it in the catalogue, and have it do
+     * nothing at all.
+     *
+     * That is the `lecturer_veto` shape this codebase already paid for: a rule
+     * that looks configured and can never fire, unnoticed precisely because
+     * nothing counted it. Counting it is the whole fix.
+     */
+    offeringsByPattern: { distributed: number; block: number; unclassified: number };
+    /**
      * Equipment quantity requirements NO sent Room can meet.
      *
      * This replaced `droppedEquipmentQuantities`, which counted requirements the
@@ -1340,6 +1355,14 @@ export async function assembleSolverInput(
             excludedFederationOfferings: federationOfferings,
             sessionsOverRoomCap: sessionsOverRoomCap(sessionInputs),
             unsatisfiableEquipmentQuantities,
+            offeringsByPattern: {
+                distributed: offeringRows.filter((o) => o.schedulingPattern === 'DISTRIBUTED').length,
+                block: offeringRows.filter((o) => o.schedulingPattern === 'BLOCK').length,
+                // NULL, counted explicitly rather than derived by subtraction:
+                // it is the number that makes an enabled pattern rule inert, so
+                // it should be readable without arithmetic.
+                unclassified: offeringRows.filter((o) => o.schedulingPattern === null).length,
+            },
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
             personsWithHeavyVetoLoad,

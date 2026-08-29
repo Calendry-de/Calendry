@@ -73,6 +73,39 @@ describe('reaching the wire', () => {
     });
 });
 
+describe('the inert-rule report', () => {
+    /*
+     * A PATTERN RULE PRICES ONLY THE OFFERINGS CARRYING ITS PATTERN, and an
+     * unclassified Offering is untouched by both. So a tenant can enable
+     * `distributed_pattern_adherence`, weight it, see it in the catalogue, and
+     * have it do nothing — the `lecturer_veto` shape this codebase already paid
+     * for once, which went unnoticed precisely because nothing counted it.
+     *
+     * Asserted in BOTH directions so a hardcoded value cannot satisfy it.
+     */
+    it('counts unclassified Offerings, which are what make the rule inert', async () => {
+        await ownerDb.offering.update({
+            where: { id: 'test-offering-a' },
+            data: { schedulingPattern: null },
+        });
+
+        const before = (await assemble()).report.offeringsByPattern;
+
+        expect(before.unclassified).toBeGreaterThan(0);
+        expect(before.distributed).toBe(0);
+
+        await ownerDb.offering.update({
+            where: { id: 'test-offering-a' },
+            data: { schedulingPattern: 'DISTRIBUTED' },
+        });
+
+        const after = (await assemble()).report.offeringsByPattern;
+
+        expect(after.distributed).toBe(1);
+        expect(after.unclassified).toBe(before.unclassified - 1);
+    });
+});
+
 describe('the write schema', () => {
     /*
      * A `<select>` cannot send "absent" — it sends the empty string. Without the
