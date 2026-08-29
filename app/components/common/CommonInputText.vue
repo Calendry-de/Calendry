@@ -115,7 +115,7 @@ const inputRef = ref<HTMLInputElement | null>(null);
 const inputId = useId();
 
 const currentLength = computed(() => model.value?.length);
-const isLengthExceeded = computed(() => currentLength.value > props.maxInputLength);
+const isLengthExceeded = computed(() => (currentLength.value ?? 0) > props.maxInputLength);
 
 defineExpose({
     input: inputRef,
