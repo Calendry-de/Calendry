@@ -166,10 +166,11 @@ export const BUILT: LandingRoadmapItem[] = [
         id: 'constraints',
         state: 'done',
         title: 'Rules each institution configures for itself',
-        note: 'Sixteen rule types, switched on and weighted per institution: double-booking, '
-            + 'session counts, unavailability, online share, room rank, exam periods and idle '
-            + 'gaps in a day. Room requirements are counted, so a course needing 24 workstations '
-            + 'is only placed where there are 24.',
+        note: 'Thirty rule types, switched on and weighted per institution: double-booking, '
+            + 'session counts, unavailability, online share, room rank and exam periods, plus '
+            + 'the shape of a day — idle gaps, teaching without a break, how long it runs, and '
+            + 'whether it crosses buildings. Rooms can be reserved institution-wide, sized to '
+            + 'the group actually attending, and kept consistent for a class across the week.',
     },
     {
         id: 'federation',
@@ -337,7 +338,7 @@ export const TECHNICAL_NOTES: LandingFeature[] = [
         title: 'The solver',
         body: 'A separate stateless Rust service, reached over gRPC against a shared schema. '
             + 'Hybrid constructive placement followed by large-neighbourhood local search with '
-            + 'simulated annealing, over sixteen constraint types. It holds no database: every '
+            + 'simulated annealing, over thirty constraint types. It holds no database: every '
             + 'run is a complete snapshot the application sends it.',
     },
 ];
