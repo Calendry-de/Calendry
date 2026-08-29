@@ -148,9 +148,9 @@ export const BUILT: LandingRoadmapItem[] = [
         id: 'availability',
         state: 'done',
         title: 'Self-service availability',
-        note: 'A lecturer declares when they cannot teach and which days they would rather have; '
-            + 'staff approve or reject each declaration. Reaching only your own data is the '
-            + 'point of that section.',
+        note: 'A lecturer declares when they cannot teach, and which days, times and kinds of '
+            + 'room they would rather have; staff approve or reject each declaration. Reaching '
+            + 'only your own data is the point of that section.',
     },
     {
         id: 'solver-integration',
@@ -160,6 +160,15 @@ export const BUILT: LandingRoadmapItem[] = [
             + 'against the current schedule, then apply or discard it. A run that succeeds with '
             + 'rules still broken is still offered — with the breaches listed — rather than '
             + 'thrown away.',
+    },
+    {
+        id: 'constraints',
+        state: 'done',
+        title: 'Rules each institution configures for itself',
+        note: 'Sixteen rule types, switched on and weighted per institution: double-booking, '
+            + 'session counts, unavailability, online share, room rank, exam periods and idle '
+            + 'gaps in a day. Room requirements are counted, so a course needing 24 workstations '
+            + 'is only placed where there are 24.',
     },
     {
         id: 'federation',
@@ -327,7 +336,7 @@ export const TECHNICAL_NOTES: LandingFeature[] = [
         title: 'The solver',
         body: 'A separate stateless Rust service, reached over gRPC against a shared schema. '
             + 'Hybrid constructive placement followed by large-neighbourhood local search with '
-            + 'simulated annealing, over fourteen constraint types. It holds no database: every '
+            + 'simulated annealing, over sixteen constraint types. It holds no database: every '
             + 'run is a complete snapshot the application sends it.',
     },
 ];
