@@ -8,6 +8,7 @@ import {
     findConstraintType,
     severityMismatch,
 } from '../shared/constraintTypes';
+import type { ConstraintParamDef } from '../shared/constraintTypes';
 import { toWireConstraint } from '../server/utils/solverInput';
 
 /**
@@ -159,6 +160,50 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         );
 
         expect((result as { config: Record<string, unknown> }).config.personPreferenceFit).toEqual({ roles: [] });
+    });
+
+    /**
+     * A TYPE WITH PARAMETERS MUST HAVE A `buildVariant` CASE.
+     *
+     * `buildVariant` ends in `default: return {}`, and the result becomes the
+     * whole variant message. So a type that declares parameters and has no case
+     * sends an EMPTY message — every field at its proto zero — while the tenant
+     * sees their configured values saved, rendered and never applied. No error,
+     * no report, and the numbers on screen are real; only the timetable
+     * disagrees.
+     *
+     * Asserted structurally rather than per type, so the next parameterised type
+     * is covered the day it is added rather than the day somebody remembers.
+     */
+    it('maps the parameters of every type that declares any', () => {
+        const sample = (param: ConstraintParamDef): unknown => {
+            if (param.default !== undefined) return param.default;
+
+            switch (param.type) {
+                case 'select': return param.options?.[0]?.value ?? '';
+                case 'boolean': return true;
+                case 'weekdays': return [1];
+                case 'text': return '1';
+                default: return param.min ?? 1;
+            }
+        };
+
+        const unmapped = CONSTRAINT_TYPES
+            .filter((type) => type.params.length > 0)
+            .filter((type) => {
+                const params = Object.fromEntries(type.params.map((p) => [p.key, sample(p)]));
+                const result = toWireConstraint(
+                    row({ type: type.key, severity: type.severity ?? 'HARD', weight: type.defaultWeight ?? null, params }),
+                    noKinds,
+                ) as { config?: Record<string, unknown> };
+
+                const variant = result.config?.[type.wireField!];
+
+                return !variant || Object.keys(variant).length === 0;
+            })
+            .map((type) => type.key);
+
+        expect(unmapped).toEqual([]);
     });
 
     it('has a wire field for every catalogue type', () => {
