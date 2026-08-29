@@ -41,6 +41,8 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'exam_spacing_window',
+    'exam_spacing_same_day',
     'minimize_location_change',
     'max_daily_span',
     'max_consecutive_blocks',
@@ -128,6 +130,8 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'examSpacingWindow'
+    | 'examSpacingSameDay'
     | 'minimizeLocationChange'
     | 'maxDailySpan'
     | 'maxConsecutiveBlocks'
@@ -986,6 +990,62 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 1,
             help: '1 means any second building is charged. Raise it if two sites in a day '
                 + 'is normal here. Rooms with no location set are ignored.',
+        }],
+    },
+
+    {
+        key: 'exam_spacing_same_day',
+        wireField: 'examSpacingSameDay',
+        label: 'No two exams for a group on one day',
+        description:
+            'Discourage a class sitting two exams on the same day. Scope this rule to '
+            + 'your exam session kind \u2014 unscoped it treats every session as an exam.',
+        evaluator: 'solver',
+        /*
+         * WHICH SESSIONS COUNT AS EXAMS IS `applies_to_kinds`, not a field here.
+         * That is the same scoping mechanism every kind-scoped type already
+         * uses, and CLAUDE.md forbids hardcoding a kind called "exam" — the
+         * vocabulary is the tenant's.
+         *
+         * Narrower than `minimize_exam_week_sessions`, which is about the exam
+         * PERIOD as a whole. This is about exams that already fall inside it not
+         * landing on one day.
+         */
+        severity: 'SOFT',
+        defaultWeight: 8,
+        params: [],
+    },
+
+    {
+        key: 'exam_spacing_window',
+        wireField: 'examSpacingWindow',
+        label: 'Clear days between a group\u2019s exams',
+        description:
+            'Discourage a class sitting two exams within a few days of each other. The '
+            + 'generalisation of the same-day rule, for institutions that want revision '
+            + 'time between papers.',
+        evaluator: 'solver',
+        /*
+         * A SEPARATE TYPE rather than a parameter on the same-day rule, which is
+         * the proto's own choice and worth keeping visible here: a tenant
+         * wanting only "not the same day" pays no window-tracking cost, and a
+         * tenant enabling both at once is a legitimate combination rather than
+         * a conflict.
+         *
+         * `minDaysBetween: 1` asks exactly what the same-day rule asks. Stated
+         * in the help so nobody enables both to mean one thing.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'minDaysBetween',
+            label: 'Days that must separate two exams',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 2,
+            help: '1 says the same thing as the same-day rule. 2 leaves one clear day '
+                + 'between papers. Scope this to your exam session kind.',
         }],
     },
 

@@ -387,6 +387,9 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 maxLocationsPerDay: Number(params.maxLocationsPerDay),
             };
 
+        case 'exam_spacing_window':
+            return { minDaysBetween: Number(params.minDaysBetween) };
+
         case 'compactness':
             return { scope: compactnessScope(params.scope) };
 
