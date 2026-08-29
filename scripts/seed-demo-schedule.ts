@@ -1,29 +1,36 @@
 /**
- * Builds a demo week of Sessions for one tenant, so the schedule UI has real
- * data to render.
+ * Builds a demo institution for one tenant: a grid, a vocabulary, a group tree,
+ * six terms, ten modules and a first week of placements.
  *
- * WHY THIS IS A SCRIPT AND NOT API CALLS
- * --------------------------------------
- * The API cannot bootstrap a schedule. The CRUD registry exposes nine entities
- * and `session-kinds` is not among them, so an Offering (which requires a
- * kind_id) cannot be created over HTTP. There is no Session-create route and no
- * Generation-create route either: Sessions were always meant to arrive from a
- * solver Generation, and the solver does not exist yet. Until it does, demo
- * data has to be written directly.
+ * SEPARATE FROM SEEDING, AND THE LINE IS NOT ARBITRARY.
  *
- * DELIBERATELY NOT IN prisma/seeds/fixtures/. That tier is guarded and empty by
- * design; it is for data every development environment wants. This is demo
- * content for one named tenant, run on request.
+ *   `prisma/seed.ts`      — data the system is INCORRECT without. The permission
+ *                           catalogue, mirrored from code. Runs everywhere,
+ *                           production included.
+ *   `provision:tenant`    — one tenant's own bootstrap: its access roles, its
+ *                           first administrator, its baseline constraint rows.
+ *   this script           — DEMO CONTENT. Nothing here is required by anything;
+ *                           a real institution names its own session kinds,
+ *                           draws its own grid and enters its own modules.
+ *
+ * Offerings in particular can only ever live here. There is no default Offering
+ * and there cannot be one — an Offering is the institution's own curriculum, so
+ * seeding one would be inventing a course nobody teaches.
  *
  *   bun run seed:demo -- --tenant test [--reset]
  *
- * Runs on the APP role: everything it writes is tenant-scoped, so it goes
- * through the same RLS the application does rather than around it. That also
- * makes it a live test of those policies.
+ * The content comes from two real documents rather than being invented; see
+ * `scripts/lib/demoData.ts` for what was read out of them and why it matters.
+ *
+ * Runs on the OWNER role because it disables append-only triggers on --reset.
+ * Everything it writes is still tenant-scoped.
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import {
+    BREAKS, GRID, GROUPS, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
+} from './lib/demoData';
 
 function arg(name: string): string | undefined {
     const index = process.argv.indexOf(`--${name}`);
@@ -34,56 +41,24 @@ function arg(name: string): string | undefined {
 const tenantSlug = arg('tenant') ?? 'test';
 const reset = process.argv.includes('--reset');
 
-/**
- * A deliberately ordinary teaching week: five days, eight 45-minute blocks
- * from 08:00. Values live here, never in the UI — the grid reads whatever the
- * tenant configured (TAXONOMY.md §2).
- */
-const GRID = {
-    name: 'Standard week',
-    blockLengthMinutes: 45,
-    blocksPerDay: 8,
-    activeDays: [1, 2, 3, 4, 5],
-    startHour: 8,
-    startMinute: 0,
-    breakMinutes: 15,
-};
-
-const ROOMS = [
-    { code: 'A101', name: 'Lecture Hall A', capacity: 180, ranking: 3 },
-    { code: 'B204', name: 'Seminar Room B', capacity: 40, ranking: 1 },
-    { code: 'C012', name: 'Computer Lab C', capacity: 24, ranking: 2 },
-    { code: 'ONLINE', name: 'Online', capacity: 999, ranking: 0, isVirtual: true },
-];
-
-const SUBJECTS = [
-    'Databases', 'Algorithms', 'Operating Systems', 'Statistics',
-    'Computer Networks', 'Software Engineering', 'Linear Algebra', 'Compilers',
-];
-
-const LECTURERS = [
-    ['Ada', 'Lovelace'], ['Grace', 'Hopper'], ['Edsger', 'Dijkstra'],
-    ['Barbara', 'Liskov'], ['Tony', 'Hoare'],
-];
-
 async function main() {
     const connectionString = resolveOwnerDatabaseUrl();
     const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
-    console.log(`Seeding demo schedule on ${describeTarget(connectionString)} for tenant '${tenantSlug}'...`);
+    console.log(`Seeding demo institution on ${describeTarget(connectionString)} for tenant '${tenantSlug}'...`);
 
     try {
         const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug } });
 
         if (!tenant) {
-            throw new Error(`No tenant with slug '${tenantSlug}'. Provision one first.`);
+            throw new Error(`No tenant with slug '${tenantSlug}'. Run provision:tenant first.`);
         }
 
         const t = tenant.id;
 
         if (reset) {
-            // Sessions cascade from Offering; events/generations need their
-            // append-only guards lifted, which only the owner can do.
+            // Sessions cascade from Offering; events and generations carry
+            // append-only guards that only the owner can lift.
             await prisma.$executeRawUnsafe('ALTER TABLE session_event DISABLE TRIGGER session_event_append_only');
             await prisma.$executeRawUnsafe('ALTER TABLE generation DISABLE TRIGGER generation_no_delete');
             await prisma.$executeRawUnsafe(`DELETE FROM session_event WHERE tenant_id = '${t}'`);
@@ -95,80 +70,86 @@ async function main() {
             console.log('  cleared existing sessions, offerings and generations');
         }
 
-        const kind = await prisma.sessionKind.upsert({
-            where: { tenantId_key: { tenantId: t, key: 'lecture' } },
-            create: { tenantId: t, key: 'lecture', name: 'Lecture', color: '#3389C6' },
-            update: {},
-        });
+        // --- vocabulary ------------------------------------------------------
+        const kindByKey = new Map<string, string>();
 
-        const seminarKind = await prisma.sessionKind.upsert({
-            where: { tenantId_key: { tenantId: t, key: 'seminar' } },
-            create: { tenantId: t, key: 'seminar', name: 'Seminar', color: '#587c58' },
-            update: {},
-        });
+        for (const k of KINDS) {
+            const row = await prisma.sessionKind.upsert({
+                where: { tenantId_key: { tenantId: t, key: k.key } },
+                create: { tenantId: t, ...k },
+                // Updated, not left alone: the `type` column is newer than some
+                // demo databases, and a stale TEACHING on the exam kinds would
+                // leave `exam_spacing_*` deriving an empty scope and skipping.
+                update: { type: k.type, name: k.name, color: k.color, requiresGroup: k.requiresGroup },
+            });
 
-        /*
-         * An exam kind, so the demo vocabulary covers the third thing a timetable
-         * actually holds. Seeded HERE and not in `provision:tenant`, which
-         * deliberately creates no kinds: `kind` is tenant-open vocabulary
-         * (TAXONOMY.md §1) and a real tenant names its own. This is demo data.
-         *
-         * The seed already creates an exam PERIOD on the academic calendar, which
-         * is a different entity — a period marks WEEKS, a kind labels a Session.
-         */
-        await prisma.sessionKind.upsert({
-            where: { tenantId_key: { tenantId: t, key: 'exam' } },
-            create: { tenantId: t, key: 'exam', name: 'Exam', color: '#A8763E' },
-            update: {},
-        });
+            kindByKey.set(k.key, row.id);
+        }
 
+        // --- grid ------------------------------------------------------------
         const grid = await prisma.timeGrid.upsert({
             where: { tenantId_name: { tenantId: t, name: GRID.name } },
             create: { tenantId: t, ...GRID, isDefault: true },
             update: { ...GRID, isDefault: true },
         });
 
-        const term = await prisma.term.upsert({
-            where: { tenantId_name: { tenantId: t, name: 'Winter 2026/27' } },
-            create: {
-                tenantId: t, name: 'Winter 2026/27',
-                startDate: new Date('2026-10-05'), endDate: new Date('2027-02-12'),
-                timeGridId: grid.id,
-            },
-            update: { timeGridId: grid.id },
+        await prisma.timeGridBreak.deleteMany({ where: { timeGridId: grid.id } });
+        await prisma.timeGridBreak.createMany({
+            data: BREAKS.map((b) => ({ tenantId: t, timeGridId: grid.id, ...b })),
         });
 
-        // An exam period, so the academic calendar is not empty (TAXONOMY.md §2).
-        await prisma.calendarPeriod.upsert({
-            where: { id: `${t}-exams` },
-            create: {
-                id: `${t}-exams`, tenantId: t, termId: term.id, kind: 'EXAM',
-                name: 'Exam weeks', startDate: new Date('2027-02-01'), endDate: new Date('2027-02-12'),
-            },
-            update: {},
-        });
+        // --- terms -----------------------------------------------------------
+        const termByKey = new Map<string, string>();
 
+        for (const term of TERMS) {
+            const row = await prisma.term.upsert({
+                where: { tenantId_name: { tenantId: t, name: term.name } },
+                create: {
+                    tenantId: t, name: term.name, timeGridId: grid.id,
+                    startDate: new Date(term.start), endDate: new Date(term.end),
+                },
+                update: { timeGridId: grid.id, startDate: new Date(term.start), endDate: new Date(term.end) },
+            });
+
+            termByKey.set(term.key, row.id);
+
+            await prisma.calendarPeriod.upsert({
+                where: { id: `${t}-exams-${term.key}` },
+                create: {
+                    id: `${t}-exams-${term.key}`, tenantId: t, termId: row.id, kind: 'EXAM',
+                    name: 'Prüfungszeitraum',
+                    startDate: new Date(term.exams[0]!), endDate: new Date(term.exams[1]!),
+                },
+                update: {},
+            });
+        }
+
+        const termId = termByKey.get('s1')!;
+
+        // --- rooms -----------------------------------------------------------
         const rooms = [];
 
         for (const room of ROOMS) {
             rooms.push(await prisma.room.upsert({
                 where: { id: `${t}-room-${room.code}` },
                 create: { id: `${t}-room-${room.code}`, tenantId: t, ...room },
-                update: {},
+                update: { ...room },
             }));
         }
 
+        // --- people ----------------------------------------------------------
         const lecturerRole = await prisma.role.findFirst({ where: { tenantId: t, key: 'lecturer' } });
+        const personByKey = new Map<string, string>();
 
-        const people = [];
-
-        for (const [givenName, familyName] of LECTURERS) {
-            const email = `${givenName.toLowerCase()}.${familyName.toLowerCase()}@demo.local`;
+        for (const l of LECTURERS) {
+            const email = `${l.key}@demo.local`;
             const person = await prisma.person.upsert({
                 where: { tenantId_email: { tenantId: t, email } },
-                create: { tenantId: t, givenName, familyName, email },
+                create: { tenantId: t, givenName: l.givenName, familyName: l.familyName, email },
                 update: {},
             });
+
+            personByKey.set(l.key, person.id);
 
             if (lecturerRole) {
                 await prisma.personRole.upsert({
@@ -177,156 +158,172 @@ async function main() {
                     update: {},
                 });
             }
-
-            people.push(person);
         }
 
-        // A nested group tree, so the closure and its "include nested" filter
-        // have something real to resolve.
-        const cohort = await prisma.group.upsert({
-            where: { id: `${t}-cohort` },
-            create: { id: `${t}-cohort`, tenantId: t, name: 'Informatics 2026', expectedSize: 160 },
-            update: {},
-        });
+        // --- groups ----------------------------------------------------------
+        // Written parent-first, which the declaration order guarantees: a child
+        // naming a parent that does not exist yet is an FK error, and FK checks
+        // do not consult RLS, so it would fail loudly rather than silently.
+        const groupByKey = new Map<string, string>();
 
-        const classes = [];
-
-        for (const name of ['Class A', 'Class B']) {
-            const group = await prisma.group.upsert({
-                where: { id: `${t}-class-${name.slice(-1)}` },
+        for (const g of GROUPS) {
+            const row = await prisma.group.upsert({
+                where: { id: `${t}-group-${g.key}` },
                 create: {
-                    id: `${t}-class-${name.slice(-1)}`, tenantId: t,
-                    parentGroupId: cohort.id, name, expectedSize: 80,
+                    id: `${t}-group-${g.key}`, tenantId: t, name: g.name,
+                    expectedSize: g.expectedSize,
+                    parentGroupId: g.parent ? groupByKey.get(g.parent)! : null,
                 },
-                update: {},
+                update: { name: g.name, expectedSize: g.expectedSize },
             });
 
-            classes.push(group);
+            groupByKey.set(g.key, row.id);
         }
 
-        const seminarGroup = await prisma.group.upsert({
-            where: { id: `${t}-seminar-a1` },
-            create: {
-                id: `${t}-seminar-a1`, tenantId: t,
-                parentGroupId: classes[0]!.id, name: 'Seminar A1', expectedSize: 20,
-            },
-            update: {},
+        await prisma.groupTerm.deleteMany({ where: { tenantId: t } });
+        await prisma.groupTerm.createMany({
+            data: GROUP_TERMS.map((link) => ({
+                tenantId: t,
+                groupId: groupByKey.get(link.group)!,
+                termId: termByKey.get(link.term)!,
+            })),
         });
 
-        const generation = await prisma.generation.upsert({
-            where: { tenantId_version: { tenantId: t, version: 1 } },
-            create: {
-                tenantId: t, version: 1, source: 'MANUAL_BASELINE',
-                status: 'APPLIED', isCurrent: true,
-            },
-            update: {},
-        });
+        // --- offerings -------------------------------------------------------
+        /*
+         * A split module becomes TWO Offerings, one per half-cohort, because an
+         * Offering carries one demand: "this many sessions, for these groups".
+         * One Offering attended by both halves would let the solver put them in
+         * the same room at the same time, which is the opposite of a split.
+         */
+        let offeringCount = 0;
+        const offeringIds: string[] = [];
 
-        // --- placements ------------------------------------------------------
-        // Spread across the week, then two deliberate defects so the violation
-        // path is visible rather than theoretical.
-        let created = 0;
-        const groups = [cohort, ...classes, seminarGroup];
+        for (const m of MODULES) {
+            const halves = m.split
+                ? [{ suffix: '-S1', group: 's1', label: ' (S1)' }, { suffix: '-S2', group: 's2', label: ' (S2)' }]
+                : [{ suffix: '', group: 'semester1', label: '' }];
 
-        for (let i = 0; i < SUBJECTS.length; i++) {
-            const subject = SUBJECTS[i] as string;
-            const offering = await prisma.offering.upsert({
-                where: { id: `${t}-offering-${i}` },
-                create: {
-                    id: `${t}-offering-${i}`, tenantId: t, termId: term.id,
-                    kindId: i % 3 === 0 ? seminarKind.id : kind.id,
-                    code: `INF-${100 + i}`, title: subject, frequency: 2, durationBlocks: i % 4 === 0 ? 2 : 1,
-                },
-                update: {},
-            });
+            for (const half of halves) {
+                const id = `${t}-offering-${m.code}${half.suffix}`;
+                /*
+                 * Each half gets the FULL contact hours, not a share of them —
+                 * the hours are what one student sits through, and splitting the
+                 * cohort doubles the teaching rather than dividing it. Halving
+                 * here would quietly under-schedule every split module.
+                 */
+                const frequency = Math.max(1, Math.round(m.hours / 2));
 
-            for (let occurrence = 0; occurrence < 2; occurrence++) {
-                const dayOfWeek = GRID.activeDays[(i + occurrence * 2) % GRID.activeDays.length] as number;
-                const blockIndex = (i + occurrence * 3) % (GRID.blocksPerDay - 1);
-                const id = `${t}-session-${i}-${occurrence}`;
-
-                await prisma.session.upsert({
+                await prisma.offering.upsert({
                     where: { id },
                     create: {
-                        id, tenantId: t, offeringId: offering.id, termId: term.id,
-                        kindId: offering.kindId, timeGridId: grid.id,
-                        termWeek: 1, dayOfWeek, blockIndex,
-                        durationBlocks: offering.durationBlocks,
-                        generationId: generation.id,
-                        // One pinned session, so the locked state is visible.
-                        isLocked: i === 1 && occurrence === 0,
+                        id, tenantId: t, termId, kindId: kindByKey.get(m.kind)!,
+                        code: `${m.code}${half.suffix}`, title: `${m.title}${half.label}`,
+                        frequency,
+                        // 90 minutes, the slot the source timetable actually uses.
+                        durationBlocks: 2,
+                        requiredRoleId: lecturerRole?.id ?? null,
                     },
-                    update: {},
+                    update: { frequency, durationBlocks: 2 },
                 });
 
-                const room = rooms[i % rooms.length]!;
-                const person = people[i % people.length]!;
-                const group = groups[i % groups.length]!;
-
-                await prisma.sessionRoom.upsert({
-                    where: { sessionId_roomId: { sessionId: id, roomId: room.id } },
-                    create: { tenantId: t, sessionId: id, roomId: room.id },
-                    update: {},
-                });
-                await prisma.sessionPerson.upsert({
-                    where: { sessionId_personId: { sessionId: id, personId: person.id } },
-                    create: { tenantId: t, sessionId: id, personId: person.id, roleId: lecturerRole?.id ?? null },
-                    update: {},
-                });
-                await prisma.sessionGroup.upsert({
-                    where: { sessionId_groupId: { sessionId: id, groupId: group.id } },
-                    create: { tenantId: t, sessionId: id, groupId: group.id },
-                    update: {},
+                await prisma.offeringGroup.deleteMany({ where: { offeringId: id } });
+                await prisma.offeringGroup.create({
+                    data: { tenantId: t, offeringId: id, groupId: groupByKey.get(half.group)! },
                 });
 
-                created++;
+                await prisma.offeringLecturer.deleteMany({ where: { offeringId: id } });
+                await prisma.offeringLecturer.create({
+                    data: {
+                        tenantId: t, offeringId: id,
+                        personId: personByKey.get(m.lecturer)!,
+                        roleId: lecturerRole?.id ?? null,
+                    },
+                });
+
+                offeringIds.push(id);
+                offeringCount++;
             }
         }
 
-        // Defect 1: two sessions in the same room, same slot — a hard room
-        // double-booking the evaluator will flag on the next edit.
-        const clash = `${t}-session-clash`;
-
-        await prisma.session.upsert({
-            where: { id: clash },
-            create: {
-                id: clash, tenantId: t, offeringId: `${t}-offering-0`, termId: term.id,
-                kindId: kind.id, timeGridId: grid.id,
-                termWeek: 1, dayOfWeek: GRID.activeDays[0] as number, blockIndex: 0,
-                durationBlocks: 2, generationId: generation.id,
-            },
-            update: {},
-        });
-        await prisma.sessionRoom.upsert({
-            where: { sessionId_roomId: { sessionId: clash, roomId: rooms[0]!.id } },
-            create: { tenantId: t, sessionId: clash, roomId: rooms[0]!.id },
-            update: {},
-        });
-        await prisma.sessionGroup.upsert({
-            where: { sessionId_groupId: { sessionId: clash, groupId: classes[1]!.id } },
-            create: { tenantId: t, sessionId: clash, groupId: classes[1]!.id },
+        // --- a baseline generation -------------------------------------------
+        /*
+         * A handful of placements, not a full timetable. Producing the full one
+         * is the SOLVER's job, and pre-placing it here would hide whether the
+         * solver can — the demo exists to be run against, not to look finished.
+         *
+         * Placed at block 1, 3, 5 … deliberately: those are the positions a
+         * 90-minute session occupies without spanning a break, so the starting
+         * point is legal and any break-spanning session in the UI came from an
+         * edit or a solve rather than from here.
+         */
+        const generation = await prisma.generation.upsert({
+            where: { tenantId_version: { tenantId: t, version: 1 } },
+            create: { tenantId: t, version: 1, source: 'MANUAL_BASELINE', status: 'APPLIED', isCurrent: true },
             update: {},
         });
 
-        // Defect 2: a session placed on a day this TimeGrid does not schedule.
-        // Representable in the schema (the CHECK only bounds 1-7), so the grid
-        // must surface it rather than silently drop it.
-        const offGrid = `${t}-session-offgrid`;
+        const legalStarts = [1, 3, 5, 7, 9, 11];
+        let placed = 0;
 
-        await prisma.session.upsert({
-            where: { id: offGrid },
-            create: {
-                id: offGrid, tenantId: t, offeringId: `${t}-offering-1`, termId: term.id,
-                kindId: kind.id, timeGridId: grid.id,
-                termWeek: 1, dayOfWeek: 6, blockIndex: 0,
-                durationBlocks: 1, generationId: generation.id,
-            },
-            update: {},
-        });
+        for (const [index, offeringId] of offeringIds.entries()) {
+            const offering = await prisma.offering.findUniqueOrThrow({
+                where: { id: offeringId },
+                include: { groups: true, lecturers: true },
+            });
+            const id = `${t}-session-${index}`;
 
-        console.log(`  ${created + 2} sessions across ${GRID.activeDays.length} days of week 1`);
-        console.log(`  1 locked, 1 room double-booking, 1 off-grid (Saturday on a Mon-Fri grid)`);
-        console.log(`  term '${term.name}', grid '${grid.name}' (${GRID.blocksPerDay} x ${GRID.blockLengthMinutes}min)`);
+            await prisma.session.upsert({
+                where: { id },
+                create: {
+                    id, tenantId: t, offeringId, termId,
+                    kindId: offering.kindId, timeGridId: grid.id,
+                    termWeek: 1,
+                    dayOfWeek: GRID.activeDays[index % GRID.activeDays.length]!,
+                    blockIndex: legalStarts[index % legalStarts.length]!,
+                    durationBlocks: 2,
+                    generationId: generation.id,
+                    isLocked: index === 0,
+                },
+                update: {},
+            });
+
+            const room = rooms[index % (rooms.length - 1)]!;
+
+            await prisma.sessionRoom.upsert({
+                where: { sessionId_roomId: { sessionId: id, roomId: room.id } },
+                create: { tenantId: t, sessionId: id, roomId: room.id },
+                update: {},
+            });
+
+            for (const link of offering.groups) {
+                await prisma.sessionGroup.upsert({
+                    where: { sessionId_groupId: { sessionId: id, groupId: link.groupId } },
+                    create: { tenantId: t, sessionId: id, groupId: link.groupId },
+                    update: {},
+                });
+            }
+
+            for (const link of offering.lecturers) {
+                await prisma.sessionPerson.upsert({
+                    where: { sessionId_personId: { sessionId: id, personId: link.personId } },
+                    create: {
+                        tenantId: t, sessionId: id, personId: link.personId,
+                        roleId: lecturerRole?.id ?? null,
+                    },
+                    update: {},
+                });
+            }
+
+            placed++;
+        }
+
+        console.log(`  ${KINDS.length} session kinds (${KINDS.filter((k) => k.type === 'EXAM').length} exam-typed)`);
+        console.log(`  grid '${grid.name}': ${GRID.blocksPerDay} x ${GRID.blockLengthMinutes}min, ${BREAKS.length} breaks, ${GRID.activeDays.length} days`);
+        console.log(`  ${TERMS.length} terms, ${GROUPS.length} groups, ${GROUP_TERMS.length} group-term scopes`);
+        console.log(`  ${LECTURERS.length} lecturers, ${rooms.length} rooms`);
+        console.log(`  ${offeringCount} offerings in '${TERMS[0]!.name}', each with a group and a lecturer`);
+        console.log(`  ${placed} baseline sessions in week 1 — the rest is the solver's job`);
         console.log('Done.');
     } catch (error) {
         console.error(`\nFailed: ${error instanceof Error ? error.message : String(error)}\n`);
