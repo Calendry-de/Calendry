@@ -188,6 +188,13 @@ describe('constraint → wire mapping (Stage 3d)', () => {
             }
         };
 
+        const classifiedKinds = new Map(
+            CONSTRAINT_TYPES
+                .map((type) => type.appliesToKindType)
+                .filter((kindType): kindType is NonNullable<typeof kindType> => Boolean(kindType))
+                .map((kindType) => [kindType, [`sample-${kindType.toLowerCase()}-kind`]]),
+        );
+
         const unmapped = CONSTRAINT_TYPES
             .filter((type) => type.params.length > 0)
             .filter((type) => {
@@ -195,6 +202,19 @@ describe('constraint → wire mapping (Stage 3d)', () => {
                 const result = toWireConstraint(
                     row({ type: type.key, severity: type.severity ?? 'HARD', weight: type.defaultWeight ?? null, params }),
                     noKinds,
+                    /*
+                     * A type declaring `appliesToKindType` derives its scope from
+                     * the tenant's Session-kind classification and SKIPS when
+                     * nothing is classified — deliberately, since an empty
+                     * `applies_to_kinds` means every kind on the wire.
+                     *
+                     * Supplied here so the skip cannot happen: this test is about
+                     * PARAMETERS reaching the wire, and a scope-driven skip would
+                     * make it silently stop checking them. Derived from the
+                     * catalogue rather than hardcoded, so a new kind type is
+                     * covered without touching this.
+                     */
+                    classifiedKinds,
                 ) as { config?: Record<string, unknown> };
 
                 const variant = result.config?.[type.wireField!];

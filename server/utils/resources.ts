@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
+import { SESSION_KIND_TYPES } from '#shared/sessionKindType';
 import type { Tx } from './tenantDb';
 import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
-import { validateConstraintShape } from '../../shared/constraintTypes';
+import { findConstraintType, validateConstraintShape } from '../../shared/constraintTypes';
 import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
 import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 import { isPermissionKey } from '../../shared/permissions';
@@ -192,10 +193,11 @@ function constraintShapeRefinement(
         severity?: string | null;
         weight?: number | null;
         params?: Record<string, unknown> | null;
+        scopes?: { kindId: string }[];
     },
     ctx: z.RefinementCtx,
 ): void {
-    for (const problem of validateConstraintShape(value)) {
+    for (const problem of validateConstraintShape({ ...value, scopeCount: value.scopes?.length })) {
         /*
          * A parameter's issue is reported at the PARAMETER's key, not at
          * `params`. `params` is one `custom: true` field the rule builder
@@ -288,6 +290,11 @@ async function constraintBeforeUpdate(ctx: {
 
     const problems: ConstraintShapeProblem[] = validateConstraintShape({
         type: existing.type,
+        // Only when the patch actually carries scopes. `undefined` means "not
+        // touched", which must not be read as "cleared to zero".
+        ...(Array.isArray(ctx.patch.scopes)
+            ? { scopeCount: (ctx.patch.scopes as unknown[]).length }
+            : {}),
         ...(touchesSeverity ? { severity: ctx.patch.severity as string | null } : {}),
         ...(touchesWeight ? { weight: ctx.patch.weight as number | null } : {}),
         ...(touchesParams
@@ -1010,6 +1017,35 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             const type = data.type as string | undefined;
             const scopes = (children.scopes ?? []) as unknown[];
 
+            /*
+             * A DERIVED TYPE HAS NO VARIANTS. Its scope comes from the session
+             * kinds' own classification, so a second row of the same type would
+             * be a second rule over exactly the same kinds — the duplicate this
+             * guard exists to prevent, and one the usual escape ("name a scope")
+             * cannot resolve, because naming a scope is refused for these.
+             */
+            const derived = type ? findConstraintType(type)?.appliesToKindType : undefined;
+
+            if (type && derived) {
+                const existing = await tx.constraint.findFirst({
+                    where: { tenantId, type },
+                    select: { id: true, name: true },
+                });
+
+                if (existing) {
+                    throw createError({
+                        statusCode: 422,
+                        statusMessage: `'${type}' already exists as "${existing.name}" and cannot have `
+                            + `a second rule: it applies to every session kind whose type is ${derived}, `
+                            + 'so another row would cover exactly the same sessions. Edit that rule, or '
+                            + `change which kinds are ${derived}.`,
+                        data: { field: 'type', type, existingConstraintId: existing.id },
+                    });
+                }
+
+                return;
+            }
+
             if (!type || scopes.length > 0) {
                 return;
             }
@@ -1104,11 +1140,18 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             // Lets the API reject a Group-scoped constraint aimed at a kind that
             // carries no Groups (TAXONOMY.md §9.5).
             requiresGroup: z.boolean().optional(),
+            /*
+             * The FIXED classification behind the tenant's own `key`/`name`.
+             * Rules that are only meaningful about one class of session derive
+             * their scope from this — see `appliesToKindType`.
+             */
+            type: z.enum(SESSION_KIND_TYPES).optional(),
         }),
         update: z.object({
             name: z.string().min(1).optional(),
             color: z.string().nullish(),
             requiresGroup: z.boolean().optional(),
+            type: z.enum(SESSION_KIND_TYPES).optional(),
         }),
         filters: z.object({ key: z.string().optional() }),
         orderBy: { key: 'asc' },

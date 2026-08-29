@@ -1,6 +1,7 @@
 import type { PermissionRequirement } from '#shared/permissions';
 import { resourcePermissions } from '#shared/permissions';
 import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
+import { SESSION_KIND_TYPES, SESSION_KIND_TYPE_HELP, SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
 
 /**
  * The management area's entity registry — a client mirror of the server's
@@ -907,6 +908,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             { key: 'key', label: 'Key', format: 'code' },
             { key: 'name', label: 'Name' },
             { key: 'color', label: 'Colour', format: 'swatch' },
+            { key: 'type', label: 'Type' },
             { key: 'requiresGroup', label: 'Has groups', format: 'boolean' },
         ],
         fields: [
@@ -919,6 +921,28 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 help: 'Stable identifier used by imports and constraints. Cannot be changed later.',
             },
             { key: 'name', label: 'Name', type: 'text', required: true },
+            {
+                key: 'type',
+                label: 'What it is',
+                type: 'select',
+                /*
+                 * NOT `createOnly`, unlike `key`. A tenant that has been running
+                 * for a term and only now wants exam rules must be able to
+                 * reclassify the kind it already has, rather than create a
+                 * second one and re-point every offering.
+                 *
+                 * No blank option: every kind is one of these, and the default
+                 * is the honest answer for a kind nobody has thought about —
+                 * unlike `schedulingPattern`, where "not decided" is a real
+                 * third state.
+                 */
+                options: SESSION_KIND_TYPES.map((value) => ({
+                    value,
+                    label: SESSION_KIND_TYPE_LABELS[value],
+                })),
+                help: 'Decides which rules reach this kind. '
+                    + SESSION_KIND_TYPE_HELP.EXAM,
+            },
             {
                 key: 'color',
                 label: 'Colour',

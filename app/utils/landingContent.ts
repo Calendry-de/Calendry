@@ -69,7 +69,9 @@ export const FEATURES: LandingFeature[] = [
         title: 'One place for what a timetable is made of',
         body: 'Rooms, classes and cohorts, staff and students, courses, terms, and your own daily '
             + 'block structure. Your vocabulary stays yours: role names, session types and room '
-            + 'equipment are things you define, not a fixed list you have to translate into.',
+            + 'equipment are things you define, not a fixed list you have to translate into. You '
+            + 'mark which of your session types are exams, so exam rules find them by that rather '
+            + 'than by what you happened to call them.',
     },
     {
         id: 'editing',

@@ -1,3 +1,5 @@
+import type { SessionKindType } from './sessionKindType';
+
 /**
  * The constraint-type library (TAXONOMY.md §7).
  *
@@ -185,6 +187,28 @@ export interface ConstraintTypeDef {
      * `RESOURCES.constraints.weight`.
      */
     severity: 'HARD' | 'SOFT' | null;
+    /**
+     * Derive `applies_to_kinds` from the tenant's Session kinds CLASSIFIED this
+     * way, instead of from the rule's own `ConstraintScope` rows.
+     *
+     * For a rule that is only meaningful about one class of session. "No two
+     * exams for a group in a day" is not a rule a tenant should be able to aim
+     * at lectures by accident, and under manual scoping the accident had a
+     * particularly bad shape: `applies_to_kinds` EMPTY MEANS EVERY KIND on the
+     * wire, so forgetting to scope such a rule did not disable it — it widened
+     * it to every session in the institution, live, on the next solve.
+     *
+     * A DECLARATION, NOT A DEFAULT. `toWireConstraint` ignores `ConstraintScope`
+     * entirely for these types, the write boundary refuses to store one, and the
+     * builder shows no kind picker. Two sources for one answer is what let two
+     * exam rules disagree about which kind was the exam kind.
+     *
+     * AN EMPTY DERIVED SET IS A SKIP, NEVER AN EMPTY LIST — see
+     * `toWireConstraint`. That is the entire safety property: the wire cannot
+     * express "no kinds", so a tenant with nothing classified must have the rule
+     * withheld and reported, not sent meaning its exact opposite.
+     */
+    appliesToKindType?: SessionKindType;
     /**
      * Weight a tenant's DEFAULT row is seeded with. Required for every SOFT
      * type and meaningless for HARD ones, because `constraint_weight_matches_severity`
@@ -1001,6 +1025,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_same_day',
+        appliesToKindType: 'EXAM',
         wireField: 'examSpacingSameDay',
         label: 'No two exams for a group on one day',
         description:
@@ -1024,6 +1049,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_window',
+        appliesToKindType: 'EXAM',
         wireField: 'examSpacingWindow',
         label: 'Clear days between a group\u2019s exams',
         description:
@@ -1288,7 +1314,13 @@ export function severityMismatch(
 
 /** One thing wrong with a proposed constraint row, named by the field it is about. */
 export interface ConstraintShapeProblem {
-    field: 'type' | 'severity' | 'weight' | 'params';
+    /*
+     * `scopes` is a real form control on the builder (the kind checkboxes) even
+     * though it is a child collection rather than a column, so an issue about it
+     * lands on something the user can see — unlike `params`, which is why the
+     * `paramKey` escape below exists.
+     */
+    field: 'type' | 'severity' | 'weight' | 'params' | 'scopes';
     /**
      * Which PARAMETER, when `field` is `'params'`.
      *
@@ -1443,6 +1475,11 @@ export function validateConstraintShape(input: {
      * every key the catalogue declares.
      */
     params?: Record<string, unknown> | null;
+    /**
+     * How many kind scopes the write carries. `undefined` means the write does
+     * not touch scopes at all, which is not the same as zero.
+     */
+    scopeCount?: number;
 }): ConstraintShapeProblem[] {
     const problems: ConstraintShapeProblem[] = [];
     const type = findConstraintType(input.type);
@@ -1451,6 +1488,29 @@ export function validateConstraintShape(input: {
         problems.push({
             field: 'type',
             message: `Unknown constraint type '${input.type}'. Expected one of: ${CONSTRAINT_TYPE_KEYS.join(', ')}.`,
+        });
+    }
+
+    /**
+     * A DERIVED TYPE CANNOT BE SCOPED BY HAND, and storing a scope it ignores is
+     * worse than refusing one.
+     *
+     * `toWireConstraint` reads `appliesToKindType` and never looks at
+     * `ConstraintScope` for these, so a stored scope would sit in the database
+     * looking like configuration, show in any list that renders scopes, and
+     * change nothing. That is the shape this file already refuses in three other
+     * places — a setting that cannot fail and cannot act.
+     *
+     * Refused rather than dropped on save, because dropping is the same silence
+     * one step earlier: the tenant would see their choice vanish with no reason
+     * given.
+     */
+    if (type?.appliesToKindType && (input.scopeCount ?? 0) > 0) {
+        problems.push({
+            field: 'scopes',
+            message: `'${type.key}' is not scoped by hand — it applies to every session kind `
+                + `whose type is ${type.appliesToKindType}. Change a session kind's type `
+                + 'instead, and the rule follows it.',
         });
     }
 

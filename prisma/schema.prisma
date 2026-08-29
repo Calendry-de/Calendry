@@ -1085,6 +1085,16 @@ model CalendarPeriod {
 /// Tenant-defined vocabulary replacing a fixed Lecture/Exam/Event split.
 /// A kind may legitimately have no Group at all (e.g. staff_meeting) — which
 /// is exactly why Constraints must declare the kinds they apply to.
+/// The fixed classification behind a tenant-named Session kind. See
+/// `SessionKind.type`; values are schema-level and adding one is a migration.
+enum SessionKindType {
+  TEACHING
+  EXAM
+  ADMIN
+
+  @@map("session_kind_type")
+}
+
 model SessionKind {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -1092,6 +1102,20 @@ model SessionKind {
   key   String
   name  String
   color String?
+
+  /// What ROLE this kind plays, as opposed to what the tenant calls it.
+  ///
+  /// THE FIXED HALF OF AN OPEN VOCABULARY. `key` and `name` stay tenant-owned —
+  /// "Klausur" is as valid as "exam" — while this is schema-level, so a rule can
+  /// act on the DECLARATION instead of guessing at the string. The two columns
+  /// are TAXONOMY.md's open/fixed split drawn through one table.
+  ///
+  /// A constraint type declaring `appliesToKindType` derives its
+  /// `applies_to_kinds` from this and ignores `ConstraintScope` entirely.
+  ///
+  /// ADMIN is unread by anything today, on purpose: it exists so "neither taught
+  /// nor assessed" can be recorded before a rule needs it.
+  type SessionKindType @default(TEACHING)
 
   /// Declares whether this kind is expected to carry Group assignments. Lets
   /// the API reject a Group-based constraint scoped to a groupless kind

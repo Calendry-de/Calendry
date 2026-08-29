@@ -19,6 +19,7 @@ import { blackedOutWeeks } from '../../shared/academicCalendar';
 import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
+import type { SessionKindType } from '../../shared/sessionKindType';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -251,7 +252,7 @@ export function toWireConstraint(row: {
     weight: number | null;
     params: unknown;
     scopes: { offeringId: string | null; kindId: string | null }[];
-}, kindKeyById: Map<string, string>): { config: ConstraintConfig } | { skip: string } {
+}, kindKeyById: Map<string, string>, kindKeysByType?: Map<SessionKindType, string[]>): { config: ConstraintConfig } | { skip: string } {
     const type = findConstraintType(row.type);
 
     if (!type) {
@@ -317,9 +318,45 @@ export function toWireConstraint(row: {
         };
     }
 
-    const appliesToKinds = row.scopes
-        .map((scope) => (scope.kindId ? kindKeyById.get(scope.kindId) : undefined))
-        .filter((key): key is string => Boolean(key));
+    /**
+     * A DECLARED type derives its kinds; it does not read `ConstraintScope`.
+     *
+     * `kindKeysByType` is optional so the many callers that only ever pass
+     * ordinary rows — tests, `violations.ts` — are unchanged. Absent is treated
+     * as "no kind is classified", which is the SAFE reading: it produces the
+     * skip below rather than an empty list.
+     */
+    const declared = type.appliesToKindType;
+    const appliesToKinds = declared
+        ? (kindKeysByType?.get(declared) ?? [])
+        : row.scopes
+            .map((scope) => (scope.kindId ? kindKeyById.get(scope.kindId) : undefined))
+            .filter((key): key is string => Boolean(key));
+
+    /**
+     * AN EMPTY DERIVED SET IS NOT AN EMPTY SCOPE — it is the whole institution.
+     *
+     * `ConstraintConfig.applies_to_kinds` says "Empty = all kinds", so sending
+     * `[]` here would turn "no group may sit two EXAMS in a day" into "no group
+     * may sit two SESSIONS in a day" for a tenant whose only mistake was never
+     * classifying a kind. The wire has no way to say "no kinds", so the only
+     * honest answer is not to send the rule.
+     *
+     * Reported, never silent: a rule the tenant enabled and weighted is not
+     * being applied, and the fix — classify a kind as EXAM — is not something
+     * anyone would guess from a timetable.
+     *
+     * Note this cannot happen to a manually scoped rule, where an empty set
+     * legitimately means "every kind" and the tenant chose it.
+     */
+    if (declared && appliesToKinds.length === 0) {
+        return {
+            skip: `No session kind is classified as ${declared}, so this rule has nothing `
+                + 'to apply to. Sending it would widen it to EVERY kind rather than none, '
+                + `because the wire reads an empty scope as "all kinds". Set a session `
+                + `kind's type to ${declared} to switch the rule on.`,
+        };
+    }
 
     const config = {
         id: row.id,
@@ -1208,10 +1245,25 @@ export async function assembleSolverInput(
         groupIds: session.groups.map((link) => link.groupId),
     }));
 
-    const kindKeyById = new Map(
-        (await tx.sessionKind.findMany({ where: { tenantId: options.tenantId } }))
-            .map((kind) => [kind.id, kind.key]),
-    );
+    const kindRows = await tx.sessionKind.findMany({ where: { tenantId: options.tenantId } });
+    const kindKeyById = new Map(kindRows.map((kind) => [kind.id, kind.key]));
+
+    /**
+     * Kind KEYS grouped by their fixed classification, for the rules that derive
+     * their scope from it rather than from `ConstraintScope`.
+     *
+     * Keys, not ids, because that is what crosses the wire — the solver has
+     * never seen a database id for a kind, and building this as ids would put
+     * one translation step between the declaration and the rule.
+     */
+    const kindKeysByType = new Map<SessionKindType, string[]>();
+
+    for (const kind of kindRows) {
+        const bucket = kindKeysByType.get(kind.type) ?? [];
+
+        bucket.push(kind.key);
+        kindKeysByType.set(kind.type, bucket);
+    }
 
     const skippedConstraints: AssemblyReport['skippedConstraints'] = [];
     const severityMismatches: AssemblyReport['severityMismatches'] = [];
@@ -1233,7 +1285,7 @@ export async function assembleSolverInput(
             });
         }
 
-        const mapped = toWireConstraint(row, kindKeyById);
+        const mapped = toWireConstraint(row, kindKeyById, kindKeysByType);
 
         if ('skip' in mapped) {
             skippedConstraints.push({ id: row.id, type: row.type, reason: mapped.skip });

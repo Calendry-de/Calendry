@@ -160,37 +160,82 @@
                 <fieldset class="builder_scopes">
                     <legend>Applies to</legend>
 
-                    <p
-                        v-if="scopeRequired"
-                        class="builder_hint builder_hint--warn"
-                    >
-                        This rule already has a tenant-wide version. Pick at least one kind,
-                        or this one would silently duplicate it.
-                    </p>
+                    <!--
+                        DERIVED SCOPE. The rule reaches every kind classified
+                        this way, and no picker is offered because there is
+                        nothing here to choose: the write boundary refuses a
+                        stored scope on these types, so a checkbox would be a
+                        control that saves and does nothing.
 
-                    <p
-                        v-else-if="!scopeKinds.length"
-                        class="builder_hint"
-                    >Every session kind — this is the tenant-wide rule.</p>
-
-                    <label
-                        v-for="kind in kinds"
-                        :key="kind.id"
-                        class="builder_scope"
-                    >
-                        <input
-                            :checked="scopeKinds.includes(kind.id)"
-                            :disabled="readonly"
-                            type="checkbox"
-                            @change="toggleScope(kind.id)"
+                        The kinds are NAMED rather than merely counted. "Applies
+                        to your exam kinds" is unfalsifiable from this screen;
+                        seeing which ones is how a tenant notices that the kind
+                        they meant is not among them.
+                    -->
+                    <template v-if="derivedKindType">
+                        <p
+                            v-if="derivedKinds.length"
+                            class="builder_hint"
                         >
-                        <span>{{ kind.name }}</span>
-                    </label>
+                            Every session kind marked
+                            <strong>{{ derivedTypeLabel }}</strong> —
+                            {{ derivedKinds.map((kind) => kind.name).join(', ') }}.
+                        </p>
 
-                    <p
-                        v-if="!kinds.length"
-                        class="builder_hint builder_hint--warn"
-                    >No session kinds exist yet, so there is nothing to scope to.</p>
+                        <!--
+                            The inert case, stated as loudly as it deserves: the
+                            rule is enabled and weighted and will be WITHHELD
+                            from the next solve, because an empty scope on the
+                            wire means every kind rather than none.
+                        -->
+                        <p
+                            v-else
+                            class="builder_hint builder_hint--warn"
+                        >
+                            No session kind is marked {{ derivedTypeLabel }} yet, so this rule
+                            has nothing to apply to and will not be sent to the scheduler.
+                            Set a kind’s type to {{ derivedTypeLabel }} and it takes effect.
+                        </p>
+
+                        <NuxtLink
+                            class="builder_scope-link"
+                            to="/manage/session-kinds"
+                        >Manage session kinds</NuxtLink>
+                    </template>
+
+                    <template v-else>
+                        <p
+                            v-if="scopeRequired"
+                            class="builder_hint builder_hint--warn"
+                        >
+                            This rule already has a tenant-wide version. Pick at least one kind,
+                            or this one would silently duplicate it.
+                        </p>
+
+                        <p
+                            v-else-if="!scopeKinds.length"
+                            class="builder_hint"
+                        >Every session kind — this is the tenant-wide rule.</p>
+
+                        <label
+                            v-for="kind in kinds"
+                            :key="kind.id"
+                            class="builder_scope"
+                        >
+                            <input
+                                :checked="scopeKinds.includes(kind.id)"
+                                :disabled="readonly"
+                                type="checkbox"
+                                @change="toggleScope(kind.id)"
+                            >
+                            <span>{{ kind.name }}</span>
+                        </label>
+
+                        <p
+                            v-if="!kinds.length"
+                            class="builder_hint builder_hint--warn"
+                        >No session kinds exist yet, so there is nothing to scope to.</p>
+                    </template>
                 </fieldset>
 
                 <fieldset
@@ -242,6 +287,8 @@ import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { CONSTRAINT_TYPES, findConstraintType, missingConstraintParams } from '#shared/constraintTypes';
 import { constraintParamControls } from '~/utils/constraintFields';
+import { SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
+import type { SessionKindType } from '#shared/sessionKindType';
 
 /**
  * Bespoke because these four fields CONSTRAIN EACH OTHER: the chosen type fixes the
@@ -280,7 +327,10 @@ const request = useRequestFetch();
 
 const kindsData = useAsyncData(
     'constraint-builder:kinds',
-    () => request<{ rows: { id: string; name: string }[] }>('/api/session-kinds', { query: { limit: 200 } }),
+    () => request<{ rows: { id: string; name: string; type: SessionKindType }[] }>(
+        '/api/session-kinds',
+        { query: { limit: 200 } },
+    ),
 );
 
 const existingData = useAsyncData(
@@ -289,6 +339,22 @@ const existingData = useAsyncData(
 );
 
 const kinds = computed(() => kindsData.data.value?.rows ?? []);
+
+/**
+ * A type that derives its kinds from their classification rather than from
+ * `ConstraintScope`. `undefined` for every ordinary rule, which keeps the
+ * checkbox list exactly as it was.
+ */
+const derivedKindType = computed(() => selectedType.value?.appliesToKindType);
+
+const derivedTypeLabel = computed(() => (derivedKindType.value
+    ? SESSION_KIND_TYPE_LABELS[derivedKindType.value]
+    : ''));
+
+/** The kinds this rule will actually reach — named, not counted. */
+const derivedKinds = computed(() => (derivedKindType.value
+    ? kinds.value.filter((kind) => kind.type === derivedKindType.value)
+    : []));
 
 const scopeKinds = computed<string[]>(() => {
     const value = draft.value.scopes;
@@ -541,6 +607,14 @@ onMounted(() => {
             font-weight: 650;
             color: $content4;
         }
+    }
+
+    /* A link out of a fieldset whose controls have been removed: the only
+       action left here is to go and classify a kind. */
+    &_scope-link {
+        align-self: start;
+        font-size: var(--font-size-sm);
+        color: $primary700;
     }
 
     &_hint {
