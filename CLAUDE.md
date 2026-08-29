@@ -80,6 +80,17 @@ values. **Never hardcode an open value into logic** — never assume a Role call
   `db-drop` (`db push --force-reset`) is the same hazard, kept only as an
   explicit escape hatch — never to rebuild a working database.
   § "Database & migrations".
+- **The history is ONE squashed migration** (`20260812000000_init`), assembled
+  pre-1.0 by CONCATENATING the 32 that built it — never regenerated, for the
+  reason above. Squashing again is fine and follows the same method; a test
+  asserting a statement exists must read the migrations DIRECTORY
+  (`tests/helpers/migrations.ts`), never a path, and must scope its match to the
+  statement it means: over the whole DDL, `is_enabled` matches a column
+  declaration and every migration's own prose matches its comments.
+- **`prisma migrate reset` does NOT run the configured seed**, whatever
+  `prisma.config.js` says — so `db-reset` calls `db-seed` itself. Undo that and
+  a rebuilt database is left with an empty `permission` table, and the next
+  `provision:tenant` fails on the `access_role_permission` FK naming neither.
 - **The helper schema is `calendry_internal`, never `calendry`** — naming it
   after the owner role lets Postgres's default `search_path` capture Prisma's own
   `_prisma_migrations` table and silently misplace every table.

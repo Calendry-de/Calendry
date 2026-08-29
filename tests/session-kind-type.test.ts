@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
+import { migrationStatements } from './helpers/migrations';
 import { toWireConstraint } from '../server/utils/solverInput';
 import { CONSTRAINT_TYPES, findConstraintType, validateConstraintShape } from '../shared/constraintTypes';
 import { SESSION_KIND_TYPES } from '../shared/sessionKindType';
@@ -196,24 +196,40 @@ describe('the migration backfill', () => {
      * this whole block green until the strip was added, which is the failure it
      * exists to catch.
      */
-    const statements = readFileSync(
-        'prisma/migrations/20260829180000_session_kind_type/migration.sql',
-        'utf8',
-    ).replace(/^\s*--.*$/gm, '');
+    /**
+     * JUST THE BACKFILL STATEMENT, not the whole DDL.
+     *
+     * Two ways to get this wrong, and both were made. Searching the raw file
+     * matches the migration's own PROSE, which names every table and flag the
+     * assertions below care about. Searching all statements then matches the
+     * rest of the schema — `is_enabled` is an ordinary column on
+     * `constraint_def`, so "does not filter on is_enabled" fails against DDL
+     * that merely declares it.
+     *
+     * The claim is about ONE statement, so the test reads one statement.
+     */
+    const statements = migrationStatements();
+    const backfill = statements
+        .slice(statements.indexOf('UPDATE "session_kind"'))
+        .split(';')[0] ?? '';
+
+    it('exists at all — the assertions below are worthless against an empty string', () => {
+        expect(backfill).toContain('UPDATE "session_kind"');
+    });
 
     it('infers EXAM from the scopes those rules already had', () => {
-        expect(statements).toContain("SET \"type\" = 'EXAM'");
-        expect(statements).toContain('constraint_scope');
+        expect(backfill).toContain("SET \"type\" = 'EXAM'");
+        expect(backfill).toContain('constraint_scope');
     });
 
     it('names every derived type, so adding one cannot leave its tenants behind', () => {
         for (const type of DERIVED) {
-            expect(statements, type.key).toContain(`'${type.key}'`);
+            expect(backfill, type.key).toContain(`'${type.key}'`);
         }
     });
 
     it('does not filter on is_enabled — a disabled rule still records the classification', () => {
-        expect(statements).not.toContain('is_enabled');
+        expect(backfill).not.toContain('is_enabled');
     });
 });
 

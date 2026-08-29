@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
+import { migrationStatements } from './helpers/migrations';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { RESOURCES } from '../server/utils/resources';
 import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
@@ -132,14 +132,9 @@ describe('the ceiling', () => {
     });
 
     it('is the same number in the migration, which cannot import it', () => {
-        const sql = readFileSync(
-            'prisma/migrations/20260829160000_offering_required_room_count/migration.sql',
-            'utf8',
-        );
-
         // SQL has no way to read `shared/rooms.ts`, so the one place the
         // constant is duplicated is checked rather than trusted.
-        expect(sql).toContain(`BETWEEN 1 AND ${MAX_ROOMS_PER_SESSION}`);
+        expect(migrationStatements()).toContain(`BETWEEN 1 AND ${MAX_ROOMS_PER_SESSION}`);
     });
 });
 
