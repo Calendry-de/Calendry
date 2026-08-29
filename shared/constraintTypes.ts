@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'max_concurrent_online_sessions',
     'minimize_weekday_imbalance',
     'room_consistency',
     'group_size_fits_room',
@@ -120,6 +121,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'maxConcurrentOnlineSessions'
     | 'minimizeWeekdayImbalance'
     | 'roomConsistency'
     | 'groupSizeFitsRoom'
@@ -660,6 +662,37 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         severity: 'SOFT',
         defaultWeight: 3,
         params: [],
+    },
+
+    {
+        key: 'max_concurrent_online_sessions',
+        wireField: 'maxConcurrentOnlineSessions',
+        label: 'Cap online sessions running at once',
+        description:
+            'A tenant-wide limit on how many sessions may be online in the same slot \u2014 '
+            + 'a platform seat count, not a room. Independent of group and of session kind.',
+        evaluator: 'solver',
+        /*
+         * HARD, and genuinely enforceable as one unlike `max_online_ratio_per_group`.
+         * The count at a single slot is fully known while placing, with no
+         * moving denominator, so the solver filters on it in `is_free` rather
+         * than pricing it — which is what ADR-0025 records as the reason the
+         * share cap could NOT be a filter.
+         *
+         * The cap lives on the rule, not on a Room: a virtual Room has no
+         * capacity concept (solver ADR-0022), and this models a platform-wide
+         * licence limit rather than any one room's property.
+         */
+        severity: 'HARD',
+        params: [{
+            key: 'maxConcurrent',
+            label: 'Maximum at the same time',
+            type: 'number',
+            min: 1,
+            required: true,
+            help: 'How many online sessions your platform can genuinely host at once. '
+                + 'No default: this is a licence figure, not a preference.',
+        }],
     },
 
 ];

@@ -323,6 +323,9 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 invert: Boolean(params.invert),
             };
 
+        case 'max_concurrent_online_sessions':
+            return { maxConcurrent: Number(params.maxConcurrent) };
+
         case 'compactness':
             /*
              * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather
