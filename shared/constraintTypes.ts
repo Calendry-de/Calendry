@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'group_size_fits_room',
     'group_veto',
     'compactness',
 ] as const;
@@ -117,6 +118,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'groupSizeFitsRoom'
     | 'groupVeto'
     | 'compactness';
 
@@ -585,6 +587,29 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultWeight: 5,
         params: [],
     },
+    {
+        key: 'group_size_fits_room',
+        wireField: 'groupSizeFitsRoom',
+        label: 'Rooms must fit the groups actually attending',
+        description:
+            'Checks the room against the real size of the groups in the session, not just '
+            + 'the minimum capacity recorded on the offering. Catches a room that fits the '
+            + 'number somebody typed but not the cohort that turns up.',
+        evaluator: 'solver',
+        /*
+         * HARD, and validation-shaped rather than a preference. It compares two
+         * facts the wire already carries — `Group.size` against
+         * `Room.capacity` — so a breach is a defect in the data or the
+         * placement, never a trade-off worth weighing.
+         *
+         * It exists BECAUSE `Offering.min_capacity` is derived: `deriveCapacity`
+         * falls back to an estimate and reports when it could not establish one
+         * at all. This is the cross-check for when that derivation was wrong.
+         */
+        severity: 'HARD',
+        params: [],
+    },
+
 ];
 
 export function findConstraintType(key: string | undefined): ConstraintTypeDef | undefined {
