@@ -673,6 +673,17 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             color: z.string().nullish(),
             frequency: z.number().int().min(1).optional(),
             durationBlocks: z.number().int().min(1).optional(),
+            /*
+             * '' IS NULL HERE. The form's blank option means UNCLASSIFIED, and a
+             * `<select>` has no way to send absent — it sends the empty string.
+             * Left unmapped, zod would reject it and the one choice that means
+             * "I have not decided" would be the only one that could not be
+             * saved.
+             */
+            schedulingPattern: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['DISTRIBUTED', 'BLOCK']).nullish(),
+            ),
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
             allowOnline: z.boolean().optional(),
@@ -686,6 +697,17 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             color: z.string().nullish(),
             frequency: z.number().int().min(1).optional(),
             durationBlocks: z.number().int().min(1).optional(),
+            /*
+             * '' IS NULL HERE. The form's blank option means UNCLASSIFIED, and a
+             * `<select>` has no way to send absent — it sends the empty string.
+             * Left unmapped, zod would reject it and the one choice that means
+             * "I have not decided" would be the only one that could not be
+             * saved.
+             */
+            schedulingPattern: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['DISTRIBUTED', 'BLOCK']).nullish(),
+            ),
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
             allowOnline: z.boolean().optional(),

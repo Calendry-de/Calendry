@@ -958,17 +958,25 @@ export async function assembleSolverInput(
              * ONLY on the solver side too, so what is sent here cannot change a
              * placement either way:
              *
-             *   requiredRoomCount    0 and 1 both mean today's single-room
-             *                        behaviour, and there is no column.
-             *   schedulingPattern    no column either; UNSPECIFIED is the honest
-             *                        classification, not a default picked to
-             *                        look decided.
-             *
-             * Each has its own card. Widening one is a data-model change here
-             * first, and only then a different value on this line.
+             * STILL ZERO, because this app models no multi-room Session — not
+             * because the field is being withheld. 0 and 1 both mean today's
+             * single-room behaviour, and the solver assigns one Room per
+             * placement regardless. "A Session with more than one Room" is the
+             * card; widening it is a data-model change here first.
              */
             requiredRoomCount: 0,
-            schedulingPattern: SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
+            /*
+             * NULL IS UNSPECIFIED, and that is a claim rather than a gap: the
+             * Offering has not been classified. Mapping it to DISTRIBUTED — what
+             * most timetables assume — would send an institution's assumption as
+             * though somebody had chosen it, and the solver would then be free
+             * to act on it the moment a pattern rule is enabled.
+             */
+            schedulingPattern: offering.schedulingPattern === 'DISTRIBUTED'
+                ? SchedulingPattern.SCHEDULING_PATTERN_DISTRIBUTED
+                : offering.schedulingPattern === 'BLOCK'
+                    ? SchedulingPattern.SCHEDULING_PATTERN_BLOCK
+                    : SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
             };
         });
     });

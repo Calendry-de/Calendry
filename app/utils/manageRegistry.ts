@@ -310,6 +310,27 @@ export const OFFERING_ENTITY: ManageEntity = {
             help: 'How many consecutive TimeGrid blocks one session occupies.',
         },
         {
+            key: 'schedulingPattern',
+            label: 'How the sessions spread',
+            type: 'select',
+            /*
+             * NOT `required`, and the blank option is not "none" — it is
+             * UNCLASSIFIED, which is where every existing offering starts and
+             * the honest answer for one nobody has decided about. Making this
+             * required would force a choice at the point of least information,
+             * and prefilling "every week" would write the common assumption in
+             * as though somebody had chosen it.
+             */
+            options: [
+                { value: '', label: 'Not decided' },
+                { value: 'DISTRIBUTED', label: 'Spread across the term' },
+                { value: 'BLOCK', label: 'Concentrated into a window' },
+            ],
+            help: 'A weekly slot for the whole term, or the whole course in a short block. '
+                + 'Recorded either way; it changes a timetable only once an administrator '
+                + 'enables the matching rule.',
+        },
+        {
             key: 'requiredRoleId',
             label: 'Required role',
             type: 'reference',

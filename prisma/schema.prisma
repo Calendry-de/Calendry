@@ -28,6 +28,25 @@ generator client {
 
 /// Kinds of academic-calendar period. Structural (TAXONOMY.md §2 names these
 /// explicitly as core from day one), so an enum rather than tenant vocabulary.
+/// How an Offering's demand distributes across a Term.
+///
+/// FIXED, not tenant vocabulary (TAXONOMY.md's open/fixed split), because the
+/// values are the proto's `SchedulingPattern` and a new one is a schema change
+/// in three repos.
+///
+/// NULL on the column is NOT a third value: it means unclassified, which is
+/// every Offering that exists today and the honest state for one nobody has
+/// decided about. It maps to `SCHEDULING_PATTERN_UNSPECIFIED`, the same claim.
+enum SchedulingPattern {
+  /// A consistent weekly slot for the whole Term. Widely assumed and enforced
+  /// by nothing until a tenant enables the matching constraint.
+  DISTRIBUTED
+  /// The whole demand concentrated into a short contiguous window.
+  BLOCK
+
+  @@map("scheduling_pattern")
+}
+
 enum CalendarPeriodKind {
   HOLIDAY
   BREAK
@@ -1120,6 +1139,10 @@ model Offering {
 
   /// Length of each Session in TimeGrid blocks.
   durationBlocks Int @default(1) @map("duration_blocks")
+
+  /// Whether this Offering's Sessions should spread across the Term or
+  /// concentrate into a window. NULL = unclassified; see the enum's comment.
+  schedulingPattern SchedulingPattern? @map("scheduling_pattern")
 
   /// Role a lecturer must hold to lead this Offering. Nullable: many kinds
   /// don't constrain who leads them.
