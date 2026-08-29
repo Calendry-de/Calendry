@@ -407,7 +407,8 @@ export const OFFERING_ENTITY: ManageEntity = {
         {
             key: 'equipment',
             label: 'Equipment it needs',
-            help: 'Restricts placement to rooms providing all of it.',
+            help: 'Restricts placement to rooms providing all of it. A count means at '
+                + 'least that many units, so only rooms that state enough qualify.',
             resource: 'equipment',
             valueKey: 'equipmentId',
             optionLabel: (row) => String(row.name ?? row.key),
@@ -620,7 +621,9 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             {
                 key: 'equipment',
                 label: 'Equipment in this room',
-                help: 'What this room provides. Offerings requiring it can only be placed here.',
+                help: 'What this room provides. Offerings requiring it can only be placed '
+                    + 'here — and a count is what an offering asking for a minimum is '
+                    + 'measured against. Left blank, this room answers presence only.',
                 resource: 'equipment',
                 valueKey: 'equipmentId',
                 optionLabel: (row) => String(row.name ?? row.key),

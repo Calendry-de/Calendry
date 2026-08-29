@@ -49,8 +49,30 @@ export interface AssemblyReport {
     excludedFederationOfferings: number;
     /** Sessions whose extra Rooms the wire cannot carry (see CLAUDE.md). */
     multiRoomSessions: string[];
-    /** Equipment requirements whose quantity the wire cannot carry. */
-    droppedEquipmentQuantities: number;
+    /**
+     * Equipment quantity requirements NO sent Room can meet.
+     *
+     * This replaced `droppedEquipmentQuantities`, which counted requirements the
+     * wire could not carry — a gap that closed when `Offering
+     * .room_feature_requirements` and `Room.feature_quantities` shipped in proto
+     * v0.10.0. The reason to report anything here now is the opposite one: those
+     * counts are ENFORCED, so a room that used to qualify on mere presence can
+     * fail on count, and an Offering whose requirement nothing satisfies has no
+     * eligible room at all. The run does not fail — it comes back unable to
+     * place that Offering — so the cause is named here rather than left to be
+     * inferred from a placement that never happened.
+     *
+     * `bestAvailable` is null when no Room states a count for the feature at
+     * all, which is the likelier cause in practice: the requirement was typed
+     * and the supply side never was.
+     */
+    unsatisfiableEquipmentQuantities: {
+        id: string;
+        title: string;
+        feature: string;
+        required: number;
+        bestAvailable: number | null;
+    }[];
     /**
      * Offerings with no establishable capacity requirement. Sent with
      * `minCapacity: 0`, which the solver reads as "any room qualifies" — the
@@ -496,22 +518,49 @@ export async function assembleSolverInput(
         // Same direction on both sides: HIGHER = more premium/scarce.
         rank: Math.max(0, room.ranking),
         isVirtual: room.isVirtual,
-        // Presence only, which is what room eligibility reads: `convert.rs`
-        // matches `Offering.required_room_features` against this list and
-        // nothing else.
+        /*
+         * BOTH LISTS, ALWAYS. A feature with a stated quantity appears here too,
+         * not only in `featureQuantities` — the solver's two checks are additive
+         * and independent (`required_room_features` against this, and
+         * `room_feature_requirements` against the quantities), so dropping a
+         * counted feature from the presence list would make a room ineligible
+         * for every Offering that asks for mere presence of it.
+         */
         featureTags: room.roomEquipment.map((link) => link.equipment.key),
         location: room.location ?? '',
         /*
-         * EMPTY, AND THE GAP IS STILL REPORTED. `Room.feature_quantities`
-         * arrived with proto v0.10.0, so `RoomEquipment.quantity` finally has
-         * somewhere to go — but the solver does not read it yet (it matches
-         * `feature_tags` membership alone), and filling it here would quietly
-         * retire `droppedEquipmentQuantities` from the assembly report while
-         * changing no answer. The report is the honest state until the search
-         * can act on the numbers. "Equipment quantity" is the card.
+         * The SUPPLY side of equipment counts. Only links that state one: a NULL
+         * `quantity` means the tenant never counted this feature for this room,
+         * which is not the same as counting it at zero — sending 0 would make
+         * the room fail every quantity requirement instead of simply not
+         * answering the question.
          */
-        featureQuantities: [],
+        featureQuantities: room.roomEquipment
+            .filter((link) => link.quantity !== null)
+            .map((link) => ({ feature: link.equipment.key, quantity: link.quantity! })),
     }));
+
+    /**
+     * The best count any sent Room supplies, per feature — used only to REPORT a
+     * requirement nothing can satisfy (see `unsatisfiableEquipmentQuantities`).
+     *
+     * Built from the same `roomRows` the wire gets, so the report answers the
+     * question the solver will actually be asked rather than a wider one about
+     * the tenant's whole estate.
+     */
+    const bestRoomQuantity = new Map<string, number>();
+
+    for (const room of roomRows) {
+        for (const link of room.roomEquipment) {
+            if (link.quantity === null) {
+                continue;
+            }
+
+            const key = link.equipment.key;
+
+            bestRoomQuantity.set(key, Math.max(bestRoomQuantity.get(key) ?? 0, link.quantity));
+        }
+    }
 
     /**
      * Only the Groups this Term's problem can involve: what the Offerings and
@@ -717,7 +766,7 @@ export async function assembleSolverInput(
         };
     });
 
-    let droppedEquipmentQuantities = 0;
+    const unsatisfiableEquipmentQuantities: AssemblyReport['unsatisfiableEquipmentQuantities'] = [];
     const offeringsWithNoDerivableCapacity: { id: string; title: string }[] = [];
     const offeringsWithPartialEnrolment: {
         id: string; title: string; members: number; expected: number;
@@ -754,7 +803,26 @@ export async function assembleSolverInput(
     const realOfferingIdOf = new Map<string, string>();
 
     const offerings: Offering[] = offeringRows.flatMap((offering) => {
-        droppedEquipmentQuantities += offering.equipment.filter((link) => link.quantity !== null).length;
+        for (const link of offering.equipment) {
+            if (link.quantity === null) {
+                continue;
+            }
+
+            const best = bestRoomQuantity.get(link.equipment.key) ?? null;
+
+            if (best === null || best < link.quantity) {
+                unsatisfiableEquipmentQuantities.push({
+                    // The REAL Offering id, not a per-series wire id: equipment
+                    // is a property of the Offering, so a split would report the
+                    // same requirement once per group for no added information.
+                    id: offering.id,
+                    title: offering.title,
+                    feature: link.equipment.key,
+                    required: link.quantity,
+                    bestAvailable: best,
+                });
+            }
+        }
 
         const groupIds = offering.groups.map((link) => link.groupId);
         const split = splitsIntoSeries(groupIds);
@@ -842,25 +910,32 @@ export async function assembleSolverInput(
             allowedRoomIds: [],
             allowOnline: offering.allowOnline,
             /*
-             * THE STAGED WIRE SURFACE, sent as zero values because this app
-             * models none of it — not because it is being withheld. All three
-             * arrived with proto v0.10.0 and are PROTO ONLY on the solver side
-             * too: no evaluator reads any of them, so what is sent here cannot
-             * change a placement either way.
+             * The DEMAND side of equipment counts, and only the links that state
+             * one. A link with a NULL quantity is already fully expressed by
+             * `requiredRoomFeatures` above — the proto says an absent
+             * `min_quantity` asks exactly the presence question — so sending it
+             * here as well would be the same requirement twice, and a reader
+             * comparing the two lists would have no way to tell which entries
+             * carry information.
+             */
+            roomFeatureRequirements: offering.equipment
+                .filter((link) => link.quantity !== null)
+                .map((link) => ({ feature: link.equipment.key, minQuantity: link.quantity! })),
+            /*
+             * STILL ZERO, because this app models neither — not because either
+             * is being withheld. Both arrived with proto v0.10.0 and are PROTO
+             * ONLY on the solver side too, so what is sent here cannot change a
+             * placement either way:
              *
-             *   roomFeatureRequirements  no minimum-COUNT room requirement is
-             *                            storable; `requiredRoomFeatures` above
-             *                            carries the presence-only ones.
-             *   requiredRoomCount        0 and 1 both mean today's single-room
-             *                            behaviour, and the app has no column.
-             *   schedulingPattern        no column either; UNSPECIFIED is the
-             *                            honest classification, not a default
-             *                            picked to look decided.
+             *   requiredRoomCount    0 and 1 both mean today's single-room
+             *                        behaviour, and there is no column.
+             *   schedulingPattern    no column either; UNSPECIFIED is the honest
+             *                        classification, not a default picked to
+             *                        look decided.
              *
              * Each has its own card. Widening one is a data-model change here
              * first, and only then a different value on this line.
              */
-            roomFeatureRequirements: [],
             requiredRoomCount: 0,
             schedulingPattern: SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
             };
@@ -1101,7 +1176,7 @@ export async function assembleSolverInput(
             externalOccupancySlots: externalOccupancy.length,
             excludedFederationOfferings: federationOfferings,
             multiRoomSessions: multiRoomSessionIds(sessionInputs),
-            droppedEquipmentQuantities,
+            unsatisfiableEquipmentQuantities,
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
             personsWithHeavyVetoLoad,
