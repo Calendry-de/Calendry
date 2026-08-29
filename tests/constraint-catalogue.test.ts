@@ -373,6 +373,44 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
+     * A PROTECTED BLOCK NAMING NOTHING RESERVES EVERYTHING.
+     *
+     * `BlockedWindow` follows `Unavailability`'s convention — an empty axis
+     * means EVERY value on that axis — so a window with no days and no blocks
+     * is the whole grid reserved as a HARD rule, not nothing reserved. The
+     * solver accepts it without complaint and every session of the applying
+     * kinds becomes unplaceable, surfacing as "no feasible placement" with
+     * nothing pointing at the cause.
+     *
+     * The two axes cannot both be `required`, because "block 4 every day" and
+     * "all of Wednesday" are each legitimate and each leaves one axis empty. So
+     * the guard is a skip, and this is what pins it.
+     */
+    it('SKIPS a protected block that names neither a day nor a block', () => {
+        const result = toWireConstraint(
+            row({ type: 'protected_block', severity: 'HARD', weight: null, params: { days: [], blocks: '' } }),
+            noKinds,
+        ) as { skip?: string };
+
+        expect(result.skip).toMatch(/ENTIRE timetable/);
+    });
+
+    it.each([
+        ['a block on every day', { days: [], blocks: '4' }, { days: [], blocks: [3] }],
+        ['a whole day', { days: [3], blocks: '' }, { days: [3], blocks: [] }],
+    ])('sends %s as one recurring window', (_label, params, expected) => {
+        // Each of these leaves ONE axis empty, which is the legitimate case the
+        // skip above must not catch. `weeks` is empty either way: the proto
+        // reads that as every week, which is what "recurring" means.
+        const config = (toWireConstraint(
+            row({ type: 'protected_block', severity: 'HARD', weight: null, params }),
+            noKinds,
+        ) as { config: Record<string, { windows: unknown[] }> }).config.protectedBlock!;
+
+        expect(config.windows).toEqual([{ ...expected, weeks: [] }]);
+    });
+
+    /*
      * BOTH IS AN EMPTY SCOPE, for every rule that carries one — not just
      * `compactness`, which is why the mapping is one shared function.
      *

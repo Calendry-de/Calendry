@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'protected_block',
     'exam_spacing_window',
     'exam_spacing_same_day',
     'minimize_location_change',
@@ -130,6 +131,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'protectedBlock'
     | 'examSpacingWindow'
     | 'examSpacingSameDay'
     | 'minimizeLocationChange'
@@ -1046,6 +1048,49 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 2,
             help: '1 says the same thing as the same-day rule. 2 leaves one clear day '
                 + 'between papers. Scope this to your exam session kind.',
+        }],
+    },
+
+    {
+        key: 'protected_block',
+        wireField: 'protectedBlock',
+        label: 'Reserve a slot institution-wide',
+        description:
+            'Lunch, assembly, a staff meeting \u2014 a time nothing may be scheduled into, '
+            + 'for everyone at once. Scope it to a session kind if only some kinds should '
+            + 'be kept out.',
+        evaluator: 'solver',
+        /*
+         * THE FIRST HARD TYPE WHOSE VALUES ARE PURE TENANT POLICY carried on the
+         * constraint itself. `lecturer_veto` and `group_veto` look similar and
+         * are not: their windows live on the Person or Group and the rule only
+         * switches enforcement on. There is no entity to hang "lunch" on.
+         *
+         * Monotone-safe like the four structural types — a protected slot is
+         * never freed by placing something elsewhere — so the solver enforces it
+         * in `is_free` rather than pricing it, and HARD is honest here in a way
+         * it is not for `max_weekly_teaching_load`.
+         *
+         * ONE RECURRING WINDOW, not the wire's full list. `BlockedWindow` also
+         * carries `weeks`, for a one-off reservation in named weeks only; this
+         * form sends none, which the proto reads as every week. That covers
+         * lunch and assembly, which is what the rule is for, and a one-off
+         * closure is `calendar_period` work rather than a second control here.
+         */
+        severity: 'HARD',
+        params: [{
+            key: 'days',
+            label: 'Days',
+            type: 'weekdays',
+            required: false,
+            help: 'Leave every day unticked to reserve the slot on all teaching days.',
+        }, {
+            key: 'blocks',
+            label: 'Blocks',
+            type: 'text',
+            required: false,
+            help: 'Block positions, comma separated, counting from 1 \u2014 e.g. 4 for the '
+                + 'lunch block. Leave empty to reserve the WHOLE of the chosen days.',
         }],
     },
 

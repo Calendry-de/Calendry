@@ -254,6 +254,31 @@ export function toWireConstraint(row: {
      * Skipped rather than degraded to unscoped, which would silently WIDEN the
      * rule to every offering: the opposite of what was configured.
      */
+    /*
+     * A PROTECTED BLOCK NAMING NOTHING WOULD BLOCK EVERYTHING.
+     *
+     * `BlockedWindow` follows `Unavailability`'s convention: an empty axis means
+     * EVERY value on that axis. So a window with no days and no blocks is not
+     * "nothing reserved" — it is the whole grid reserved, as a HARD rule, and
+     * the solver accepts it without complaint. Every session of the applying
+     * kinds becomes unplaceable, reported as nothing more specific than no
+     * feasible placement.
+     *
+     * Skipped and named rather than sent, matching how an offering-scoped rule
+     * is handled below: the two axes cannot BOTH be `required`, because "block 4
+     * every day" and "all of Wednesday" are each legitimate and each leaves one
+     * of them empty.
+     */
+    if (type.key === 'protected_block'
+        && parseWeekdayList(params.days).length === 0
+        && parseBlockPositions(params.blocks).length === 0) {
+        return {
+            skip: 'No days and no blocks are set, which would reserve the ENTIRE timetable '
+                + 'rather than nothing — an empty axis means "every value". Name at least '
+                + 'one day or one block.',
+        };
+    }
+
     if (row.scopes.some((scope) => scope.offeringId)) {
         return {
             skip: 'Scoped to specific offerings, which the wire cannot express '
@@ -299,6 +324,34 @@ export function toWireConstraint(row: {
  * the only one that could reach the default, and it did the moment its
  * `wireField` was set.
  */
+/** Weekday numbers a `weekdays` param holds, sorted and cleaned. */
+function parseWeekdayList(value: unknown): number[] {
+    return Array.isArray(value)
+        ? [...new Set(value.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 7))]
+            .sort((a, b) => a - b)
+        : [];
+}
+
+/**
+ * A comma-separated list of 1-BASED block positions, as the wire's 0-based
+ * indices — the same conversion `minimize_block_usage` does, and for the same
+ * reason: a human counts blocks from one and the grid counts from zero.
+ *
+ * Unparseable and out-of-range entries are dropped rather than rejected. The
+ * field is free text and a stale position is already inert solver-side, so
+ * failing a whole run over one stray character is the harsher answer to the
+ * same input.
+ */
+function parseBlockPositions(value: unknown): number[] {
+    return [...new Set(
+        String(value ?? '')
+            .split(',')
+            .map((part) => Number(part.trim()))
+            .filter((n) => Number.isInteger(n) && n >= 1)
+            .map((n) => n - 1),
+    )].sort((a, b) => a - b);
+}
+
 /**
  * The GROUP / PERSON / BOTH selector shared by every whole-day rule.
  *
@@ -390,6 +443,21 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
         case 'exam_spacing_window':
             return { minDaysBetween: Number(params.minDaysBetween) };
 
+        case 'protected_block':
+            /*
+             * ONE WINDOW, and `weeks` deliberately empty — the proto reads that
+             * as every week, which is the recurring reservation this form
+             * offers. Blocks are 1-based for a human and 0-based on the wire,
+             * converted here exactly as `minimize_block_usage` does.
+             */
+            return {
+                windows: [{
+                    days: parseWeekdayList(params.days),
+                    blocks: parseBlockPositions(params.blocks),
+                    weeks: [],
+                }],
+            };
+
         case 'compactness':
             return { scope: compactnessScope(params.scope) };
 
@@ -417,12 +485,7 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 // rejected: the field is free text, and a stale position is
                 // already inert solver-side, so failing the whole run over one
                 // stray character would be the harsher answer to the same input.
-                blocks: String(params.blocks ?? '')
-                    .split(',')
-                    .map((part) => Number(part.trim()))
-                    .filter((n) => Number.isInteger(n) && n >= 1)
-                    .map((n) => n - 1)
-                    .sort((a, b) => a - b),
+                blocks: parseBlockPositions(params.blocks),
                 first: Boolean(params.first),
                 last: Boolean(params.last),
             };
