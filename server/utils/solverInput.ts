@@ -329,6 +329,9 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
         case 'room_turnaround_buffer':
             return { bufferBlocks: Number(params.bufferBlocks) };
 
+        case 'minimize_room_churn':
+            return { maxRoomsPerWeek: Number(params.maxRoomsPerWeek) };
+
         case 'compactness':
             /*
              * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather

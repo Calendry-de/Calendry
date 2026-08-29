@@ -41,6 +41,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'minimize_exam_week_sessions',
     'minimize_online_sessions',
     'person_preference_fit',
+    'minimize_room_churn',
     'room_turnaround_buffer',
     'max_concurrent_online_sessions',
     'minimize_weekday_imbalance',
@@ -122,6 +123,7 @@ export type WireConstraintField =
     | 'minimizeOnline'
     | 'minimizeBlockUsage'
     | 'personPreferenceFit'
+    | 'minimizeRoomChurn'
     | 'roomTurnaroundBuffer'
     | 'maxConcurrentOnlineSessions'
     | 'minimizeWeekdayImbalance'
@@ -725,6 +727,38 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 1,
             help: 'One block is the usual answer. This is in BLOCKS, not minutes \u2014 how '
                 + 'long a block is comes from your time grid.',
+        }],
+    },
+
+    {
+        key: 'minimize_room_churn',
+        wireField: 'minimizeRoomChurn',
+        label: 'Give a group a home room',
+        description:
+            'Cap how many different rooms a class uses across a week. Mostly one room, '
+            + 'with a special-purpose room as the exception \u2014 the school model rather '
+            + 'than the university one.',
+        evaluator: 'solver',
+        /*
+         * A plain distinct COUNT across the week, not weighted by how often the
+         * group returns to its most-used room. That is the difference from
+         * `room_consistency`, which is per-offering across the term.
+         *
+         * Also distinct from `minimize_location_change`, which is about
+         * building-hopping WITHIN a day: a group can keep to one building all
+         * week and still use six rooms in it.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
+        params: [{
+            key: 'maxRoomsPerWeek',
+            label: 'Rooms a group may use in a week',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 2,
+            help: 'Past this, each extra room is charged. 2 allows a home room plus one '
+                + 'specialist room; raise it for a university-style timetable.',
         }],
     },
 
