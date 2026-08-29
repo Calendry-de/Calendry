@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
 import type { Tx } from './tenantDb';
 import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
 import { validateConstraintShape } from '../../shared/constraintTypes';
@@ -686,6 +687,18 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             ),
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
+            /*
+             * BOUNDED AT BOTH ENDS, and the upper bound is not a preference.
+             * Above `MAX_ROOMS_PER_SESSION` the solver REFUSES the whole input
+             * rather than truncating, so a 5 saved here is a scheduling outage
+             * for the tenant, surfacing later as a failed run naming an
+             * Offering somebody edited weeks ago. Rejected at the write, where
+             * the person who typed it is still looking at it.
+             *
+             * The database CHECK says the same thing again — this is the
+             * friendly refusal, that one is the guarantee.
+             */
+            requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).optional(),
             allowOnline: z.boolean().optional(),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
@@ -710,6 +723,18 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             ),
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
+            /*
+             * BOUNDED AT BOTH ENDS, and the upper bound is not a preference.
+             * Above `MAX_ROOMS_PER_SESSION` the solver REFUSES the whole input
+             * rather than truncating, so a 5 saved here is a scheduling outage
+             * for the tenant, surfacing later as a failed run naming an
+             * Offering somebody edited weeks ago. Rejected at the write, where
+             * the person who typed it is still looking at it.
+             *
+             * The database CHECK says the same thing again — this is the
+             * friendly refusal, that one is the guarantee.
+             */
+            requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).optional(),
             allowOnline: z.boolean().optional(),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),

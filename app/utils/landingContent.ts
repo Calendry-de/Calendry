@@ -127,7 +127,9 @@ export const BUILT: LandingRoadmapItem[] = [
         state: 'done',
         title: 'Management screens for the core entities',
         note: 'Rooms, groups, people, courses, terms, the daily block grid and its breaks, plus a '
-            + 'Ctrl+K palette that jumps to any of them.',
+            + 'Ctrl+K palette that jumps to any of them. A course can state that one session '
+            + 'needs several rooms at once — a cohort too large for any single hall — and the '
+            + 'scheduler places the combination.',
     },
     {
         id: 'calendar',

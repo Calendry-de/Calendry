@@ -1,5 +1,6 @@
 import type { PermissionRequirement } from '#shared/permissions';
 import { resourcePermissions } from '#shared/permissions';
+import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
 
 /**
  * The management area's entity registry — a client mirror of the server's
@@ -414,11 +415,36 @@ export const OFFERING_ENTITY: ManageEntity = {
             },
         },
         {
+            key: 'requiredRoomCount',
+            label: 'Rooms needed at once',
+            type: 'number',
+            min: 1,
+            /*
+             * THE CEILING IS STATED, NOT DISCOVERED. Past
+             * `MAX_ROOMS_PER_SESSION` the solver refuses the whole input rather
+             * than degrading, so the failure is not "this offering scheduled
+             * badly" — it is every run failing for the tenant, reported against
+             * an offering edited weeks earlier.
+             *
+             * The help text also names the SUMMING reading, because the
+             * alternative ("each room must hold the whole group") is a coherent
+             * thing to want, gives the opposite answer on the same input, and
+             * is not what this does. Left unsaid, a timetabler would only find
+             * out from a timetable that looks wrong.
+             */
+            max: MAX_ROOMS_PER_SESSION,
+            help: `One for almost everything. Above one, a session occupies that many rooms `
+                + `simultaneously and their capacities are ADDED — 120 students fit two `
+                + `60-seat halls. Use it for a cohort too large for any single room, not for a `
+                + `practical where each room must hold everyone. At most ${MAX_ROOMS_PER_SESSION}.`,
+        },
+        {
             key: 'requiredCapacity',
             label: 'Required room capacity',
             type: 'number',
             min: 0,
-            help: 'Leave unset to derive it from the attached groups.',
+            help: 'Leave unset to derive it from the attached groups. Compared against the '
+                + 'SUM of the capacities when more than one room is needed at once.',
             derived: {
                 path: '/api/offering-capacity/:id',
                 describe: (data) => {

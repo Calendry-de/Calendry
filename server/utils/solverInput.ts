@@ -74,6 +74,21 @@ export interface AssemblyReport {
      */
     offeringsByPattern: { distributed: number; block: number; unclassified: number };
     /**
+     * Offerings asking for more Rooms at once than the snapshot even contains.
+     *
+     * A DEFINITE impossibility, unlike most of what the solver weighs: it does
+     * not depend on capacity, features or what else is placed. Fewer Rooms exist
+     * than one Session must occupy simultaneously, so no combination can be
+     * built and the Offering cannot be placed at all.
+     *
+     * Reported rather than refused, matching `unsatisfiableEquipmentQuantities`:
+     * the run is still worth making, and the answer comes back as hard
+     * violations. What is not acceptable is for the cause to be invisible —
+     * "why is this course unplaced" has an exact answer here, and it is one
+     * nobody would guess from a violation naming a slot.
+     */
+    offeringsNeedingMoreRoomsThanExist: { id: string; title: string; needs: number; available: number }[];
+    /**
      * Equipment quantity requirements NO sent Room can meet.
      *
      * This replaced `droppedEquipmentQuantities`, which counted requirements the
@@ -1092,18 +1107,18 @@ export async function assembleSolverInput(
                 .filter((link) => link.quantity !== null)
                 .map((link) => ({ feature: link.equipment.key, minQuantity: link.quantity! })),
             /*
-             * STILL ZERO, because this app models neither — not because either
-             * is being withheld. Both arrived with proto v0.10.0 and are PROTO
-             * ONLY on the solver side too, so what is sent here cannot change a
-             * placement either way:
+             * Sent as stored, and 1 is the overwhelming majority. The proto
+             * treats 0 and 1 identically, so this was pinned at 0 for as long
+             * as the app had no column — the capability was live in the solver
+             * and unreachable from here.
              *
-             * STILL ZERO, because this app models no multi-room Session — not
-             * because the field is being withheld. 0 and 1 both mean today's
-             * single-room behaviour, and the solver assigns one Room per
-             * placement regardless. "A Session with more than one Room" is the
-             * card; widening it is a data-model change here first.
+             * NOT clamped on the way out. `MAX_ROOMS_PER_SESSION` is enforced
+             * at the write and again by a database CHECK, so a value that
+             * cannot be solved never reaches this line; clamping here would
+             * turn the one input the solver deliberately REFUSES into a silent
+             * substitution of a different Offering than the tenant described.
              */
-            requiredRoomCount: 0,
+            requiredRoomCount: offering.requiredRoomCount,
             /*
              * NULL IS UNSPECIFIED, and that is a claim rather than a gap: the
              * Offering has not been classified. Mapping it to DISTRIBUTED — what
@@ -1355,6 +1370,17 @@ export async function assembleSolverInput(
             excludedFederationOfferings: federationOfferings,
             sessionsOverRoomCap: sessionsOverRoomCap(sessionInputs),
             unsatisfiableEquipmentQuantities,
+            offeringsNeedingMoreRoomsThanExist: offeringRows
+                .filter((o) => o.requiredRoomCount > roomRows.length)
+                .map((o) => ({
+                    id: o.id,
+                    title: o.title,
+                    needs: o.requiredRoomCount,
+                    // The Rooms actually SENT, not the tenant's whole estate —
+                    // the report has to answer the question the solver was
+                    // asked, which federation sharing can widen.
+                    available: roomRows.length,
+                })),
             offeringsByPattern: {
                 distributed: offeringRows.filter((o) => o.schedulingPattern === 'DISTRIBUTED').length,
                 block: offeringRows.filter((o) => o.schedulingPattern === 'BLOCK').length,
