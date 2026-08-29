@@ -1,49 +1,58 @@
 # DECISIONS.md — Calendry
 
-The **archive** half of this project's persistent memory, split out of CLAUDE.md
-on 2026-08-26 because that file had grown past the point a session can absorb in
-one read (~2,100 lines).
+The **reasoning** half of this project's persistent memory. Three files, three
+different jobs, and keeping them apart is what stops any of them rotting:
 
-**What lives here vs. what stays in CLAUDE.md.** CLAUDE.md keeps the standing
-rule, the number, the invariant — whatever a session would actually break by not
-knowing. This file keeps the *story*: how a bug was found, what was measured, why
-the obvious fix was wrong, what was verified and how. Deleting this content would
-delete the argument, not just the bug.
+| | Holds | Rots when |
+|---|---|---|
+| `CLAUDE.md` | The standing **rule** — the invariant, the number, whatever a session would break by not knowing. | It grows past one read. |
+| **This file** | **Why** that rule exists: how a bug was found, what was measured, why the obvious fix was wrong. | It duplicates the other two. |
+| [The project board](https://github.com/users/MindCollaps/projects/4) | The **work** — what is open, what it needs, what is still undecided. | Nobody checks a card against the code. |
+
+**The division was sharpened on 2026-08-29**, when the board's cards stopped
+being pointers to these files and became self-contained. Everything about *what a
+piece of work is and what it still needs* now lives on its card. What stays here
+is only what a future session needs in order to **change a live rule safely** —
+the argument, not the changelog. Several sections shrank accordingly, and three
+that were pure history were removed outright.
+
+So: **do not restate a card here, and do not restate this file on a card.** Two
+copies of a claim in a project this size is not redundancy, it is a future
+contradiction with no way to tell which half is stale.
 
 **Read a named section before changing what it covers; do not read this file
 front to back.** CLAUDE.md's rules point here by section name (`§ "…"`), and
-those 24 pointers are a contract — renaming a heading breaks a reference that
-nothing else will catch. The index below is the entry point.
+those pointers are a contract — renaming a heading breaks a reference nothing
+else will catch. `server/utils/solverInput.ts` carries one too. The index below
+is the entry point.
 
 **Treat every entry as "what happened and what we found", not as a live claim
 about current code.** Prose is checked by nobody. Verify a function name, a path,
-a line count or a measurement against the code before relying on it for a
-decision — and if you find one that has drifted, fix it here in the same change.
-Three were found and fixed on 2026-08-28 alone: a `server/utils/` path for a file
-that lives in `server/plugins/`, an instruction to return `{}` where `{}` throws,
-and a claim that `params` accepted arbitrary JSON hours after it stopped doing so.
+a line count or a measurement before relying on it — and if you find one that has
+drifted, fix it here in the same change. Four were found and fixed in the last
+week alone: a `server/utils/` path for a file that lives in `server/plugins/`, an
+instruction to return `{}` where `{}` throws, a claim that `params` accepted
+arbitrary JSON hours after it stopped, and a solver ADR quoting a move budget the
+app had already raised six hundredfold.
 
-**This file has been consolidated twice.** On 2026-08-27 detail moved out of
-CLAUDE.md into it, and on 2026-08-28 the seams from that move were removed: 13
-identical provenance stamps, 7 doubled headings (`# X` immediately followed by
-`### X`), 13 references to "DECISIONS.md §" from inside DECISIONS.md, and a
-160-line section that restated ten other sections and pointed at each one. If you
-are adding a section, add it once, and link rather than restate.
+That failure mode is not hypothetical here. **Five board cards in one week turned
+out to describe work that was already done** — the solver image, two backfills, a
+role assignment, and the solver's run registry. Check the code first; it is free.
 
 ## Index
 
 | Area | Sections |
 |---|---|
-| Database, schema, deploy | Database & migrations · The `calendry_internal` schema · Bootstrap & deploy |
-| Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling |
+| Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
+| Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
 | Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
-| Solver: operations | Solver & proto: operational detail · Solver: Federation scope |
+| Solver: operations | Solver & proto: operational detail |
 | Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · A Session that spans a break · Stage 6c: why the review screen shows two panels |
-| Odds and ends | `weekCountOf` vs. `weeksInTerm` · `CommonButton` rendered a `<div>` · Design tooling · The 100%-slot-occupancy schedule shape · Pre-launch branding sweep |
+| Odds and ends | `CommonButton` rendered a `<div>` · The 100%-slot-occupancy schedule shape · Two vatsim-radar attributions |
 
 ---
 
@@ -364,23 +373,6 @@ Confirmed against a live solver, Stage 1: an over-constrained snapshot (60
 sessions demanded into a 40-slot grid) returned `RUN_STATUS_SUCCEEDED`,
 `termination_reason=move_budget`, objective 21, 40 placements and 2
 `ExactFrequency` hard violations — rather than failing the run.
-
----
-
-# Solver: Federation scope — superseded design note
-
-Historical: two Federation mechanisms were decided in principle and
-deliberately NOT implemented before Stage 7. Both are now implemented — see
-CLAUDE.md's "Federation-shared room occupancy" and "Federation-shareable
-Sessions" for what actually shipped.
-
-- `ExternalOccupancy` (occupancy of Federation-shared Rooms by other tenants)
-  — resolved via a parameterless `SECURITY DEFINER` function, not a
-  cross-tenant ledger.
-- `Session` becoming federation-shareable — resolved with the Session row
-  shared but participant links (`session_group`, `session_person`) staying
-  tenant-private, a deliberate narrowing of the TAXONOMY.md amendment's
-  literal wording.
 
 ---
 
@@ -1429,6 +1421,30 @@ filesystem.
 
 ---
 
+# A federation-shared Session shares the row, not its participants
+
+CLAUDE.md's exception 1 says `session` may be Federation- rather than
+Tenant-owned, with RLS read widened to the federation. What it does not say, and
+what was decided deliberately, is **how far that sharing goes**.
+
+The Session ROW is shared. Its participant links — `session_group` and
+`session_person` — stay **tenant-private**. So a member tenant sees that a shared
+lecture occupies a shared hall at a given time, and does not see which of another
+institution's cohorts or people are in it.
+
+That is a **deliberate narrowing of TAXONOMY.md's literal wording**, which reads
+as though the whole Session becomes federation-visible. Occupancy is what a
+federation needs to coordinate; the roster is not, and widening it would make
+cross-tenant attendance visible to every member as a side effect of sharing a
+room. If a future change makes participants federation-visible, it needs its own
+reasoning — it is not an oversight to tidy up.
+
+Related: `ExternalOccupancy` — occupancy of federation-shared Rooms by other
+tenants — is resolved through a parameterless `SECURITY DEFINER` function, not a
+cross-tenant ledger, for the same reason the auth plane is.
+
+---
+
 # The `calendry_internal` schema — why it was actually necessary
 
 Not hypothetical: naming the helper schema `calendry` (matching the owner
@@ -1515,248 +1531,113 @@ A native `<button>` also inherits the UA font rather than the page's, so
 
 # Per-person preferences: stages 5–7, and three false negatives on the way
 
-The design record (`per-person-preferences-design.md`) holds the decisions and
-the staging. This is what the last three stages actually cost, because all three
-of the traps below produced a result that looked like a clean answer.
+The feature and its verification are on the board. What is kept here is the three
+traps, because **all three produced a result that looked like a clean answer** —
+and none of them is specific to this feature.
 
-**The flip broke assembly instantly, and the default branch was the reason.**
-Setting `wireField: 'personPreferenceFit'` — one line, the last app-side step —
-threw `message.roles is not iterable` inside `hashInput`, before any request was
-made, so the symptom was the whole `SolverInput` assembly failing rather than one
-constraint misbehaving. Cause: `buildVariant`'s `default: return {}` is only safe
-for a message with NO FIELDS AT ALL, which is not the same as a message this app
-sends no values for. ts-proto iterates a repeated field without a presence check.
-Probed all sixteen variants rather than fixing the one: `MaxOnlineShare`,
-`MinimizeBlockUsage`, `MinimizeDayUsage`, `MinimizeRoomRank` and
-`PersonPreferenceFit` all crash on `{}`, and the first four already had explicit
-cases — `PersonPreferenceFit` was the only one that could ever reach the default,
-and it did the moment its field was named. `{ roles: [] }` is also the only value
-the solver accepts, so the fix is load-bearing in two unrelated directions.
+**1. `buildVariant`'s `default: return {}` is only safe for a message with NO
+FIELDS AT ALL**, which is not the same as a message this app sends no values for.
+ts-proto iterates a repeated field without a presence check, so `{}` threw
+`message.roles is not iterable` inside `hashInput` — before any request was made,
+so the symptom was the whole `SolverInput` assembly failing rather than one
+constraint misbehaving. Probed all sixteen variants rather than fixing the one:
+`MaxOnlineShare`, `MinimizeBlockUsage`, `MinimizeDayUsage`, `MinimizeRoomRank` and
+`PersonPreferenceFit` all crash on `{}`; the first four already had explicit
+cases, and `PersonPreferenceFit` was the only one that could ever reach the
+default. `{ roles: [] }` is load-bearing in two unrelated directions: the only
+value that encodes, and the only value the solver accepts.
 
-**An objective TOTAL cannot distinguish "term absent" from "term satisfied."**
-The first stage 6 run reported `objective=118.5` with the rule off and on —
-identical, which reads exactly like a term that was never added. It had been
-added and driven to zero, and the other soft terms were unmoved by placements
-that only changed which day they sat on. The fix is to read the per-constraint
-COMPONENT from `ObjectiveBreakdown`, plus an unsatisfiable-by-construction
-variant (every stated preference rewritten to one shared slot, which 40
-placements cannot share) that charges 100 when it cannot be met. Without that
-second run, a component of 0 and no component at all still look alike. Same shape
-as the case log above: a number that means both "nothing to report" and "nothing
-happened."
+**2. An objective TOTAL cannot distinguish "term absent" from "term satisfied."**
+A run reported `objective=118.5` with the rule off and on — identical, which reads
+exactly like a term that was never added. It had been added and driven to zero.
+Read the per-constraint `ObjectiveBreakdown` component, and confirm with a variant
+that is unsatisfiable by construction.
 
-**A starved search imitates a rule that does not fire.** A later run of the same
-script came back with the placements IDENTICAL off vs on and the unmet cost
-unchanged at 32 — the exact signature of a feature that does not work. The runs
-had terminated on `time_budget` rather than `move_budget`, and the search had
-barely progressed past construction. This is why the determinism rule matters
-operationally and not just for reproducibility: `time_budget` is not comparable
-run to run, so a comparison drawn across two of them is not evidence either way.
-The script now uses a deliberately generous 180s wall clock so the move budget
-binds, and prints `termination` so an invalid comparison is visible rather than
-silently believed. It also uses fresh idempotency keys per invocation — the
-solver's registry is in-memory and keyed by what the caller passes, so a stable
-key replays the first invocation's answers forever, including across the code
-change you are trying to measure.
+**3. A `time_budget` run is not evidence.** Rule-off and rule-on produced
+identical placements because the search never got far enough to differ — the
+signature of a feature that does not work. Only `move_budget` and `converged`
+terminations are reproducible; raise the wall clock until the move budget binds
+before comparing anything.
 
-**And a fourth: the check itself solved an empty Term and called it a failure.**
-The script took the first Term by `startDate`. A second Term was then created in
-the development tenant with an earlier start and no offerings, and every line the
-script prints reported exactly what a broken feature reports — 0 placements,
-unmet cost 0 both ways, "moved toward the stated preferences: NO". Nothing was
-wrong except the fixture. It now picks the Term with the most offerings, PRINTS
-which one and why, and ABORTS on an empty instance or zero scored placements
-rather than scoring them. Verified against both the locally built solver and the
-published compose image, which agree: unmet cost 33 → 0.
+A fourth, smaller one worth the line: the stage-6 script solved an **empty Term**
+(a new term with 0 offerings sorted first) and reported "the rule doesn't fire".
+A verification script must pick its subject deliberately and abort on an empty
+one.
 
-**Stage 7 replaced the disclaimer rather than removing it, against the plan.**
-The stage table said "remove the 'Recorded, not yet used by the scheduler'
-disclaimer". Removing it would have left the page claiming by omission that
-preferences are honoured, and they are honoured only where the tenant enabled
-`person_preference_fit` — which is off by default. That is the same untrue
-reassurance the disclaimer existed to prevent, pointing the other way. The page
-now names the dependency, because it cannot read `constraint_def`:
-`constraint.read` is an administrator's key and widening it is a permissions
-decision. Tracked on the project board rather than decided in a copy edit.
-
-**Two comments were corrected mid-feature rather than at stage 7.** The schema
-comment on `PersonPreference` and the type comment in `shared/availability.ts`
-both said "STORED BUT NOT YET SOLVER-EFFECTIVE ... no wire field exists", and
-stage 4 had already falsified all three clauses of it — something read it, the
-field existed, and it was `Person.preferred` rather than the two column names the
-comment guessed at. Waiting for stage 7 to delete them would have left them wrong
-for however long the solver work took. A stale comment on a schema column is read
-as current by whoever finds it next.
+*(The design record `per-person-preferences-design.md` was deleted with the other
+staging artefacts; the decisions it held are in the board card and in ADR-0026.)*
 
 ---
 
-## What the solver actually charges, and three ways to write it wrong
-
-Restored 2026-08-28: this reasoning was deleted with the condensed summary in
-§ "Solver & proto: operational detail", which was the only place it lived.
-CLAUDE.md keeps the resulting rule; the argument is archive material and belongs
-here. Both departures from this repo's original design record are solver ADR-0026.
-
-**It charges the unmet fraction, not the fit.** The design record said `1 - fit`
-was interchangeable with `fit`. It is not: a soft term that can go NEGATIVE
-breaks the `hard_penalty` bound, the convergence check and `ruin_worst`'s
-ordering, all three at once. Cost rises with unmet preference; it never pays out.
-
-**It is the MEAN over a placement's counted lecturers of `multiplier × unmet`.**
-Three plausible-looking alternatives are all wrong, and none of them is caught by
-a bound check:
-
-- *the sum* — makes a placement more expensive for having more lecturers, which
-  prices team teaching rather than preference;
-- `mean(multiplier) × mean(unmet)` — the form a reader writes from skimming, and
-  the one to watch for: it decouples each person's multiplier from their own
-  unmet fraction, so a lecturer with a high multiplier and no unmet preference
-  subsidises one with a low multiplier and a lot of it;
-- *the max* — turns a soft preference into a de-facto veto by the least
-  satisfied person.
-
-**A NULL `weight_multiplier` is sent as ABSENT, never 0.** The wire field is
-`optional` precisely because proto3's zero is itself a meaningful multiplier —
-"this person's preferences do not count" — and is not what "unset" means.
-
-**`wireField` had to land in the same change as the solver's evaluator, and this
-is the sharp edge.** Before the evaluator existed, sending the variant made the
-solver answer `UNIMPLEMENTED`, which fails the **entire** StartRun rather than
-skipping the one rule. So a catalogue entry that crosses the wire early is
-strictly worse than one that does not cross at all — it takes every other
-constraint down with it. `Person.preferred` arrived in proto `0.7.0`; the
-evaluator arrived in solver `41f6227` (2026-08-27), and the `wireField` line
-shipped with it, not before.
-
-**The inert case is counted, for the reason `lecturer_veto` went unnoticed.** The
-assembly report reports `placementsWithNoSignal == placementsCounted` — a rule
-that is enabled, crosses the wire and prices nothing at all. Nothing counted that
-for `lecturer_veto`, so nobody knew.
-
 # Constraint `params` at the write boundary
 
-**Closed 2026-08-28**, the last of the three gaps in the same family: the rule
-builder honoured a rule and the generic CRUD API did not. Severity and weight
-were closed earlier via `validateConstraintShape()`; `params` was left as
-`z.record(z.string(), z.unknown())` — arbitrary JSON — while `buildVariant`
-reads four of those values with no guard at all.
+**Closed 2026-08-28**, the last of three gaps in one family: the rule builder
+honoured a rule and the generic CRUD API did not. The four failure modes are on
+the board card; what belongs here is why the validation is shaped the way it is.
 
 **Driven by the catalogue, not by a list.** Validation reads each parameter's own
 `ConstraintParamDef` (`type`, `min`, `max`, `options`), so a parameter is
-validated the moment it is declared and there is no second list to keep in step.
-Same reasoning as `wireField` being data rather than a switch in the mapper.
-
-**The four failure modes, and why only one of them was ever noticeable.** Every
-one is reachable from `buildVariant` today:
-
-| Stored value | What actually happens |
-|---|---|
-| `days: "monday"` | Cast `as number[]` then `.map`ped — **throws during assembly and fails the whole run**, every other constraint with it. The only loud one. |
-| `maxRatio: "thirty"` | `Number()` → `NaN`, encoded as a NaN double. Every comparison against `NaN` is false, so the rule is inert and **looks like a rule being satisfied**. |
-| `invert: "false"` | `Boolean('false')` is `true`. The stored value means its own opposite. |
-| `window: "SHARE_WINDOW_PER_WEK"` | Compared against one literal (`=== 'SHARE_WINDOW_PER_WEEK' ? 2 : 1`), so a typo silently selects per-term — a guard that cannot distinguish "per term" from "matched nothing", which is the trap CLAUDE.md § "Guards must fail loudly" names. |
+validated the moment it is declared and there is no second list to drift. Same
+reasoning as `wireField` being data rather than a switch in the mapper.
 
 **Two things it deliberately does NOT check**, and both are the difference
 between closing a gap and breaking the screen that repairs one:
 
-- **Not requiredness.** `missingConstraintParams()` asks that at SOLVE time,
-  where the answer is one skipped rule with a stated reason rather than a refused
-  save. A rule somebody is still configuring — or has deliberately left disabled
-  — has to be writable. Duplicating the check here would also give two copies a
-  chance to disagree about what "set" means, and they already would: an empty
-  weekday list is unanswered to one and a value to the other.
-- **Not unknown keys.** The builder spreads the stored object on every edit
-  (`{ ...params.value, [key]: value }`), so a key left behind by a parameter the
-  catalogue no longer declares travels with the row. Refusing it would make
-  exactly the legacy rows that need repairing unrepairable — the same reasoning
-  that makes `beforeUpdate` validate only touched fields. A stale key is inert
-  (`buildVariant` reads by name), and a MISTYPED key is not silent either:
-  every parameter the mapper reads unsafely is `required`, so the parameter it
-  should have been is unset, `missingConstraintParams` names it, and the rule is
-  skipped with a reason instead of sent as nonsense.
+- **Not requiredness.** `missingConstraintParams()` asks that at SOLVE time, where
+  the answer is one skipped rule with a stated reason rather than a refused save.
+  A rule someone is still configuring must stay saveable, and two copies could
+  disagree about what "set" means — an empty weekday list already differs.
+- **Not unknown keys.** The builder spreads the stored object on every edit, so a
+  key left by a retired parameter travels with the row; refusing it would make
+  exactly the legacy rows that need repairing unrepairable. A stale key is inert.
+  A *mistyped* key is not silent either: every parameter the mapper reads unsafely
+  is `required`, so `missingConstraintParams` names it and skips the rule.
 
-**Issues are blamed on the PARAMETER's key, never on `params`.** This looks like
-a detail and is not. `params` is a registered field (`manageRegistry.ts`,
-`custom: true`) that the rule builder renders as many controls and never displays
-an error for. So `path: ['params']` sets `fieldErrors.params` on a control that
-shows nothing, and `applyError` — finding a field with that key — skips the
-orphan banner it has for exactly this case. The result is a failed save with
-nothing marked anywhere, the least diagnosable outcome a form has. An
-unregistered key takes the orphan path and names the parameter instead. Pinned
-by an HTTP test, because only a real call reveals which key the response names.
+**Issues are blamed on the PARAMETER's key, never on `params`.** `params` is a
+registered `custom` field the builder renders as many controls and never shows an
+error for, so `path: ['params']` sets `fieldErrors.params` on nothing and
+`applyError` skips its orphan banner — a failed save with nothing marked, the
+least diagnosable outcome a form has.
 
-**Falsified rather than trusted.** Four mutations of the new code, each checked
-to fail: disabling the loop (7 tests fail), dropping the `min` bound (1),
-accepting any truthy value as a boolean (1), and treating `''` as a value rather
-than as unset (1). The last one initially appeared to discriminate nothing — its
-anchor also matched a nearly identical line in `missingConstraintParams`, so the
-patch never applied and the suite passed for the wrong reason. Worth
-remembering: a mutation that fails to apply and a mutation the tests cannot see
-both print "all passed".
+---
 
 # `PersonPreferenceFit.roles`: lecturers only, and what widening would cost
 
-**Decided 2026-08-28.** The field stays; the value stays empty. This is an
-answer, not a deferral — the tracked entry that asked the question ("whose
-preferences count") is closed by it.
+**Decided 2026-08-28. The field stays; the value stays empty** — an answer, not a
+deferral. A `PersonPreferenceFit` term prices the preferences of a placement's
+**lecturers** and of nobody else. On the wire that is `roles: []` — empty,
+present, and the only value the solver accepts (`PreferenceRolesUnsupported`,
+solver ADR-0026).
 
-**The decision.** A `PersonPreferenceFit` term prices the preferences of a
-placement's **lecturers**, and of nobody else. On the wire that is
-`roles: []` — empty, present, and the only value `calendry-solver` accepts
-(`PreferenceRolesUnsupported`, ADR-0026). There is no tenant-facing control for
-it and none is planned.
+**Why not simply widen it.** A Session's attendee set is the **whole descendant
+closure** of every attached Group. So "attendees" for a first-year lecture is not
+a handful of people, it is the cohort: two hundred students, each contributing a
+preference the solver would average alongside the one person whose Tuesday it
+actually is. Whatever the aggregation, the teacher's preference becomes noise at
+the third decimal. The rule would still run, still report a cost, and still steer
+— just not toward anything anybody asked for.
 
-**Why not simply widen it.** The obvious reading of "count everyone's
-preferences" is wrong in a way that is invisible on any small fixture. A
-Session's attendee set is the **whole descendant closure** of every attached
-Group (`attendeeSets` uses `descendantGroupIds` — CLAUDE.md states the
-membership-flows-DOWN rule for exactly this reason). So "attendees" for a
-first-year lecture is not a handful of people, it is the cohort: two hundred
-students, each contributing a preference the solver would average or sum
-alongside the one person whose Tuesday it actually is. Whatever the aggregation,
-the teacher's preference becomes noise at the third decimal place. The rule
-would still run, still report a cost, and still steer — just not toward anything
-anybody asked for. That is the silent-wrong-answer class this project keeps
-designing against, and it is why the solver refuses the value rather than
-approximating it.
+**The bar a widening must clear**, so a future attempt starts from it:
 
-**What widening would actually require** — the bar, so that a future attempt
-starts from it rather than rediscovering it:
-
-1. **A per-role normalisation rule**, decided before any code. Not a weight per
-   role, which merely re-scales the same broken aggregate — a rule that fixes
-   what one role's preferences are worth relative to another's independently of
-   how many people hold it. "Lecturers and students count equally" has to mean
-   something when the ratio is 1:200.
+1. **A per-role normalisation rule, decided before any code.** Not a weight per
+   role, which merely re-scales the same broken aggregate — a rule that fixes what
+   one role's preference is worth relative to another's *independently of how many
+   people hold it*.
 2. **A redefinition of the charge.** The solver charges the *mean over a
    placement's counted lecturers* of `multiplier × unmet`. A mean over a mixed
-   role set is not that function with a bigger input; it is a different function,
-   and the `hard_penalty` bound and `ruin_worst` ordering both depend on the
-   current one.
-3. **A decision about whose data a student's preference is.** Lecturer
-   preferences are already visible to whoever schedules. Two hundred students'
-   stated availability is a different disclosure, and the person who can see the
-   resulting schedule is not obviously the person who may see its inputs.
+   role set is a different function, and the `hard_penalty` bound and
+   `ruin_worst`'s ordering both depend on the current one.
+3. **A disclosure decision.** Two hundred students' stated availability is a
+   different disclosure from a lecturer's.
 
-None of the three is blocked by the schema, which is the point of leaving the
-field in place: whoever takes them needs no proto bump, only an answer.
+None is schema-blocked, which is the point of leaving the field in place.
 
-**What holds the decision.** Two guards, and deliberately not a comment:
+**The trap:** `roles: []` is empty *and present*. `{}` — the value every other
+parameterless variant returns — throws during encoding and takes the whole
+assembly with it. Held by `tests/constraint-catalogue.test.ts`, which asserts the
+variant equals `{ roles: [] }` exactly.
 
-- `tests/constraint-catalogue.test.ts` asserts `personPreferenceFit` equals
-  `{ roles: [] }` **exactly**, so adding a role in `buildVariant` fails there
-  rather than at `StartRun`.
-- The solver refuses a non-empty value outright, so even if the app sent one it
-  would fail the whole run loudly instead of pricing the wrong set.
-
-**The one trap to keep in view.** `roles: []` is empty *and present*. `{}` —
-the value every other parameterless variant returns, and the value this file
-recommended until 2026-08-28 — throws `message.roles is not iterable` inside
-`hashInput`, before anything is sent, taking the entire assembly with it.
-ts-proto iterates a repeated field with no presence check. So the empty array is
-load-bearing in two independent directions: it is the only value the solver
-accepts, and the only one that encodes. § "Per-person preferences: stages 5–7"
-records how that was found.
+---
 
 # Schedule display standards
 
@@ -1889,142 +1770,70 @@ would overturn "breaks never cross the wire."
 
 # Group availability windows
 
-`group_term_availability` answers "when inside this Term is this Group around?"
-— a block-placement cohort, a late intake. **One window per (Group, Term), by
-primary key**, so a second is unrepresentable; **absent row = the whole Term**,
-fail-open like `group_term` and for the same reason. At least one bound is
-required (DB CHECK): a boundless row says exactly what an absent row says.
+Shipped; the verification is on the board. Two things here must not be undone.
 
-- **Stored POSITIVE, sent NEGATIVE.** The tenant records availability; the wire
-  has one convention for absence (`Unavailability`, shared with
-  `Person.blackouts`). `blackedOutWeeks()` in `shared/academicCalendar.ts` is the
-  only place that flips, and it is called by both the assembly and the editor's
-  preview so they cannot disagree. Inverting it fails 9 of 11 assertions in
-  `tests/group-availability-weeks.test.ts` — the polarity bug is otherwise
-  silent, since every Session still gets placed either way.
-- **Week granularity rounds toward AVAILABLE.** `Unavailability.weeks` indexes
-  the Term's weeks, so a window ending mid-week frees that whole week. The rule
-  is HARD; rounding the other way would refuse placements that are fine. Same
-  "touches the week" reading `EXAM` periods use.
-- **`group_veto` enforces it, and seeds DISABLED** like its twin `lecturer_veto`
-  — windows are Group data, enablement is tenant policy. So the editor says so
-  where the dates are entered rather than leaving a tenant to wonder; without
-  that this would be the third "recorded, but is it used?" surface here.
-- **The solver's direction is not symmetric.** A window binds the Group and its
-  DESCENDANTS, so the query walks UP (`expand_ancestry`). A leaf's absence must
-  not veto its parent's lecture, which the parent's other children still attend.
-  Solver ADR-0027; all three candidate closures agree on a flat hierarchy.
-- Verified end to end by `scripts/group-availability-check.ts`: rule off, 7 of
-  one cohort's 20 placements sat in blocked weeks; rule on, 0 — while 23
-  placements of other groups still used those weeks, so the rule is narrow
-  rather than globally restrictive.
-- **A new constraint type needs `bun run backfill:constraints -- --all-missing`**
-  on every existing tenant, or nobody can enable it. Already the mechanism for
-  this; `group_veto` is what it currently reports as missing.
+**`group_term_availability` is the OPPOSITE table from `group_term`, and merging
+them is the trap.** `group_term` is a **visibility scope** — row existence means
+"only these Terms", and an unlinked Group is visible in every Term (fail-open).
+Adding availability dates there is the obvious move and would silently scope the
+Group **out of every other Term**. Absent row in `group_term_availability` =
+available for the whole Term.
+
+**Stored POSITIVE, sent NEGATIVE.** `blackedOutWeeks()` is the only place the
+polarity flips, and week granularity rounds toward AVAILABLE — a partially covered
+week counts as available, because the alternative removes teaching time nobody
+asked to remove.
+
+**Blackouts inherit DOWNWARD, so the query walks UP.** A Session attached to group
+`g` is blocked by the windows of `{g} ∪ ancestors(g)`. That needed a **third**
+closure table in the solver, `expand_ancestry` — neither of the existing two:
+`subtree` points the wrong way and `conflict` contains it plus every descendant,
+so both would let one seminar's absence veto the lecture its whole cohort attends.
+All three agree on a flat hierarchy, which is why the guard is a two-level
+fixture: `expand_conflict` fails exactly ONE of the eight tests in
+`group_veto.rs`, `expand_subtree` fails four. Solver ADR-0027.
 
 ---
 
 # A Session that spans a break: legal, drawn honestly, not sent to the solver
 
-**Decided 2026-08-28**, closing the tracked OPEN QUESTION. Three answers, and the
-standing rule survives all three: **TimeGrid breaks still never cross the wire.**
+**Decided 2026-08-28.** A multi-block Session spanning a break is LEGAL, the app
+must not draw it as contiguous teaching, and **breaks still never cross the wire**.
+The measurements and the shipped fix are on the board; what must not be undone is
+here.
 
-1. A multi-block Session spanning a break is **LEGAL**.
-2. The app must **stop drawing it as contiguous teaching**, because that is a
-   false claim about the clock.
-3. Whether a given tenant *wants* it is a tenant policy question, deferred to a
-   constraint — not decided in the renderer and not hardcoded anywhere.
+**Do not "fix" this by adding a break field to the proto.** Three reasons, and the
+first is the one that reads as settled and is not:
 
-## What was actually wrong
+`toWireTimeGrid`'s comment says a gap "changes no adjacency" — sound for a
+single-block Session, **false for a multi-block one**, whose contiguity is a claim
+about the clock. A correct conclusion resting on a wrong reason is more dangerous
+than a wrong one, because it stops the reader thinking. The conclusion survives
+for different reasons:
 
-`durationBlocks` counts block INDICES. Every consumer treated two indices as one
-contiguous stretch of clock, and that is false whenever a gap separates them. On
-the dev tenant's `Standard week` grid — 8 × 45min, `breakMinutes: 0`, named
-breaks after blocks 0 (45m), 1 (15m) and 3 (30m) — a two-block Session starting
-at block 3 occupies **120 minutes and teaches 90**, and rendered identically to a
-genuine 90-minute one. Measured, not hypothesised: **one live Session was already
-in that state** (21 Sessions had `durationBlocks: 2`; 20 started at a block with
-no following gap, 1 started at block 3).
+- **No mechanism.** `Offering` has no `veto_slots` on the wire; the solver derives
+  veto masks from constraints and per-Person/Group `Unavailability`, none of which
+  can say "do not START a two-block Session at block 3".
+- **Not universal.** A three-hour lab through a 15-minute coffee break is
+  ordinary; a lecture through a 45-minute lunch is not. Deciding it globally would
+  be a tenant-open judgement dressed as a schema fact.
+- **Unpreventable anyway.** Manual edits produce it by design — hard-constraint
+  violations from manual edits warn rather than block. A rule the solver honoured
+  and one drag could bypass would still need the honest rendering, so the
+  rendering was the load-bearing fix all along.
 
-Note which grid shape makes this the NORMAL case rather than an edge case. With
-`breakMinutes > 0` every pair of consecutive blocks is separated, so *every*
-multi-block Session spans a gap. This tenant has `breakMinutes: 0` and names each
-gap individually, which is why only one Session was affected — a different tenant
-would have had all of them.
-
-## Why the obvious fix is wrong
-
-The obvious fix is to send breaks to the solver so it can avoid such placements.
-`toWireTimeGrid` argues against it explicitly:
-
-> `breakMinutes` is DELIBERATELY NOT SENT … the solver reasons in block INDICES,
-> so a gap between blocks changes no adjacency and no conflict — it only changes
-> what a block is called on a clock, which is presentation.
-
-That reasoning is **sound for a single-block Session and unsound for a
-multi-block one**: a two-block Session's contiguity IS an adjacency claim about
-wall-clock time. So the comment's conclusion is right and its stated reason is
-incomplete, which is a more dangerous combination than being simply wrong — it
-reads as settled.
-
-The conclusion survives for a different reason: **the app cannot express this to
-the solver anyway, and should not want to.**
-
-- There is no per-Offering slot veto on the wire. `Offering` carries no
-  `veto_slots` field; the solver derives its veto masks from constraints and from
-  per-Person/Group `Unavailability`, neither of which can say "do not START a
-  two-block Session at block 3".
-- Sending breaks would therefore mean a proto field, a solver rule, and a
-  standing rule overturned — to enforce a policy that is not universal. A
-  three-hour lab running through a 15-minute coffee break is ordinary; a lecture
-  through a 45-minute lunch is not. That is exactly the shape CLAUDE.md forbids
-  hardcoding: a tenant-open judgement dressed as a schema fact.
-
-And it could never be *prevented* regardless: manual edits produce this by
-design, since hard-constraint violations from manual edits **warn rather than
-block**. A rule the solver honoured and a human could bypass in one drag still
-needs the honest rendering. So the rendering was the load-bearing fix all along.
-
-## What shipped
-
-`gapsWithinSpan()` in `shared/timeGrid.ts`, alongside `gapAfter`/`breakAfter` —
-one definition of "which gaps fall inside this span", so the renderer, the
-accessible name and any future report ask the same function rather than
-re-deriving the walk. It counts the unnamed default gap as well as named breaks
-(both occupy real time; `label` is null for the unnamed one) and measures
-`fromMinute` from the span's own start, so a caller needs no second boundary walk.
-
-`ScheduleSessionChip` draws each interruption as a hatched band at its true
-position, **in px at the grid's constant scale** — never a percentage of the
-chip, because a row grows when its column is crowded and a percentage would slide
-the marker off the break it marks. Same rule as `bandWithin`. The band is opaque
-over the chip's fill rather than tinted: the point is that the stretch is NOT the
-session, and a tint reads as a variation of it.
-
-The FACT is separate from the PICTURE, and that matters for the agenda, which has
-no vertical time axis: `perMinute` is optional, and without it the overlay is
-omitted while the interruption is still named in the meta row and the accessible
-name. A chip that silently claims two contiguous blocks is wrong in a list too.
-
-## What was deliberately left out
-
-**Reporting it as a violation.** It belongs in the `constraint_violation`
-mechanism as a tenant-toggleable rule, which makes it a new constraint type — and
-a new constraint type is itself a migration (catalogue entry, `backfill:constraints
---all-missing`, and a decision about whether the solver or the app evaluates it).
-That is its own card, not a rider on a rendering fix.
-
-**A `no_session_spanning_break` constraint.** Same reason, and it needs the
-question above answered first: an app-evaluated rule can see breaks and cannot
-steer the solver; a solver-evaluated one steers but needs breaks on the wire,
-which is the thing this decision declines to do.
-
-## The one thing to not undo
-
-Do not "fix" this by adding a break field to the proto. The rendering is the fix.
-If a future tenant genuinely needs the solver to avoid these placements, that is
-a constraint with a recorded decision reversing this section — not a schema
+If a tenant genuinely needs the solver to avoid these placements, that is a
+constraint with its own recorded decision reversing this section — not a schema
 change made in passing because the gap looked like missing data.
+
+**`gapsWithinSpan()` is the single definition** of what a span occupies but does
+not teach, beside `gapAfter`/`breakAfter`. It counts the unnamed default gap as
+well as named breaks, because both occupy real time. Note the grid shape that
+makes this the normal case rather than an edge case: with `breakMinutes > 0`
+*every* pair of consecutive blocks is separated, so every multi-block Session
+spans a gap.
+
+---
 
 # Solver & proto: operational detail
 
@@ -2133,115 +1942,56 @@ measurement:
 
 ---
 
-# Design tooling
+# Screens: a lobby display is a device, not a person
 
-- Use the **`design-taste-frontend`** skill (`.claude/skills/`, source
-  `Leonxlnx/taste-skill`) for visual/UI work; pair with **`frontend-design`**
-  (`anthropics/skills`, fetch via `skills use ... --skill frontend-design`)
-  for greenfield/reshaped UI — distinctive choices over the three
-  AI-generated-design defaults (warm-cream serif / near-black-accent /
-  broadsheet-hairline).
-- Tokens (`app/scss/tokens-root.scss` / `tokens.scss`) remain the
-  implementation layer regardless — see design-tokens rule below.
+The build is on the board. What belongs here is the decision that was NOT taken,
+and one lesson about how it was verified.
+
+**It is not a fourth RLS exception, and the reason generalises.** The obvious
+build — a public unauthenticated read — needs RLS dropped or a policy answering
+with no tenant context. That was unnecessary, because exception 2 (the pre-tenant
+auth plane) is not "auth is special"; it is a general **technique**: resolve a
+credential by the unique hash of a secret it presents, never by a tenant filter,
+through a `SECURITY DEFINER` function taking the secret alone. `screen_identity()`
+mirrors `session_identity()` line for line, and everything after it is an ordinary
+`withTenant()` transaction. **That technique is the part that generalises; the
+device model is not** — a student without a credential is a different problem.
+
+**A non-account principal holds no permissions and cannot acquire any.**
+`heldPermissions()` throws 403 when `actorPersonId` is null — a guard written for
+accounts that had not chosen a tenant, which happens to refuse a screen key
+against every check in the app, including ones written years from now by somebody
+who has never heard of screens. Never give a non-account principal an
+`actorPersonId` to make a check pass.
+
+**A revoked key proves nothing.** The first version of the isolation probe ran
+after revocation and got 401 everywhere. That looks like a pass and demonstrates
+nothing, because a revoked key is refused before any permission is consulted. The
+probe only means something with a LIVE key, which returns 403 from the permission
+layer rather than 401 from the resolver. Any future "this principal cannot reach
+X" check has the same failure mode.
+
+**Adding `kind` to `RequestIdentity` found a lie.** The background poller was
+constructing an identity with `accountId: ''` and `sessionId: ''` — it has neither,
+and the empty strings said something untrue about what was making the request.
+Blast radius was nil, and that is the point worth keeping: `identity.accountId`
+and `identity.sessionId` are read NOWHERE outside the type. Only `actorPersonId`,
+`tenantId` and `federationId` are ever consulted.
+
+**Key rotation is deliberately absent**, not forgotten. Rotating invalidates the
+URL typed into a device on a wall, and the person clicking is rarely the person
+who can walk to it. It belongs behind its own explicit action with its own
+confirmation, never inside a PATCH that also renames things. Revoking
+(`isActive: false`) is the recoverable half and is built.
 
 ---
 
-# Screens: a lobby display is a device, not a person
+# Two vatsim-radar attributions are deliberate
 
-The backlog asked for "a lobby/kiosk display showing live room occupancy — needs
-a device credential distinct from a real user account, plus a room-centric
-schedule view". Both halves turned out to be the easy part. The decision worth
-recording is the one that was NOT taken.
-
-## Why this is not a fourth RLS exception
-
-The obvious build is a public unauthenticated read: a URL anybody can open that
-shows a board. That needs either RLS dropped on the tables a board reads, or a
-policy that answers with no tenant context — a fourth exception to the isolation
-model, which `CLAUDE.md` says not to add without a comparably strong reason to
-the existing three.
-
-There was no such reason, because the existing shape already fits. Exception 2
-(the pre-tenant auth plane) is not "auth is special"; it is a general technique:
-**resolve a credential by the unique hash of a secret it presents, never by a
-tenant filter, through a `SECURITY DEFINER` function taking the secret alone.**
-A screen key is exactly that. `calendry_internal.screen_identity()` mirrors
-`session_identity()` line for line, and once it has returned a tenant, every
-subsequent read is an ordinary `withTenant()` transaction under the same RLS as
-any other request. `screen` and `screen_room` are themselves tenant-scoped and
-RLS-protected like everything else.
-
-So the feature that looked like it required relaxing the model required nothing.
-
-## The authority question answers itself
-
-A device that reads a timetable is a principal, and the reflex is to ask which
-permissions it should hold. The better answer is that it holds none and cannot.
-
-`heldPermissions()` already throws 403 when `identity.actorPersonId` is null — a
-guard written for accounts that have not chosen a tenant. A screen has no acting
-Person and never will, so it is refused by every permission check in the app,
-including ones written years from now by somebody who has never heard of screens.
-Verified against five unrelated routes with a LIVE key, not a revoked one: the
-first version of that probe ran after revocation and got 401 everywhere, which
-looks like a pass and proves nothing, since a revoked key is refused before any
-permission is consulted.
-
-Its authority is therefore `ScreenIdentity.roomIds`, read at exactly one route.
-
-## `RequestIdentity` became a discriminated union, and found a lie
-
-Adding `kind` turned up something the flat type had been hiding: the background
-solver poller was constructing an identity with `accountId: ''` and
-`sessionId: ''`. It has no account and no session — it runs when nobody is logged
-in — and the empty strings said something untrue about what was making the
-request. The union made it a compile error; `kind: 'system'` is the honest
-answer, and it holds no permissions either, which it has never needed.
-
-Blast radius was nil: `identity.accountId` and `identity.sessionId` are read
-NOWHERE outside the type. Only `actorPersonId`, `tenantId` and `federationId` are
-ever consulted.
-
-## The key can only be shown once, which is a UI constraint
-
-Only the SHA-256 is stored. `CLAUDE.md`'s account-password rule then decides the
-rest: the create page navigates to the saved row on success, so a
-server-generated secret would be gone before it could be read — which is why an
-account's initial password is generated in the BROWSER. A screen key is the same
-shape and uses the same machinery: `shared/screenKey.ts`, a draft field, the full
-display URL shown with a copy button before saving. The server still generates
-one when a caller sends none, so a script is not forced through a browser.
-
-## Two bugs, both silent, both found by looking at the database
-
-Worth recording because both were self-inflicted instances of rules this repo
-already states.
-
-1. **The liveness stamp matched zero rows.** `last_seen_at` was written with a
-   fire-and-forget `getPrisma().$executeRaw` OUTSIDE the tenant transaction. The
-   app role runs under `FORCE ROW LEVEL SECURITY`, so with no
-   `current_tenant_id()` the UPDATE silently affected nothing — the very first
-   architecture rule in `CLAUDE.md`. The response was identical either way;
-   only reading the column caught it.
-2. **The no-term early return skipped both the rooms and the stamp.** Between
-   terms the board returned `rooms: []`, so a working display in August was
-   indistinguishable from a broken one, and no screen recorded a heartbeat for
-   the whole summer. Now the rooms come back empty with the state NAMED, and the
-   stamp happens before anything that can return early. Caught by the test suite
-   against a fixture with no running term — the manual probe had one, so it
-   passed there.
-
-## What was deliberately left out
-
-- **Key rotation.** Rotating invalidates the URL typed into a device on a wall,
-  and the person clicking is rarely the person who can walk to it. It belongs
-  behind its own explicit action with its own confirmation, not inside a PATCH
-  that also renames things. Revoking (`isActive: false`) is the recoverable half
-  and is built.
-- **The other half of the backlog entry** — a student viewing their own schedule
-  with no account. Same section, genuinely different problem: that one is about
-  identifying a PERSON without a credential, where this was about a device with
-  one. Still open.
+`modules/styles.ts` and `app/scss/variables.scss` carry attribution comments to
+vatsim-radar. They are **provenance for borrowed code, not leftover branding**,
+and survived the rebrand sweep on purpose. Do not remove them as stale template
+text — that is exactly what they look like.
 
 ---
 
@@ -2258,21 +2008,3 @@ deciding whether it was intended. It was.
 
 ---
 
-# Pre-launch branding sweep
-
-The Step 1 rebrand searched only for the `xxx-changeme` placeholder pattern,
-so anything the template author hardcoded under a different name survived
-it; `Swindler` (the page title and header text) was found by accident while
-building the login UI. A full case-insensitive sweep across all three repos
-found exactly one further instance: `bun.lock` still recorded `"name":
-"xxx-changeme"` for the workspace, because `bun install` does not rewrite
-that field when it disagrees with `package.json`. Fixed by hand,
-re-verified with `--frozen-lockfile`.
-
-Everything else was clean: `package.json` metadata, README, `robots.txt`,
-`useHead` titles, layouts, devcontainer, both compose files, `.config/`, and
-both sibling repos.
-
-Two vatsim-radar attributions in `modules/styles.ts` and
-`app/scss/variables.scss` are deliberately KEPT — provenance for borrowed
-code, not branding.
