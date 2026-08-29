@@ -159,7 +159,8 @@ export const BUILT: LandingRoadmapItem[] = [
         note: 'Start a run, keep the result even if the solver restarts, review the proposal '
             + 'against the current schedule, then apply or discard it. A run that succeeds with '
             + 'rules still broken is still offered — with the breaches listed — rather than '
-            + 'thrown away.',
+            + 'thrown away. A clash made by hand can be repaired without rebuilding the term: '
+            + 'the repair moves as little as it can, and still produces a proposal to review.',
     },
     {
         id: 'constraints',

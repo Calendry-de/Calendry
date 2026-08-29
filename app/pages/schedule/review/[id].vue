@@ -1,15 +1,20 @@
 <template>
-    <!--
-        THE OPENER MARKS A CHANGE OF MODE. Arriving here is deliberate and
-        infrequent, and what follows is the only screen that can replace a whole
-        term's timetable. Faster than the landing page's — a work surface, not an
-        entrance — and it collapses under `prefers-reduced-motion`.
-    -->
     <CommonPageOpener
         v-model="opening"
         :mark-size="140"
         :speed="1.6"
     >
+        <!--
+            THE OPENER MARKS A CHANGE OF MODE. Arriving here is deliberate and
+            infrequent, and what follows is the only screen that can replace a
+            whole term's timetable. Faster than the landing page's — a work
+            surface, not an entrance — and it collapses under
+            `prefers-reduced-motion`.
+
+            Inside the root rather than above it: a comment beside the single
+            root element counts as a second root to `vue/no-multiple-template-root`,
+            which failed `bun run lint` for the whole repo.
+        -->
         <div class="review">
         <header class="review_head">
             <div class="review_identity">
