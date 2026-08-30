@@ -131,7 +131,8 @@ export const BUILT: LandingRoadmapItem[] = [
         note: 'Rooms, groups, people, courses, terms, the daily block grid and its breaks, plus a '
             + 'Ctrl+K palette that jumps to any of them. A course can state that one session '
             + 'needs several rooms at once — a cohort too large for any single hall — and the '
-            + 'scheduler places the combination.',
+            + 'scheduler places the combination. A class can be assembled from other classes, '
+            + 'for a track two cohorts take together.',
     },
     {
         id: 'calendar',

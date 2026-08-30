@@ -4063,3 +4063,86 @@ CREATE POLICY tenant_isolation ON "exam_request"
     WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "exam_request" TO calendry_app;
+
+
+-- ===========================================================================
+-- A Group assembled from other Groups
+-- ===========================================================================
+--
+-- Two cohorts each offer the same elective track, and the students who chose it
+-- are taught together. `dit22 S1 Management` and `dit22 S2 Management` need to
+-- become one teaching group.
+--
+-- NOT A SECOND PARENT, and that is the first thing to say because it is what
+-- anybody reaches for. Both track groups already have a parent, so a combining
+-- group above them makes the hierarchy a DAG — and `Group.parent_id` is
+-- SINGULAR on the wire while all three closure walks (`expand_subtree`,
+-- `expand_conflict`, `expand_ancestry`) assume a tree and run in the search's
+-- hot path. The combined group is an ordinary root-level Group with its own
+-- membership instead, which is what solver ADR-0012 already established for
+-- electives and which needs no schema change at all: a student in both their
+-- cohort and the combined group is double-booked on the PERSON axis, because
+-- `attendees_of` expands a Session's groups through `expand_subtree` and
+-- collects their members.
+--
+-- So the model already expressed this. What it could not express is WHERE the
+-- membership came from — somebody hand-added forty students and nothing
+-- recorded why those forty. This table is that intent.
+--
+-- MATERIALISED, NOT DERIVED. Membership is copied on an explicit regenerate and
+-- sits still until the next one. A live union would always be correct and would
+-- change a timetable's attendee set between two solves with nothing in the
+-- event log saying why — room eligibility and derived capacity moving with it.
+-- Stale is the visible failure; silently different is not. `members_generated_at`
+-- is what lets the UI say which it currently is.
+--
+-- A SOURCE IS A GROUP, NOT A "TRACK". Track is tenant-open vocabulary and there
+-- is no Track entity to invent one from; picking the source Groups by hand says
+-- the same thing in the tenant's own terms.
+-- ---------------------------------------------------------------------------
+CREATE TABLE "group_source" (
+    "tenant_id"       TEXT NOT NULL,
+    -- The combined Group.
+    "group_id"        TEXT NOT NULL,
+    -- One Group it draws its members from.
+    "source_group_id" TEXT NOT NULL,
+
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "group_source_pkey" PRIMARY KEY ("group_id", "source_group_id")
+);
+
+-- A Group drawing from itself would make every regenerate a no-op that looks
+-- like it did something, and is never what anybody meant.
+ALTER TABLE "group_source" ADD CONSTRAINT "group_source_not_self"
+    CHECK ("group_id" <> "source_group_id");
+
+ALTER TABLE "group_source" ADD CONSTRAINT "group_source_tenant_id_fkey"
+    FOREIGN KEY ("tenant_id") REFERENCES "tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "group_source" ADD CONSTRAINT "group_source_group_id_fkey"
+    FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CASCADE on the source too: a source that no longer exists cannot be drawn
+-- from, and leaving a dangling row would make the next regenerate quietly
+-- produce a smaller group than the one before it with nothing naming the
+-- difference. Deleting the row is what makes the change visible in the list.
+ALTER TABLE "group_source" ADD CONSTRAINT "group_source_source_group_id_fkey"
+    FOREIGN KEY ("source_group_id") REFERENCES "group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE INDEX "group_source_tenant_id_idx" ON "group_source" ("tenant_id");
+CREATE INDEX "group_source_source_group_id_idx" ON "group_source" ("source_group_id");
+
+-- NULL means "never generated", which is different from "generated and nothing
+-- has changed since" — the two read identically in a UI that only counts
+-- members, and they call for different words.
+ALTER TABLE "group" ADD COLUMN "members_generated_at" TIMESTAMPTZ(3);
+
+ALTER TABLE "group_source" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "group_source" FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON "group_source"
+    USING (tenant_id = calendry_internal.current_tenant_id())
+    WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "group_source" TO calendry_app;

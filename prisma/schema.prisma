@@ -335,6 +335,7 @@ model Tenant {
   @@index([federationId])
   @@map("tenant")
   examRequests ExamRequest[]
+  groupSources GroupSource[]
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +653,21 @@ model Group {
   tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   parentGroup Group?  @relation("GroupHierarchy", fields: [parentGroupId], references: [id], onDelete: Restrict)
   children    Group[] @relation("GroupHierarchy")
+
+  /// When `sources` were last copied into `memberships`. NULL means never —
+  /// which is a different fact from "generated and unchanged since", and the
+  /// two read identically in a UI that only counts members.
+  membersGeneratedAt DateTime? @map("members_generated_at") @db.Timestamptz(3)
+
+  /// Groups this one draws its members from. A COMBINED group — two cohorts'
+  /// Management tracks taught together — is an ordinary root-level Group whose
+  /// membership was copied from these, not a second parent above them: the
+  /// hierarchy is a tree on the wire and in every closure walk.
+  ///
+  /// MATERIALISED. Membership is copied on an explicit regenerate, so a solve
+  /// today and a solve tomorrow see the same attendees unless somebody asked.
+  sources     GroupSource[] @relation("CombinedGroup")
+  sourceOf    GroupSource[] @relation("SourceGroup")
 
   memberships    Membership[]
   offeringGroups OfferingGroup[]
@@ -1982,4 +1998,26 @@ model ExamRequest {
   @@index([requestedByPersonId])
   @@index([offeringId])
   @@map("exam_request")
+}
+
+/// One Group a combined Group draws its members from.
+///
+/// The INTENT behind a membership that would otherwise look hand-assembled:
+/// without this, somebody adds forty students and nothing records why those
+/// forty, or how to do it again next term.
+model GroupSource {
+  tenantId      String @map("tenant_id")
+  groupId       String @map("group_id")
+  sourceGroupId String @map("source_group_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group       Group  @relation("CombinedGroup", fields: [groupId], references: [id], onDelete: Cascade)
+  sourceGroup Group  @relation("SourceGroup", fields: [sourceGroupId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, sourceGroupId])
+  @@index([tenantId])
+  @@index([sourceGroupId])
+  @@map("group_source")
 }

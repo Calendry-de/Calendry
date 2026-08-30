@@ -207,6 +207,28 @@ export const RELATIONS: Record<string, RelationConfig> = {
     },
 
     /**
+     * Groups a combined Group draws its members from.
+     *
+     * NOT in the manage registry's `relations` array, like `groups/availability`
+     * below and for a related reason: editing the set is only half the feature.
+     * The other half is an ACTION — copy those members in — and a panel that
+     * saved the sources while the membership silently stayed as it was would be
+     * the most misleading version of this possible. `ManageGroupForm` renders
+     * both together.
+     *
+     * A PUT-set like every other collection here, so "add one, drop one" is one
+     * request that either lands or does not.
+     */
+    'groups/sources': {
+        parent: 'groups',
+        parentModel: 'group',
+        model: 'groupSource',
+        parentKey: 'groupId',
+        item: z.object({ sourceGroupId: id }),
+        select: { sourceGroupId: true },
+    },
+
+    /**
      * When a Group is available inside each Term — the cohort that runs only the
      * first six weeks.
      *
