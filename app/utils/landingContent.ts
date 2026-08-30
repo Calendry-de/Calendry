@@ -151,6 +151,14 @@ export const BUILT: LandingRoadmapItem[] = [
             + 'its own room, groups and people.',
     },
     {
+        id: 'ical-export',
+        state: 'done',
+        title: 'Download your schedule as a calendar file',
+        note: 'An .ics of your own sessions for a term, opened in whatever calendar app you '
+            + 'already use — real UTC times, converted from the institution’s own clock rather '
+            + 'than sent as its wall-clock hours.',
+    },
+    {
         id: 'person-search',
         state: 'done',
         title: 'Finding a person by name',
@@ -243,8 +251,10 @@ export const NEXT: LandingRoadmapItem[] = [
     {
         id: 'export',
         state: 'next',
-        title: 'Export to iCal, Google Calendar and Outlook',
-        note: 'Not started. Today a schedule lives in Calendry and is read there.',
+        title: 'A live calendar subscription, not just a download',
+        note: 'The one-off .ics download is built. A stable URL your calendar app polls on its '
+            + 'own is a different, harder question — a feed link is itself a credential, and it '
+            + 'needs the same answer as letting a student view a schedule with no account.',
     },
     {
         id: 'notifications',
