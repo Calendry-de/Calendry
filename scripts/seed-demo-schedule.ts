@@ -1,6 +1,7 @@
 /**
  * Builds a demo institution for one tenant: a grid, a vocabulary, a group tree,
- * six terms, ten modules and a first week of placements.
+ * six terms, every module of the six-semester curriculum and a first week of
+ * placements in each term.
  *
  * SEPARATE FROM SEEDING, AND THE LINE IS NOT ARBITRARY.
  *
@@ -124,8 +125,6 @@ async function main() {
             });
         }
 
-        const termId = termByKey.get('s1')!;
-
         // --- rooms -----------------------------------------------------------
         const rooms = [];
 
@@ -202,7 +201,8 @@ async function main() {
         for (const m of MODULES) {
             const halves = m.split
                 ? [{ suffix: '-S1', group: 's1', label: ' (S1)' }, { suffix: '-S2', group: 's2', label: ' (S2)' }]
-                : [{ suffix: '', group: 'semester1', label: '' }];
+                : [{ suffix: '', group: m.group, label: '' }];
+            const termId = termByKey.get(m.term)!;
 
             for (const half of halves) {
                 const id = `${t}-offering-${m.code}${half.suffix}`;
@@ -275,6 +275,14 @@ async function main() {
          */
         const legalStarts = Array.from({ length: GRID.blocksPerDay }, (_, i) => i);
         let placed = 0;
+        /*
+         * RESET PER TERM, not a running count across all six. Every term's
+         * baseline is its own "handful of placements" — without the reset,
+         * Semester 2 onward would start wherever the previous term's count
+         * happened to land in the day/block cycle instead of Monday, block 0.
+         */
+        let termCursor: string | null = null;
+        let indexInTerm = 0;
 
         for (const [index, offeringId] of offeringIds.entries()) {
             const offering = await prisma.offering.findUniqueOrThrow({
@@ -283,20 +291,27 @@ async function main() {
             });
             const id = `${t}-session-${index}`;
 
+            if (offering.termId !== termCursor) {
+                termCursor = offering.termId;
+                indexInTerm = 0;
+            }
+
             await prisma.session.upsert({
                 where: { id },
                 create: {
-                    id, tenantId: t, offeringId, termId,
+                    id, tenantId: t, offeringId, termId: offering.termId,
                     kindId: offering.kindId, timeGridId: grid.id,
                     termWeek: 1,
-                    dayOfWeek: GRID.activeDays[index % GRID.activeDays.length]!,
-                    blockIndex: legalStarts[index % legalStarts.length]!,
+                    dayOfWeek: GRID.activeDays[indexInTerm % GRID.activeDays.length]!,
+                    blockIndex: legalStarts[indexInTerm % legalStarts.length]!,
                     durationBlocks: 1,
                     generationId: generation.id,
                     isLocked: index === 0,
                 },
                 update: {},
             });
+
+            indexInTerm++;
 
             const room = rooms[index % (rooms.length - 1)]!;
 
@@ -332,7 +347,7 @@ async function main() {
         console.log(`  grid '${grid.name}': ${GRID.blocksPerDay} x ${GRID.blockLengthMinutes}min, ${BREAKS.length} breaks, ${GRID.activeDays.length} days`);
         console.log(`  ${TERMS.length} terms, ${GROUPS.length} groups, ${GROUP_TERMS.length} group-term scopes`);
         console.log(`  ${LECTURERS.length} lecturers, ${rooms.length} rooms`);
-        console.log(`  ${offeringCount} offerings in '${TERMS[0]!.name}', each with a group and a lecturer`);
+        console.log(`  ${offeringCount} offerings across all ${TERMS.length} terms, each with a group and a lecturer`);
         console.log(`  ${placed} baseline sessions in week 1 — the rest is the solver's job`);
         console.log('Done.');
     } catch (error) {

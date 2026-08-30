@@ -215,7 +215,9 @@ async function main() {
             // credential (a lecturer working across a federation).
             const existing = await tx.account.findUnique({ where: { email: adminEmail } });
             const account = existing
-                ?? (await tx.account.create({ data: { email: adminEmail, passwordHash } }));
+                ?? (await tx.account.create({
+                    data: { email: adminEmail, passwordHash, mustChangePassword: true },
+                }));
 
             await tx.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 
@@ -241,8 +243,7 @@ async function main() {
             console.log('\n  Existing account reused — the current password is unchanged.');
         } else {
             console.log(`\n  Initial password: ${initialPassword}`);
-            console.log('  Shown once and never recoverable. There is no forced rotation yet —');
-            console.log('  see the must_change_password item in CLAUDE.md.');
+            console.log('  Shown once and never recoverable. Must be changed at first sign-in.');
         }
 
         console.log('\nNo TimeGrid, Term or SessionKind was created: those are per-tenant');

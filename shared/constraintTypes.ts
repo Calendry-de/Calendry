@@ -1713,7 +1713,7 @@ export function defaultConstraintRow(type: ConstraintTypeDef): {
     weight: number | null;
     isEnabled: boolean;
     isDefault: true;
-    params: Record<string, unknown>;
+    params: Record<string, number | string | boolean>;
 } {
     // `severity: null` means the tenant chooses; HARD is the safe reading,
     // since a rule that turns out to be a preference is a weaker claim than one
@@ -1744,7 +1744,9 @@ export function defaultConstraintRow(type: ConstraintTypeDef): {
         isDefault: true,
         params: Object.fromEntries(
             type.params
-                .filter((param) => param.default !== undefined)
+                .filter((param): param is typeof param & { default: number | string | boolean } => (
+                    param.default !== undefined
+                ))
                 .map((param) => [param.key, param.default]),
         ),
     };

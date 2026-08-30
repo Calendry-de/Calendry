@@ -254,7 +254,9 @@ async function main() {
             }
 
             const account = existingAccount
-                ?? (await tx.account.create({ data: { email, passwordHash: passwordHash as string } }));
+                ?? (await tx.account.create({
+                    data: { email, passwordHash: passwordHash as string, mustChangePassword: true },
+                }));
 
             if (!linkExists) {
                 await tx.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
@@ -283,7 +285,8 @@ async function main() {
 
         if (password) {
             console.log(`\n  Password: ${password}`);
-            console.log('  Shown once. Store it somewhere, or reset it with `bun run reset:password`.\n');
+            console.log('  Shown once, and must be changed at first sign-in. To issue a new one '
+                + 'instead: `bun run reset:password`.\n');
         } else if (!linkExists) {
             console.log('\n  No new password: that login already existed and keeps the one it has.\n');
         }
