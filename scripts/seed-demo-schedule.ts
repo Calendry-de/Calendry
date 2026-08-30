@@ -220,11 +220,15 @@ async function main() {
                         id, tenantId: t, termId, kindId: kindByKey.get(m.kind)!,
                         code: `${m.code}${half.suffix}`, title: `${m.title}${half.label}`,
                         frequency,
-                        // 90 minutes, the slot the source timetable actually uses.
-                        durationBlocks: 2,
+                        /*
+                         * ONE block, which IS 90 minutes here — the slot a
+                         * module fills in the source timetable. It was 2 while
+                         * a block was 45.
+                         */
+                        durationBlocks: 1,
                         requiredRoleId: lecturerRole?.id ?? null,
                     },
-                    update: { frequency, durationBlocks: 2 },
+                    update: { frequency, durationBlocks: 1 },
                 });
 
                 await prisma.offeringGroup.deleteMany({ where: { offeringId: id } });
@@ -263,7 +267,13 @@ async function main() {
             update: {},
         });
 
-        const legalStarts = [1, 3, 5, 7, 9, 11];
+        /*
+         * EVERY block is a legal start now, because every baseline session is
+         * one block long and a one-block session cannot span a break. The list
+         * existed when a session was two 45-minute blocks and half the
+         * positions straddled a gap.
+         */
+        const legalStarts = Array.from({ length: GRID.blocksPerDay }, (_, i) => i);
         let placed = 0;
 
         for (const [index, offeringId] of offeringIds.entries()) {
@@ -281,7 +291,7 @@ async function main() {
                     termWeek: 1,
                     dayOfWeek: GRID.activeDays[index % GRID.activeDays.length]!,
                     blockIndex: legalStarts[index % legalStarts.length]!,
-                    durationBlocks: 2,
+                    durationBlocks: 1,
                     generationId: generation.id,
                     isLocked: index === 0,
                 },

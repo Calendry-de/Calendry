@@ -24,49 +24,54 @@
 /**
  * The teaching day, read off the timetable's time column.
  *
- * 45-minute blocks from 08:00, and the gaps are NOT uniform — which is the
- * whole reason this is worth copying exactly:
+ * SIX 90-MINUTE BLOCKS FROM 09:00, and the gaps between them are NOT uniform —
+ * which is the whole reason this is worth copying exactly:
  *
- *     b0   08:00–08:45        break 15
- *     b1   09:00–09:45
- *     b2   09:45–10:30        break 15
- *     b3   10:45–11:30
- *     b4   11:30–12:15        LUNCH 45
- *     b5   13:00–13:45
- *     b6   13:45–14:30        break 15
- *     b7   14:45–15:30
- *     b8   15:30–16:15        break 15
- *     b9   16:30–17:15
- *     b10  17:15–18:00        break 15
- *     b11  18:15–19:00
- *     b12  19:00–19:45
+ *     b0   09:00–10:30        break 15
+ *     b1   10:45–12:15        LUNCH 45
+ *     b2   13:00–14:30        break 15
+ *     b3   14:45–16:15        break 15
+ *     b4   16:30–18:00        break 15
+ *     b5   18:15–19:45
+ *
+ * THREE BIG BLOCKS ARE STILL THE SHAPE OF THE DAY, and they are the gaps rather
+ * than the blocks: `b0+b1` is the morning (09:00–12:15), `b2+b3` the afternoon
+ * (13:00–16:15), `b4+b5` the evening (16:30–19:45) — three runs of exactly 195
+ * minutes, separated by the one big break and one short one. The source
+ * timetable draws those three as single rows. It is modelled at 90 minutes
+ * anyway because that is the unit SESSIONS occupy in it: `Stat1` and
+ * `EAC S1-1` each fill half an afternoon, not all of it.
  *
  * `breakMinutes` is 0 BECAUSE the breaks are named. A uniform gap would
  * separate EVERY pair of consecutive blocks, which would make every two-block
  * session break-spanning and turn the break-related rules into noise — see
- * CLAUDE.md § "TimeGrid breaks". Here only five positions carry a gap, and a
- * 90-minute session placed at b1, b3, b5, b7, b9 or b11 spans none of them.
+ * CLAUDE.md § "TimeGrid breaks". Here five positions carry a gap and they carry
+ * three different lengths, which no uniform value can say.
+ *
+ * THE 08:00–09:00 ROW IS DROPPED. It is 60 minutes, so no uniform block length
+ * can hold it alongside the rest, and it carries one session in twelve weeks of
+ * the source timetable. Including it would mean modelling the whole day at 45
+ * minutes to accommodate an outlier.
  */
 export const GRID = {
     name: 'Standard week',
-    blockLengthMinutes: 45,
-    blocksPerDay: 13,
+    blockLengthMinutes: 90,
+    blocksPerDay: 6,
     /* Saturday is a real teaching day in the source timetable — ST, IT-Risk and
      * TheoInf all meet on one — so the demo grid includes it rather than
      * assuming the Mon–Fri week most timetables are drawn for. */
     activeDays: [1, 2, 3, 4, 5, 6],
-    startHour: 8,
+    startHour: 9,
     startMinute: 0,
     breakMinutes: 0,
 };
 
 export const BREAKS = [
-    { afterBlockIndex: 0, durationMinutes: 15, label: 'Morgenpause' },
+    { afterBlockIndex: 0, durationMinutes: 15, label: 'Pause' },
+    { afterBlockIndex: 1, durationMinutes: 45, label: 'Mittagspause' },
     { afterBlockIndex: 2, durationMinutes: 15, label: 'Pause' },
-    { afterBlockIndex: 4, durationMinutes: 45, label: 'Mittagspause' },
-    { afterBlockIndex: 6, durationMinutes: 15, label: 'Pause' },
-    { afterBlockIndex: 8, durationMinutes: 15, label: 'Pause' },
-    { afterBlockIndex: 10, durationMinutes: 15, label: 'Pause' },
+    { afterBlockIndex: 3, durationMinutes: 15, label: 'Pause' },
+    { afterBlockIndex: 4, durationMinutes: 15, label: 'Pause' },
 ];
 
 /**
@@ -115,9 +120,10 @@ export const LECTURERS = [
 /**
  * Semester-1 modules, from the study book's Modulübersicht.
  *
- * `hours` is `Kontaktstunden LFH` — academic hours, which ARE 45 minutes, so
- * they convert to blocks one-for-one. Every module meets in 90-minute slots
- * like the source timetable does, hence `frequency = hours / 2`.
+ * `hours` is `Kontaktstunden LFH` — academic hours of 45 minutes. A block is
+ * 90, so a block is TWO of them and `frequency = hours / 2`. Every module meets
+ * for one block at a time, which is what the source timetable shows: a module
+ * fills one row, and a row is 90 minutes.
  *
  * `split: true` means the cohort is taught in two halves. The source timetable
  * shows exactly this for `EAC S1-1` / `EAC S1-2`, and it is the reason the S1
