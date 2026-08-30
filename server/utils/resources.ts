@@ -194,10 +194,18 @@ function constraintShapeRefinement(
         weight?: number | null;
         params?: Record<string, unknown> | null;
         scopes?: { kindId: string }[];
+        members?: { offeringId: string }[];
     },
     ctx: z.RefinementCtx,
 ): void {
-    for (const problem of validateConstraintShape({ ...value, scopeCount: value.scopes?.length })) {
+    for (const problem of validateConstraintShape({
+        ...value,
+        scopeCount: value.scopes?.length,
+        // Coalesced to 0, unlike the update path: a brand-new row has no
+        // existing members to leave alone by omitting the field, so "not
+        // sent" here means exactly what it says.
+        memberCount: value.members?.length ?? 0,
+    })) {
         /*
          * A parameter's issue is reported at the PARAMETER's key, not at
          * `params`. `params` is one `custom: true` field the rule builder
@@ -269,11 +277,12 @@ async function constraintBeforeUpdate(ctx: {
     const touchesSeverity = 'severity' in ctx.patch;
     const touchesWeight = 'weight' in ctx.patch;
     const touchesParams = 'params' in ctx.patch;
+    const touchesMembers = Array.isArray(ctx.patch.members);
 
     // Nothing this guard is about is being changed, so there is nothing to say.
     // Renaming or disabling a row must never be blocked by the shape of a value
     // the caller is not touching.
-    if (!touchesSeverity && !touchesWeight && !touchesParams) {
+    if (!touchesSeverity && !touchesWeight && !touchesParams && !touchesMembers) {
         return;
     }
 
@@ -299,6 +308,9 @@ async function constraintBeforeUpdate(ctx: {
         ...(touchesWeight ? { weight: ctx.patch.weight as number | null } : {}),
         ...(touchesParams
             ? { params: ctx.patch.params as Record<string, unknown> | null }
+            : {}),
+        ...(touchesMembers
+            ? { memberCount: (ctx.patch.members as unknown[]).length }
             : {}),
     });
 
@@ -965,7 +977,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
 
     constraints: {
         model: 'constraint',
-        include: { scopes: true },
+        // `include` here is boolean-only (`ResourceConfig.include`), so
+        // ordering by `position` happens where `relationMembers` is actually
+        // consumed (the picker UI, the solver-input assembly) rather than here.
+        include: { scopes: true, relationMembers: true },
         /**
          * Scopes travel WITH the constraint rather than as a relation.
          *
@@ -980,7 +995,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
          * Same mechanism `time-grids` already uses for `breaks`, and written in
          * one transaction for the same reason.
          */
-        childKeys: ['scopes'],
+        childKeys: ['scopes', 'members'],
         async writeChildren({ tx, tenantId, id, children }) {
             const rows = (children.scopes ?? []) as { kindId: string }[];
 
@@ -997,6 +1012,27 @@ export const RESOURCES: Record<string, ResourceConfig> = {
                         // Offering scoping is deliberately not exposed here —
                         // see the schema note below.
                         offeringId: null,
+                    })),
+                });
+            }
+
+            /*
+             * A RELATION TYPE'S ORDERED OPERANDS (ADR-0028 in calendry-solver).
+             * `position` comes from array order, not a field the client sends —
+             * the array IS the order, the same way the submitted list IS the
+             * authority for scopes above.
+             */
+            const members = (children.members ?? []) as { offeringId: string }[];
+
+            await tx.constraintRelationMember.deleteMany({ where: { constraintId: id, tenantId } });
+
+            if (members.length) {
+                await tx.constraintRelationMember.createMany({
+                    data: members.map((member, position) => ({
+                        constraintId: id,
+                        tenantId,
+                        offeringId: member.offeringId,
+                        position,
                     })),
                 });
             }
@@ -1114,6 +1150,13 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              */
             timeGridId: optionalId,
             scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
+            /**
+             * A RELATION TYPE'S OPERANDS (ADR-0028 in calendry-solver) —
+             * `ConstraintRelationMember`, never `ConstraintScope`: these
+             * Offerings are what the rule is ABOUT, not a filter narrowing it.
+             * Order is the array's own order; see `writeChildren`.
+             */
+            members: z.array(z.object({ offeringId: z.string().min(1) })).optional(),
         }).superRefine(constraintShapeRefinement),
         update: z.object({
             name: z.string().min(1).optional(),
@@ -1130,6 +1173,8 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              */
             timeGridId: optionalId,
             scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
+            /** Editable after creation too; same operands-not-scope reasoning as create. */
+            members: z.array(z.object({ offeringId: z.string().min(1) })).optional(),
         }),
         beforeUpdate: constraintBeforeUpdate,
         filters: z.object({

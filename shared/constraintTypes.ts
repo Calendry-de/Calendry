@@ -42,6 +42,24 @@ export const PER_SESSION_CONSTRAINT_TYPES = [
 export type PerSessionConstraintType = (typeof PER_SESSION_CONSTRAINT_TYPES)[number];
 
 /**
+ * App-decided, pairwise, but keyed by explicit RELATION MEMBERSHIP
+ * (`ConstraintRelationMember`) rather than a shared Room/Lecturer/Group/Person
+ * already loaded into `describeCollision`'s `ctx`.
+ *
+ * A SEPARATE LIST FROM `STRUCTURAL_CONSTRAINT_TYPES`, for the same reason
+ * `PER_SESSION_CONSTRAINT_TYPES` is: `describeCollision`'s switch is
+ * exhaustive over pairs sharing that one precomputed context, and a relation's
+ * data (which Offerings relate) isn't in it and can't be added to it without
+ * changing what every other branch receives. `server/utils/violations.ts` runs
+ * this list as its own third pass instead.
+ */
+export const RELATION_CONSTRAINT_TYPES = [
+    'different_time',
+] as const;
+
+export type RelationConstraintType = (typeof RELATION_CONSTRAINT_TYPES)[number];
+
+/**
  * Types owned by the solver service (TAXONOMY.md §7) — evaluated at generation
  * time rather than by this app on every manual edit.
  *
@@ -258,6 +276,20 @@ export interface ConstraintTypeDef {
     defaultWeight?: number;
     params: ConstraintParamDef[];
     /**
+     * Set for a RELATION type (ADR-0028 in calendry-solver): this type's
+     * operands are an ordered, tenant-chosen set of Offerings — `params` is
+     * always `[]` for these, and the set itself (`ConstraintRelationMember`)
+     * is what a form has to collect instead.
+     *
+     * `minMembers` is the smallest set the type means anything for — 2 for
+     * every relation shipped so far, since a relation about one Offering
+     * alone is not a relation. NO DEFAULT ROW: `defaultConstraintTypes()`
+     * excludes every type carrying this, because there is no membership a
+     * seed could choose on a tenant's behalf — "the first constraint whose
+     * operands are chosen by the tenant in the constraint itself" (ADR-0028).
+     */
+    relation?: { minMembers: number };
+    /**
      * Set when a newer type supersedes this one.
      *
      * The entry STAYS in the catalogue. Removing it would make every existing
@@ -344,6 +376,27 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          */
         defaultWeight: 5,
         params: [],
+    },
+
+    // ---- Structural, evaluated here, RELATION-BASED (ADR-0028) --------------
+    {
+        key: 'different_time',
+        label: 'Different time',
+        description:
+            'Named offerings must never be scheduled at overlapping times, even '
+            + 'though they share no room, lecturer or group — the case an elective '
+            + 'combination is, where the students taking both are not a modelled '
+            + 'cohort.',
+        evaluator: 'app',
+        severity: 'HARD',
+        /*
+         * NO `params` — its one configurable fact is WHICH Offerings relate,
+         * which is `ConstraintRelationMember`, not a scalar the params form can
+         * render. NO `wireField` either: it is sent, just not through
+         * `ConstraintConfig` — see `assembleSolverInput`'s relation carve-out.
+         */
+        params: [],
+        relation: { minMembers: 2 },
     },
 
     // ---- Hard, solver-owned --------------------------------------------------
@@ -1325,7 +1378,8 @@ export const CONSTRAINT_TYPE_KEYS = CONSTRAINT_TYPES.map((type) => type.key);
 export function constraintCatalogueDrift(): { missingFromCatalogue: string[]; missingFromEvaluators: string[] } {
     const declared = new Set(CONSTRAINT_TYPE_KEYS);
     const evaluated = [
-        ...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES, ...SOLVER_OWNED_CONSTRAINT_TYPES,
+        ...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES,
+        ...RELATION_CONSTRAINT_TYPES, ...SOLVER_OWNED_CONSTRAINT_TYPES,
     ];
 
     return {
@@ -1396,7 +1450,7 @@ export interface ConstraintShapeProblem {
      * lands on something the user can see — unlike `params`, which is why the
      * `paramKey` escape below exists.
      */
-    field: 'type' | 'severity' | 'weight' | 'params' | 'scopes';
+    field: 'type' | 'severity' | 'weight' | 'params' | 'scopes' | 'members';
     /**
      * Which PARAMETER, when `field` is `'params'`.
      *
@@ -1556,6 +1610,13 @@ export function validateConstraintShape(input: {
      * not touch scopes at all, which is not the same as zero.
      */
     scopeCount?: number;
+    /**
+     * How many `ConstraintRelationMember` rows the write carries. `undefined`
+     * means the write does not touch members at all — same absent-vs-zero
+     * distinction as `scopeCount`, and for the same reason: a legacy row
+     * missing this must stay editable for fields it is not touching.
+     */
+    memberCount?: number;
 }): ConstraintShapeProblem[] {
     const problems: ConstraintShapeProblem[] = [];
     const type = findConstraintType(input.type);
@@ -1587,6 +1648,24 @@ export function validateConstraintShape(input: {
             message: `'${type.key}' is not scoped by hand — it applies to every session kind `
                 + `whose type is ${type.appliesToKindType}. Change a session kind's type `
                 + 'instead, and the rule follows it.',
+        });
+    }
+
+    /**
+     * A RELATION TYPE'S OPERANDS ARE ITS WHOLE CONFIGURATION — there is no
+     * default to fall back to (`defaultConstraintTypes()` excludes these), so
+     * naming fewer than `minMembers` Offerings is not a smaller version of the
+     * rule, it is a rule that names no relationship at all.
+     *
+     * `undefined` skips this, same as every other field here: a write that
+     * does not touch `members` must not fail because of what a DIFFERENT edit
+     * (renaming, disabling) leaves alone.
+     */
+    if (type?.relation && input.memberCount !== undefined && input.memberCount < type.relation.minMembers) {
+        problems.push({
+            field: 'members',
+            message: `'${type.key}' needs at least ${type.relation.minMembers} offerings named — `
+                + `it relates them to each other, and ${input.memberCount} names no relationship.`,
         });
     }
 
@@ -1689,9 +1768,16 @@ export function validateConstraintShape(input: {
  * as a first-class option in a UI whose entire premise is "every row here is a
  * rule you can use". `minimize_first_block` and `minimize_last_block` are both
  * superseded by `minimize_block_usage`.
+ *
+ * RELATION TYPES ARE EXCLUDED TOO, for a different reason: there is no
+ * membership a seed could choose on a tenant's behalf. Every other type here
+ * means something with zero configuration beyond severity/weight; a
+ * `different_time` row with no `ConstraintRelationMember` rows names no
+ * relationship at all (ADR-0028 in calendry-solver — "the first constraint
+ * whose operands are chosen by the tenant in the constraint itself").
  */
 export function defaultConstraintTypes(): ConstraintTypeDef[] {
-    return CONSTRAINT_TYPES.filter((type) => !type.deprecatedBy);
+    return CONSTRAINT_TYPES.filter((type) => !type.deprecatedBy && !type.relation);
 }
 
 /**

@@ -342,6 +342,7 @@ model Tenant {
   @@map("tenant")
   examRequests ExamRequest[]
   groupSources GroupSource[]
+  constraintRelationMembers ConstraintRelationMember[]
 }
 
 // ---------------------------------------------------------------------------
@@ -1247,12 +1248,13 @@ model Offering {
   kind         SessionKind @relation(fields: [kindId], references: [id], onDelete: Restrict)
   requiredRole Role?       @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
 
-  groups           OfferingGroup[]
-  lecturers        OfferingLecturer[]
-  equipment        OfferingEquipment[]
-  sessions         Session[]
-  constraintScopes ConstraintScope[]
-  violations       ConstraintViolation[]
+  groups                        OfferingGroup[]
+  lecturers                     OfferingLecturer[]
+  equipment                     OfferingEquipment[]
+  sessions                      Session[]
+  constraintScopes              ConstraintScope[]
+  violations                    ConstraintViolation[]
+  constraintRelationMemberships ConstraintRelationMember[]
 
   @@index([tenantId])
   @@index([federationId])
@@ -1564,8 +1566,9 @@ model Constraint {
   tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   timeGrid TimeGrid? @relation(fields: [timeGridId], references: [id], onDelete: Cascade)
 
-  scopes     ConstraintScope[]
-  violations ConstraintViolation[]
+  scopes          ConstraintScope[]
+  violations      ConstraintViolation[]
+  relationMembers ConstraintRelationMember[]
 
   @@index([tenantId])
   @@index([tenantId, isEnabled])
@@ -1598,6 +1601,44 @@ model ConstraintScope {
   @@index([offeringId])
   @@index([kindId])
   @@map("constraint_scope")
+}
+
+/// One Offering's membership in an OfferingRelation (ADR-0028 in
+/// calendry-solver: "a relation is an ordered set of Offering references, a
+/// relation type, and that type's parameters"). The `Constraint` row IS the
+/// relation — its `type` names the relation type (e.g. `different_time`),
+/// `severity`/`weight`/`isEnabled` behave exactly as they do for every other
+/// type. This table is only the ordered membership.
+///
+/// A NEW CARRIER, NEVER `ConstraintScope` — scope and membership are opposite
+/// meanings that would share a table. For a kind-scoped rule, the named
+/// Offering is a FILTER ("this rule applies to X's Sessions"); for a relation,
+/// the named Offerings are OPERANDS ("the rule is about the relationship
+/// between A and B"), and applying it "to A" alone is meaningless. The same
+/// trap `group_term` vs `group_term_availability` already records.
+///
+/// `position` is stored even though `DifferentTime` (symmetric) ignores it,
+/// because a future order-dependent relation type (e.g. Precedence) cannot
+/// retrofit an order onto rows that never had one without leaving every
+/// existing relation order-ambiguous — cheaper to carry one integer now than
+/// to migrate every relation ever created later.
+model ConstraintRelationMember {
+  id           String @id @default(uuid(7))
+  tenantId     String @map("tenant_id")
+  constraintId String @map("constraint_id")
+  offeringId   String @map("offering_id")
+  position     Int
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  constraint Constraint @relation(fields: [constraintId], references: [id], onDelete: Cascade)
+  offering   Offering   @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+
+  @@unique([constraintId, offeringId])
+  @@index([tenantId])
+  @@index([offeringId])
+  @@map("constraint_relation_member")
 }
 
 // ---------------------------------------------------------------------------

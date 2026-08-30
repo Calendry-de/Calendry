@@ -1300,6 +1300,22 @@ export async function assembleSolverInput(
 
     for (const row of constraintRows) {
         const type = findConstraintType(row.type);
+
+        /*
+         * RELATION TYPES NEVER REACH `toWireConstraint`. Their type carries no
+         * `wireField` because there is no `ConstraintConfig` field for them to
+         * populate — the whole point of a relation is that its operands are an
+         * ordered set of Offerings, sent instead as `SolverInput.offeringRelations`
+         * (assembled separately, below). Falling through to `toWireConstraint`
+         * would report every one of these as "wire has no field for this type
+         * yet", which is the message for a catalogue entry shipped ahead of the
+         * proto — the wrong diagnosis for a type that is sent, just on a
+         * different message.
+         */
+        if (type?.relation) {
+            continue;
+        }
+
         const mismatch = type ? severityMismatch(type, row.severity) : null;
 
         if (type && mismatch) {
