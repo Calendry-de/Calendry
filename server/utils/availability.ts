@@ -8,7 +8,7 @@ import {
     validateWindow,
 } from '../../shared/availability';
 import type { HolidayResolution, TermWindow, UnavailabilityWindow } from '../../shared/availability';
-import { isoDate, overlaps, weekCountOf } from '../../shared/academicCalendar';
+import { isoDate, isoWeekday, overlaps, weekCountOf } from '../../shared/academicCalendar';
 
 /**
  * Reading and writing person availability.
@@ -308,6 +308,32 @@ export function resolveHolidayRange(
 }
 
 /**
+ * A single date, resolved to the ONE term it falls in, its week index, and its
+ * ISO weekday — the day-level counterpart to `resolveHolidayRange` above,
+ * which resolves a RANGE and deliberately blocks every day of every week it
+ * touches. Reused rather than duplicated: `resolveHolidayRange(terms, d, d)`
+ * already refuses a date outside every term and a date spanning more than one
+ * (impossible for `from === to`, but the shared function does not know that,
+ * so the same error paths apply for free).
+ *
+ * WHY THIS NEEDS A TERM AT ALL, when the recurring pattern next door writes
+ * none. `termId IS NULL` means "every term", which is what a recurring pattern
+ * means and is NOT what a specific date means — `weeks:[2]` reached both demo
+ * terms once, thirteen months apart, before `approvedBlackoutsFor` scoped
+ * reads by term. A date-derived window is unambiguously one term's week, so it
+ * writes that term rather than leaving the field to mean "every term" by
+ * omission.
+ */
+export function resolveVetoDate(
+    terms: readonly TermWindow[],
+    date: Date,
+): { term: TermWindow; weeks: number[]; dayOfWeek: number } {
+    const { term, resolution } = resolveHolidayRange(terms, date, date);
+
+    return { term, weeks: resolution.weeks, dayOfWeek: isoWeekday(date) };
+}
+
+/**
  * Payload for one submitted window.
  *
  * Ranges are NOT checked here. `validateWindow` needs the tenant's grid, which a
@@ -319,6 +345,22 @@ export const windowSchema = z.object({
     blocks: z.array(z.number().int()).max(64).default([]),
     weeks: z.array(z.number().int()).max(64).default([]),
     reason: z.string().trim().max(500).nullish(),
+    /**
+     * "I cannot teach THIS day" — a single calendar date, as `/schedule`'s
+     * blocked-day button sends it (issue #2), rather than the recurring
+     * pattern this route otherwise writes.
+     *
+     * MUTUALLY EXCLUSIVE WITH `days`/`weeks`, enforced below rather than by
+     * the type: a caller naming both is ambiguous about which one wins, and
+     * guessing is how a lecturer ends up blocking a different day than the one
+     * they clicked.
+     *
+     * NOT a third route. The card is explicit that this must not grow its own
+     * endpoint — it converges on the same `personUnavailability.create()`
+     * this route already makes; only how `days`/`weeks`/`termId` are derived
+     * differs.
+     */
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a YYYY-MM-DD date.').optional(),
 });
 
 /**

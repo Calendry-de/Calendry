@@ -200,6 +200,19 @@
                 ref="solverControl"
                 :term-id="solverTermId"
             />
+
+            <!--
+                ITS OWN GATE (availability.manage_own), unrelated to any of the
+                above — see the component's own comment. Last in the group,
+                matching the solver control's own reasoning: its anchored panel
+                opens toward the bar's right edge.
+            -->
+            <ScheduleBlockedDayButton
+                v-if="week && activeDays?.length && slotDateOf"
+                :week="week"
+                :active-days="activeDays"
+                :slot-date-of="slotDateOf"
+            />
         </div>
 
     </section>
@@ -207,9 +220,14 @@
 
 <script setup lang="ts">
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
+import ScheduleBlockedDayButton from '~/components/schedule/ScheduleBlockedDayButton.vue';
 import type { NamedRow, Term } from '~/composables/schedule';
 
 const props = defineProps<{
+    /** The visible week and its real dates, for "I can't teach this week". */
+    week?: number;
+    activeDays?: number[];
+    slotDateOf?: (week: number, dayOfWeek: number) => Date | null;
     terms: Term[];
     /**
      * WHAT THIS CALLER CAN SEE, not what the tenant has. For an administrator

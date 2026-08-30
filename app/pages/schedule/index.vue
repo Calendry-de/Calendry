@@ -37,6 +37,9 @@
             :can-create-session="canCreateSession"
             :creating="editing.creating.value"
             :solver-term-id="data.resolvedTermId.value"
+            :week="filters.week.value"
+            :active-days="data.grid.value?.activeDays ?? []"
+            :slot-date-of="data.slotDateOf"
             @toggle-create="editing.toggleCreating"
         />
 
