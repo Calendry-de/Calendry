@@ -7,24 +7,19 @@
         </p>
 
         <!--
-            STAGE 7, 2026-08-27: this replaced "Recorded, not yet used by the
-            scheduler", which was true until the solver gained its evaluator
-            (calendry-solver 41f6227) and this app flipped the constraint's
-            wireField. Verified end to end before the sentence changed —
-            `scripts/preference-solve-check.ts` scores the same instance solved
-            with and without the rule, and the stated preferences went from 7 of
-            40 placements satisfied to 40 of 40.
+            ISSUE #3, RESOLVED: the hedge this replaced said "This page cannot
+            read the tenant's constraint rows" and left the actual state
+            unstated. `/api/me/enforcement` answers the ONE question this page
+            needs — is `person_preference_fit` currently on — with a plain
+            boolean and no new permission (see that route's own comment for
+            why none was needed). Two sentences now, chosen by the same fact
+            rather than always saying the same thing regardless of it.
 
-            IT IS NOT AN UNCONDITIONAL PROMISE, and that is deliberate.
-            `person_preference_fit` is off by default and each institution
-            chooses whether to enable it, so "the timetable weighs these" would
-            be false wherever it is switched off — the same class of untrue
-            reassurance the old disclaimer existed to prevent, just pointing the
-            other way. This page cannot read the tenant's constraint rows
-            (`constraint.read` is an administrator's key), so it names the
-            dependency rather than guessing at it. Resolving the real state
-            needs a decision about what a lecturer may see of their
-            institution's configuration — tracked on the project board.
+            STILL NOT AN UNCONDITIONAL PROMISE even when true: a preference
+            always loses to a hard requirement, so "weighed" is not "granted".
+            Verified end to end when this first shipped — `scripts/preference
+            -solve-check.ts` scores the same instance solved with and without
+            the rule, 7 of 40 placements satisfied against 40 of 40.
         -->
         <p
             class="note"
@@ -34,13 +29,18 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            <span>
-                <strong>The scheduler can weigh these.</strong>
+            <span v-if="preferencesWeighed">
+                <strong>Your institution weighs these.</strong>
                 Preferences are saved, visible to administrators, and read by the timetable
                 generator, which tries to place your sessions on the days, blocks and kinds of
-                room you choose. Whether it does is an institution setting, and a preference
-                always loses to a hard requirement — so treat it as a wish that is now heard,
-                not a guarantee.
+                room you choose. A preference always loses to a hard requirement — so treat it
+                as a wish that is heard, not a guarantee.
+            </span>
+            <span v-else>
+                <strong>Your institution does not currently weigh these.</strong>
+                Preferences are still saved and visible to administrators, but the timetable
+                generator is not asked to act on them yet — an administrator switches this on
+                for the whole institution. Saving now means it takes effect the moment they do.
             </span>
         </p>
 
@@ -145,11 +145,27 @@ const request = useRequestFetch();
 
 const { data, refresh } = await useAsyncData(
     'my:preferences',
-    () => request<Payload>('/api/me/availability'),
+    async () => {
+        const [payload, enforcement] = await Promise.all([
+            request<Payload>('/api/me/availability'),
+            /*
+             * NEEDS NO PERMISSION — see the route's own comment — so it cannot
+             * fail this wave for anyone who reached `/api/me/availability`
+             * (availability.manage_own) here. Not wrapped in a `.catch()`
+             * fallback the way `ManageGroupAvailability`'s tolerant fetch is:
+             * that one guards against a caller who genuinely may not hold
+             * `constraint.read`, which does not apply here at all.
+             */
+            request<{ preferencesWeighed: boolean }>('/api/me/enforcement'),
+        ]);
+
+        return { ...payload, preferencesWeighed: enforcement.preferencesWeighed };
+    },
 );
 
 const grid = computed(() => data.value?.grid ?? null);
 const roomFeatureOptions = computed(() => data.value?.roomFeatureOptions ?? []);
+const preferencesWeighed = computed(() => data.value?.preferencesWeighed ?? false);
 
 const draftDays = ref<number[]>([]);
 const draftBlocks = ref<number[]>([]);

@@ -319,17 +319,17 @@ const PAGES = [
     },
     {
         /*
-         * The marker moved with stage 7 (2026-08-27). It was "Recorded, not yet
-         * used by the scheduler" — true until the solver gained its evaluator,
-         * and the sentence this page existed to be honest with. The replacement
-         * carries the same weight and is the reason the anchor is still THIS
-         * paragraph rather than a heading: it is the one thing on the page a
-         * lecturer needs in order to know what saving does, so losing it is the
-         * failure worth catching.
+         * The marker moved AGAIN with issue #3: the page now reads the real
+         * `person_preference_fit` state from `/api/me/enforcement` instead of
+         * hedging, and renders one of two sentences depending on it.
+         * `person_preference_fit` is OFF by default and this fixture tenant
+         * never enables it, so the "not currently weighed" branch is the one
+         * that actually renders here — still the honest disclosure this
+         * paragraph exists for, just the other half of it.
          */
         path: '/my/preferences',
         roles: ['selfService'],
-        marker: 'The scheduler can weigh these',
+        marker: 'does not currently weigh these',
         why: 'the honest disclosure of what saving a preference now does',
     },
     {
