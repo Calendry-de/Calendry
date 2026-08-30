@@ -34,6 +34,36 @@ Everything below is tagged **[FIXED]** or **[OPEN]** accordingly.
   - It is a **visibility scope, not a scheduling rule.** Nothing about it reaches the solver: which Groups a solve involves is derived from what its Offerings and Sessions actually reference, never from this table. Deriving it from tenant configuration instead would let a mis-scoped Group produce an input whose Offerings name a Group the solver was never sent.
 - Conflict rule: **a scheduling conflict on a parent Group propagates to block its child Groups** (and vice versa should be checked at implementation time — needs an ancestor/descendant closure structure, see §6).
 
+### Composed Groups — amendment (2026-08-30)
+
+**`GroupSource`** [FIXED relation] — Group ↔ Group ("draws from"), for a Group
+whose `Membership` is materialised (copied), not derived, from one or more
+OTHER Groups' own direct members.
+
+Motivating case: two cohorts each run the same elective track, and the
+students who chose it are taught together — `dit22 S1 Management` and
+`dit22 S2 Management` need to be one teaching Group.
+
+**NOT A SECOND PARENT**, which is what the shape suggests. A combined Group
+is an ordinary ROOT-LEVEL Group with its own `Membership` rows — nesting it
+under both source Groups would make the hierarchy a DAG, and every closure
+walk (ancestor/descendant/conflict, §6) assumes a tree and runs in the
+solver's hot path. It also adds no scheduling capability: a Person's
+Sessions already conflict through whichever Groups they are a direct member
+of, regardless of how that membership arrived — what a live union of two
+cohorts' rosters was actually missing is a RECORD of where a combined
+Group's members came from and how to reproduce it next Term.
+
+**MATERIALISED, NOT A LIVE UNION.** Regenerating REPLACES the target's
+`Membership` rows with its sources' current direct members — never their
+descendants; a source is named by hand and means itself, not its subtree —
+and does not run automatically, so a solve today and one next week see the
+same people until someone deliberately copies again. A live union would move
+a timetable's attendee set between two solves with nothing in the event log
+saying why, dragging each source's own room-eligibility and derived capacity
+along with it. A Group with no `GroupSource` rows is ordinary: its members
+are whoever was put in it directly.
+
 ### Space
 - **`Room`** [FIXED] — has capacity, a ranking/desirability value (from prototype), and location.
 - **`Equipment` / `Feature`** [OPEN, tenant-defined] — tags on a Room (projector, PC lab, lab bench, etc.), referenced by Offerings that require them.

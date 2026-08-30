@@ -30,7 +30,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 import {
-    BREAKS, GRID, GROUPS, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
+    BREAKS, GRID, GROUPS, GROUP_SOURCES, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
 } from './lib/demoData';
 
 function arg(name: string): string | undefined {
@@ -69,6 +69,27 @@ async function main() {
             await prisma.$executeRawUnsafe('ALTER TABLE session_event ENABLE TRIGGER session_event_append_only');
             await prisma.$executeRawUnsafe('ALTER TABLE generation ENABLE TRIGGER generation_no_delete');
             console.log('  cleared existing sessions, offerings and generations');
+
+            /*
+             * GROUPS TOO, deliberately, and not with a single DELETE — the
+             * self-referential `parentGroupId` FK is `onDelete: Restrict`, so a
+             * row survives as long as anything still points at it as a parent.
+             * Deleting current leaves repeatedly clears the whole tenant's tree
+             * regardless of how many past shapes `GROUPS` has had: without
+             * this, a group key this script stops declaring (as `semester4-st`
+             * was, once) outlives the code that created it, orphaned with no
+             * Offering and no way for a later run to reach it by id.
+             */
+            for (let round = 0; round < 10; round++) {
+                const { count } = await prisma.group.deleteMany({
+                    where: { tenantId: t, children: { none: {} } },
+                });
+
+                if (count === 0) {
+                    break;
+                }
+            }
+            console.log('  cleared existing groups (including any from an earlier shape)');
         }
 
         // --- vocabulary ------------------------------------------------------
@@ -188,66 +209,82 @@ async function main() {
             })),
         });
 
+        // Systemtechnik/Management are "Built from other groups" — see GROUPS'
+        // own comment. `group_source`'s PK is `(groupId, sourceGroupId)`, so this
+        // is idempotent without a delete-then-create.
+        for (const link of GROUP_SOURCES) {
+            await prisma.groupSource.upsert({
+                where: {
+                    groupId_sourceGroupId: {
+                        groupId: groupByKey.get(link.group)!,
+                        sourceGroupId: groupByKey.get(link.source)!,
+                    },
+                },
+                create: {
+                    tenantId: t,
+                    groupId: groupByKey.get(link.group)!,
+                    sourceGroupId: groupByKey.get(link.source)!,
+                },
+                update: {},
+            });
+        }
+
         // --- offerings -------------------------------------------------------
         /*
-         * A split module becomes TWO Offerings, one per half-cohort, because an
-         * Offering carries one demand: "this many sessions, for these groups".
-         * One Offering attended by both halves would let the solver put them in
-         * the same room at the same time, which is the opposite of a split.
+         * ONE Offering per module, carrying every Group in `m.groups` directly.
+         * TAXONOMY.md § "What attaching several Groups to one Offering MEANS":
+         * two-or-more Groups on one Offering is N independent parallel Session
+         * series, one per Group — the app does the splitting. Not modelled as
+         * separate `-S1`/`-S2` Offerings, which is the union-shaped workaround
+         * that note exists to retire.
          */
         let offeringCount = 0;
         const offeringIds: string[] = [];
 
         for (const m of MODULES) {
-            const halves = m.split
-                ? [{ suffix: '-S1', group: 's1', label: ' (S1)' }, { suffix: '-S2', group: 's2', label: ' (S2)' }]
-                : [{ suffix: '', group: m.group, label: '' }];
             const termId = termByKey.get(m.term)!;
+            const id = `${t}-offering-${m.code}`;
+            /*
+             * Every series gets the FULL contact hours, not a share of them —
+             * the hours are what one student sits through, and a second Group
+             * doubles the teaching rather than dividing it. Halving here would
+             * quietly under-schedule every multi-group module.
+             */
+            const frequency = Math.max(1, Math.round(m.hours / 2));
 
-            for (const half of halves) {
-                const id = `${t}-offering-${m.code}${half.suffix}`;
-                /*
-                 * Each half gets the FULL contact hours, not a share of them —
-                 * the hours are what one student sits through, and splitting the
-                 * cohort doubles the teaching rather than dividing it. Halving
-                 * here would quietly under-schedule every split module.
-                 */
-                const frequency = Math.max(1, Math.round(m.hours / 2));
+            await prisma.offering.upsert({
+                where: { id },
+                create: {
+                    id, tenantId: t, termId, kindId: kindByKey.get(m.kind)!,
+                    code: m.code, title: m.title,
+                    frequency,
+                    /*
+                     * ONE block, which IS 90 minutes here — the slot a
+                     * module fills in the source timetable. It was 2 while
+                     * a block was 45.
+                     */
+                    durationBlocks: 1,
+                    requiredRoleId: lecturerRole?.id ?? null,
+                },
+                update: { frequency, durationBlocks: 1 },
+            });
 
-                await prisma.offering.upsert({
-                    where: { id },
-                    create: {
-                        id, tenantId: t, termId, kindId: kindByKey.get(m.kind)!,
-                        code: `${m.code}${half.suffix}`, title: `${m.title}${half.label}`,
-                        frequency,
-                        /*
-                         * ONE block, which IS 90 minutes here — the slot a
-                         * module fills in the source timetable. It was 2 while
-                         * a block was 45.
-                         */
-                        durationBlocks: 1,
-                        requiredRoleId: lecturerRole?.id ?? null,
-                    },
-                    update: { frequency, durationBlocks: 1 },
-                });
+            await prisma.offeringGroup.deleteMany({ where: { offeringId: id } });
+            await prisma.offeringGroup.createMany({
+                data: m.groups.map((g) => ({ tenantId: t, offeringId: id, groupId: groupByKey.get(g)! })),
+            });
 
-                await prisma.offeringGroup.deleteMany({ where: { offeringId: id } });
-                await prisma.offeringGroup.create({
-                    data: { tenantId: t, offeringId: id, groupId: groupByKey.get(half.group)! },
-                });
+            await prisma.offeringLecturer.deleteMany({ where: { offeringId: id } });
+            await prisma.offeringLecturer.create({
+                data: {
+                    tenantId: t, offeringId: id,
+                    personId: personByKey.get(m.lecturer)!,
+                    roleId: lecturerRole?.id ?? null,
+                },
+            });
 
-                await prisma.offeringLecturer.deleteMany({ where: { offeringId: id } });
-                await prisma.offeringLecturer.create({
-                    data: {
-                        tenantId: t, offeringId: id,
-                        personId: personByKey.get(m.lecturer)!,
-                        roleId: lecturerRole?.id ?? null,
-                    },
-                });
-
-                offeringIds.push(id);
-                offeringCount++;
-            }
+            offeringIds.push(id);
+            offeringCount++;
         }
 
         // --- a baseline generation -------------------------------------------
@@ -283,71 +320,95 @@ async function main() {
          */
         let termCursor: string | null = null;
         let indexInTerm = 0;
+        let sessionIndex = 0;
 
-        for (const [index, offeringId] of offeringIds.entries()) {
+        for (const offeringId of offeringIds) {
             const offering = await prisma.offering.findUniqueOrThrow({
                 where: { id: offeringId },
                 include: { groups: true, lecturers: true },
             });
-            const id = `${t}-session-${index}`;
 
             if (offering.termId !== termCursor) {
                 termCursor = offering.termId;
                 indexInTerm = 0;
             }
 
-            await prisma.session.upsert({
-                where: { id },
-                create: {
-                    id, tenantId: t, offeringId, termId: offering.termId,
-                    kindId: offering.kindId, timeGridId: grid.id,
-                    termWeek: 1,
-                    dayOfWeek: GRID.activeDays[indexInTerm % GRID.activeDays.length]!,
-                    blockIndex: legalStarts[indexInTerm % legalStarts.length]!,
-                    durationBlocks: 1,
-                    generationId: generation.id,
-                    isLocked: index === 0,
-                },
-                update: {},
-            });
+            /*
+             * ONE SESSION PER ATTACHED GROUP, mirroring what the solver does
+             * with a multi-group Offering (TAXONOMY.md § "What attaching
+             * several Groups to one Offering MEANS") — never one shared
+             * Session for the union, which would put both halves in the same
+             * room at the same time.
+             */
+            for (const groupLink of offering.groups) {
+                const id = `${t}-session-${sessionIndex}`;
 
-            indexInTerm++;
-
-            const room = rooms[index % (rooms.length - 1)]!;
-
-            await prisma.sessionRoom.upsert({
-                where: { sessionId_roomId: { sessionId: id, roomId: room.id } },
-                create: { tenantId: t, sessionId: id, roomId: room.id },
-                update: {},
-            });
-
-            for (const link of offering.groups) {
-                await prisma.sessionGroup.upsert({
-                    where: { sessionId_groupId: { sessionId: id, groupId: link.groupId } },
-                    create: { tenantId: t, sessionId: id, groupId: link.groupId },
-                    update: {},
-                });
-            }
-
-            for (const link of offering.lecturers) {
-                await prisma.sessionPerson.upsert({
-                    where: { sessionId_personId: { sessionId: id, personId: link.personId } },
+                await prisma.session.upsert({
+                    where: { id },
                     create: {
-                        tenantId: t, sessionId: id, personId: link.personId,
-                        roleId: lecturerRole?.id ?? null,
+                        id, tenantId: t, offeringId, termId: offering.termId,
+                        kindId: offering.kindId, timeGridId: grid.id,
+                        termWeek: 1,
+                        dayOfWeek: GRID.activeDays[indexInTerm % GRID.activeDays.length]!,
+                        blockIndex: legalStarts[indexInTerm % legalStarts.length]!,
+                        durationBlocks: 1,
+                        generationId: generation.id,
+                        isLocked: sessionIndex === 0,
                     },
                     update: {},
                 });
-            }
 
-            placed++;
+                /*
+                 * THE LAP, not the raw index. Day and block both cycle on
+                 * `indexInTerm % 6` above, so every 6th series repeats the same
+                 * (day, block) pair — harmless with only a handful of series per
+                 * term, but Semester 4-6 now carry up to 20. Cycling the room on
+                 * that same period-6 index would make every repeat land in the
+                 * same ROOM too, i.e. a real double-booking rather than a
+                 * cosmetic one. Indexing by lap instead — how many full sweeps
+                 * of the 6 slots this series is into — guarantees the 6 series
+                 * sharing one lap get 6 distinct (day, block) pairs, and only
+                 * the NEXT lap's repeat of a pair gets a different room.
+                 */
+                const lap = Math.floor(indexInTerm / GRID.blocksPerDay);
+
+                indexInTerm++;
+
+                const room = rooms[lap % (rooms.length - 1)]!;
+
+                await prisma.sessionRoom.upsert({
+                    where: { sessionId_roomId: { sessionId: id, roomId: room.id } },
+                    create: { tenantId: t, sessionId: id, roomId: room.id },
+                    update: {},
+                });
+
+                await prisma.sessionGroup.upsert({
+                    where: { sessionId_groupId: { sessionId: id, groupId: groupLink.groupId } },
+                    create: { tenantId: t, sessionId: id, groupId: groupLink.groupId },
+                    update: {},
+                });
+
+                for (const link of offering.lecturers) {
+                    await prisma.sessionPerson.upsert({
+                        where: { sessionId_personId: { sessionId: id, personId: link.personId } },
+                        create: {
+                            tenantId: t, sessionId: id, personId: link.personId,
+                            roleId: lecturerRole?.id ?? null,
+                        },
+                        update: {},
+                    });
+                }
+
+                placed++;
+                sessionIndex++;
+            }
         }
 
         console.log(`  ${KINDS.length} session kinds (${KINDS.filter((k) => k.type === 'EXAM').length} exam-typed)`);
         console.log(`  grid '${grid.name}': ${GRID.blocksPerDay} x ${GRID.blockLengthMinutes}min, ${BREAKS.length} breaks, ${GRID.activeDays.length} days`);
-        console.log(`  ${TERMS.length} terms, ${GROUPS.length} groups, ${GROUP_TERMS.length} group-term scopes`);
+        console.log(`  ${TERMS.length} terms, ${GROUPS.length} groups, ${GROUP_TERMS.length} group-term scopes, ${GROUP_SOURCES.length} group sources`);
         console.log(`  ${LECTURERS.length} lecturers, ${rooms.length} rooms`);
-        console.log(`  ${offeringCount} offerings across all ${TERMS.length} terms, each with a group and a lecturer`);
+        console.log(`  ${offeringCount} offerings across all ${TERMS.length} terms, each with a lecturer and one or two groups`);
         console.log(`  ${placed} baseline sessions in week 1 — the rest is the solver's job`);
         console.log('Done.');
     } catch (error) {

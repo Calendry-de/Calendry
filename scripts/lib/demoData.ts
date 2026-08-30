@@ -128,23 +128,32 @@ export const LECTURERS = [
  * for one block at a time, which is what the source timetable shows: a module
  * fills one row, and a row is 90 minutes.
  *
- * `term` and `group` say WHERE an Offering attaches: which Term it runs in,
- * and which node of the `GROUPS` tree its cohort is. `split: true` overrides
- * `group` — the cohort is taught in two halves instead, `s1`/`s2`. The source
- * timetable shows exactly this for `EAC S1-1` / `EAC S1-2`, and it is the
- * reason the `s1`/`s2` groups exist at all: a split module produces one
- * Offering per half, each attended by one of them, and the two must never be
- * placed together. No other semester's source document (there is no
- * Stundenplan for them, only the Studienbuch) shows this, so `split` is only
- * ever used in `s1`.
+ * `term` says which Term the Offering runs in. `groups` says who attends —
+ * and CARRIES ONE OR TWO ENTRIES ON PURPOSE. TAXONOMY.md § "What attaching
+ * several Groups to one Offering MEANS": two-or-more is N INDEPENDENT PARALLEL
+ * Session series, one per Group, each getting the full `frequency` — not one
+ * shared Session for the union. `['s1', 's2']` is therefore the whole
+ * split mechanism: no `-S1`/`-S2` suffix Offering, no second `code`, the app
+ * does the splitting. This is a correction from an earlier version of this
+ * file, which modelled the two Semester-1 lab modules as two separate
+ * Offerings by hand — exactly the union-shaped workaround the taxonomy note
+ * exists to retire.
+ *
+ * `S1`/`S2` ARE A STANDING DIVISION, not a Semester-1-only artefact — the
+ * cohort was taught as two halves for nearly every module, all six semesters
+ * (first-hand account, not the Studienbuch — it names no groups at all). So
+ * `groups: ['s1', 's2']` is the DEFAULT here, not the exception.
  *
  * SEMESTERS 4–6 FORK: from module 19 on, the Studienbuch prints two parallel
  * variants — "Vertiefung Systemtechnik" and "Vertiefung Management" — for a
- * few modules per semester, while the rest stay common to both. A real
- * student takes one branch, never both; the demo models both anyway, as the
- * `-st` / `-mgmt` subgroups under each of `semester4/5/6` in `GROUPS`, which is
- * why those terms carry noticeably more Offerings than a real cohort's
- * schedule would.
+ * few modules per semester, while the rest stay the S1/S2 default. Choosing a
+ * Vertiefung RECOMBINED the two halves rather than further splitting them —
+ * "S1 and S2 together" in one room per Vertiefung — which is exactly
+ * `systemtechnik` / `management` in `GROUPS`: two ordinary top-level Groups
+ * built from `s1` + `s2` via `GROUP_SOURCES` (the "Built from other groups"
+ * feature), not children of any one semester. A fork module therefore carries
+ * `groups: ['systemtechnik']` or `['management']` — ONE group, because the
+ * recombination already happened; it does not split again.
  *
  * LECTURERS ARE ASSIGNED, NOT SOURCED: only the Semester-1 Stundenplan names
  * who actually taught it. Semesters 2–6 reuse the same seven people, matched
@@ -169,85 +178,85 @@ export const LECTURERS = [
  * would not.
  */
 export const MODULES = [
-    // --- Semester 1 (dit22 Semester 1 — cohort of 44, split s1/s2 for two modules) ---
-    { code: 'MAT-101', title: 'Analysis I', hours: 32, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's1', group: 'semester1' },
-    { code: 'MAT-102', title: 'Lineare Algebra I', hours: 32, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's1', group: 'semester1' },
-    { code: 'ENG-101', title: 'Requirements Engineering und Modellierung', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's1', group: 'semester1' },
-    { code: 'INF-101', title: 'Einführung in die Informatik und Digitaltechnik', hours: 28, kind: 'lecture', lecturer: 'werner', exam: 'Klausur 60 Min.', term: 's1', group: 'semester1' },
-    { code: 'INF-102', title: 'Einführung in die objektorientierte Programmierung', hours: 36, kind: 'lab', lecturer: 'arnold', split: true, exam: 'Leistungsnachweis', term: 's1', group: 'semester1' },
-    { code: 'OEK-101', title: 'Allgemeine Betriebswirtschaftslehre', hours: 28, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's1', group: 'semester1' },
-    { code: 'OEK-102', title: 'Grundlagen der Wertschöpfung', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's1', group: 'semester1' },
-    { code: 'TEC-101', title: 'Computernetze und Grundlagen des Internet', hours: 28, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's1', group: 'semester1' },
-    { code: 'MET-101', title: 'Wissenschaftliches Arbeiten', hours: 8, kind: 'seminar', lecturer: 'werner', split: true, exam: 'Leistungsnachweis', term: 's1', group: 'semester1' },
-    { code: 'PRG-101', title: 'Algorithmen und Datenstrukturen', hours: 32, kind: 'lecture', lecturer: 'neubauer', exam: 'Klausur 60 Min.', term: 's1', group: 'semester1' },
+    // --- Semester 1 ---
+    { code: 'MAT-101', title: 'Analysis I', hours: 32, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'MAT-102', title: 'Lineare Algebra I', hours: 32, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'ENG-101', title: 'Requirements Engineering und Modellierung', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'INF-101', title: 'Einführung in die Informatik und Digitaltechnik', hours: 28, kind: 'lecture', lecturer: 'werner', exam: 'Klausur 60 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'INF-102', title: 'Einführung in die objektorientierte Programmierung', hours: 36, kind: 'lab', lecturer: 'arnold', exam: 'Leistungsnachweis', term: 's1', groups: ['s1', 's2'] },
+    { code: 'OEK-101', title: 'Allgemeine Betriebswirtschaftslehre', hours: 28, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'OEK-102', title: 'Grundlagen der Wertschöpfung', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's1', groups: ['s1', 's2'] },
+    { code: 'TEC-101', title: 'Computernetze und Grundlagen des Internet', hours: 28, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's1', groups: ['s1', 's2'] },
+    { code: 'MET-101', title: 'Wissenschaftliches Arbeiten', hours: 8, kind: 'seminar', lecturer: 'werner', exam: 'Leistungsnachweis', term: 's1', groups: ['s1', 's2'] },
+    { code: 'PRG-101', title: 'Algorithmen und Datenstrukturen', hours: 32, kind: 'lecture', lecturer: 'neubauer', exam: 'Klausur 60 Min.', term: 's1', groups: ['s1', 's2'] },
 
-    // --- Semester 2 (dit22 Semester 2 — flat, no split evidenced for this cohort) ---
-    { code: 'ENG-102', title: 'Software Engineering', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's2', group: 'semester2' },
-    { code: 'TEC-102', title: 'Betriebssysteme', hours: 24, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 60 Min.', term: 's2', group: 'semester2' },
-    { code: 'MET-102', title: 'Hausarbeit', hours: 2, kind: 'seminar', lecturer: 'werner', exam: 'Hausarbeit mit Vortrag', term: 's2', group: 'semester2' },
-    { code: 'MET-103', title: 'Einstieg in Projektmanagement', hours: 28, kind: 'seminar', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's2', group: 'semester2' },
-    { code: 'PRG-102', title: 'Anwendungen C++', hours: 40, kind: 'lab', lecturer: 'arnold', exam: 'Leistungsnachweis', term: 's2', group: 'semester2' },
-    { code: 'MAT-103', title: 'Analysis II', hours: 28, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's2', group: 'semester2' },
-    { code: 'MAT-104', title: 'Lineare Algebra II', hours: 28, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's2', group: 'semester2' },
-    { code: 'INF-103', title: 'Komplexität', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's2', group: 'semester2' },
-    { code: 'DAT-101', title: 'Datenorganisation und Datenbanken', hours: 24, kind: 'lecture', lecturer: 'werner', exam: 'Klausur 90 Min.', term: 's2', group: 'semester2' },
-    { code: 'DAT-102', title: 'Datenmanagement mit SQL', hours: 24, kind: 'lab', lecturer: 'werner', exam: 'Klausur 90 Min.', term: 's2', group: 'semester2' },
+    // --- Semester 2 ---
+    { code: 'ENG-102', title: 'Software Engineering', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'TEC-102', title: 'Betriebssysteme', hours: 24, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 60 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'MET-102', title: 'Hausarbeit', hours: 2, kind: 'seminar', lecturer: 'werner', exam: 'Hausarbeit mit Vortrag', term: 's2', groups: ['s1', 's2'] },
+    { code: 'MET-103', title: 'Einstieg in Projektmanagement', hours: 28, kind: 'seminar', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'PRG-102', title: 'Anwendungen C++', hours: 40, kind: 'lab', lecturer: 'arnold', exam: 'Leistungsnachweis', term: 's2', groups: ['s1', 's2'] },
+    { code: 'MAT-103', title: 'Analysis II', hours: 28, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'MAT-104', title: 'Lineare Algebra II', hours: 28, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'INF-103', title: 'Komplexität', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'DAT-101', title: 'Datenorganisation und Datenbanken', hours: 24, kind: 'lecture', lecturer: 'werner', exam: 'Klausur 90 Min.', term: 's2', groups: ['s1', 's2'] },
+    { code: 'DAT-102', title: 'Datenmanagement mit SQL', hours: 24, kind: 'lab', lecturer: 'werner', exam: 'Klausur 90 Min.', term: 's2', groups: ['s1', 's2'] },
 
-    // --- Semester 3 (dit22 Semester 3 — flat) ---
-    { code: 'INF-104', title: 'Theoretische Informatik', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's3', group: 'semester3' },
-    { code: 'PMG-101', title: 'Management von Projekten', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Bewertete Gruppenarbeit', term: 's3', group: 'semester3' },
-    { code: 'STA-101', title: 'Statistik I', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's3', group: 'semester3' },
-    { code: 'MAT-105', title: 'Algebra und Zahlentheorie I', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's3', group: 'semester3' },
-    { code: 'OEK-103', title: 'Kosten- und Leistungsrechnung', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's3', group: 'semester3' },
-    { code: 'PRG-103', title: 'Erweiterte Anwendungen C++', hours: 32, kind: 'lab', lecturer: 'arnold', exam: 'Leistungsnachweis', term: 's3', group: 'semester3' },
-    { code: 'PRG-104', title: 'Softwaretechnik', hours: 24, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 60 Min.', term: 's3', group: 'semester3' },
-    { code: 'SEC-101', title: 'Grundlagen IT-Sicherheit', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 180 Min.', term: 's3', group: 'semester3' },
-    { code: 'SEC-102', title: 'IT-Risk', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 180 Min.', term: 's3', group: 'semester3' },
-    { code: 'SEC-103', title: 'Einführung in die Kryptologie', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's3', group: 'semester3' },
-    { code: 'KI-101', title: 'Einführung Artificial Intelligence', hours: 16, kind: 'lecture', lecturer: 'werner', exam: 'Vortrag / (schriftliches) Referat', term: 's3', group: 'semester3' },
-    { code: 'KI-102', title: 'Big Data Analytics', hours: 24, kind: 'lecture', lecturer: 'werner', exam: 'Vortrag / (schriftliches) Referat', term: 's3', group: 'semester3' },
+    // --- Semester 3 ---
+    { code: 'INF-104', title: 'Theoretische Informatik', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'PMG-101', title: 'Management von Projekten', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Bewertete Gruppenarbeit', term: 's3', groups: ['s1', 's2'] },
+    { code: 'STA-101', title: 'Statistik I', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 60 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'MAT-105', title: 'Algebra und Zahlentheorie I', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'OEK-103', title: 'Kosten- und Leistungsrechnung', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'PRG-103', title: 'Erweiterte Anwendungen C++', hours: 32, kind: 'lab', lecturer: 'arnold', exam: 'Leistungsnachweis', term: 's3', groups: ['s1', 's2'] },
+    { code: 'PRG-104', title: 'Softwaretechnik', hours: 24, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 60 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'SEC-101', title: 'Grundlagen IT-Sicherheit', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 180 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'SEC-102', title: 'IT-Risk', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 180 Min.', term: 's3', groups: ['s1', 's2'] },
+    { code: 'SEC-103', title: 'Einführung in die Kryptologie', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's3', groups: ['s1', 's2'] },
+    { code: 'KI-101', title: 'Einführung Artificial Intelligence', hours: 16, kind: 'lecture', lecturer: 'werner', exam: 'Vortrag / (schriftliches) Referat', term: 's3', groups: ['s1', 's2'] },
+    { code: 'KI-102', title: 'Big Data Analytics', hours: 24, kind: 'lecture', lecturer: 'werner', exam: 'Vortrag / (schriftliches) Referat', term: 's3', groups: ['s1', 's2'] },
 
-    // --- Semester 4 (dit22 Semester 4 — common modules flat, two fork into -st/-mgmt) ---
-    { code: 'STA-102', title: 'Statistik II', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'HA', term: 's4', group: 'semester4' },
-    { code: 'MAT-106', title: 'Algebra und Zahlentheorie II', hours: 20, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's4', group: 'semester4' },
-    { code: 'OEK-104', title: 'Personalführung', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's4', group: 'semester4' },
-    { code: 'SEC-104', title: 'Grundlagen Cloud Computing', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's4', group: 'semester4' },
-    { code: 'PMG-102', title: 'Projektrealisierung mit Kooperations-Partnern', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Projektdokumentation', term: 's4', group: 'semester4' },
-    { code: 'SEC-105', title: 'Grundlagen IT-Angriffe und deren Abwehr', hours: 20, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 90 Min.', term: 's4', group: 'semester4' },
-    { code: 'SEC-106', title: 'Sichere Software', hours: 28, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 90 Min.', term: 's4', group: 'semester4' },
-    { code: 'MGT-101', title: 'IT-Governance and Compliance', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 60 Min.', term: 's4', group: 'semester4' },
+    // --- Semester 4 (common modules stay S1/S2; two fork into the Vertiefung groups) ---
+    { code: 'STA-102', title: 'Statistik II', hours: 24, kind: 'lecture', lecturer: 'neumann', exam: 'HA', term: 's4', groups: ['s1', 's2'] },
+    { code: 'MAT-106', title: 'Algebra und Zahlentheorie II', hours: 20, kind: 'lecture', lecturer: 'neumann', exam: 'Klausur 120 Min.', term: 's4', groups: ['s1', 's2'] },
+    { code: 'OEK-104', title: 'Personalführung', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's4', groups: ['s1', 's2'] },
+    { code: 'SEC-104', title: 'Grundlagen Cloud Computing', hours: 16, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's4', groups: ['s1', 's2'] },
+    { code: 'PMG-102', title: 'Projektrealisierung mit Kooperations-Partnern', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Projektdokumentation', term: 's4', groups: ['s1', 's2'] },
+    { code: 'SEC-105', title: 'Grundlagen IT-Angriffe und deren Abwehr', hours: 20, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 90 Min.', term: 's4', groups: ['s1', 's2'] },
+    { code: 'SEC-106', title: 'Sichere Software', hours: 28, kind: 'lecture', lecturer: 'arnold', exam: 'Klausur 90 Min.', term: 's4', groups: ['s1', 's2'] },
+    { code: 'MGT-101', title: 'IT-Governance and Compliance', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 60 Min.', term: 's4', groups: ['s1', 's2'] },
     // Vertiefung Systemtechnik: "Cloud Sicherheit"
-    { code: 'SYT-101', title: 'Anwendung Cloud Computing', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 120 Min.', term: 's4', group: 'semester4-st' },
-    { code: 'SYT-102', title: 'Kryptographie', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 120 Min.', term: 's4', group: 'semester4-st' },
+    { code: 'SYT-101', title: 'Anwendung Cloud Computing', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 120 Min.', term: 's4', groups: ['systemtechnik'] },
+    { code: 'SYT-102', title: 'Kryptographie', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 120 Min.', term: 's4', groups: ['systemtechnik'] },
     // Vertiefung Management: "IT-Prozess Management"
-    { code: 'MGT-102', title: 'IT-Security-Management', hours: 24, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's4', group: 'semester4-mgmt' },
-    { code: 'MGT-103', title: 'ITIL', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Leistungsnachweis', term: 's4', group: 'semester4-mgmt' },
+    { code: 'MGT-102', title: 'IT-Security-Management', hours: 24, kind: 'lecture', lecturer: 'gareis', exam: 'Klausur 60 Min.', term: 's4', groups: ['management'] },
+    { code: 'MGT-103', title: 'ITIL', hours: 20, kind: 'lecture', lecturer: 'gareis', exam: 'Leistungsnachweis', term: 's4', groups: ['management'] },
 
-    // --- Semester 5 (dit22 Semester 5 — common modules flat, two fork into -st/-mgmt) ---
-    { code: 'FOR-101', title: 'Forensik', hours: 32, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', group: 'semester5' },
-    { code: 'FOR-102', title: 'IT-Recht und IT-Sicherheitsrecht', hours: 16, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', group: 'semester5' },
-    { code: 'MGT-104', title: 'Hausarbeit zu Management fokussierten Themen', hours: 2, kind: 'seminar', lecturer: 'witte', exam: 'Hausarbeit mit Vortrag', term: 's5', group: 'semester5' },
-    { code: 'PMG-103', title: 'Projektrealisierung und Ergebnispräsentation', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Projektdoku. und -präsentation', term: 's5', group: 'semester5' },
-    { code: 'WAR-101', title: 'Praktische IT-Angriffe und deren Abwehr', hours: 36, kind: 'project', lecturer: 'arnold', exam: 'Bewertete Gruppenarbeit', term: 's5', group: 'semester5' },
-    { code: 'WPF-101', title: 'Wahlpflichtfach I', hours: 60, kind: 'seminar', lecturer: 'werner', exam: 'vers. Prüfungsleistungen', term: 's5', group: 'semester5' },
+    // --- Semester 5 (common modules stay S1/S2; two fork into the Vertiefung groups) ---
+    { code: 'FOR-101', title: 'Forensik', hours: 32, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', groups: ['s1', 's2'] },
+    { code: 'FOR-102', title: 'IT-Recht und IT-Sicherheitsrecht', hours: 16, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', groups: ['s1', 's2'] },
+    { code: 'MGT-104', title: 'Hausarbeit zu Management fokussierten Themen', hours: 2, kind: 'seminar', lecturer: 'witte', exam: 'Hausarbeit mit Vortrag', term: 's5', groups: ['s1', 's2'] },
+    { code: 'PMG-103', title: 'Projektrealisierung und Ergebnispräsentation', hours: 60, kind: 'project', lecturer: 'gareis', exam: 'Projektdoku. und -präsentation', term: 's5', groups: ['s1', 's2'] },
+    { code: 'WAR-101', title: 'Praktische IT-Angriffe und deren Abwehr', hours: 36, kind: 'project', lecturer: 'arnold', exam: 'Bewertete Gruppenarbeit', term: 's5', groups: ['s1', 's2'] },
+    { code: 'WPF-101', title: 'Wahlpflichtfach I', hours: 60, kind: 'seminar', lecturer: 'werner', exam: 'vers. Prüfungsleistungen', term: 's5', groups: ['s1', 's2'] },
     // Vertiefung Systemtechnik: "Kryptoanalyse"
-    { code: 'SYT-103', title: 'Kryptoanalyse I', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 60 Min.', term: 's5', group: 'semester5-st' },
-    { code: 'SYT-104', title: 'Kryptoanalyse II', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Bewertete Gruppenarbeit', term: 's5', group: 'semester5-st' },
+    { code: 'SYT-103', title: 'Kryptoanalyse I', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Klausur 60 Min.', term: 's5', groups: ['systemtechnik'] },
+    { code: 'SYT-104', title: 'Kryptoanalyse II', hours: 20, kind: 'lecture', lecturer: 'lobachev', exam: 'Bewertete Gruppenarbeit', term: 's5', groups: ['systemtechnik'] },
     // Vertiefung Management: "Security Engineering"
-    { code: 'MGT-105', title: 'Social Engineering', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', group: 'semester5-mgmt' },
-    { code: 'MGT-106', title: 'Grundlagen Mobiler Software', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', group: 'semester5-mgmt' },
+    { code: 'MGT-105', title: 'Social Engineering', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', groups: ['management'] },
+    { code: 'MGT-106', title: 'Grundlagen Mobiler Software', hours: 20, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's5', groups: ['management'] },
 
-    // --- Semester 6 (dit22 Semester 6 — common modules flat, two fork into -st/-mgmt) ---
-    { code: 'WAR-102', title: 'Erweiterte IT-Angriffe und proaktive Abwehr', hours: 36, kind: 'project', lecturer: 'arnold', exam: 'Bewertete Gruppenarbeit mit Präs.', term: 's6', group: 'semester6' },
-    { code: 'WPF-102', title: 'Wahlpflichtfach II', hours: 60, kind: 'seminar', lecturer: 'werner', exam: 'vers. Prüfungsleistungen', term: 's6', group: 'semester6' },
-    { code: 'THS-101', title: 'Bachelor-Thesis', hours: 0, kind: 'project', lecturer: 'gareis', exam: 'Bachelor-Thesis', term: 's6', group: 'semester6' },
-    { code: 'THS-102', title: 'Bachelor-Kolloquium', hours: 2, kind: 'presentation', lecturer: 'gareis', exam: 'Kolloquium', term: 's6', group: 'semester6' },
+    // --- Semester 6 (common modules stay S1/S2; two fork into the Vertiefung groups) ---
+    { code: 'WAR-102', title: 'Erweiterte IT-Angriffe und proaktive Abwehr', hours: 36, kind: 'project', lecturer: 'arnold', exam: 'Bewertete Gruppenarbeit mit Präs.', term: 's6', groups: ['s1', 's2'] },
+    { code: 'WPF-102', title: 'Wahlpflichtfach II', hours: 60, kind: 'seminar', lecturer: 'werner', exam: 'vers. Prüfungsleistungen', term: 's6', groups: ['s1', 's2'] },
+    { code: 'THS-101', title: 'Bachelor-Thesis', hours: 0, kind: 'project', lecturer: 'gareis', exam: 'Bachelor-Thesis', term: 's6', groups: ['s1', 's2'] },
+    { code: 'THS-102', title: 'Bachelor-Kolloquium', hours: 2, kind: 'presentation', lecturer: 'gareis', exam: 'Kolloquium', term: 's6', groups: ['s1', 's2'] },
     // Vertiefung Systemtechnik: "Mobile Systems"
-    { code: 'SYT-105', title: 'Field Communications', hours: 24, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's6', group: 'semester6-st' },
-    { code: 'SYT-106', title: 'Entwicklung der Mobilen Software', hours: 20, kind: 'lab', lecturer: 'arnold', exam: 'Klausur 60 Min.', term: 's6', group: 'semester6-st' },
+    { code: 'SYT-105', title: 'Field Communications', hours: 24, kind: 'lecture', lecturer: 'lobachev', exam: 'Leistungsnachweis', term: 's6', groups: ['systemtechnik'] },
+    { code: 'SYT-106', title: 'Entwicklung der Mobilen Software', hours: 20, kind: 'lab', lecturer: 'arnold', exam: 'Klausur 60 Min.', term: 's6', groups: ['systemtechnik'] },
     // Vertiefung Management: "Security Management"
-    { code: 'MGT-107', title: 'Computational Trust', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's6', group: 'semester6-mgmt' },
-    { code: 'MGT-108', title: 'Responsibility', hours: 16, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's6', group: 'semester6-mgmt' },
+    { code: 'MGT-107', title: 'Computational Trust', hours: 24, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's6', groups: ['management'] },
+    { code: 'MGT-108', title: 'Responsibility', hours: 16, kind: 'lecture', lecturer: 'witte', exam: 'Klausur 120 Min.', term: 's6', groups: ['management'] },
 ];
 
 /**
@@ -289,76 +298,70 @@ export const TERMS = [
 ];
 
 /**
- * The group tree, as requested, and it is a REAL nesting rather than a flat
- * pair — which is what makes the conflict closure observable: a Session for
- * `dit22 Semester 1` conflicts with one for `… S1`, in both directions,
- * without either naming the other.
+ * The group tree — flatter than an earlier version of this file had it, and
+ * deliberately so. `s1`/`s2` are a STANDING division of the cohort (see
+ * `MODULES`), not a Semester-1 artefact, so they sit directly under `cohort`
+ * rather than nested under one semester — nesting them under `semester1`
+ * would have made a Semester-4 Session in `s1` fail to conflict-closure
+ * against a Semester-4 Session in `cohort`'s other children, since closure
+ * walks ancestors/descendants, not siblings. "Which semester" is the
+ * Offering's `term`, not a Group — this tree has no `semesterN` nodes at all.
  *
- * SEMESTERS 4–6 NEST ONE LEVEL DEEPER, for the same reason `semester1` nests
- * `s1`/`s2`: the Studienbuch forks those three semesters into two parallel
- * Vertiefungen (Systemtechnik / Management), so a Session in
- * `… Semester 4 (Systemtechnik)` must conflict with one in
- * `… Semester 4` (a student in that half is still IN that semester) without
- * either naming the other — the closure, not a cross-reference, is what makes
- * that hold.
+ *   IT-Security          the programme
+ *     dit22               the cohort (44)
+ *       S1                one standing half (22) — taught separately
+ *       S2                the other standing half (22)
+ *       Systemtechnik      (22) — built from S1 + S2, see GROUP_SOURCES
+ *       Management         (22) — built from S1 + S2, see GROUP_SOURCES
  *
- *   IT-Security                             the programme
- *     dit22                                 the cohort
- *       dit22 Semester 1                    everyone in that semester
- *         dit22 Semester 1 S1               first half (one split module)
- *         dit22 Semester 1 S2               second half
- *       dit22 Semester 2                    flat — no split evidenced
- *       dit22 Semester 3                    flat
- *       dit22 Semester 4                    common modules
- *         dit22 Semester 4 (Systemtechnik)  "Cloud Sicherheit"
- *         dit22 Semester 4 (Management)     "IT-Prozess Management"
- *       dit22 Semester 5                    common modules
- *         dit22 Semester 5 (Systemtechnik)  "Kryptoanalyse"
- *         dit22 Semester 5 (Management)     "Security Engineering"
- *       dit22 Semester 6                    common modules
- *         dit22 Semester 6 (Systemtechnik)  "Mobile Systems"
- *         dit22 Semester 6 (Management)     "Security Management"
+ * `Systemtechnik`/`Management` are `parent: null` (root-level, like `cohort`
+ * itself) for the reason TAXONOMY.md gives for "Built from other groups":
+ * a combining group is an ordinary Group with its own membership, not a
+ * second parent — nesting it under both `s1` and `s2` would make the tree a
+ * DAG, which the closure walk cannot be.
  */
 export const GROUPS = [
     { key: 'programme', name: 'IT-Security', parent: null, expectedSize: 132 },
     { key: 'cohort', name: 'dit22', parent: 'programme', expectedSize: 44 },
-    { key: 'semester1', name: 'dit22 Semester 1', parent: 'cohort', expectedSize: 44 },
-    { key: 's1', name: 'dit22 Semester 1 S1', parent: 'semester1', expectedSize: 22 },
-    { key: 's2', name: 'dit22 Semester 1 S2', parent: 'semester1', expectedSize: 22 },
-    { key: 'semester2', name: 'dit22 Semester 2', parent: 'cohort', expectedSize: 44 },
-    { key: 'semester3', name: 'dit22 Semester 3', parent: 'cohort', expectedSize: 44 },
-    { key: 'semester4', name: 'dit22 Semester 4', parent: 'cohort', expectedSize: 44 },
-    { key: 'semester4-st', name: 'dit22 Semester 4 (Systemtechnik)', parent: 'semester4', expectedSize: 22 },
-    { key: 'semester4-mgmt', name: 'dit22 Semester 4 (Management)', parent: 'semester4', expectedSize: 22 },
-    { key: 'semester5', name: 'dit22 Semester 5', parent: 'cohort', expectedSize: 44 },
-    { key: 'semester5-st', name: 'dit22 Semester 5 (Systemtechnik)', parent: 'semester5', expectedSize: 22 },
-    { key: 'semester5-mgmt', name: 'dit22 Semester 5 (Management)', parent: 'semester5', expectedSize: 22 },
-    { key: 'semester6', name: 'dit22 Semester 6', parent: 'cohort', expectedSize: 44 },
-    { key: 'semester6-st', name: 'dit22 Semester 6 (Systemtechnik)', parent: 'semester6', expectedSize: 22 },
-    { key: 'semester6-mgmt', name: 'dit22 Semester 6 (Management)', parent: 'semester6', expectedSize: 22 },
+    { key: 's1', name: 'dit22 S1', parent: 'cohort', expectedSize: 22 },
+    { key: 's2', name: 'dit22 S2', parent: 'cohort', expectedSize: 22 },
+    { key: 'systemtechnik', name: 'dit22 Systemtechnik', parent: null, expectedSize: 22 },
+    { key: 'management', name: 'dit22 Management', parent: null, expectedSize: 22 },
+];
+
+/**
+ * `systemtechnik` and `management` are "Built from other groups"
+ * (`ManageGroupSources.vue`) rather than plain Groups: each draws its
+ * membership from BOTH standing halves, because choosing a Vertiefung
+ * recombined S1 and S2 rather than splitting either further. Seeded as
+ * `group_source` rows directly — there are no Person-level memberships in
+ * this demo to actually copy (no student Persons are seeded, only the seven
+ * lecturers), so "regenerate members" would copy zero rows either way; what
+ * matters here is the SOURCES relationship existing to see and to build on.
+ */
+export const GROUP_SOURCES: { group: string; source: string }[] = [
+    { group: 'systemtechnik', source: 's1' },
+    { group: 'systemtechnik', source: 's2' },
+    { group: 'management', source: 's1' },
+    { group: 'management', source: 's2' },
 ];
 
 /**
  * Which groups are scoped to which Terms.
  *
- * ONLY THE LEAF GROUPS ANY OFFERING ACTUALLY ATTACHES TO ARE SCOPED, and the
- * rest — including every `semesterN` parent — are deliberately left unlinked.
- * `group_term` is fail-open — a Group with no row is available in EVERY Term —
- * so linking every group would say nothing, while linking exactly the ones
- * `MODULES` references says something checkable: each exists for its own
- * semester and nowhere else. It is also the only shape that can catch the
- * trap the table exists to avoid, since adding a row NARROWS rather than
- * widens (CLAUDE.md § "Group↔Term scoping").
+ * `s1`/`s2` ATTACH TO EVERY TERM, because every semester's Offerings use them
+ * by default. `systemtechnik`/`management` attach only to the three terms
+ * that fork — `group_term` is fail-open (a Group with no row is available in
+ * EVERY Term), so linking exactly the terms `MODULES` references for each
+ * says something checkable rather than nothing (CLAUDE.md §
+ * "Group↔Term scoping").
  */
-export const GROUP_TERMS: { group: string; term: string }[] = [
-    { group: 's1', term: 's1' },
-    { group: 's2', term: 's1' },
-    { group: 'semester2', term: 's2' },
-    { group: 'semester3', term: 's3' },
-    { group: 'semester4-st', term: 's4' },
-    { group: 'semester4-mgmt', term: 's4' },
-    { group: 'semester5-st', term: 's5' },
-    { group: 'semester5-mgmt', term: 's5' },
-    { group: 'semester6-st', term: 's6' },
-    { group: 'semester6-mgmt', term: 's6' },
-];
+export const GROUP_TERMS: { group: string; term: string }[] = TERMS.flatMap((term) => [
+    { group: 's1', term: term.key },
+    { group: 's2', term: term.key },
+]).concat(
+    ['s4', 's5', 's6'].flatMap((term) => [
+        { group: 'systemtechnik', term },
+        { group: 'management', term },
+    ]),
+);
