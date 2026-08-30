@@ -86,8 +86,14 @@ export async function sessionReadScope(
  *
  * A person with no memberships and no attachments matches NOTHING, which is the
  * honest answer — an empty timetable, not everybody's.
+ *
+ * EXPORTED for the iCal export (issue #15), which must not invent a second
+ * answer to "which Sessions are mine" — the card's own words. That export is
+ * ALWAYS the caller's own slice, never `sessionReadScope`'s `any` branch, so it
+ * calls this directly rather than going through the read-permission switch
+ * above.
  */
-async function ownSessionClause(tx: Tx, identity: RequestIdentity): Promise<Record<string, unknown>> {
+export async function ownSessionClause(tx: Tx, identity: RequestIdentity): Promise<Record<string, unknown>> {
     const personId = identity.actorPersonId;
 
     if (!personId) {
