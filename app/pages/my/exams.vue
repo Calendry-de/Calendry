@@ -78,12 +78,17 @@
 
                 <label class="entry_field">
                     <span class="entry_label">Week</span>
-                    <input
+                    <select
                         v-model.number="termWeek"
                         class="entry_input"
-                        min="1"
-                        type="number"
                     >
+                        <option
+                            v-for="w in weeks"
+                            :key="w.week"
+                            :selected="w.week === termWeek"
+                            :value="w.week"
+                        >{{ w.label }}</option>
+                    </select>
                 </label>
 
                 <label class="entry_field">
@@ -126,6 +131,27 @@
                     >
                 </label>
 
+                <!--
+                    ADVISORY, NEVER A GATE. A Nachklausur legitimately sits in an
+                    ordinary teaching week — the timetable this demo's data came
+                    from is full of them — so this says what the institution
+                    declared and leaves the choice alone.
+                -->
+                <p
+                    v-if="examWeeks.length && !chosenIsExamWeek"
+                    class="entry_advice entry_field--wide"
+                >
+                    {{ examPeriodLabel }} That is where this institution has said its
+                    assessments belong; you can still ask for another week.
+                </p>
+                <p
+                    v-else-if="!examWeeks.length"
+                    class="entry_advice entry_field--wide"
+                >
+                    This term has no exam period on the academic calendar, so there is no
+                    week to prefer. An administrator sets one under calendar periods.
+                </p>
+
                 <label class="entry_field entry_field--wide">
                     <span class="entry_label">Note for the reviewer</span>
                     <textarea
@@ -163,7 +189,8 @@
                     <div class="row_main">
                         <strong>{{ row.offering.title }}</strong>
                         <span class="row_meta">
-                            {{ row.kind.name }} · week {{ row.termWeek }},
+                            {{ row.kind.name }} · week {{ row.termWeek }}<!--
+                            -->{{ row.weekKind === 'EXAM' ? ' (exam week)' : '' }},
                             {{ weekdayName(row.dayOfWeek) }} {{ startLabel(row.blockIndex) }}
                         </span>
                         <span
@@ -187,6 +214,7 @@
 
 <script setup lang="ts">
 import { type TimeGrid, blockTime, weekdayName } from '~/composables/schedule';
+import { WEEK_KIND_NAME, classifyWeeks } from '#shared/academicCalendar';
 
 /**
  * A lecturer's own exam requests, and the form to add one.
@@ -210,6 +238,8 @@ interface RequestRow {
     decisionNote: string | null;
     offering: { id: string; title: string; code: string | null };
     kind: { id: string; name: string };
+    /** Resolved per Term by the server, so both exam pages agree. */
+    weekKind: string;
 }
 
 const STATUS_LABEL: Record<RequestRow['status'], string> = {
@@ -223,9 +253,9 @@ const STATUS_LABEL: Record<RequestRow['status'], string> = {
 const request = useRequestFetch();
 
 const { data, refresh } = await useAsyncData('my:exams', async () => {
-    const [mine, offerings, kinds, grids] = await Promise.all([
+    const [mine, offerings, kinds, grids, terms, periods] = await Promise.all([
         request<{ rows: RequestRow[] }>('/api/me/exam-requests'),
-        request<{ rows: { id: string; title: string; code: string | null }[] }>(
+        request<{ rows: { id: string; title: string; code: string | null; termId: string }[] }>(
             '/api/offerings?limit=200',
         ),
         request<{ rows: { id: string; name: string; type: string }[] }>(
@@ -235,9 +265,22 @@ const { data, refresh } = await useAsyncData('my:exams', async () => {
         // takes that interface, and a structurally-similar duplicate here would
         // drift from it silently the next time the grid gains a field.
         request<{ rows: TimeGrid[] }>('/api/time-grids?limit=50'),
+        request<{ rows: { id: string; name: string; startDate: string; endDate: string }[] }>(
+            '/api/terms?limit=100',
+        ),
+        request<{ rows: { termId: string; kind: string; startDate: string; endDate: string }[] }>(
+            '/api/calendar-periods?limit=200',
+        ),
     ]);
 
-    return { mine: mine.rows, offerings: offerings.rows, kinds: kinds.rows, grids: grids.rows };
+    return {
+        mine: mine.rows,
+        offerings: offerings.rows,
+        kinds: kinds.rows,
+        grids: grids.rows,
+        terms: terms.rows,
+        periods: periods.rows,
+    };
 });
 
 const rows = computed(() => data.value?.mine ?? []);
@@ -264,6 +307,62 @@ const blockOptions = computed(() => Array.from(
     (_, index) => ({ value: index, label: startLabel(index) }),
 ));
 
+/**
+ * The chosen module's Term, and its weeks classified.
+ *
+ * `classifyWeeks` is the SAME function the server's `classifyTermWeeks` calls
+ * and the same one the solver calendar is built from — imported from `#shared`
+ * rather than reimplemented, because "which week is an exam week" having two
+ * definitions is exactly the failure TimeGrid already demonstrated.
+ */
+const term = computed(() => {
+    const module = modules.value.find((m) => m.id === offeringId.value);
+
+    return data.value?.terms?.find((t) => t.id === module?.termId);
+});
+
+const weeks = computed(() => {
+    const t = term.value;
+
+    if (!t) {
+        return [];
+    }
+
+    const periods = (data.value?.periods ?? [])
+        .filter((p) => p.termId === t.id)
+        .map((p) => ({ kind: p.kind as 'EXAM' | 'BREAK' | 'HOLIDAY', startDate: new Date(p.startDate), endDate: new Date(p.endDate) }));
+
+    return classifyWeeks(new Date(t.startDate), new Date(t.endDate), periods).map((w) => {
+        const kind = WEEK_KIND_NAME[w.kind] ?? 'UNSPECIFIED';
+
+        return {
+            week: w.index + 1,
+            kind,
+            // The kind is IN the label, not a colour beside it: this select is
+            // the one place the choice is made, and an exam week that reads the
+            // same as every other week is a choice made blind.
+            label: kind === 'TEACHING' || kind === 'UNSPECIFIED'
+                ? `Week ${w.index + 1}`
+                : `Week ${w.index + 1} — ${kind.toLowerCase()} week`,
+        };
+    });
+});
+
+const examWeeks = computed(() => weeks.value.filter((w) => w.kind === 'EXAM'));
+const chosenIsExamWeek = computed(() => examWeeks.value.some((w) => w.week === termWeek.value));
+
+const examPeriodLabel = computed(() => {
+    const list = examWeeks.value.map((w) => w.week);
+
+    if (!list.length) {
+        return '';
+    }
+
+    return list.length === 1
+        ? `This term's exam period is week ${list[0]}.`
+        : `This term's exam period is weeks ${list[0]}–${list[list.length - 1]}.`;
+});
+
 const offeringId = ref('');
 const kindId = ref('');
 const termWeek = ref(1);
@@ -281,6 +380,13 @@ const error = ref('');
  */
 offeringId.value = modules.value[0]?.id ?? '';
 kindId.value = examKinds.value[0]?.id ?? '';
+/*
+ * THE FIRST EXAM WEEK, not week 1. An exam is a locked Event the solver never
+ * places, so `MinimizeExamWeek` cannot pull it anywhere — the default IS the
+ * placement for anyone who does not change it, and defaulting to the first week
+ * of term was actively wrong.
+ */
+termWeek.value = examWeeks.value[0]?.week ?? 1;
 
 async function submit() {
     busy.value = true;
@@ -386,6 +492,20 @@ async function submit() {
         font-size: var(--font-size-sm);
         font-weight: 650;
         color: $content4;
+    }
+
+    /* Advisory, in the warning palette rather than the error one: nothing is
+       wrong, and the choice it describes is still allowed. */
+    &_advice {
+        margin: 0;
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-sm);
+        line-height: 1.5;
+        color: $warning700;
+
+        background: varToRgba('warning500', 0.12);
     }
 
     &_input {

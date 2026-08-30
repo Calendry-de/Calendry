@@ -288,3 +288,67 @@ describe('the lecturer’s own list', () => {
         expect((await res.text())).toContain('Waiting on a decision');
     });
 });
+
+describe('the exam week', () => {
+    /**
+     * `#6` recorded "exams ideally near term-end" as an open SOLVER weighting.
+     * It is not one: an institution says where its term-end assessment window is
+     * by declaring an EXAM calendar period, and the flow reads that.
+     *
+     * It has to, because the solver cannot help here — an approved exam is a
+     * locked Event and `MinimizeExamWeek` only steers what the solver PLACES.
+     * The lecturer's chosen week is the final answer.
+     */
+    it('reports the kind of week a request landed in', async () => {
+        const term = await ownerDb.term.findFirstOrThrow({ where: { id: 'test-term-a' } });
+
+        await ownerDb.calendarPeriod.create({
+            data: {
+                tenantId: term.tenantId,
+                termId: term.id,
+                kind: 'EXAM',
+                name: 'Prüfungszeitraum',
+                // The last week of the fixture term.
+                startDate: new Date(term.endDate.getTime() - 6 * 86_400_000),
+                endDate: term.endDate,
+            },
+        });
+
+        const weeks = Math.max(
+            1,
+            Math.ceil((term.endDate.getTime() - term.startDate.getTime()) / (7 * 86_400_000)),
+        );
+
+        const inExam = await request({ termWeek: weeks, dayOfWeek: 1, blockIndex: 5 });
+        const outside = await request({ termWeek: 1, dayOfWeek: 1, blockIndex: 6 });
+
+        expect(inExam.status, JSON.stringify(inExam.body)).toBe(200);
+        expect(outside.status).toBe(200);
+
+        const mine = await api<{ rows: { id: string; weekKind: string }[] }>(
+            '/api/me/exam-requests',
+            { cookie: adminA },
+        );
+
+        const byId = new Map(mine.body.rows.map((r) => [r.id, r.weekKind]));
+
+        expect(byId.get(inExam.body.request.id)).toBe('EXAM');
+        // TEACHING, not EXAM — and allowed, because a Nachklausur legitimately
+        // sits in an ordinary teaching week.
+        expect(byId.get(outside.body.request.id)).not.toBe('EXAM');
+    });
+
+    it('does not refuse a week outside the exam period', async () => {
+        // Warn and allow. Refusing would forbid a resit, which is a thing
+        // institutions actually schedule mid-term.
+        expect((await request({ termWeek: 2, dayOfWeek: 1, blockIndex: 7 })).status).toBe(200);
+    });
+
+    it('reports it on the review queue too, from the same helper', async () => {
+        const res = await api<{ rows: { weekKind: string }[] }>('/api/exam-requests', { cookie: adminA });
+
+        expect(res.status).toBe(200);
+        expect(res.body.rows.every((r) => typeof r.weekKind === 'string')).toBe(true);
+        expect(res.body.rows.some((r) => r.weekKind === 'EXAM')).toBe(true);
+    });
+});

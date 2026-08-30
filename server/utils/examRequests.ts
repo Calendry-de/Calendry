@@ -4,7 +4,8 @@ import type { RequestIdentity } from './tenantResolver';
 import { appendEvent, placementOf, requireBaselineGeneration } from './sessionEvents';
 import { refreshViolations } from './violations';
 import { fitsGrid } from './gridBounds';
-import { weekCountOf } from '../../shared/academicCalendar';
+import { WEEK_KIND_NAME, classifyWeeks, weekCountOf } from '../../shared/academicCalendar';
+import type { WeekKindName } from '../../shared/academicCalendar';
 
 /**
  * The rules behind a lecturer's exam request, in one place because four routes
@@ -271,4 +272,44 @@ export async function materializeExam(
     });
 
     return { sessionId: created.id };
+}
+
+/**
+ * What KIND of week each `termWeek` in a Term is.
+ *
+ * WHY THE EXAM FLOW NEEDS THIS AT ALL. An approved exam is a locked Event, and
+ * the solver never places an Event — so `MinimizeExamWeek`, the rule whose whole
+ * job is steering sessions relative to the exam period, cannot reach it. The
+ * lecturer's chosen week IS the final answer, which makes "is that week actually
+ * the exam period" a question the UI has to answer rather than the objective.
+ *
+ * It also answers the thing `#6` recorded as an open solver question. "Exams
+ * ideally near term-end" needs no weighting: an institution says where its
+ * term-end assessment window is by declaring an EXAM calendar period, and that
+ * declaration is right here.
+ *
+ * ADVISORY, NEVER A GATE. A Nachklausur legitimately sits in an ordinary
+ * teaching week — the real timetable this project's demo data came from is full
+ * of them — so refusing a non-exam week would forbid a thing institutions
+ * actually do. Warn and allow, as everywhere else.
+ */
+export async function classifyTermWeeks(
+    tx: Tx,
+    tenantId: string,
+    termId: string,
+): Promise<{ week: number; kind: WeekKindName }[]> {
+    const term = await tx.term.findFirst({
+        where: { id: termId, tenantId },
+        select: { startDate: true, endDate: true, calendarPeriods: true },
+    });
+
+    if (!term) {
+        return [];
+    }
+
+    return classifyWeeks(term.startDate, term.endDate, term.calendarPeriods).map((week) => ({
+        // `termWeek` in the database is 1-based; `ClassifiedWeek.index` is not.
+        week: week.index + 1,
+        kind: WEEK_KIND_NAME[week.kind] ?? 'UNSPECIFIED',
+    }));
 }

@@ -1,4 +1,5 @@
 import { requirePermission } from '../../../utils/requirePermission';
+import { classifyTermWeeks } from '../../../utils/examRequests';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
@@ -20,5 +21,26 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         },
     });
 
-    return { rows };
+    /*
+     * The week's KIND, resolved per Term rather than stored on the row: a
+     * request outlives the calendar it was made against, and a period edited
+     * afterwards must change what the row reads as. Cached per Term because a
+     * queue is overwhelmingly one or two of them.
+     */
+    const byTerm = new Map<string, { week: number; kind: string }[]>();
+
+    const withWeekKind = [];
+
+    for (const row of rows) {
+        if (!byTerm.has(row.termId)) {
+            byTerm.set(row.termId, await classifyTermWeeks(tx, identity.tenantId, row.termId));
+        }
+
+        withWeekKind.push({
+            ...row,
+            weekKind: byTerm.get(row.termId)?.find((w) => w.week === row.termWeek)?.kind ?? 'UNSPECIFIED',
+        });
+    }
+
+    return { rows: withWeekKind };
 }));

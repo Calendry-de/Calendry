@@ -50,6 +50,17 @@
                         <span class="row_meta">
                             asked for by {{ personName(row.requestedBy) }}{{ row.room ? ` · prefers ${row.room.name}` : '' }}
                         </span>
+                        <!--
+                            The reviewer's most useful single fact, and one the
+                            request itself does not carry: an exam outside the
+                            declared period is a legitimate ask (a Nachklausur
+                            usually is) and also the one worth looking at twice.
+                        -->
+                        <span
+                            class="row_meta"
+                            :class="{ 'row_meta--warn': row.weekKind !== 'EXAM' }"
+                        >{{ row.weekKind === 'EXAM' ? 'inside the exam period' : 'outside the exam period' }}</span>
+
                         <span
                             v-if="row.note"
                             class="row_note"
@@ -133,6 +144,8 @@ interface ReviewRow {
     kind: { id: string; name: string };
     term: { id: string; name: string };
     room: { id: string; name: string; code: string } | null;
+    /** Resolved per Term by the server, so both exam pages agree. */
+    weekKind: string;
     requestedBy: Named | null;
     decidedBy: Named | null;
 }
@@ -280,6 +293,8 @@ async function decide(id: string, action: 'approve' | 'reject') {
     &_meta {
         font-size: var(--font-size-sm);
         color: $content7;
+
+        &--warn { color: $warning700; }
     }
 
     &_note {
