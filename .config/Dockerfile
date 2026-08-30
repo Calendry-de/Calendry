@@ -77,6 +77,11 @@ COPY --chown=app:app prisma.config.js ./prisma.config.js
 # prisma/seed.ts imports shared/permissions and scripts/lib/ownerDatabaseUrl.
 COPY --chown=app:app shared ./shared
 COPY --chown=app:app scripts ./scripts
+# The operator CLIs (provision:tenant, reset:password, create:account) import
+# hashPassword from here — the one server/ file they need, and self-contained
+# (node:crypto only), so it comes without dragging in the rest of server/ or a
+# bigger node_modules than the prisma-only install above provides.
+COPY --chown=app:app server/utils/auth.ts ./server/utils/auth.ts
 COPY --chown=app:app package.json ./package.json
 # The generated client the seed imports. Reads the schema, not the database.
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
