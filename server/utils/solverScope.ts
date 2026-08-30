@@ -83,6 +83,14 @@ export function toWireScope(scope: StoredScope): SolveScope {
             ? LockPolicy.LOCK_POLICY_MINIMIZE_MOVEMENT
             : LockPolicy.LOCK_POLICY_HARD,
         minimizeMovementWeight: scope.minimizeMovementWeight,
+        /*
+         * NOT YET A CALLER-SET VALUE — `StoredScope` has nothing to carry it,
+         * because nothing here asks for it yet. Proto's own doc comment: "Zero
+         * (the default) asks the solver to freely re-optimize, unchanged from
+         * before this field existed." Sending anything else would be inventing
+         * a preference resolveScope() was never asked for.
+         */
+        minimizeInscopeMovementWeight: 0,
     };
 }
 

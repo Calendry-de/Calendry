@@ -1425,6 +1425,16 @@ export async function assembleSolverInput(
         externalOccupancy,
         constraints,
         referenceSlot,
+        /*
+         * ALWAYS EMPTY — a genuinely new constraint TYPE (`DifferentTime`, "no
+         * two of these Offerings may ever share a slot"), not a new param on an
+         * existing one. Nothing in this app can populate it yet: no catalogue
+         * entry, no Prisma table naming which Offerings relate, no tenant-facing
+         * config surface. Sending `[]` is the honest state — "this tenant has
+         * configured none" — the same reasoning `toWireConstraint` uses to skip
+         * a type with no `wireField` rather than inventing a value for it.
+         */
+        offeringRelations: [],
     };
 
     return {
