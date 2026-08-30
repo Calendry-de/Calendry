@@ -297,7 +297,7 @@ async function main() {
 
             await tx.account.update({
                 where: { id: account.id },
-                data: { passwordHash, mustChangePassword: true },
+                data: { passwordHash, mustChangePassword: true, passwordChangedAt: new Date() },
             });
 
             // Sessions hang off account_id, so this reaches every tenant the

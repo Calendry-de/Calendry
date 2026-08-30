@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { hashToken } from './auth';
 
 /**
@@ -183,4 +184,71 @@ export async function deleteExpiredSessions(now = new Date()): Promise<{ deleted
     });
 
     return { deleted: count, before };
+}
+
+/**
+ * Guards `login` and `change-password` against repeated guessing — issue #13
+ * item 3. Both take an email plus a secret and answer a generic failure
+ * either way, so a rate limit is the only thing standing between an attacker
+ * and an unlimited number of tries at one account's password.
+ *
+ * ROUTE-QUALIFIED KEY, not just the email: `login` and `change_password` are
+ * two different doors accepting the same secret, and succeeding at one must
+ * not spend the other's budget — see the migration's own note.
+ *
+ * ONE ATOMIC STATEMENT, not a read-then-write. Two concurrent guesses reading
+ * the same count and both incrementing from it would let an attacker double
+ * their effective rate exactly at the point that matters — the threshold.
+ * Postgres's own row-level locking inside `INSERT … ON CONFLICT DO UPDATE`
+ * makes the reset-if-expired-else-increment logic a single round trip with no
+ * race to reason about.
+ *
+ * NO RLS, NO TENANT CONTEXT — this runs on the base Prisma client for the
+ * identical reason every other function in this file does: the routes it
+ * guards are pre-tenant.
+ */
+export async function checkRateLimit(
+    route: string,
+    identifier: string,
+    options: { maxAttempts: number; windowMinutes: number },
+): Promise<void> {
+    const key = `${route}:${identifier.toLowerCase()}`;
+
+    const [row] = await getPrisma().$queryRaw<{ attempt_count: number }[]>(
+        Prisma.sql`
+            INSERT INTO "auth_rate_limit" ("key", "attempt_count", "window_start")
+            VALUES (${key}, 1, now())
+            ON CONFLICT ("key") DO UPDATE SET
+                "attempt_count" = CASE
+                    WHEN "auth_rate_limit"."window_start" < now() - make_interval(mins => ${options.windowMinutes})
+                        THEN 1
+                    ELSE "auth_rate_limit"."attempt_count" + 1
+                END,
+                "window_start" = CASE
+                    WHEN "auth_rate_limit"."window_start" < now() - make_interval(mins => ${options.windowMinutes})
+                        THEN now()
+                    ELSE "auth_rate_limit"."window_start"
+                END
+            RETURNING "attempt_count"
+        `,
+    );
+
+    if ((row?.attempt_count ?? 0) > options.maxAttempts) {
+        throw createError({
+            statusCode: 429,
+            statusMessage: 'Too many attempts. Wait a few minutes and try again.',
+        });
+    }
+}
+
+/**
+ * Clears the counter after a SUCCESSFUL attempt, so one earlier typo does not
+ * count against someone who then got it right. Never called on failure —
+ * that would let an attacker reset their own budget by alternating a
+ * deliberately-wrong guess pattern, which defeats the whole mechanism.
+ */
+export async function resetRateLimit(route: string, identifier: string): Promise<void> {
+    await getPrisma().authRateLimit.deleteMany({
+        where: { key: `${route}:${identifier.toLowerCase()}` },
+    });
 }

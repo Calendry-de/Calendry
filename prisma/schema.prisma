@@ -1780,13 +1780,37 @@ model Account {
   mustChangePassword Boolean @default(false) @map("must_change_password")
 
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  /// When the password itself last changed — NOT `updatedAt`, which any field
+  /// touches. Drives expiry (issue #13): an account whose password has stood
+  /// unchanged past the policy's maximum age is treated the same way a forced
+  /// reset is, at login.
+  passwordChangedAt DateTime @default(now()) @map("password_changed_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   persons  AccountPerson[]
   sessions AuthSession[]
 
   @@map("account")
+}
+
+/// Guards `login` and `change-password` — the two routes that accept a
+/// password as proof and answer a generic failure either way, deliberately,
+/// so neither is an account-existence oracle. NO RLS, matching `account` /
+/// `account_person` / `auth_session`: a rate-limit check runs BEFORE the
+/// tenant is known, because the routes it guards are pre-tenant themselves.
+///
+/// `key` names the ROUTE as well as the account — `login:<email>` and
+/// `change_password:<email>` are counted separately, because succeeding at
+/// one door must not consume the guessing budget for the other.
+model AuthRateLimit {
+  key           String   @id
+  attemptCount  Int      @default(1) @map("attempt_count")
+  windowStart   DateTime @default(now()) @map("window_start") @db.Timestamptz(3)
+
+  @@map("auth_rate_limit")
 }
 
 /// Account ↔ Person: the identities one login can act as, one per Tenant.

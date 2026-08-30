@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { hashPassword, verifyPassword } from '../../utils/auth';
-import { findAccountByEmail } from '../../utils/authDb';
+import { checkRateLimit, findAccountByEmail, resetRateLimit } from '../../utils/authDb';
 
 const bodySchema = z.object({
     email: z.string().email(),
@@ -20,6 +20,11 @@ const bodySchema = z.object({
  */
 export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
+
+    // Counted SEPARATELY from `login` (see `checkRateLimit`'s own comment):
+    // this route accepts the same secret as a second door.
+    await checkRateLimit('change_password', body.email, { maxAttempts: 10, windowMinutes: 15 });
+
     const account = await findAccountByEmail(body.email);
 
     // Same generic 401 and same work as the login route, so this endpoint does
@@ -31,6 +36,8 @@ export default defineEventHandler(async (event) => {
     if (!account || !account.isActive || !ok) {
         throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
+
+    await resetRateLimit('change_password', body.email);
 
     if (await verifyPassword(body.newPassword, account.passwordHash)) {
         throw createError({
@@ -45,7 +52,7 @@ export default defineEventHandler(async (event) => {
     await prisma.$transaction(async (tx) => {
         await tx.account.update({
             where: { id: account.id },
-            data: { passwordHash, mustChangePassword: false },
+            data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
         });
 
         // A password change invalidates existing sessions, for the same reason

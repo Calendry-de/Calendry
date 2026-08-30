@@ -1,6 +1,11 @@
 import { z } from 'zod';
-import { SESSION_COOKIE, SESSION_TTL_MS, generateSessionToken, hashToken, verifyPassword } from '../../utils/auth';
-import { createSession, findAccountByEmail, listAccountIdentities, touchAccountLogin } from '../../utils/authDb';
+import {
+    MAX_PASSWORD_AGE_MS, SESSION_COOKIE, SESSION_TTL_MS, generateSessionToken, hashToken, verifyPassword,
+} from '../../utils/auth';
+import {
+    checkRateLimit, createSession, findAccountByEmail, listAccountIdentities,
+    resetRateLimit, touchAccountLogin,
+} from '../../utils/authDb';
 
 const bodySchema = z.object({
     email: z.string().email(),
@@ -23,6 +28,11 @@ const bodySchema = z.object({
  */
 export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
+
+    // BEFORE any password work — issue #13 item 3. Failing fast on a rate
+    // limit also means an attacker's blocked guesses cost no scrypt work.
+    await checkRateLimit('login', body.email, { maxAttempts: 10, windowMinutes: 15 });
+
     const account = await findAccountByEmail(body.email);
 
     // Same response shape and roughly the same work for "no such account" and
@@ -36,11 +46,29 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
 
-    // A forced reset authenticates but issues NO session and NO cookie. The
-    // account must clear the flag through /api/auth/change-password first.
-    // Deliberately not a "restricted session": every route would then have to
-    // know about a half-privileged state, and one that forgot would be a hole.
-    if (account.mustChangePassword) {
+    // A correct guess, whatever happens next (tenant selection, a forced
+    // reset). The attacker's job — and a legitimate user's — is done here;
+    // penalising an earlier typo past this point would only hurt the latter.
+    await resetRateLimit('login', body.email);
+
+    /*
+     * EXPIRY READS THE SAME BRANCH AS A FORCED RESET, deliberately — issue
+     * #13 item 1. Both mean "authenticate, but issue no session until the
+     * password changes", and a route two steps downstream should not have to
+     * know there are two different reasons that state can be true. Checked
+     * AFTER `mustChangePassword` rather than instead of it, so an operator's
+     * explicit reset is never silently overridden by the age check finding
+     * the OLD password's timestamp still on the row.
+     */
+    const passwordAge = Date.now() - account.passwordChangedAt.getTime();
+    const passwordExpired = passwordAge > MAX_PASSWORD_AGE_MS;
+
+    // A forced reset OR an expired password authenticates but issues NO
+    // session and NO cookie. The account must clear the state through
+    // /api/auth/change-password first. Deliberately not a "restricted
+    // session": every route would then have to know about a half-privileged
+    // state, and one that forgot would be a hole.
+    if (account.mustChangePassword || passwordExpired) {
         return {
             requiresPasswordChange: true,
             tenantSelectionRequired: false,

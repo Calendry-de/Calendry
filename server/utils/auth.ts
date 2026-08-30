@@ -14,6 +14,22 @@ export const SESSION_COOKIE = 'calendry_session';
 export const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 /**
+ * Maximum password age before login treats an account like a forced reset —
+ * issue #13 item 1. GLOBAL, not per-tenant: an Account is tenant-independent
+ * (`CLAUDE.md`, "the auth plane") — one login can act in several
+ * institutions, so a policy attached to it cannot be one tenant's setting
+ * without meaning "whichever tenant reset it last" for everyone else.
+ *
+ * 90 DAYS, chosen rather than measured: current guidance (NIST 800-63B)
+ * argues AGAINST forced periodic rotation in favour of length and a
+ * breach-list check, which is why item 2 (complexity rules) is explicitly
+ * left undecided rather than guessed at here. This value exists because the
+ * card asked for expiry specifically, not because rotation is best practice —
+ * document that tension rather than pretend it is settled.
+ */
+export const MAX_PASSWORD_AGE_MS = 1000 * 60 * 60 * 24 * 90;
+
+/**
  * scrypt from node:crypto — memory-hard, and no third-party dependency for
  * something this security-critical. Stored as `scrypt$<salt>$<key>`, both
  * base64; the base64 alphabet contains no '$', so the format is unambiguous.

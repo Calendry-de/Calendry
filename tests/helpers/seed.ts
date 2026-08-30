@@ -85,6 +85,17 @@ export type Fixtures = typeof ids;
 export async function teardown() {
     const emails = Object.values(ACCOUNTS).map((e) => `'${e}'`).join(',');
 
+    /*
+     * WHOLE TABLE, unconditionally. `auth_rate_limit` has no foreign key to
+     * `account` — it is keyed by a computed `route:email` string, precisely
+     * because it has to survive the account it is about not existing yet
+     * (the row an attacker's guess creates before any account matches it).
+     * Nothing here ties it to the fixture's own accounts, so deleting by
+     * email would miss rows keyed against ad-hoc emails a test created
+     * itself — and `fileParallelism: false` means no other file's rate-limit
+     * test is ever mid-flight to disturb.
+     */
+    await ownerDb.$executeRawUnsafe('DELETE FROM auth_rate_limit');
     await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email IN (${emails})`);
     await ownerDb.$executeRawUnsafe(`DELETE FROM tenant WHERE id IN ('${ids.tenantA}','${ids.tenantB}')`);
     await ownerDb.$executeRawUnsafe(`DELETE FROM room WHERE federation_id = '${ids.federationId}'`);

@@ -4148,3 +4148,59 @@ CREATE POLICY tenant_isolation ON "group_source"
     WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "group_source" TO calendry_app;
+
+
+-- ===========================================================================
+-- Rate limiting on the two routes that accept a password as proof
+-- ===========================================================================
+--
+-- `login` and `change-password` both take an email plus a secret and answer
+-- generic 401 either way, deliberately, so neither is an account-existence
+-- oracle. Neither had anything slowing down repeated guesses.
+--
+-- NO RLS, matching `account` / `account_person` / `auth_session` exactly, and
+-- for the identical reason: a rate-limit check has to run BEFORE the tenant is
+-- known, because the routes it guards are pre-tenant themselves. Its
+-- protection is the same access shape those three already use — read and
+-- written only by an exact `key`, never by a tenant filter — so it needs no
+-- policy to be safe, only the discipline every query goes through one
+-- function rather than a bespoke WHERE clause.
+--
+-- `key` NAMES THE ROUTE, not just the account: `login:<email>` and
+-- `change_password:<email>` are counted separately, because guessing a
+-- password at the login form and guessing it as "current password" proof are
+-- the same attack against two different doors, and a limit shared between them
+-- would let succeeding at one door quietly consume the budget for the other.
+-- ---------------------------------------------------------------------------
+CREATE TABLE "auth_rate_limit" (
+    "key"           TEXT NOT NULL,
+    "attempt_count" INTEGER NOT NULL DEFAULT 1,
+    "window_start"  TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "auth_rate_limit_pkey" PRIMARY KEY ("key")
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "auth_rate_limit" TO calendry_app;
+
+-- ---------------------------------------------------------------------------
+-- Password expiry — issue #13 item 1
+-- ---------------------------------------------------------------------------
+--
+-- NOT `updated_at`. That column is `@updatedAt`, touched by ANY change to the
+-- row — `is_active`, `must_change_password`, a future field — so it answers
+-- "when was this account last modified", not "when did the password itself
+-- last change". Expiry needs the second question asked precisely, or toggling
+-- an unrelated flag would silently reset somebody's password clock.
+--
+-- BACKFILLED TO `created_at`, not left NULL. An account with no recorded
+-- change has never changed its password since it was created, which is a real
+-- date and the honest one to expire from — NULL would either mean "never
+-- expires" (wrong: exempts every account that predates this column) or need a
+-- third state nothing here asks for.
+-- ---------------------------------------------------------------------------
+ALTER TABLE "account" ADD COLUMN "password_changed_at" TIMESTAMPTZ(3);
+
+UPDATE "account" SET "password_changed_at" = "created_at" WHERE "password_changed_at" IS NULL;
+
+ALTER TABLE "account" ALTER COLUMN "password_changed_at" SET NOT NULL;
+ALTER TABLE "account" ALTER COLUMN "password_changed_at" SET DEFAULT CURRENT_TIMESTAMP;
