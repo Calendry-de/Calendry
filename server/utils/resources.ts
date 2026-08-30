@@ -193,8 +193,8 @@ function constraintShapeRefinement(
         severity?: string | null;
         weight?: number | null;
         params?: Record<string, unknown> | null;
-        scopes?: { kindId: string }[];
-        members?: { offeringId: string }[];
+        scopes?: { kindId: string }[] | null;
+        members?: { offeringId: string }[] | null;
     },
     ctx: z.RefinementCtx,
 ): void {
@@ -1149,14 +1149,24 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * the same numbers by.
              */
             timeGridId: optionalId,
-            scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
+            /*
+             * `.nullish()`, NOT `.optional()` — `useEntityForm.save()` sends
+             * `null` for a `custom` field nothing touched (`toPayloadValue`'s
+             * fallback is `value ?? null`), not an absent key. `.optional()`
+             * tolerates the key being missing but rejects an explicit `null`,
+             * so the most ordinary create — no scope checkbox touched — failed
+             * "Validation Error" on `scopes`. Same bug, same fix, as
+             * `server/api/screens/index.post.ts`'s `roomIds`.
+             */
+            scopes: z.array(z.object({ kindId: z.string().min(1) })).nullish(),
             /**
              * A RELATION TYPE'S OPERANDS (ADR-0028 in calendry-solver) —
              * `ConstraintRelationMember`, never `ConstraintScope`: these
              * Offerings are what the rule is ABOUT, not a filter narrowing it.
              * Order is the array's own order; see `writeChildren`.
              */
-            members: z.array(z.object({ offeringId: z.string().min(1) })).optional(),
+            // Same `.nullish()` reasoning as `scopes` just above.
+            members: z.array(z.object({ offeringId: z.string().min(1) })).nullish(),
         }).superRefine(constraintShapeRefinement),
         update: z.object({
             name: z.string().min(1).optional(),
@@ -1172,9 +1182,19 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * the same numbers by.
              */
             timeGridId: optionalId,
-            scopes: z.array(z.object({ kindId: z.string().min(1) })).optional(),
+            /*
+             * `.nullish()`, NOT `.optional()` — `useEntityForm.save()` sends
+             * `null` for a `custom` field nothing touched (`toPayloadValue`'s
+             * fallback is `value ?? null`), not an absent key. `.optional()`
+             * tolerates the key being missing but rejects an explicit `null`,
+             * so the most ordinary create — no scope checkbox touched — failed
+             * "Validation Error" on `scopes`. Same bug, same fix, as
+             * `server/api/screens/index.post.ts`'s `roomIds`.
+             */
+            scopes: z.array(z.object({ kindId: z.string().min(1) })).nullish(),
             /** Editable after creation too; same operands-not-scope reasoning as create. */
-            members: z.array(z.object({ offeringId: z.string().min(1) })).optional(),
+            // Same `.nullish()` reasoning as `scopes` just above.
+            members: z.array(z.object({ offeringId: z.string().min(1) })).nullish(),
         }),
         beforeUpdate: constraintBeforeUpdate,
         filters: z.object({

@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { PER_SESSION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
+import { PER_SESSION_CONSTRAINT_TYPES, RELATION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
 import type { StructuralConstraintType } from '../../shared/constraintTypes';
 import { gapsWithinSpan } from '../../shared/timeGrid';
 import type { Tx } from './tenantDb';
@@ -34,9 +34,12 @@ import { conflictGroupIds, descendantGroupIds } from './groupClosure';
 export {
     STRUCTURAL_CONSTRAINT_TYPES,
     PER_SESSION_CONSTRAINT_TYPES,
+    RELATION_CONSTRAINT_TYPES,
     SOLVER_OWNED_CONSTRAINT_TYPES,
 } from '../../shared/constraintTypes';
-export type { StructuralConstraintType, PerSessionConstraintType } from '../../shared/constraintTypes';
+export type {
+    StructuralConstraintType, PerSessionConstraintType, RelationConstraintType,
+} from '../../shared/constraintTypes';
 
 interface PlacedSession {
     id: string;
@@ -125,7 +128,11 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const configured = await tx.constraint.findMany({
         where: {
             tenantId,
-            type: { in: [...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES] },
+            type: {
+                in: [
+                    ...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES, ...RELATION_CONSTRAINT_TYPES,
+                ],
+            },
         },
         select: { id: true, type: true, severity: true, weight: true, isEnabled: true },
     });
@@ -266,15 +273,19 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const detected: Detected[] = [];
 
     /*
-     * TWO SHAPES OF `enabled` ROW, dispatched separately: `describeCollision`'s
+     * THREE SHAPES OF `enabled` ROW, dispatched separately: `describeCollision`'s
      * switch is exhaustive over the PAIRWISE types and has no case for a
-     * per-session one, so a per-session row is never handed to it.
+     * per-session or relation one, so neither is ever handed to it.
      */
     const pairwiseEnabled = enabled.filter(
-        (c) => !PER_SESSION_CONSTRAINT_TYPES.includes(c.type as never),
+        (c) => !PER_SESSION_CONSTRAINT_TYPES.includes(c.type as never)
+            && !RELATION_CONSTRAINT_TYPES.includes(c.type as never),
     );
     const perSessionEnabled = enabled.filter(
         (c) => PER_SESSION_CONSTRAINT_TYPES.includes(c.type as never),
+    );
+    const relationEnabled = enabled.filter(
+        (c) => RELATION_CONSTRAINT_TYPES.includes(c.type as never),
     );
 
     for (const constraint of pairwiseEnabled) {
@@ -361,6 +372,75 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                         gaps: gaps.map((g) => ({ afterBlockIndex: g.afterBlockIndex, minutes: g.minutes, label: g.label })),
                     },
                 });
+            }
+        }
+    }
+
+    /**
+     * RELATION-BASED: keyed by explicit `ConstraintRelationMember` membership,
+     * not a shared Room/Lecturer/Group/Person `describeCollision` already has
+     * loaded — the same reason `PER_SESSION_CONSTRAINT_TYPES` gets its own pass
+     * rather than a case in that switch (`shared/constraintTypes.ts`'s comment
+     * on `RELATION_CONSTRAINT_TYPES`).
+     *
+     * REUSES `candidates`, not a new query: a relation violation still needs
+     * `blocksOverlap` (same term/week/day), and `candidates` already holds
+     * every Session sharing one with ANY seed — a relation's OTHER member
+     * Offering's Session is already in there if it could possibly overlap.
+     */
+    if (relationEnabled.length > 0) {
+        const members = await tx.constraintRelationMember.findMany({
+            where: { constraintId: { in: relationEnabled.map((c) => c.id) } },
+            select: { constraintId: true, offeringId: true },
+        });
+
+        const membersByConstraint = new Map<string, Set<string>>();
+
+        for (const m of members) {
+            const set = membersByConstraint.get(m.constraintId) ?? new Set<string>();
+
+            set.add(m.offeringId);
+            membersByConstraint.set(m.constraintId, set);
+        }
+
+        for (const constraint of relationEnabled) {
+            const memberOfferingIds = membersByConstraint.get(constraint.id) ?? new Set<string>();
+
+            // A dangling-member relation (see `assembleSolverInput`'s report)
+            // still names real Offerings here — this reads `Offering.id`
+            // directly, never the solver's snapshot — so this only fires for
+            // a relation that never had two members at all.
+            if (memberOfferingIds.size < 2) {
+                continue;
+            }
+
+            for (const seed of seeds) {
+                if (!memberOfferingIds.has(seed.offeringId)) {
+                    continue;
+                }
+
+                for (const other of candidates) {
+                    if (
+                        other.id === seed.id
+                        || other.offeringId === seed.offeringId
+                        || !memberOfferingIds.has(other.offeringId)
+                        || !blocksOverlap(seed, other)
+                    ) {
+                        continue;
+                    }
+
+                    detected.push({
+                        constraintId: constraint.id,
+                        sessionId: seed.id,
+                        severity: constraint.severity as 'HARD' | 'SOFT',
+                        penalty: constraint.severity === 'SOFT' ? constraint.weight : null,
+                        detail: {
+                            reason: 'different_time_violated',
+                            collidesWithSessionId: other.id,
+                            collidesWithOfferingId: other.offeringId,
+                        },
+                    });
+                }
             }
         }
     }

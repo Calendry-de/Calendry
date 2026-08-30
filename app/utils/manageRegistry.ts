@@ -585,6 +585,16 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
          * payload, exactly as `time_grid.breaks` does.
          */
         { key: 'scopes', label: 'Applies to kinds', type: 'text', custom: true },
+        /*
+         * A relation type's ordered Offering operands (ADR-0028 in
+         * calendry-solver) — `ConstraintRelationMember`, never
+         * `ConstraintScope`. Same reasoning as `scopes` just above: `custom`
+         * because `ManageOfferingRelationMembers` renders the picker and the
+         * value is an array, and it has to be declared here to take part in
+         * the draft, dirty tracking and the save payload at all — undeclared,
+         * `useEntityForm.save()`'s generic per-field loop never sends it.
+         */
+        { key: 'members', label: 'Related offerings', type: 'text', custom: true },
         { key: 'isEnabled', label: 'Enabled', type: 'boolean' },
     ],
 };

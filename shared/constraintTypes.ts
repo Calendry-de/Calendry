@@ -1652,6 +1652,21 @@ export function validateConstraintShape(input: {
     }
 
     /**
+     * A RELATION TYPE IS NOT KIND-SCOPED EITHER, and for the same reason as
+     * above: `assembleSolverInput` never calls `toWireConstraint` for these
+     * (see its relation carve-out), so a stored `ConstraintScope` row would
+     * sit in the database looking like configuration and change nothing. The
+     * rule's whole scope IS its named Offerings.
+     */
+    if (type?.relation && (input.scopeCount ?? 0) > 0) {
+        problems.push({
+            field: 'scopes',
+            message: `'${type.key}' is not scoped by session kind — it relates the specific `
+                + 'offerings named below, and applies to their sessions regardless of kind.',
+        });
+    }
+
+    /**
      * A RELATION TYPE'S OPERANDS ARE ITS WHOLE CONFIGURATION — there is no
      * default to fall back to (`defaultConstraintTypes()` excludes these), so
      * naming fewer than `minMembers` Offerings is not a smaller version of the

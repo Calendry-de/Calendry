@@ -32,6 +32,7 @@
                     >
                         {{ selectedType?.label ?? draft.type ?? '—' }}
                         <em v-if="mode === 'edit' && !readonly">Cannot be changed — create a new constraint instead.</em>
+                        <em v-else-if="typeIsPreset && selectedType?.relation">Name its offerings below, then save.</em>
                         <em v-else-if="typeIsPreset">A scoped variant of this rule. Scope it below, then save.</em>
                     </p>
 
@@ -202,7 +203,17 @@
                     </select>
                 </fieldset>
 
-                <fieldset class="builder_scopes">
+                <!--
+                    A RELATION TYPE HAS NO KIND SCOPE — see the fieldset below
+                    instead. Showing this one would offer a control that saves
+                    and does nothing (`assembleSolverInput` never reads
+                    `ConstraintScope` for these), the same trap the derived-type
+                    branch above already avoids.
+                -->
+                <fieldset
+                    v-if="!selectedType?.relation"
+                    class="builder_scopes"
+                >
                     <legend>Applies to</legend>
 
                     <!--
@@ -283,6 +294,22 @@
                     </template>
                 </fieldset>
 
+                <!--
+                    RELATION MEMBERS — a relation type's whole configuration
+                    (ADR-0028 in calendry-solver). Not one more param: the
+                    generic `ManageField`/`constraintParamControls` machinery
+                    renders scalars, and this is an ordered set of Offerings.
+                -->
+                <ManageOfferingRelationMembers
+                    v-if="selectedType?.relation"
+                    v-model="relationMemberIds"
+                    :error="form.fieldErrors.value.members"
+                    :help="`Needs at least ${selectedType.relation.minMembers} offerings.`"
+                    :load-failed="Boolean(offeringsData.error.value)"
+                    :offerings="offerings"
+                    :readonly="readonly"
+                />
+
                 <fieldset
                     v-if="selectedType?.params.length"
                     class="builder_params"
@@ -329,6 +356,7 @@ import type { ConstraintParamDef } from '#shared/constraintTypes';
 import type { FieldDef } from '~/utils/manageRegistry';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageField from '~/components/manage/ManageField.vue';
+import ManageOfferingRelationMembers from '~/components/manage/ManageOfferingRelationMembers.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { CONSTRAINT_TYPES, findConstraintType, missingConstraintParams } from '#shared/constraintTypes';
 import { constraintParamControls } from '~/utils/constraintFields';
@@ -399,6 +427,22 @@ const gridsData = useAsyncData(
 const grids = computed(() => gridsData.data.value?.rows ?? []);
 
 /**
+ * For the relation-member picker. Fetched unconditionally like grids above —
+ * a relation type can be chosen at any time, and a watcher-assigned ref would
+ * render empty on the server regardless.
+ */
+const offeringsData = useAsyncData(
+    'constraint-builder:offerings',
+    () => request<{ rows: { id: string; title: string; code: string | null }[] }>(
+        '/api/offerings',
+        // 200 is the generic route's own cap (`server/api/[resource]/index.get.ts`).
+        { query: { limit: 200 } },
+    ),
+);
+
+const offerings = computed(() => offeringsData.data.value?.rows ?? []);
+
+/**
  * A type that derives its kinds from their classification rather than from
  * `ConstraintScope`. `undefined` for every ordinary rule, which keeps the
  * checkbox list exactly as it was.
@@ -443,6 +487,24 @@ function toggleScope(kindId: string) {
 
     draft.value.scopes = next.map((id) => ({ kindId: id }));
 }
+
+/**
+ * `draft.value.members` in the wire shape (`{ offeringId }[]`, ordered);
+ * `ManageOfferingRelationMembers` works in plain ids, the same translation
+ * `scopeKinds`/`toggleScope` do for kind scopes above.
+ */
+const relationMemberIds = computed<string[]>({
+    get() {
+        const value = draft.value.members;
+
+        return Array.isArray(value)
+            ? value.map((m) => (m as { offeringId?: string }).offeringId).filter((id): id is string => Boolean(id))
+            : [];
+    },
+    set(ids) {
+        draft.value.members = ids.map((id) => ({ offeringId: id }));
+    },
+});
 
 /**
  * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry.

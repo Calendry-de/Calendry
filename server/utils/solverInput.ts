@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { CompactnessScope, SchedulingPattern, SolverInput } from '@mindcollaps/calendry-proto';
 import type {
-    ConstraintConfig, ExternalOccupancy, Offering, Person, Room, SlotRef,
+    ConstraintConfig, ExternalOccupancy, Offering, OfferingRelation, Person, Room, SlotRef,
 } from '@mindcollaps/calendry-proto';
 import type { Tx } from './tenantDb';
 import { assertClosedUnderParent, conflictClosure, referencedGroupIds } from './solverGroups';
@@ -162,6 +162,15 @@ export interface AssemblyReport {
      * field, the type determines it — with any weight on a HARD type ignored.
      */
     severityMismatches: { id: string; type: string; stored: string; expected: string }[];
+    /**
+     * A relation (e.g. `different_time`) naming an Offering that no longer
+     * exists in this Term's snapshot — deleted after being added, or never
+     * belonging to this Term. Filtered out here rather than sent and left for
+     * the solver's `ConvertError::UnknownOffering` to refuse the WHOLE run:
+     * a dangling member makes only ITS relation unenforceable, not every rule
+     * in the tenant.
+     */
+    relationsWithDanglingMembers: { id: string; type: string; danglingOfferingIds: string[] }[];
     /**
      * Groups the tenant has that this Term's problem does not involve, and which
      * were therefore not sent. Reported rather than narrowed quietly, like every
@@ -393,6 +402,26 @@ export function toWireConstraint(row: {
     } as ConstraintConfig;
 
     return { config };
+}
+
+/**
+ * The per-relation-type payload — `OfferingRelation`'s equivalent of
+ * `buildVariant` above, kept separate because a relation's wire shape
+ * (`offeringIds` plus one discriminated variant) is not a `ConstraintConfig`
+ * at all (see `assembleSolverInput`'s relation carve-out).
+ *
+ * `null` for an unmapped key: a catalogue entry can carry `relation` before
+ * its wire variant ships, the same "ahead of the schema" situation
+ * `ConstraintTypeDef.wireField` documents — reported by the caller rather
+ * than guessed at here.
+ */
+function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'differentTime'> | null {
+    switch (typeKey) {
+        case 'different_time':
+            return { differentTime: {} };
+        default:
+            return null;
+    }
 }
 
 /**
@@ -714,7 +743,7 @@ export async function assembleSolverInput(
             }),
             tx.constraint.findMany({
                 where: { tenantId: options.tenantId, isEnabled: true },
-                include: { scopes: true },
+                include: { scopes: true, relationMembers: { orderBy: { position: 'asc' } } },
             }),
             tx.role.findFirst({ where: { tenantId: options.tenantId, key: 'lecturer' }, select: { id: true } }),
         ]);
@@ -1296,7 +1325,10 @@ export async function assembleSolverInput(
 
     const skippedConstraints: AssemblyReport['skippedConstraints'] = [];
     const severityMismatches: AssemblyReport['severityMismatches'] = [];
+    const relationsWithDanglingMembers: AssemblyReport['relationsWithDanglingMembers'] = [];
     const constraints: ConstraintConfig[] = [];
+    const offeringRelations: OfferingRelation[] = [];
+    const realOfferingIds = new Set(offeringRows.map((o) => o.id));
 
     for (const row of constraintRows) {
         const type = findConstraintType(row.type);
@@ -1306,13 +1338,52 @@ export async function assembleSolverInput(
          * `wireField` because there is no `ConstraintConfig` field for them to
          * populate — the whole point of a relation is that its operands are an
          * ordered set of Offerings, sent instead as `SolverInput.offeringRelations`
-         * (assembled separately, below). Falling through to `toWireConstraint`
-         * would report every one of these as "wire has no field for this type
-         * yet", which is the message for a catalogue entry shipped ahead of the
-         * proto — the wrong diagnosis for a type that is sent, just on a
-         * different message.
+         * (assembled below, from the same row). Falling through to
+         * `toWireConstraint` would report every one of these as "wire has no
+         * field for this type yet", which is the message for a catalogue entry
+         * shipped ahead of the proto — the wrong diagnosis for a type that is
+         * sent, just on a different message.
          */
         if (type?.relation) {
+            const dangling = row.relationMembers
+                .map((m) => m.offeringId)
+                .filter((id) => !realOfferingIds.has(id));
+
+            /*
+             * A DANGLING MEMBER IS OMITTED WHOLE, not filtered down to its
+             * remaining members. ADR-0028: "a relation with one side missing
+             * is a rule that cannot be evaluated, and running it half-applied
+             * would satisfy it by construction" — a 3-member DifferentTime
+             * missing one Offering is not a valid 2-member DifferentTime, it
+             * is a different, unconfigured rule.
+             */
+            if (dangling.length > 0) {
+                relationsWithDanglingMembers.push({ id: row.id, type: row.type, danglingOfferingIds: dangling });
+
+                continue;
+            }
+
+            const variant = wireRelationVariant(row.type);
+
+            if (!variant) {
+                skippedConstraints.push({
+                    id: row.id, type: row.type,
+                    reason: 'The wire has no relation-kind field for this type yet.',
+                });
+
+                continue;
+            }
+
+            offeringRelations.push({
+                id: row.id,
+                enabled: row.isEnabled,
+                // Meaningful for SOFT relation types only; `different_time` is
+                // always HARD, so this is never read.
+                weight: row.weight ?? 0,
+                offeringIds: row.relationMembers.map((m) => m.offeringId),
+                ...variant,
+            });
+
             continue;
         }
 
@@ -1441,16 +1512,9 @@ export async function assembleSolverInput(
         externalOccupancy,
         constraints,
         referenceSlot,
-        /*
-         * ALWAYS EMPTY — a genuinely new constraint TYPE (`DifferentTime`, "no
-         * two of these Offerings may ever share a slot"), not a new param on an
-         * existing one. Nothing in this app can populate it yet: no catalogue
-         * entry, no Prisma table naming which Offerings relate, no tenant-facing
-         * config surface. Sending `[]` is the honest state — "this tenant has
-         * configured none" — the same reasoning `toWireConstraint` uses to skip
-         * a type with no `wireField` rather than inventing a value for it.
-         */
-        offeringRelations: [],
+        // Built above, alongside `constraints`, from the same `constraintRows`
+        // — every enabled `different_time` row with no dangling member.
+        offeringRelations,
     };
 
     return {
@@ -1503,6 +1567,7 @@ export async function assembleSolverInput(
             legacyCombinedSessionsOmitted,
             skippedConstraints,
             severityMismatches,
+            relationsWithDanglingMembers,
             groupsOmitted: groupRows.length - sentGroupRows.length,
             groupAvailability: {
                 windowsSent: groupsWithAvailabilityWindow,
