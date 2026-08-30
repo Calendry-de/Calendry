@@ -122,7 +122,8 @@ export const BUILT: LandingRoadmapItem[] = [
         state: 'done',
         title: 'Schedule view and editor',
         note: 'Week grid on a desktop, day agenda on a phone. Move, swap and lock, with clashes '
-            + 'recorded rather than refused, and every edit appended to a log with an actor.',
+            + 'recorded rather than refused, and every edit appended to a log with an actor. A '
+            + 'locked session\u2019s lecturer can be overridden by hand, permanently.',
     },
     {
         id: 'manage',

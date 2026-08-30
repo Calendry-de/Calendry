@@ -410,8 +410,9 @@ Three kinds of change are **themselves migrations**:
 
 Owed by any tenant provisioned before them: `account.read`, `account.manage`,
 `tenant.read`, `tenant.update`, `generation.read`, `session.read_own`,
-`screen.read`, `screen.manage`, `exam.request_own`, `exam.review`, the `member`
-role, and a `group_veto` constraint row.
+`screen.read`, `screen.manage`, `exam.request_own`, `exam.review`,
+`session.assign_lecturer`, the `member` role, and a `group_veto` constraint
+row.
 
 **`exam.request_own` is the one that wants granting to LECTURERS, not just to
 `tenant-admin`.** `grant:permissions --all-missing` repairs the admin role only,

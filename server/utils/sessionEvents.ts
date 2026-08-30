@@ -3,7 +3,8 @@ import type { Tx } from './tenantDb';
 import type { RequestIdentity } from './tenantResolver';
 
 export type EventType =
-    | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
+    | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'SET_LECTURERS'
+    | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
 
 /**
  * Appends to the immutable edit log (TAXONOMY.md §3).

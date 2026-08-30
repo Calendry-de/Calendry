@@ -120,6 +120,17 @@ const EXPLICIT_PERMISSIONS = [
      * "put things on the calendar" without "take them off".
      */
     { key: 'session.update', category: 'session', description: "Edit an Event's title, kind, groups and people" },
+    /**
+     * Override which lecturer leads a Session, once it is LOCKED (or it is an
+     * Event, which is always safe — see the route's own comment for why).
+     *
+     * A SEPARATE KEY FROM `session.update`, which only ever touches Events:
+     * this one also reaches a locked Offering-linked Session, a state that
+     * route explicitly refuses. Folding the two together would grant "edit a
+     * locked Session's lecturer" to anyone holding "rename this Event",
+     * which is a materially bigger authority than the label promises.
+     */
+    { key: 'session.assign_lecturer', category: 'session', description: 'Override which lecturer leads a locked session' },
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
 
     // Operations

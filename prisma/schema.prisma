@@ -230,6 +230,12 @@ enum SessionEventType {
   /// Offering-linked Session takes those from its Offering and from solver
   /// output, so the route that emits this refuses one.
   UPDATE_DETAILS
+  /// A manual override of who leads a Session — #7 item 4. Only ever written
+  /// when the Session is safe from the next solve: an Event (structurally out
+  /// of scope) or a Session already LOCKED. `lecturers.post.ts` refuses
+  /// anything else, matching `UPDATE_DETAILS`'s refusal for an unlocked
+  /// Offering-linked Session's other fields.
+  SET_LECTURERS
   LOCK
   UNLOCK
 

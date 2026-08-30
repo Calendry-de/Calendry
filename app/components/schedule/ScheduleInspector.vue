@@ -126,11 +126,34 @@
                 -->
                 <div>
                     <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
-                    <dd v-if="lecturers.length">{{ lecturerNames }}</dd>
+                    <dd v-if="!lecturerEditable && lecturers.length">{{ lecturerNames }}</dd>
                     <dd
-                        v-else
+                        v-else-if="!lecturerEditable"
                         class="inspector_muted"
                     >Nobody assigned</dd>
+                    <dd v-else>
+                        <ManageRelationPicker
+                            :def="lecturerRelation"
+                            :rows="lecturers"
+                            :options="people"
+                            :extra-options="[]"
+                            :readonly="busy"
+                            @add="onLecturerAdd"
+                            @remove="onLecturerRemove"
+                        />
+                    </dd>
+                    <!--
+                        THE PRECONDITION, STATED RATHER THAN LEFT TO A FAILED
+                        REQUEST. A control that is simply absent reads as "this
+                        cannot be edited"; this session's lecturer CAN be, one
+                        click away, and the hint is what makes that click
+                        findable instead of a guess.
+                    -->
+                    <p
+                        v-if="canAssignLecturer && !lecturerEditable && session?.offeringId !== null"
+                        class="inspector_hint"
+                    >Lock this session to override who teaches it — otherwise the next solve
+                        would silently replace your choice.</p>
                 </div>
                 <div>
                     <dt>{{ attendees.length === 1 ? 'Person' : 'People' }}</dt>
@@ -331,6 +354,9 @@ const props = defineProps<{
     canSwap: boolean;
     canDelete: boolean;
     canUpdate: boolean;
+    /** Separate from `canUpdate`: this also reaches a LOCKED Offering-linked
+     * Session, which `session.update` explicitly does not. */
+    canAssignLecturer: boolean;
     /** Calendar date of this Session's slot; null before a term resolves. */
     sessionDate: Date | null;
     /** Tenant vocabulary, for the kind picker. */
@@ -366,6 +392,28 @@ const locale = useViewerLocale();
  * the server will reject is worse than showing none.
  */
 const editable = computed(() => props.canUpdate && props.session?.offeringId === null);
+
+/**
+ * Safe from the next solve, and therefore safe to override here: an Event
+ * (structurally out of scope regardless of `isLocked`) or a Session already
+ * locked — `planMaterialization` skips a locked Session entirely, on a rebuild
+ * as much as a repair. Anything else would be silently discarded by the next
+ * apply, which `lecturers.post.ts` refuses.
+ */
+const lecturerEditable = computed(() => props.canAssignLecturer
+    && (props.session?.offeringId === null || props.session?.isLocked === true));
+
+const lecturerRelation: RelationDef = {
+    key: 'lecturers',
+    label: 'Lecturer',
+    help: 'Who leads this session. Changing it here overrides what the Offering or the '
+        + 'solver assigned, permanently — the whole reason a lock is required first.',
+    resource: 'persons',
+    valueKey: 'personId',
+    searchable: true,
+    optionLabel: personOptionLabel,
+    emptyHint: 'No people in this institution yet.',
+};
 
 const personRelation: RelationDef = {
     key: 'people',
@@ -407,6 +455,16 @@ function onGroupRemove(value: string) {
 }
 
 /** Same shape as groups: the whole set is sent, so removal needs no own path. */
+function onLecturerAdd(value: string) {
+    const next = [...new Set([...lecturers.value.map((l) => l.personId), value])];
+
+    emit('set-lecturers', next);
+}
+
+function onLecturerRemove(value: string) {
+    emit('set-lecturers', lecturers.value.map((l) => l.personId).filter((id) => id !== value));
+}
+
 function onPersonAdd(value: string) {
     const next = [...(props.session?.people ?? []).map((p) => p.personId), value];
 
@@ -433,6 +491,7 @@ const emit = defineEmits<{
     delete: [];
     /** A partial edit of what this Event IS; one request per control. */
     'set-details': [patch: Record<string, unknown>];
+    'set-lecturers': [personIds: string[]];
     'set-rooms': [roomIds: string[]];
 }>();
 

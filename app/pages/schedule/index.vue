@@ -221,6 +221,7 @@
                     :can-swap="canSwap"
                     :can-delete="canDeleteSession"
                     :can-update="canUpdateSession"
+                    :can-assign-lecturer="canAssignLecturer"
                     :kinds="data.kinds.value"
                     :people="data.people.value"
                     :groups="data.groups.value"
@@ -237,6 +238,7 @@
                     @toggle-lock="editing.toggleLock"
                     @delete="deleteSelectedEvent"
                     @set-details="saveEventDetails"
+                    @set-lecturers="saveLecturers"
                     />
 
                 <ScheduleOffGridTray
@@ -322,6 +324,7 @@ const canReviewProposals = useHasPermission('generation.read');
 const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
 const canUpdateSession = useHasPermission('session.update');
+const canAssignLecturer = useHasPermission('session.assign_lecturer');
 /**
  * A placement carries the week on screen — the grid does not know which week it
  * shows, so the page supplies it. That is what makes a cross-week move possible.
@@ -425,6 +428,29 @@ async function saveEventDetails(patch: Record<string, unknown>) {
 
     try {
         await $fetch(`/api/sessions/${target.id}/details`, { method: 'POST', body: patch });
+        await data.refreshAll();
+    } catch (caught: unknown) {
+        const detail = (caught as { data?: { statusMessage?: string } }).data;
+
+        editing.error.value = detail?.statusMessage ?? 'Could not save that change.';
+    }
+}
+
+/**
+ * A locked Session's lecturer, or an Event's — the two cases `lecturers.post.ts`
+ * accepts. No `offeringId !== null` bail-out here, unlike `saveEventDetails`:
+ * that guard exists because `details.post.ts` refuses every Offering-linked
+ * Session outright, and this route does not.
+ */
+async function saveLecturers(personIds: string[]) {
+    const target = editing.selected.value;
+
+    if (!target) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/sessions/${target.id}/lecturers`, { method: 'POST', body: { personIds } });
         await data.refreshAll();
     } catch (caught: unknown) {
         const detail = (caught as { data?: { statusMessage?: string } }).data;

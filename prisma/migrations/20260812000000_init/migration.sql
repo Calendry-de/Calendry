@@ -2783,6 +2783,8 @@ SET search_path = public;
 -- that adds it, not adding one — and this migration only adds. The first row
 -- carrying it is written by a later request. (Server is PG 18.1.)
 ALTER TYPE "session_event_type" ADD VALUE IF NOT EXISTS 'UPDATE_DETAILS';
+-- from the manual lecturer override, #7 item 4
+ALTER TYPE "session_event_type" ADD VALUE IF NOT EXISTS 'SET_LECTURERS';
 
 
 -- ===========================================================================
