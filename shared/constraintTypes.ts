@@ -23,6 +23,25 @@ export const STRUCTURAL_CONSTRAINT_TYPES = [
 export type StructuralConstraintType = (typeof STRUCTURAL_CONSTRAINT_TYPES)[number];
 
 /**
+ * App-decided, but PER SESSION rather than pairwise — a fact about one
+ * placement and the TimeGrid it sits in, needing no counterpart Session to
+ * compare against.
+ *
+ * A SEPARATE LIST FROM `STRUCTURAL_CONSTRAINT_TYPES`, not a fifth member of it,
+ * because that list drives `describeCollision`'s dispatch, whose switch is
+ * exhaustive over pairs — `(a, b)` — and has nowhere to put a check that only
+ * ever looks at one Session. Folding this in would mean either a dead case
+ * that never fires from the pairwise loop, or bending the pairwise loop to
+ * also iterate seeds alone; `server/utils/violations.ts` runs this list as its
+ * own pass instead.
+ */
+export const PER_SESSION_CONSTRAINT_TYPES = [
+    'no_session_spanning_break',
+] as const;
+
+export type PerSessionConstraintType = (typeof PER_SESSION_CONSTRAINT_TYPES)[number];
+
+/**
  * Types owned by the solver service (TAXONOMY.md §7) — evaluated at generation
  * time rather than by this app on every manual edit.
  *
@@ -293,6 +312,37 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             + 'tree, both scheduled at once.',
         evaluator: 'app',
         severity: 'HARD',
+        params: [],
+    },
+
+    // ---- Structural, evaluated here, PER SESSION (no counterpart) ----------
+    {
+        key: 'no_session_spanning_break',
+        label: 'Report sessions spanning a break',
+        description:
+            'A session that starts before a named break and ends after it is drawn '
+            + 'honestly on the grid and is entirely LEGAL — this only makes the fact '
+            + 'queryable, so it can be listed, counted and reviewed rather than living '
+            + 'only in the chip somebody happens to be looking at.',
+        evaluator: 'app',
+        severity: 'SOFT',
+        /*
+         * UNCALIBRATED, like `REPAIR_MOVEMENT_WEIGHT` — chosen to be visible in
+         * a SOFT summary next to this tenant's other soft rules, not measured
+         * against them. Meaningful even with no solver objective behind this
+         * type: `refreshViolations` sets `penalty: weight` for every SOFT
+         * violation regardless of which evaluator found it, and the review
+         * screen sums penalties per type — the same mechanism a solver-priced
+         * SOFT rule uses.
+         *
+         * NO WIRE FIELD, and that is not a gap to close casually: this is the
+         * REPORTING half only (issue #27). The solver AVOIDING this shape is a
+         * different, unbuilt card (issue #26) that needs the grid's break
+         * structure on the wire at all, which today it deliberately is not
+         * (CLAUDE.md, "TimeGrid breaks"). Enabling this type has no effect on
+         * what the solver places — only on what a manual edit is reported as.
+         */
+        defaultWeight: 5,
         params: [],
     },
 
@@ -1274,7 +1324,9 @@ export const CONSTRAINT_TYPE_KEYS = CONSTRAINT_TYPES.map((type) => type.key);
  */
 export function constraintCatalogueDrift(): { missingFromCatalogue: string[]; missingFromEvaluators: string[] } {
     const declared = new Set(CONSTRAINT_TYPE_KEYS);
-    const evaluated = [...STRUCTURAL_CONSTRAINT_TYPES, ...SOLVER_OWNED_CONSTRAINT_TYPES];
+    const evaluated = [
+        ...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES, ...SOLVER_OWNED_CONSTRAINT_TYPES,
+    ];
 
     return {
         missingFromCatalogue: evaluated.filter((key) => !declared.has(key)),
@@ -1680,7 +1732,15 @@ export function defaultConstraintRow(type: ConstraintTypeDef): {
         name: type.label,
         severity,
         weight: severity === 'SOFT' ? type.defaultWeight! : null,
-        isEnabled: STRUCTURAL_CONSTRAINT_TYPES.includes(type.key as never),
+        /*
+         * PER_SESSION types are ALSO enabled by default alongside the
+         * pairwise structural ones: both are purely informational reports a
+         * tenant benefits from seeing from day one, neither can make a term
+         * infeasible, and both are enabled the same way every existing
+         * structural default row already is.
+         */
+        isEnabled: STRUCTURAL_CONSTRAINT_TYPES.includes(type.key as never)
+            || PER_SESSION_CONSTRAINT_TYPES.includes(type.key as never),
         isDefault: true,
         params: Object.fromEntries(
             type.params

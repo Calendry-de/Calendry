@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     CONSTRAINT_TYPES,
+    PER_SESSION_CONSTRAINT_TYPES,
     SOLVER_OWNED_CONSTRAINT_TYPES,
     STRUCTURAL_CONSTRAINT_TYPES,
     constraintCatalogueDrift,
@@ -31,19 +32,31 @@ describe('constraint catalogue', () => {
         expect(drift.missingFromEvaluators).toEqual([]);
     });
 
-    it('marks structural types as app-evaluated and the rest as solver-owned', () => {
+    it('marks structural and per-session types as app-evaluated, the rest as solver-owned', () => {
+        /*
+         * THREE LISTS NOW, not two — `PER_SESSION_CONSTRAINT_TYPES` joined
+         * `STRUCTURAL_CONSTRAINT_TYPES` as a second app-evaluated category with
+         * `no_session_spanning_break`: also decided from placement data alone,
+         * just not pairwise. Both are 'app'; only `SOLVER_OWNED_CONSTRAINT_TYPES`
+         * is 'solver'.
+         */
+        const appEvaluated = new Set<string>([
+            ...STRUCTURAL_CONSTRAINT_TYPES,
+            ...PER_SESSION_CONSTRAINT_TYPES,
+        ]);
+
         for (const type of CONSTRAINT_TYPES) {
-            const expected = (STRUCTURAL_CONSTRAINT_TYPES as readonly string[]).includes(type.key)
-                ? 'app'
-                : 'solver';
+            const expected = appEvaluated.has(type.key) ? 'app' : 'solver';
 
             expect(type.evaluator, `${type.key} evaluator`).toBe(expected);
         }
     });
 
-    it('covers exactly the two evaluator lists', () => {
+    it('covers exactly the three evaluator lists', () => {
         expect(CONSTRAINT_TYPES).toHaveLength(
-            STRUCTURAL_CONSTRAINT_TYPES.length + SOLVER_OWNED_CONSTRAINT_TYPES.length,
+            STRUCTURAL_CONSTRAINT_TYPES.length
+            + PER_SESSION_CONSTRAINT_TYPES.length
+            + SOLVER_OWNED_CONSTRAINT_TYPES.length,
         );
     });
 
@@ -239,8 +252,18 @@ describe('constraint → wire mapping (Stage 3d)', () => {
          * announce itself — it fails, and whoever added the type decides
          * deliberately whether the field exists yet, instead of discovering
          * months later that an enabled rule never crossed.
+         *
+         * ONE NAMED, PERMANENT EXEMPTION: `PER_SESSION_CONSTRAINT_TYPES`. These
+         * are evaluator:'app' and never reach the solver AT ALL — unlike the
+         * pairwise structural types (also 'app', but dual-enforced: sent to the
+         * solver as a hard filter too, which is why THEY carry a wireField). A
+         * per-session type's missing field is not "ahead of the schema", it is
+         * "there is no schema to be ahead of" — see its catalogue comment.
          */
-        const unmapped = CONSTRAINT_TYPES.filter((type) => !type.wireField).map((type) => type.key);
+        const unmapped = CONSTRAINT_TYPES
+            .filter((type) => !type.wireField)
+            .filter((type) => !(PER_SESSION_CONSTRAINT_TYPES as readonly string[]).includes(type.key))
+            .map((type) => type.key);
 
         expect(unmapped).toEqual([]);
     });

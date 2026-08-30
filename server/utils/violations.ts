@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
-import { STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
+import { PER_SESSION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
 import type { StructuralConstraintType } from '../../shared/constraintTypes';
+import { gapsWithinSpan } from '../../shared/timeGrid';
 import type { Tx } from './tenantDb';
 import { conflictGroupIds, descendantGroupIds } from './groupClosure';
 
@@ -32,9 +33,10 @@ import { conflictGroupIds, descendantGroupIds } from './groupClosure';
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
 export {
     STRUCTURAL_CONSTRAINT_TYPES,
+    PER_SESSION_CONSTRAINT_TYPES,
     SOLVER_OWNED_CONSTRAINT_TYPES,
 } from '../../shared/constraintTypes';
-export type { StructuralConstraintType } from '../../shared/constraintTypes';
+export type { StructuralConstraintType, PerSessionConstraintType } from '../../shared/constraintTypes';
 
 interface PlacedSession {
     id: string;
@@ -47,6 +49,16 @@ interface PlacedSession {
     dayOfWeek: number;
     blockIndex: number;
     durationBlocks: number;
+}
+
+/**
+ * A seed, additionally carrying its own TimeGrid — needed only by the
+ * per-session pass below, which is why `candidates` does not select it: a
+ * candidate is never checked for spanning a break, only for colliding with a
+ * seed.
+ */
+interface SeedSession extends PlacedSession {
+    timeGridId: string | null;
 }
 
 /** Half-open block ranges [start, start+duration) overlap. */
@@ -113,7 +125,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const configured = await tx.constraint.findMany({
         where: {
             tenantId,
-            type: { in: [...STRUCTURAL_CONSTRAINT_TYPES] },
+            type: { in: [...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES] },
         },
         select: { id: true, type: true, severity: true, weight: true, isEnabled: true },
     });
@@ -135,8 +147,9 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         select: {
             id: true, tenantId: true, termId: true, kindId: true, offeringId: true,
             termWeek: true, dayOfWeek: true, blockIndex: true, durationBlocks: true,
+            timeGridId: true,
         },
-    })) as PlacedSession[];
+    })) as SeedSession[];
 
     if (seeds.length === 0) {
         return 0;
@@ -252,7 +265,19 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
 
     const detected: Detected[] = [];
 
-    for (const constraint of enabled) {
+    /*
+     * TWO SHAPES OF `enabled` ROW, dispatched separately: `describeCollision`'s
+     * switch is exhaustive over the PAIRWISE types and has no case for a
+     * per-session one, so a per-session row is never handed to it.
+     */
+    const pairwiseEnabled = enabled.filter(
+        (c) => !PER_SESSION_CONSTRAINT_TYPES.includes(c.type as never),
+    );
+    const perSessionEnabled = enabled.filter(
+        (c) => PER_SESSION_CONSTRAINT_TYPES.includes(c.type as never),
+    );
+
+    for (const constraint of pairwiseEnabled) {
         for (const seed of seeds) {
             for (const other of candidates) {
                 if (other.id === seed.id || !blocksOverlap(seed, other)) {
@@ -276,6 +301,65 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                     severity: constraint.severity as 'HARD' | 'SOFT',
                     penalty: constraint.severity === 'SOFT' ? constraint.weight : null,
                     detail: { ...collision, collidesWithSessionId: other.id },
+                });
+            }
+        }
+    }
+
+    /**
+     * PER-SESSION: one Session, its own TimeGrid, no counterpart. Grids are
+     * fetched ONCE per distinct `timeGridId` among the seeds, not once per
+     * (constraint, seed) — the pairwise loop above re-uses precomputed closures
+     * for the same reason.
+     */
+    if (perSessionEnabled.length > 0) {
+        const gridIds = [...new Set(seeds.map((s) => s.timeGridId).filter((id): id is string => id !== null))];
+
+        const grids = gridIds.length
+            ? await tx.timeGrid.findMany({
+                where: { id: { in: gridIds } },
+                select: {
+                    id: true, blocksPerDay: true, blockLengthMinutes: true,
+                    startHour: true, startMinute: true, breakMinutes: true,
+                    breaks: { select: { afterBlockIndex: true, durationMinutes: true, label: true, dayOfWeek: true } },
+                },
+            })
+            : [];
+
+        const gridById = new Map(grids.map((grid) => [grid.id, grid]));
+
+        for (const constraint of perSessionEnabled) {
+            for (const seed of seeds) {
+                // No grid, nothing to check against — the same "named rather
+                // than filtered" reasoning `fitsGrid` callers already follow:
+                // a null timeGridId here means there is no rule to violate,
+                // not that the rule passed.
+                const grid = seed.timeGridId ? gridById.get(seed.timeGridId) : undefined;
+
+                if (!grid) {
+                    continue;
+                }
+
+                const gaps = gapsWithinSpan(
+                    grid,
+                    seed.blockIndex,
+                    seed.durationBlocks,
+                    seed.dayOfWeek,
+                );
+
+                if (gaps.length === 0) {
+                    continue;
+                }
+
+                detected.push({
+                    constraintId: constraint.id,
+                    sessionId: seed.id,
+                    severity: constraint.severity as 'HARD' | 'SOFT',
+                    penalty: constraint.severity === 'SOFT' ? constraint.weight : null,
+                    detail: {
+                        reason: 'session_spans_break',
+                        gaps: gaps.map((g) => ({ afterBlockIndex: g.afterBlockIndex, minutes: g.minutes, label: g.label })),
+                    },
                 });
             }
         }

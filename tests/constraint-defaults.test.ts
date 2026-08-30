@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import {
-    CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES,
+    CONSTRAINT_TYPES, PER_SESSION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES,
     defaultConstraintRow, defaultConstraintTypes,
 } from '../shared/constraintTypes';
 
@@ -67,14 +67,19 @@ describe('the catalogue half', () => {
         }
     });
 
-    it('enables exactly the structural rules and nothing else', () => {
+    it('enables exactly the structural and per-session rules, and nothing else', () => {
+        // PER_SESSION types joined structural ones as auto-enabled-by-default:
+        // both are purely informational reports with no way to make a term
+        // infeasible, so both start on for a freshly-provisioned tenant.
         const enabled = defaultConstraintTypes()
             .map(defaultConstraintRow)
             .filter((row) => row.isEnabled)
             .map((row) => row.type)
             .sort();
 
-        expect(enabled).toEqual([...STRUCTURAL_CONSTRAINT_TYPES].sort());
+        expect(enabled).toEqual(
+            [...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES].sort(),
+        );
     });
 
     it('does NOT auto-enable person_preference_fit', () => {
