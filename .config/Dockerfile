@@ -76,7 +76,7 @@ COPY --chown=app:app prisma.config.js ./prisma.config.js
 
 # prisma/seed.ts imports shared/permissions and scripts/lib/ownerDatabaseUrl.
 COPY --chown=app:app shared ./shared
-COPY --chown=app:app scripts/lib ./scripts/lib
+COPY --chown=app:app scripts ./scripts
 COPY --chown=app:app package.json ./package.json
 # The generated client the seed imports. Reads the schema, not the database.
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \

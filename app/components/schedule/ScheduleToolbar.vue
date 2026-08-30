@@ -312,9 +312,15 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
      */
     position: relative;
 
-    /* Above `.schedule_body` so the solver's anchored panels overlay the grid
-       instead of displacing it; `.schedule_side` is sticky and later in the DOM. */
-    z-index: 2;
+    /*
+     * Above `.schedule_body` so the solver's and blocked-day panels overlay the
+     * grid instead of displacing it; `.schedule_side` is sticky and later in the
+     * DOM. Must also outrank `ScheduleGrid`'s own sticky corner (z-index: 3) —
+     * that cell creates its own stacking context with nothing in between to
+     * contain it, so it compared directly against this one and painted over
+     * both anchored panels regardless of their own (locally-scoped) z-index.
+     */
+    z-index: 4;
 
     display: grid;
     grid-template-areas:
