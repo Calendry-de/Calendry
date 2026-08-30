@@ -273,7 +273,7 @@ defineExpose({ reset });
     &_weeks {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--space-1);
 
         margin: 0;
         padding: 0;

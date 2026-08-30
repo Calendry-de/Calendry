@@ -590,7 +590,7 @@ function clearSearch() {
 
         &--ok {
             display: inline-flex;
-            gap: 2px;
+            gap: var(--space-1);
             align-items: center;
             color: $success700;
 

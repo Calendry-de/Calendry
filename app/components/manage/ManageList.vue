@@ -412,7 +412,7 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
     &_loading {
         display: flex;
         justify-content: center;
-        padding: 60px 0;
+        padding: 60px 0; // Empty-state spacing, hand-tuned — not on the scale.
     }
 
     &_pager {

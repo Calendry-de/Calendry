@@ -157,7 +157,7 @@ function subjectOf(violation: Violation): string {
     // to navigate to, and a button that selects nothing is worse than text.
     &_unplaced {
         display: flex;
-        gap: 5px;
+        gap: 5px; // Between space-2 (4px) and space-3 (6px) — hand-tuned, not on the scale.
         align-items: center;
 
         font-size: var(--font-size-sm);

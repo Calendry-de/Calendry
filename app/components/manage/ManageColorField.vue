@@ -99,7 +99,7 @@ const controlId = useId();
 
             width: 44px;
             height: 44px;
-            padding: 2px;
+            padding: var(--space-1);
             border: 1px solid $surface5;
             border-radius: var(--radius-lg);
 

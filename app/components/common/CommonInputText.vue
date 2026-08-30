@@ -128,24 +128,24 @@ defineExpose({
 
     &_label {
         margin-bottom: 8px;
-        font-size: 13px;
+        font-size: var(--font-size-md);
         font-weight: 600;
 
         @include mobile {
-            font-size: 10px;
+            font-size: var(--font-size-xs);
         }
     }
 
     &_container {
         display: flex;
-        gap: 16px;
+        gap: var(--space-6);
         align-items: center;
 
         width: 100%;
         height: v-bind(height);
         padding: 0 16px;
         border: 2px solid transparent;
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
 
         background: $surface2;
 
@@ -168,17 +168,17 @@ defineExpose({
 
     &__input {
         display: flex;
-        gap: 12px;
+        gap: var(--space-5);
         align-items: center;
         width: 100%;
 
         input {
             width: 100%;
-            padding: 12px 0;
+            padding: var(--space-5) 0;
             border: none;
 
             font-family: $defaultFont;
-            font-size: 13px;
+            font-size: var(--font-size-md);
             font-weight: 600;
             color:$content4;
 
@@ -188,7 +188,7 @@ defineExpose({
             box-shadow: none;
 
             @include mobile {
-                font-size: 10px;
+                font-size: var(--font-size-xs);
             }
 
             &::placeholder {
@@ -202,7 +202,7 @@ defineExpose({
         margin-top: 4px;
         margin-bottom: 10px;
 
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         color: $content7;
         text-align: right;
 

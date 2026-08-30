@@ -246,7 +246,7 @@ const stepOnWheel = useWheelStep({
 
         width: 40%;
         height: 2px;
-        border-radius: 2px;
+        border-radius: 2px; // Half the 2px height — a pill end, not a scale step.
 
         background: $primary500;
 

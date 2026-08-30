@@ -312,7 +312,7 @@ function emitValue(value: unknown) {
 
             width: 40px;
             height: 38px;
-            padding: 2px;
+            padding: var(--space-1);
             border: 1px solid $surface4;
             border-radius: var(--radius-lg);
 

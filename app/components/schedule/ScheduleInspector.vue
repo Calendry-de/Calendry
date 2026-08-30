@@ -576,7 +576,7 @@ const attendeeNames = computed(() => attendees.value
 
         min-height: 160px;
 
-        font-size: 13px;
+        font-size: var(--font-size-md);
         color: $content7;
         text-align: center;
 
@@ -600,15 +600,15 @@ const attendeeNames = computed(() => attendees.value
     &_title {
         margin: 0;
 
-        font-size: 17px;
+        font-size: var(--font-size-lg);
         font-weight: 650;
         line-height: 1.25;
         color: $content2;
     }
 
     &_sub {
-        margin: 4px 0 0;
-        font-size: 12px;
+        margin: var(--space-2) 0 0;
+        font-size: var(--font-size-sm);
         color: $content7;
     }
 
@@ -621,9 +621,9 @@ const attendeeNames = computed(() => attendees.value
 
         display: flex;
 
-        padding: 4px;
+        padding: var(--space-2);
         border: 0;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
 
         color: $content7;
 
@@ -653,7 +653,7 @@ const attendeeNames = computed(() => attendees.value
     &_facts {
         display: flex;
         flex-direction: column;
-        gap: 12px;
+        gap: var(--space-5);
         margin: 0;
 
         dt {
@@ -689,9 +689,9 @@ const attendeeNames = computed(() => attendees.value
        these never appear where nothing may change. */
     &_control {
         width: 100%;
-        padding: 4px 6px;
+        padding: var(--space-2) var(--space-3);
         border: 1px solid $surface5;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
 
         font: inherit;
         color: inherit;
@@ -703,9 +703,9 @@ const attendeeNames = computed(() => attendees.value
        the pointer or focus lands on it. */
     &_title--edit {
         width: 100%;
-        padding: 2px 4px;
+        padding: var(--space-1) var(--space-2);
         border: 1px solid transparent;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
 
         font: inherit;
         color: inherit;
@@ -720,18 +720,18 @@ const attendeeNames = computed(() => attendees.value
     }
 
     &_violations {
-        padding: 12px;
-        border-radius: 8px;
+        padding: var(--space-5);
+        border-radius: var(--radius-lg);
         background: rgb(169, 125, 45, 0.14);
 
         h3 {
             display: flex;
-            gap: 6px;
+            gap: var(--space-3);
             align-items: center;
 
             margin: 0 0 8px;
 
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             font-weight: 650;
             color: $warning700;
             text-transform: uppercase;
@@ -746,12 +746,12 @@ const attendeeNames = computed(() => attendees.value
         ul {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: var(--space-3);
 
             margin: 0;
             padding-left: 16px;
 
-            font-size: 12.5px;
+            font-size: var(--font-size-sm);
             line-height: 1.45;
             color: $content5;
         }
@@ -764,8 +764,8 @@ const attendeeNames = computed(() => attendees.value
     }
 
     &_note {
-        margin: 8px 0 0;
-        font-size: 11.5px;
+        margin: var(--space-4) 0 0;
+        font-size: var(--font-size-xs);
         line-height: 1.4;
         color: $content7;
     }
@@ -773,13 +773,13 @@ const attendeeNames = computed(() => attendees.value
     &_actions {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--space-4);
         margin-top: auto;
     }
 
     &_hint {
         margin: 0;
-        font-size: 11.5px;
+        font-size: var(--font-size-xs);
         line-height: 1.4;
         color: $content7;
     }

@@ -58,21 +58,21 @@ const toastIcon = {
 
         min-width: 300px;
         max-width: 400px;
-        padding: 16px 20px;
-        border-radius: 8px;
+        padding: 16px 20px; // 20px has no scale match; kept together rather than half-tokenized.
+        border-radius: var(--radius-lg);
 
         background: $content1;
         box-shadow: 2px 2px 2px rgb(0 0 0 / 25%);
 
         &-header {
             display: flex;
-            gap: 12px;
+            gap: var(--space-5);
             align-items: center;
         }
 
         &-title {
             flex: 1;
-            font-size: 14px;
+            font-size: var(--font-size-md);
             font-weight: 600;
             color: $surface2;
         }
@@ -105,11 +105,11 @@ const toastIcon = {
 
             width: 29px;
             height: 29px;
-            padding: 4px;
+            padding: var(--space-2);
             border: none;
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
 
-            font-size: 24px;
+            font-size: var(--font-size-xl);
             font-weight: 300;
             line-height: 1;
             color: $surface6;
@@ -128,7 +128,7 @@ const toastIcon = {
         &-content {
             margin-top: 8px;
             padding-left: 36px;
-            font-size: 14px;
+            font-size: var(--font-size-md);
             color: $surface5;
         }
     }

@@ -192,15 +192,15 @@ const getAttrs = computed(() => {
     user-select: none;
 
     display: flex;
-    gap: 12px;
+    gap: var(--space-5);
     align-items: center;
     justify-content: center;
 
     width: var(--button-width);
     min-height: 40px;
-    padding: 8px 20px;
+    padding: 8px 20px; // 20px has no scale match; kept together rather than half-tokenized.
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 
     /* A native <button> inherits the UA's font, not the page's — so switching
        the root element from <div> would silently restyle every button. The
@@ -380,7 +380,7 @@ const getAttrs = computed(() => {
     &--icon {
         width: 40px;
         height: 40px;
-        padding: 8px;
+        padding: var(--space-4);
     }
 
     &--size-S {
@@ -400,7 +400,7 @@ const getAttrs = computed(() => {
         padding: 0;
         border-radius: 0;
 
-        font-size: 10px;
+        font-size: var(--font-size-xs);
         color: var(--link-color);
         text-align: left;
         text-decoration: underline;

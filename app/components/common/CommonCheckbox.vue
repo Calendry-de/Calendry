@@ -36,11 +36,11 @@ const checked = defineModel({ type: Boolean, required: true });
     user-select: none;
 
     display: flex;
-    gap: 16px;
+    gap: var(--space-6);
     align-items: center;
 
     font-family: $defaultFont;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     line-height: 100%;
 
@@ -56,7 +56,7 @@ const checked = defineModel({ type: Boolean, required: true });
         width: 16px;
         height: 16px;
         border: 1px solid $content2;
-        border-radius: 4px;
+        border-radius: var(--radius-sm);
 
         transition: 0.3s;
 

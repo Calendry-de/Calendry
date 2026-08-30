@@ -161,16 +161,16 @@ function countFor(day: number): number {
 .agenda {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-5);
     width: 100%;
 
     &_days {
         overflow-x: auto;
         display: flex;
-        gap: 4px;
+        gap: var(--space-2);
 
-        padding: 4px;
-        border-radius: 8px;
+        padding: var(--space-2);
+        border-radius: var(--radius-lg);
 
         background: $surface1;
     }
@@ -180,7 +180,7 @@ function countFor(day: number): number {
 
         display: flex;
         flex: 1;
-        gap: 5px;
+        gap: 5px; // Between space-2 (4px) and space-3 (6px) — hand-tuned, not on the scale.
         align-items: center;
         justify-content: center;
 
@@ -190,12 +190,12 @@ function countFor(day: number): number {
         // there; this is the screen it was written for.
         min-width: 44px;
         min-height: 44px;
-        padding: 8px 12px;
+        padding: var(--space-4) var(--space-5);
         border: 0;
-        border-radius: 6px;
+        border-radius: var(--radius-md);
 
         font-family: inherit;
-        font-size: 12.5px;
+        font-size: var(--font-size-sm);
         font-weight: 600;
         color: $content6;
 
@@ -214,10 +214,10 @@ function countFor(day: number): number {
 
     &_count {
         min-width: 17px;
-        padding: 1px 4px;
-        border-radius: 9px;
+        padding: 1px 4px; // 1px is a hairline on a small badge; kept together rather than half-tokenized.
+        border-radius: 9px; // Half the 17px min-width — a circular badge, not a scale step.
 
-        font-size: 10.5px;
+        font-size: var(--font-size-xs);
         font-variant-numeric: tabular-nums;
         color: $surface1;
 
@@ -229,7 +229,7 @@ function countFor(day: number): number {
     &_targets {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--space-4);
 
         margin: 0;
         padding: 0;
@@ -241,18 +241,18 @@ function countFor(day: number): number {
         cursor: pointer;
 
         display: flex;
-        gap: 12px;
+        gap: var(--space-5);
         align-items: center;
         justify-content: space-between;
 
         width: 100%;
         min-height: 52px;
-        padding: 10px 12px;
+        padding: 10px 12px; // 10px has no scale match; kept together rather than half-tokenized.
         border: 1px dashed $primary600;
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
 
         font-family: inherit;
-        font-size: 13px;
+        font-size: var(--font-size-md);
         color: $content2;
 
         background: varToRgba('primary500', 0.08);
@@ -265,7 +265,7 @@ function countFor(day: number): number {
     &_target-time {
         display: flex;
         flex: none;
-        gap: 6px;
+        gap: var(--space-3);
         align-items: baseline;
 
         font-weight: 600;
@@ -274,7 +274,7 @@ function countFor(day: number): number {
 
     &_target-verb {
         display: flex;
-        gap: 6px;
+        gap: var(--space-3);
         align-items: center;
         color: $primary700;
 
@@ -286,9 +286,9 @@ function countFor(day: number): number {
 
     &_empty {
         margin: 0;
-        padding: 28px 0;
+        padding: 28px 0; // Between space-7 (24px) and space-8 (32px) — hand-tuned, not on the scale.
 
-        font-size: 13px;
+        font-size: var(--font-size-md);
         color: $content7;
         text-align: center;
     }
@@ -296,7 +296,7 @@ function countFor(day: number): number {
     &_list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--space-4);
 
         margin: 0;
         padding: 0;
@@ -320,17 +320,17 @@ function countFor(day: number): number {
     &_time {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--space-1);
 
         padding-top: 7px;
 
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         font-variant-numeric: tabular-nums;
         color: $content6;
         text-align: right;
 
         &-end {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: $content7;
         }
     }

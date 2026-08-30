@@ -195,7 +195,7 @@ const TARGETS = [
     &_chipTitle,
     &_chipMeta {
         height: 3px;
-        border-radius: 2px;
+        border-radius: 2px; // Half the 3px height — a pill end, not a scale step.
     }
 
     &_chipTitle {

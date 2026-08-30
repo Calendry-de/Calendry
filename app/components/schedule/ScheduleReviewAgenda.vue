@@ -201,7 +201,7 @@ function countFor(day: number): number {
     &_count {
         min-width: 18px;
         padding: var(--space-1) var(--space-2);
-        border-radius: 9px;
+        border-radius: 9px; // Half the 18px min-width — a circular badge, not a scale step.
 
         font-size: var(--font-size-xs);
         font-variant-numeric: tabular-nums;

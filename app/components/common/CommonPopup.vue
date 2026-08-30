@@ -112,15 +112,15 @@ defineSlots<{
     background: rgb(212 238 247 / 10%);
 
     &-content {
-        padding: 32px;
-        border-radius: 8px;
+        padding: var(--space-8);
+        border-radius: var(--radius-lg);
         background: $surface1;
     }
 
     &-control {
         display: flex;
         flex-flow: row;
-        gap: 16px;
+        gap: var(--space-6);
         align-items: center;
         justify-content: right;
 

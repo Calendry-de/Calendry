@@ -222,7 +222,7 @@ function submit() {
      */
     &_form :deep(.input__input input),
     &_textarea {
-        font-size: 16px;
+        font-size: var(--font-size-lg);
     }
 
     &_form :deep(.input_label) {

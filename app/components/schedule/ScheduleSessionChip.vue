@@ -386,7 +386,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
      * so occupancy gets an EDGE instead.
      */
     border: 1px solid $surface5;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
 
     text-align: left;
 
@@ -423,7 +423,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
         display: none;
         flex: none;
 
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         font-weight: 600;
         font-variant-numeric: tabular-nums;
         color: $content6;
@@ -473,7 +473,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     &_title {
         overflow: hidden;
 
-        font-size: 12.5px;
+        font-size: var(--font-size-sm);
         font-weight: 600;
         line-height: 1.25;
         color: $content4;
@@ -483,10 +483,10 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
 
     &_meta {
         display: flex;
-        gap: 4px;
+        gap: var(--space-2);
         align-items: center;
 
-        font-size: 11px;
+        font-size: var(--font-size-xs);
         color: $content7;
     }
 

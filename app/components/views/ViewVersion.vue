@@ -17,7 +17,7 @@ const config = useRuntimeConfig();
     right: 10px;
     bottom: 10px;
 
-    font-size: 0.8rem;
+    font-size: var(--font-size-sm);
     color: $content7;
 }
 </style>

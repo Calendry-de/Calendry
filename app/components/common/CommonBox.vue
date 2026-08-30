@@ -23,12 +23,12 @@ defineSlots<{
     .common-box {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: var(--space-6);
 
         min-width: 50vmax;
-        padding: 32px;
+        padding: var(--space-8);
         border: 1px solid $surface7;
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
 
         background-color: $surface5;
 

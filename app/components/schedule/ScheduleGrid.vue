@@ -247,10 +247,10 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
-    gap: 1px;
+    gap: 1px; // Grid-line gutter, drawn via the background colour — a physical constant, not a scale step.
 
-    padding: 1px;
-    border-radius: 10px;
+    padding: 1px; // Same grid-line gutter on the outer edge.
+    border-radius: var(--radius-xl);
 
     background: $surface5;
 
@@ -265,7 +265,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         top: 0;
         left: 0;
 
-        border-radius: 9px 0 0;
+        border-radius: 9px 0 0; // Hand-tuned sticky-corner rounding, not a scale step.
     }
 
     &_day {
@@ -274,13 +274,13 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         top: 0;
 
         display: flex;
-        gap: 6px;
+        gap: var(--space-3);
         align-items: center;
         justify-content: center;
 
         height: 40px;
 
-        font-size: 13px;
+        font-size: var(--font-size-md);
         font-weight: 600;
         color: $content6;
         letter-spacing: 0.02em;
@@ -288,17 +288,17 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         &-short { display: none; }
 
         &-date {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             font-weight: 500;
             font-variant-numeric: tabular-nums;
             color: $content7;
         }
 
         &-note {
-            padding: 1px 6px;
-            border-radius: 999px;
+            padding: 1px 6px; // 1px is the same grid-gutter constant above; kept together with 6px rather than half-tokenized.
+            border-radius: 999px; // Idiomatic "fully round" — always a pill/circle regardless of size.
 
-            font-size: 10px;
+            font-size: var(--font-size-xs);
             font-weight: 600;
             color: $content6;
             letter-spacing: 0.04em;
@@ -345,7 +345,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
     &_time {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: var(--space-1);
         align-items: flex-end;
         justify-content: center;
 
@@ -355,12 +355,12 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         font-variant-numeric: tabular-nums;
 
         &-start {
-            font-size: 12px;
+            font-size: var(--font-size-sm);
             color: $content6;
         }
 
         &-end {
-            font-size: 11px;
+            font-size: var(--font-size-xs);
             color: $content7;
         }
     }
@@ -373,7 +373,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         padding: 0 10px;
 
-        font-size: 10px;
+        font-size: var(--font-size-xs);
         font-variant-numeric: tabular-nums;
         color: $content7;
     }
@@ -397,7 +397,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
                 width: 100%;
                 height: 100%;
                 border: 1px dashed varToRgba('primary600', 0.55);
-                border-radius: 6px;
+                border-radius: var(--radius-md);
 
                 opacity: 0;
 
@@ -427,11 +427,11 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
     &_gap {
         overflow: hidden;
         display: flex;
-        gap: 6px;
+        gap: var(--space-3);
         align-items: center;
         justify-content: center;
 
-        font-size: 10px;
+        font-size: var(--font-size-xs);
         color: $content7;
         letter-spacing: 0.02em;
         white-space: nowrap;
@@ -455,7 +455,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         pointer-events: none;
 
         display: flex;
-        gap: 2px;
+        gap: var(--space-1);
 
         /*
          * IN FLOW, and that is load-bearing. `min-height` is a floor, and the
@@ -471,7 +471,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
         align-self: start;
 
         min-width: 0;
-        padding: 2px;
+        padding: var(--space-1);
 
         > * { pointer-events: auto; }
 
@@ -479,7 +479,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
            grows to fit. See `clusterSlots`. */
         &--compact {
             flex-direction: column;
-            gap: 1px;
+            gap: 1px; // Tightest possible fit for the crowded-cluster fallback — a physical minimum, not a scale step.
 
             /*
              * The same chip, one line high. `:deep` because this is a layout
@@ -489,12 +489,12 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
             :deep(.chip) {
                 flex: none;
                 flex-direction: row;
-                gap: 8px;
+                gap: var(--space-4);
                 align-items: baseline;
                 justify-content: flex-start;
 
                 min-height: 24px;
-                padding: 3px 8px;
+                padding: 3px 8px; // Hand-tuned for the single-line compact chip; 3px has no scale match.
             }
 
             :deep(.chip_meta) {

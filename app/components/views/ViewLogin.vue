@@ -67,14 +67,14 @@ const displayName = computed(() => {
 .loggedin-view {
     display: flex;
     flex-direction: row;
-    gap: 16px;
+    gap: var(--space-6);
     align-items: center;
     justify-content: center;
 }
 
 .btn-wrap {
     display: flex;
-    gap: 12px;
+    gap: var(--space-5);
     align-items: center;
     justify-content: center;
 }

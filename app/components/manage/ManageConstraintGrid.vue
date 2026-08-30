@@ -491,7 +491,7 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
     }
 
     &_sev {
-        padding: 2px $space4;
+        padding: var(--space-1) $space4;
         border-radius: $radiusSm;
 
         font-size: $fontSizeXs;

@@ -24,7 +24,7 @@ defineSlots<{ default: () => unknown }>();
 <style scoped lang="scss">
 .blank {
     max-width: 52ch;
-    padding: 40px var(--space-7);
+    padding: 40px var(--space-7); // 40px has no scale match — the other half already is one.
     border-radius: var(--radius-xl);
     background: $surface1;
 
@@ -37,7 +37,7 @@ defineSlots<{ default: () => unknown }>();
 
     p {
         margin: 0;
-        font-size: 13.5px;
+        font-size: var(--font-size-md);
         line-height: 1.55;
         color: $content7;
     }

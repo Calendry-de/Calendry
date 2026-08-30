@@ -30,7 +30,7 @@ const { toasts } = storeToRefs(store);
 
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-5);
 }
 
 .toast-item {
