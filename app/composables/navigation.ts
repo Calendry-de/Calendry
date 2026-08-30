@@ -207,6 +207,24 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             to: '/my/availability',
         },
         {
+            id: 'my.exams',
+            label: 'My exams',
+            description: 'Ask for an exam on a module you lead. Reviewed before it is placed.',
+            icon: 'material-symbols:history-edu-outline',
+            section: 'my',
+            keywords: ['exam', 'klausur', 'assessment', 'request', 'my'],
+            /*
+             * FOUR endpoints, ONE key, and the page enumerates them: its own
+             * requests, the modules to choose from, the exam kinds, and the
+             * grid. `exam.request_own` is the section's authority — "may I ask
+             * for an exam" — and the others are reference data every signed-in
+             * person can already read. Gating on the narrowest of the four
+             * would hide the page from the people it is for.
+             */
+            permission: 'exam.request_own',
+            to: '/my/exams',
+        },
+        {
             id: 'my.preferences',
             label: 'My teaching preferences',
             description: 'Days and times you would rather teach. Recorded, not yet used by the scheduler.',
@@ -242,6 +260,22 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
              */
             permission: 'tenant.read',
             to: '/manage/display',
+        },
+        {
+            id: 'manage.exam-reviews',
+            label: 'Exam review',
+            description: 'Approve or reject exams lecturers have asked for on their own modules.',
+            icon: 'material-symbols:history-edu-outline',
+            section: 'manage',
+            keywords: ['exam', 'klausur', 'review', 'approve', 'reject', 'pending', 'assessment'],
+            /*
+             * `exam.review` and not `exam.request_own`. A page whose only
+             * actions are approve and reject is not worth offering to somebody
+             * who can do neither — the same reasoning the unavailability review
+             * entry below gives for gating on the narrower key.
+             */
+            permission: 'exam.review',
+            to: '/manage/exams/reviews',
         },
         {
             id: 'manage.availability-reviews',

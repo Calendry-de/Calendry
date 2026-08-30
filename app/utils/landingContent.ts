@@ -156,6 +156,14 @@ export const BUILT: LandingRoadmapItem[] = [
             + 'The people already assigned stay on screen while you look for the next one.',
     },
     {
+        id: 'exams',
+        state: 'done',
+        title: 'A lecturer asks for an exam; staff decide',
+        note: 'Request an exam on a module you lead, and see where the request got to. '
+            + 'It reaches no timetable until somebody approves it, because an exam is a room '
+            + 'and an hour the schedule has to find.',
+    },
+    {
         id: 'availability',
         state: 'done',
         title: 'Self-service availability',

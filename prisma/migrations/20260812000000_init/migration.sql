@@ -3909,3 +3909,157 @@ ALTER TABLE "constraint_def"
     FOREIGN KEY ("time_grid_id") REFERENCES "time_grid"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE INDEX "constraint_def_time_grid_id_idx" ON "constraint_def"("time_grid_id");
+
+
+-- ===========================================================================
+-- A lecturer asks for an exam; staff decide
+-- ===========================================================================
+--
+-- The lecturer-facing half of exam placement. A lecturer proposes a slot for an
+-- exam on a module THEY lead; somebody with the review key approves or rejects
+-- it, and approval is what creates the Session.
+--
+-- A REQUEST TABLE, NOT A STATUS ON `session`. The alternative was a PENDING
+-- Session, and it fails for a structural reason rather than a stylistic one: a
+-- Session row is read by the schedule view, the solver snapshot, the violation
+-- checker, the conflict queries and every export. Each of those would have to
+-- learn to exclude a pending one, and each is a place the exclusion can be
+-- forgotten — silently, since a forgotten filter shows MORE rather than fewer.
+-- Nothing queries this table but its own routes, so a pending request cannot
+-- leak into a timetable by omission.
+--
+-- APPROVAL CREATES AN EVENT, not a Session on the module's Offering, and this
+-- is the part worth reading twice. `ExactFrequency` is HARD: the solver expects
+-- exactly `offering.frequency` Sessions for an Offering and will delete or
+-- report anything beyond it. Attaching an exam to the module's own Offering
+-- would therefore either be destroyed by the next solve or count as a
+-- violation of the module's own demand. An Event — `offering_id` NULL — is
+-- structurally out of every solve's scope (`planMaterialization` tests
+-- `inScope.has(s.offeringId)`, and `inScope` is a Set of ids), so it survives
+-- untouched while still occupying its room and its people.
+--
+-- It carries the module's GROUPS and the requesting lecturer, which is what
+-- makes the exam rules reach it at all: `exam_spacing_same_day` and
+-- `exam_spacing_window` are per-Group aggregates over placements, and a locked
+-- Event is a placement the solver must schedule around.
+--
+-- `session_id` is the approval's receipt. It is what makes approving twice
+-- unable to create two exams, and it is nullable because a PENDING or REJECTED
+-- request has created nothing.
+--
+-- The status/decision shape deliberately mirrors `person_unavailability`,
+-- including the CHECK that makes a half-decided row unrepresentable and the
+-- SET NULL audit pointers — deleting an administrator must not cascade away the
+-- decisions they made.
+-- ---------------------------------------------------------------------------
+CREATE TYPE "exam_request_status" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
+
+CREATE TABLE "exam_request" (
+    "id"        TEXT NOT NULL,
+    "tenant_id" TEXT NOT NULL,
+
+    -- The module this is an exam FOR. Never becomes the Session's offering_id;
+    -- see above. It is what "my own Offering" is checked against, and what the
+    -- created Event borrows its groups and its title from.
+    "offering_id" TEXT NOT NULL,
+    "term_id"     TEXT NOT NULL,
+
+    -- Must name a kind whose `type` is EXAM. Not enforceable here — it is a
+    -- cross-row condition — so the write boundary refuses it and a test pins
+    -- that. A non-exam kind would place a Session no exam rule can see.
+    "kind_id" TEXT NOT NULL,
+
+    "term_week"       INTEGER NOT NULL,
+    "day_of_week"     INTEGER NOT NULL,
+    "block_index"     INTEGER NOT NULL,
+    "duration_blocks" INTEGER NOT NULL DEFAULT 1,
+
+    -- A PREFERENCE, not a reservation. Nothing holds it while the request is
+    -- pending, so approval re-checks that it is free.
+    "room_id" TEXT,
+
+    "note" TEXT,
+
+    "status" "exam_request_status" NOT NULL DEFAULT 'PENDING',
+
+    "requested_by_person_id" TEXT,
+    "decided_by_person_id"   TEXT,
+    "decided_at"             TIMESTAMPTZ(3),
+    "decision_note"          TEXT,
+
+    -- The Session approval created. NULL for a request that has not been
+    -- approved, which is what stops a second approval creating a second exam.
+    "session_id" TEXT,
+
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "exam_request_pkey" PRIMARY KEY ("id")
+);
+
+-- Same reasoning as `person_unavailability_decision_complete`: written against
+-- the timestamp, which is a fact, rather than the decider, which is a pointer
+-- that may legitimately be detached.
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_decision_complete"
+    CHECK (
+        (status = 'PENDING'  AND decided_at IS NULL)
+        OR
+        (status <> 'PENDING' AND decided_at IS NOT NULL)
+    );
+
+-- Only an APPROVED request may point at a Session, and every approved one must.
+-- Without this an approval could half-land — decided, but with nothing created
+-- and nothing saying so.
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_session_matches_status"
+    CHECK (
+        (status = 'APPROVED' AND session_id IS NOT NULL)
+        OR
+        (status <> 'APPROVED' AND session_id IS NULL)
+    );
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_placement_in_week"
+    CHECK ("term_week" >= 1 AND "day_of_week" BETWEEN 1 AND 7 AND "block_index" >= 0 AND "duration_blocks" >= 1);
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_tenant_id_fkey"
+    FOREIGN KEY ("tenant_id") REFERENCES "tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CASCADE on the module: a request for an Offering that no longer exists is
+-- meaningless, and its approved Session is an Event that survives on its own.
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_offering_id_fkey"
+    FOREIGN KEY ("offering_id") REFERENCES "offering"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_term_id_fkey"
+    FOREIGN KEY ("term_id") REFERENCES "term"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_kind_id_fkey"
+    FOREIGN KEY ("kind_id") REFERENCES "session_kind"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_room_id_fkey"
+    FOREIGN KEY ("room_id") REFERENCES "room"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- SET NULL, matching `session_event.session_id`: deleting the exam must not
+-- destroy the record that it was asked for and granted.
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_session_id_fkey"
+    FOREIGN KEY ("session_id") REFERENCES "session"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_requested_by_fkey"
+    FOREIGN KEY ("requested_by_person_id") REFERENCES "person"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+ALTER TABLE "exam_request" ADD CONSTRAINT "exam_request_decided_by_fkey"
+    FOREIGN KEY ("decided_by_person_id") REFERENCES "person"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+CREATE INDEX "exam_request_tenant_id_idx" ON "exam_request" ("tenant_id");
+-- The review queue's own query.
+CREATE INDEX "exam_request_tenant_id_status_idx" ON "exam_request" ("tenant_id", "status");
+-- "My requests", which is the lecturer's whole view of this feature.
+CREATE INDEX "exam_request_requested_by_person_id_idx" ON "exam_request" ("requested_by_person_id");
+CREATE INDEX "exam_request_offering_id_idx" ON "exam_request" ("offering_id");
+
+ALTER TABLE "exam_request" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "exam_request" FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON "exam_request"
+    USING (tenant_id = calendry_internal.current_tenant_id())
+    WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "exam_request" TO calendry_app;

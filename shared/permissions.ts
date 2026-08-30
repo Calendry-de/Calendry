@@ -160,6 +160,23 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'availability.read_any', category: 'availability', description: "View anyone's unavailability and preferences" },
     { key: 'availability.manage_any', category: 'availability', description: 'Set, approve and reject unavailability for anyone' },
 
+    /**
+     * Exams a lecturer asks for on their own modules.
+     *
+     * TWO KEYS AND NOT ONE, because the card that asked for this said the two
+     * flows need different authority and it is right: `request_own` is held by
+     * every lecturer and reaches only Offerings the holder LEADS, while
+     * `review` decides for the institution and can record an exam for anybody.
+     *
+     * NOT FOLDED INTO `session.create`. That key creates a Session anywhere,
+     * for anyone, immediately — granting it to every lecturer so they could ask
+     * for their own exam would hand out the whole schedule to get one square of
+     * it. The scope is the point: `request_own` creates NOTHING until a
+     * decision, and the Offering it names is checked against the acting Person.
+     */
+    { key: 'exam.request_own', category: 'session', description: 'Request an exam for a module you lead' },
+    { key: 'exam.review', category: 'session', description: 'Approve or reject exam requests, and record one for anyone' },
+
     // Administration
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
     { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },

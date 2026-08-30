@@ -334,6 +334,7 @@ model Tenant {
 
   @@index([federationId])
   @@map("tenant")
+  examRequests ExamRequest[]
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +387,8 @@ model Person {
   @@unique([tenantId, externalRef])
   @@index([tenantId])
   @@map("person")
+  examRequestsMade     ExamRequest[] @relation("ExamRequestRequestedBy")
+  examRequestsDecided  ExamRequest[] @relation("ExamRequestDecidedBy")
 }
 
 /// Tenant-defined vocabulary. `lecturer` is the one universal key (the person
@@ -745,6 +748,7 @@ model Room {
   @@index([tenantId])
   @@index([federationId])
   @@map("room")
+  examRequests ExamRequest[]
 }
 
 /// Tenant-defined tags (projector, PC lab, lab bench). Federation-ownable for
@@ -911,6 +915,7 @@ model Term {
   @@unique([tenantId, name])
   @@index([tenantId])
   @@map("term")
+  examRequests ExamRequest[]
 }
 
 /// Group ↔ Term: which Terms a Group is available in (TAXONOMY.md §2).
@@ -1135,6 +1140,7 @@ model SessionKind {
   @@unique([tenantId, key])
   @@index([tenantId])
   @@map("session_kind")
+  examRequests ExamRequest[]
 }
 
 /// DEMAND: "this must happen N times, needs a Lecturer with role X, a Group, a
@@ -1230,6 +1236,7 @@ model Offering {
   @@index([federationId])
   @@index([termId])
   @@map("offering")
+  examRequests ExamRequest[]
 }
 
 /// Offering ↔ Group. Many-to-many: a cross-enrolled elective serves groups
@@ -1410,6 +1417,7 @@ model Session {
   @@index([generationId])
   @@index([tenantId, termId, termWeek, dayOfWeek, blockIndex])
   @@map("session")
+  examRequests ExamRequest[]
 }
 
 // --- Assignment: three explicit tables, not one polymorphic table. ----------
@@ -1895,4 +1903,83 @@ model PersonAccessRole {
   @@index([accessRoleId])
   @@index([tenantId])
   @@map("person_access_role")
+}
+
+/// PENDING until somebody with the review key decides. Mirrors
+/// `PersonUnavailabilityStatus`, and for the same reason: a lecturer's request
+/// adds demand the institution has to find room for.
+enum ExamRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("exam_request_status")
+}
+
+/// A lecturer's request for an exam on a module they lead, and its decision.
+///
+/// A REQUEST TABLE, NOT A STATUS ON `Session`. A pending Session would have to
+/// be excluded by the schedule view, the solver snapshot, the violation checker
+/// and every export — four places the exclusion can be forgotten, and a
+/// forgotten filter shows MORE rather than fewer. Nothing queries this table
+/// but its own routes.
+///
+/// APPROVAL CREATES AN EVENT (`Session.offeringId` NULL), never a Session on
+/// the module's own Offering: `ExactFrequency` is HARD, so an extra Session on
+/// an Offering is either deleted by the next solve or reported as violating the
+/// module's own demand. An Event is structurally out of every solve's scope.
+model ExamRequest {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  /// The module this is an exam FOR — what "my own Offering" is checked
+  /// against, and what the created Event borrows its groups and title from.
+  /// Never becomes the Session's `offeringId`.
+  offeringId String @map("offering_id")
+  termId     String @map("term_id")
+
+  /// Must name a kind whose `type` is EXAM. A cross-row condition, so the write
+  /// boundary enforces it rather than a CHECK — a non-exam kind would create a
+  /// Session no exam rule can see.
+  kindId String @map("kind_id")
+
+  termWeek       Int @map("term_week")
+  dayOfWeek      Int @map("day_of_week")
+  blockIndex     Int @map("block_index")
+  durationBlocks Int @default(1) @map("duration_blocks")
+
+  /// A PREFERENCE, not a reservation. Nothing holds it while the request is
+  /// pending, so approval re-checks that it is free.
+  roomId String? @map("room_id")
+
+  note String?
+
+  status ExamRequestStatus @default(PENDING)
+
+  requestedByPersonId String?   @map("requested_by_person_id")
+  decidedByPersonId   String?   @map("decided_by_person_id")
+  decidedAt           DateTime? @map("decided_at") @db.Timestamptz(3)
+  decisionNote        String?   @map("decision_note")
+
+  /// The Session approval created. NULL until then, which is what stops a
+  /// second approval creating a second exam.
+  sessionId String? @map("session_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  offering    Offering    @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  term        Term        @relation(fields: [termId], references: [id], onDelete: Cascade)
+  kind        SessionKind @relation(fields: [kindId], references: [id], onDelete: Restrict)
+  room        Room?       @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  session     Session?    @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  requestedBy Person?     @relation("ExamRequestRequestedBy", fields: [requestedByPersonId], references: [id], onDelete: SetNull)
+  decidedBy   Person?     @relation("ExamRequestDecidedBy", fields: [decidedByPersonId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([requestedByPersonId])
+  @@index([offeringId])
+  @@map("exam_request")
 }
