@@ -1,5 +1,6 @@
 import { blockSpan } from '../../../shared/timeGrid';
 import { isoWeekday, weekIndexOf } from '../../../shared/academicCalendar';
+import { localNow } from '../../utils/solverCalendar';
 import { requireIdentity, withRequestTenant } from '../../utils/tenantDb';
 import { resolveScreenKey } from '../../utils/authDb';
 
@@ -57,6 +58,20 @@ export default defineEventHandler(async (event) => {
         const now = new Date();
 
         /*
+         * "Today" and "now" are the TENANT's, never the server's
+         * (Tenant.timezone — all grid logic runs in that zone). The server
+         * clock is typically UTC in a container, so deriving the weekday or
+         * the minute-of-day from it would shift every entry for an
+         * institution in another zone, and flip the day entirely around
+         * local midnight.
+         */
+        const tenant = await tx.tenant.findUniqueOrThrow({
+            where: { id: identity.tenantId },
+            select: { timezone: true },
+        });
+        const local = localNow(now, tenant.timezone);
+
+        /*
          * The scope, resolved to actual Rooms. An EMPTY `roomIds` means every
          * room — fail-open, matching the table — so it becomes an absent filter
          * rather than `in: []`, which would silently match nothing and produce a
@@ -90,8 +105,11 @@ export default defineEventHandler(async (event) => {
             });
         }
 
+        // Date-only columns compare against the tenant-local calendar day
+        // (`local.date` is its UTC midnight), so the term's first and last
+        // days count as inside it in the institution's own zone.
         const term = await tx.term.findFirst({
-            where: { startDate: { lte: now }, endDate: { gte: now } },
+            where: { startDate: { lte: local.date }, endDate: { gte: local.date } },
             include: { timeGrid: { include: { breaks: true } } },
             orderBy: { startDate: 'asc' },
         });
@@ -123,9 +141,9 @@ export default defineEventHandler(async (event) => {
         }
 
         const grid = term.timeGrid;
-        const dayOfWeek = isoWeekday(now);
+        const dayOfWeek = isoWeekday(local.date);
         // `weekIndexOf` is 0-based; `session.term_week` is 1-based.
-        const termWeek = weekIndexOf(term.startDate, now) + 1;
+        const termWeek = weekIndexOf(term.startDate, local.date) + 1;
 
         const sessions = await tx.session.findMany({
             where: {
@@ -142,7 +160,7 @@ export default defineEventHandler(async (event) => {
             },
         });
 
-        const minutesNow = now.getHours() * 60 + now.getMinutes();
+        const minutesNow = local.minutes;
 
         const board = rooms.map((room) => {
             const entries = sessions

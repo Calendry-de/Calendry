@@ -134,6 +134,27 @@ export async function revokeSession(sessionId: string) {
     });
 }
 
+/**
+ * Set a new password hash and revoke every open session, atomically.
+ *
+ * One transaction: whoever prompted the change may be locking someone out, so
+ * the new credential and the revocations must land together — a crash between
+ * the two would leave a "changed" password with the old sessions still live.
+ */
+export async function updatePasswordAndRevokeSessions(accountId: string, passwordHash: string): Promise<void> {
+    await getPrisma().$transaction(async (tx) => {
+        await tx.account.update({
+            where: { id: accountId },
+            data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
+        });
+
+        await tx.authSession.updateMany({
+            where: { accountId, revokedAt: null },
+            data: { revokedAt: new Date() },
+        });
+    });
+}
+
 export async function touchAccountLogin(accountId: string) {
     return getPrisma().account.update({
         where: { id: accountId },

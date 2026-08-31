@@ -49,11 +49,14 @@ function icsUtc(date: Date): string {
 /**
  * Escapes the characters RFC 5545 §3.3.11 requires escaped in TEXT values.
  * Order matters: backslash first, or escaping the others would re-escape the
- * backslashes just added.
+ * backslashes just added. CR/CRLF is normalised to `\n` BEFORE the newline
+ * escape — a raw CR surviving into the output would start a new content line
+ * mid-value, letting a title inject arbitrary ICS properties.
  */
 function icsText(value: string): string {
     return value
         .replace(/\\/g, '\\\\')
+        .replace(/\r\n?/g, '\n')
         .replace(/;/g, '\\;')
         .replace(/,/g, '\\,')
         .replace(/\n/g, '\\n');

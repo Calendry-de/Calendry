@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LECTURER_ROLE_KEY } from '../../../shared/roles';
 import { descendantGroupIds } from '../../utils/groupClosure';
 import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
         };
 
         for (const p of assignedPeople) {
-            add(p.personId, p.role?.key === 'lecturer' ? 'lecturer' : 'directly_assigned');
+            add(p.personId, p.role?.key === LECTURER_ROLE_KEY ? 'lecturer' : 'directly_assigned');
         }
 
         for (const m of memberships) {

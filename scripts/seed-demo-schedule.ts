@@ -29,6 +29,7 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { LECTURER_ROLE_KEY } from '../shared/roles';
 import {
     BREAKS, GRID, GROUPS, GROUP_SOURCES, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
 } from './lib/demoData';
@@ -158,7 +159,7 @@ async function main() {
         }
 
         // --- people ----------------------------------------------------------
-        const lecturerRole = await prisma.role.findFirst({ where: { tenantId: t, key: 'lecturer' } });
+        const lecturerRole = await prisma.role.findFirst({ where: { tenantId: t, key: LECTURER_ROLE_KEY } });
         const personByKey = new Map<string, string>();
 
         for (const l of LECTURERS) {

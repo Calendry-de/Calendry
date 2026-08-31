@@ -20,3 +20,16 @@ export const LANDING_ROUTE = '/';
  * gated by its data route instead.
  */
 export const SCREEN_ROUTE = '/screen';
+
+/**
+ * Whether a `?redirect=` value is safe to navigate to — ONE definition, used by
+ * both the route guard and the login page's destination resolver, so the two
+ * cannot disagree about what counts as internal.
+ *
+ * Internal means one leading `/` followed by neither `/` nor `\`: `//host` is a
+ * scheme-relative URL, and browsers normalise `\` to `/` in a Location header,
+ * so `/\evil.com` is `//evil.com` in disguise.
+ */
+export function isInternalPath(path: string): boolean {
+    return path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\');
+}

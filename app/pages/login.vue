@@ -101,7 +101,7 @@
 
 <script setup lang="ts">
 import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
-import { HOME_ROUTE, LANDING_ROUTE } from '~/utils/routes';
+import { HOME_ROUTE, LANDING_ROUTE, isInternalPath } from '~/utils/routes';
 
 /**
  * Two-step sign-in.
@@ -138,7 +138,7 @@ if (route.query.select === '1' && session.value?.availableTenants.length) {
 function destination(): string {
     const redirect = route.query.redirect;
 
-    if (typeof redirect !== 'string' || !redirect.startsWith('/') || redirect.startsWith('//')) {
+    if (typeof redirect !== 'string' || !isInternalPath(redirect)) {
         return HOME_ROUTE;
     }
 

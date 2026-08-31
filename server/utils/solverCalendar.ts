@@ -41,13 +41,22 @@ export function toWireTimeGrid(grid: AppTimeGrid, institutionTimezone: string): 
         dayStartMinute: grid.startHour * 60 + grid.startMinute,
         activeDays: [...grid.activeDays].sort((a, b) => a - b),
         institutionTimezone,
-        // `breakMinutes` is DELIBERATELY NOT SENT: the wire TimeGrid has no such
-        // field, and it needs none. The solver reasons in block INDICES, so a
-        // gap between blocks changes no adjacency and no conflict — it only
-        // changes what a block is called on a clock, which is presentation.
-        // Breaks still matter locally (blockTime(), and blockOfMinute() below,
-        // which maps wall-clock "now" onto an index). Do not "fix" this by
-        // adding a field to the proto.
+        /*
+         * The real gaps are DELIBERATELY NOT SENT — CLAUDE.md, "TimeGrid
+         * breaks never reach the solver". The solver reasons in block INDICES,
+         * so a gap changes no adjacency and no conflict; breaks matter locally
+         * (blockTime(), blockOfMinute()). proto v0.15 added these two fields
+         * solely for `MinimizeBreakSpanning`, a constraint type this repo's
+         * catalogue does not yet carry, so nothing can read them — and these
+         * are the proto's documented "no gap" defaults, which serialize to the
+         * exact bytes the pre-0.15 message had (`inputHash` unchanged).
+         * Sending the tenant's real `breakMinutes`/`breaks` is part of landing
+         * that constraint type, which is a deliberate deploy of its own
+         * (CLAUDE.md § "A new constraint type, or one gaining a `wireField`"),
+         * never a by-the-way edit here.
+         */
+        defaultGapMinutes: 0,
+        breaks: [],
     };
 }
 

@@ -30,6 +30,7 @@ import { PrismaClient } from '@prisma/client';
 // second copy of the KDF drifts silently the moment the original changes.
 import { hashPassword } from '../server/utils/auth';
 import { PERMISSIONS } from '../shared/permissions';
+import { LECTURER_ROLE_KEY } from '../shared/roles';
 import { defaultConstraintRow, defaultConstraintTypes } from '../shared/constraintTypes';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
@@ -129,7 +130,7 @@ async function main() {
             const lecturerRole = await tx.role.create({
                 data: {
                     tenantId: tenant.id,
-                    key: 'lecturer',
+                    key: LECTURER_ROLE_KEY,
                     name: 'Lecturer',
                     description: 'Leads a Session. The one universal domain role.',
                     isSystem: true,

@@ -1,5 +1,6 @@
 import type { ConstraintViolation, PlacedSession, SolverOutput } from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
+import { LECTURER_ROLE_KEY } from '../../shared/roles';
 import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';
 import { parseWireOfferingId } from './offeringSplit';
@@ -427,7 +428,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
     const kindByOffering = new Map(offerings.map((o) => [o.id, o.kindId]));
 
     const lecturerRole = await tx.role.findFirst({
-        where: { tenantId, key: 'lecturer' },
+        where: { tenantId, key: LECTURER_ROLE_KEY },
         select: { id: true },
     });
 

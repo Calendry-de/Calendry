@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LECTURER_ROLE_KEY } from '../../../../shared/roles';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { appendEvent, requireBaselineGeneration } from '../../../utils/sessionEvents';
 import { requirePermission } from '../../../utils/requirePermission';
@@ -74,7 +75,7 @@ export default defineEventHandler(async (event) => {
         }
 
         const lecturerRole = await tx.role.findFirst({
-            where: { tenantId: identity.tenantId, key: 'lecturer' },
+            where: { tenantId: identity.tenantId, key: LECTURER_ROLE_KEY },
             select: { id: true },
         });
 

@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
 
     return withRequestTenant(event, async (tx, identity) => {
-            await requirePermission(event, tx, 'session.move');
+        await requirePermission(event, tx, 'session.move');
 
         const session = await tx.session.findFirst({
             where: { id, tenantId: identity.tenantId },

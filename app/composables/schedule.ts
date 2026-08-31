@@ -8,6 +8,7 @@
  */
 import type { TimeGridBreak } from '#shared/timeGrid';
 import { blockSpan } from '#shared/timeGrid';
+import { LECTURER_ROLE_KEY } from '#shared/roles';
 
 export interface TimeGrid {
     id: string;
@@ -164,12 +165,12 @@ export function blockTime(
 }
 
 /**
- * The one fixed Role key (TAXONOMY.md §2) — every other role name is tenant
- * vocabulary. The same test `solverInput.ts` uses for `lecturerIds`, so the panel,
- * the chip and the solver agree about who leads a Session. Named here because a
- * fourth bare `'lecturer'` literal is how one of them ends up disagreeing.
+ * The one fixed Role key now lives in `shared/roles.ts`, where the server's
+ * uses (lecturer assignment, materialisation, `lecturerIds` on the wire) read
+ * the same definition. Imported and re-bound here — not `export ... from` —
+ * because this file also uses it below.
  */
-export const LECTURER_ROLE_KEY = 'lecturer';
+export { LECTURER_ROLE_KEY };
 
 export interface AssignedPerson {
     personId: string;

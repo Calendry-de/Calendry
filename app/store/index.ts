@@ -30,7 +30,6 @@ export const useStore = defineStore('index', {
                 this.toasts.shift();
             }
 
-            // Auto-remove after duration
             setTimeout(() => {
                 this.removeToast(toast.id);
             }, toast.duration);

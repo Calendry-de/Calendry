@@ -1,5 +1,5 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
-import { HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE } from '~/utils/routes';
+import { HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE, isInternalPath } from '~/utils/routes';
 
 /**
  * Route guard: every page needs a session except the ones listed here.
@@ -61,8 +61,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
             const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : HOME_ROUTE;
 
             // Only internal paths: an open redirect would let a crafted link
-            // bounce a freshly authenticated user to another origin.
-            return navigateTo(redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : HOME_ROUTE);
+            // bounce a freshly authenticated user to another origin. `/\` is
+            // rejected too — browsers treat a backslash in a Location header
+            // as `/`, so `/\evil.com` is `//evil.com` in disguise.
+            return navigateTo(isInternalPath(redirect) ? redirect : HOME_ROUTE);
         }
 
         return;

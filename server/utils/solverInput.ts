@@ -21,6 +21,7 @@ import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 import type { SessionKindType } from '../../shared/sessionKindType';
 import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
+import { LECTURER_ROLE_KEY } from '../../shared/roles';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -757,7 +758,7 @@ export async function assembleSolverInput(
                 where: { tenantId: options.tenantId, isEnabled: true },
                 include: { scopes: true, relationMembers: { orderBy: { position: 'asc' } } },
             }),
-            tx.role.findFirst({ where: { tenantId: options.tenantId, key: 'lecturer' }, select: { id: true } }),
+            tx.role.findFirst({ where: { tenantId: options.tenantId, key: LECTURER_ROLE_KEY }, select: { id: true } }),
         ]);
 
     /**
@@ -807,6 +808,13 @@ export async function assembleSolverInput(
          */
         featureTags: room.roomEquipment.map((link) => link.equipment.key),
         location: room.location ?? '',
+        /*
+         * The app models no site; empty is the proto's documented "no site
+         * set" (co-located with every other Room), read only by
+         * `TravelTimeBetweenRooms` — a constraint type not yet in this repo's
+         * catalogue. Wiring a real value is part of landing that type.
+         */
+        site: '',
         /*
          * The SUPPLY side of equipment counts. Only links that state one: a NULL
          * `quantity` means the tenant never counted this feature for this room,
@@ -1238,6 +1246,13 @@ export async function assembleSolverInput(
                 : offering.schedulingPattern === 'BLOCK'
                     ? SchedulingPattern.SCHEDULING_PATTERN_BLOCK
                     : SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
+            /*
+             * The app has no such column; false is the proto's "no preference"
+             * default, read only by `MinimizeOfferingDistinctDays` — a
+             * constraint type not yet in this repo's catalogue. A real
+             * per-Offering knob is part of landing that type.
+             */
+            preferFullerDays: false,
             };
         });
     });
@@ -1588,7 +1603,7 @@ export async function assembleSolverInput(
             preferences: {
                 lecturersWithPreference: personRows.filter((person) => (
                     narrowedPreferences.has(person.id)
-                    && person.personRoles.some((link) => link.role.key === 'lecturer')
+                    && person.personRoles.some((link) => link.role.key === LECTURER_ROLE_KEY)
                 )).length,
                 droppedOutOfGridValues,
                 placementsWithNoSignal,

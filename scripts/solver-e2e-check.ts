@@ -24,6 +24,7 @@ import { PrismaClient } from '@prisma/client';
 import { LockPolicy, RunStatus } from '@calendry-de/calendry-proto';
 import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 import { assembleSolverInput } from '../server/utils/solverInput';
+import { LECTURER_ROLE_KEY } from '../shared/roles';
 import { cancelRun, getStatus, startRun, toWireU64 } from '../server/utils/solverClient';
 
 const SEED_RELATIONS = process.argv.includes('--seed-relations');
@@ -54,7 +55,7 @@ try {
         rule('SEEDING OFFERING RELATIONS (fixture repair, not part of the feature)');
 
         const offerings = await prisma.offering.findMany({ where: { tenantId: tenant.id, termId: term.id } });
-        const lecturerRole = await prisma.role.findFirstOrThrow({ where: { tenantId: tenant.id, key: 'lecturer' } });
+        const lecturerRole = await prisma.role.findFirstOrThrow({ where: { tenantId: tenant.id, key: LECTURER_ROLE_KEY } });
         const lecturers = await prisma.personRole.findMany({
             where: { tenantId: tenant.id, roleId: lecturerRole.id },
         });
