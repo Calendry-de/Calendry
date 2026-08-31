@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         description="Preferred teaching days and blocks, for everyone in this institution."
         title="Teaching preferences"
     >
@@ -130,7 +130,7 @@
             v-if="!people.length"
             class="note"
         >No active people in this institution yet.</p>
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
@@ -139,7 +139,7 @@ import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlock
 import AvailabilityRoomFeaturePicker from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import type { RoomFeatureOption } from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import AvailabilityWeightMultiplier from '~/components/availability/AvailabilityWeightMultiplier.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { describePreferences } from '~/utils/availabilityLabels';
 import { useHasPermission, useSession } from '~/composables/session';

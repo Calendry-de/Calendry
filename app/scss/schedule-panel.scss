@@ -99,11 +99,6 @@
             }
         }
 
-        &:focus-visible {
-            outline: 2px solid $primary400;
-            outline-offset: var(--space-1);
-        }
-
         // Thumb-reached below 700px, where the side column goes static and these
         // rows sit in the page flow.
         @include mobileOnly() { min-height: 44px; }

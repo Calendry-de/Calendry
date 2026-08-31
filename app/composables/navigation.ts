@@ -8,10 +8,10 @@ import { logout, useSession } from '~/composables/session';
 import { HOME_ROUTE } from '~/utils/routes';
 
 /**
- * The navigation registry — one typed list behind the header, the /manage sidebar,
- * the /manage index and the Ctrl+K palette. What places exist, what they are
- * called, and who may see them; not fetching, not the palette's open/close
- * machine, not permissions themselves.
+ * The navigation registry — one typed list behind the header, `CommonAppShell`'s
+ * sidebar (on `/dashboard` and every `/manage/*` page), and the Ctrl+K palette.
+ * What places exist, what they are called, and who may see them; not fetching,
+ * not the palette's open/close machine, not permissions themselves.
  *
  * The `manage.*` entries are PROJECTED from MANAGE_ENTITIES rather than retyped,
  * which is why the sidebar and the palette cannot drift.
@@ -154,20 +154,6 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             permission: 'generation.read',
             to: '/schedule/proposals',
         },
-        {
-            id: 'manage',
-            label: 'Manage',
-            description: 'Configure the entities the timetable is built from.',
-            icon: 'material-symbols:tune',
-            section: 'manage',
-            keywords: ['manage', 'admin', 'setup', 'configure', 'settings'],
-            // No permission of its own: the index page is meaningful only if at
-            // least one section is readable, which `useNavEntries` decides from
-            // the projected entries rather than from a hardcoded guess.
-            to: '/manage',
-            inHeader: true,
-        },
-
         {
             id: 'my',
             label: 'My settings',
@@ -422,13 +408,7 @@ export function useNavEntries(): ComputedRef<ResolvedNavEntry[]> {
             );
         });
 
-        // The Manage index earns its place only if it leads somewhere. Showing a
-        // hub whose every section is hidden is the "empty state that means
-        // broken" failure in miniature.
-        const hasManageSection = visible.some((entry) => entry.id.startsWith('manage.'));
-        const shown = hasManageSection ? visible : visible.filter((entry) => entry.id !== 'manage');
-
-        return shown.map((entry) => ({
+        return visible.map((entry) => ({
             ...entry,
             active: Boolean(entry.to) && isActiveRoute(entry.to as string, route.path),
         }));
@@ -457,7 +437,7 @@ export function useHeaderNav(): ComputedRef<ResolvedNavEntry[]> {
     return computed(() => entries.value.filter((entry) => entry.inHeader));
 }
 
-/** The /manage sidebar and index: entity sections only, never the hub itself. */
+/** The dashboard's manage-entities overview cards: entity sections only. */
 export function useManageSections(): ComputedRef<ResolvedNavEntry[]> {
     const entries = useNavEntries();
 
@@ -469,4 +449,20 @@ export function useCanManageAnything(): ComputedRef<boolean> {
     const sections = useManageSections();
 
     return computed(() => sections.value.length > 0);
+}
+
+/**
+ * `CommonAppShell`'s sidebar source: every reachable destination except
+ * 'home' (linking a page to itself is noise) and the 'account' section
+ * (theme/switch-tenant/sign-out are actions, not places — `/dashboard`
+ * renders those separately, and no other shell page has anywhere to put
+ * them). Broader than `useManageSections()` on purpose: the sidebar is the
+ * app's one persistent nav, not just the manage area's.
+ */
+export function useAppSections(): ComputedRef<ResolvedNavEntry[]> {
+    const entries = useNavEntries();
+
+    return computed(() => entries.value.filter(
+        (entry) => entry.to && entry.id !== 'home' && entry.section !== 'account',
+    ));
 }

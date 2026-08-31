@@ -31,6 +31,15 @@ export const CRUD_RESOURCES = {
      * business editing the tenant's library of reusable shapes.
      */
     'offering-templates': 'offering_template',
+    /**
+     * A curriculum plan is a bundle of templates, tenant-authored the same
+     * way — its own CRUD authority for the same reason `offering-templates`
+     * has one, distinct from `offering.*` and from `offering_template.*`.
+     * `offering_plan.apply` (below, EXPLICIT_PERMISSIONS) is separate again:
+     * reading and authoring a plan is not the same authority as the bulk
+     * Offering-creation an apply actually performs.
+     */
+    'offering-plans': 'offering_plan',
     'time-grids': 'time_grid',
     terms: 'term',
     constraints: 'constraint',
@@ -237,6 +246,15 @@ const EXPLICIT_PERMISSIONS = [
      * holding this key alone. See `assertLecturesOffering`.
      */
     { key: 'offering.set_scheduling_pattern', category: 'offering', description: 'Set the teaching pattern of a module you lead (spread across the term, or kept together)' },
+    /**
+     * Bulk-creating a Group's whole course load from a curriculum plan —
+     * genuinely distinct from `offering_plan.read`/`update` (authoring a
+     * plan) and from `offering.create` (making one Offering by hand): this
+     * one action creates several Offerings and attaches a Group to each in a
+     * single step, which is a materially bigger write than reading a plan
+     * implies.
+     */
+    { key: 'offering_plan.apply', category: 'offering_plan', description: 'Apply a curriculum plan to a group, creating its offerings for a term' },
 
     // Administration
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },

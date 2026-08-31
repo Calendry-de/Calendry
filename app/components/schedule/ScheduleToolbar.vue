@@ -4,126 +4,30 @@
         aria-label="Filters and schedule actions"
     >
         <div class="bar_group">
-            <label class="bar_field">
-                <span>Term</span>
-                <select
-                    v-model="termIdModel"
-                    class="bar_select"
-                    :title="selectedName(terms, termIdModel || (terms[0]?.id ?? ''), '')"
-                >
-                    <!--
-                        `:selected` explicitly: `filters.termId` is seeded by a
-                        watchEffect Vue never flushes during SSR, so without it
-                        no `selected` attribute is emitted and the browser falls
-                        back to option 1 — right today only because
-                        `resolvedTermId` also falls back to `terms[0]`.
-                    -->
-                    <option
-                        v-for="term in terms"
-                        :key="term.id"
-                        :value="term.id"
-                        :selected="term.id === (termIdModel || terms[0]?.id)"
-                    >{{ term.name }}</option>
-                </select>
-            </label>
-
-
             <!--
-                A FILTER EXISTS WHEN IT HAS SOMETHING TO CHOOSE BETWEEN, and that
-                is the whole rule — not a permission.
-
-                It WAS a permission (`group.read` / `room.read` / `person.read`),
-                which was wrong in the case that matters most: somebody reading
-                their own timetable holds none of those and may well have sessions
-                across three cohorts, and narrowing to one of them is exactly what
-                they want. Their options come from the schedule they can already
-                see, so there is nothing left to gate — the option list IS the
-                boundary.
-
-                The count rule also retires the empty-select case for everybody: a
-                select offering only its own placeholder claims this institution
-                has none of them. One option is no better — narrowing to the only
-                value there is changes nothing.
-
-                `|| ...Model` keeps an ACTIVE filter reachable whatever the list
-                does, so a control can never vanish while it is still narrowing
-                the view and leave no way to clear it.
-
-                (Deliberately not naming the placeholder strings in this comment:
-                an SSR render emits template comments into the HTML, so a comment
-                quoting an option is a comment a test can match.)
-
-                Term and Density stay unconditional: a term is the frame every
-                schedule is drawn in, and density is a view preference that reads
-                nothing.
+                Term/Group/Room/Person moved to `ScheduleFilterPanel` — a
+                toggleable drawer rather than a permanent reservation, for the
+                same reason `.schedule_side` in `schedule/index.vue` gave up its
+                fixed width. This button is the only trace of them left here.
             -->
-            <label
-                v-if="showGroupFilter"
-                class="bar_field"
+            <button
+                type="button"
+                class="bar_filters-toggle"
+                :class="{ 'bar_filters-toggle--active': filtersOpenModel }"
+                :aria-expanded="filtersOpenModel"
+                aria-controls="schedule-filters-panel"
+                @click="filtersOpenModel = !filtersOpenModel"
             >
-                <span>Group</span>
-                <select
-                    v-model="groupIdModel"
-                    class="bar_select"
-                    :title="selectedName(groups, groupIdModel, 'All groups')"
-                >
-                    <option value="">All groups</option>
-                    <option
-                        v-for="group in groups"
-                        :key="group.id"
-                        :value="group.id"
-                    >{{ group.name }}</option>
-                </select>
-            </label>
-
-            <label
-                v-if="groupIdModel"
-                class="bar_check"
-            >
-                <input
-                    v-model="includeNestedModel"
-                    type="checkbox"
-                >
-                <span>Include nested</span>
-            </label>
-
-            <label
-                v-if="showRoomFilter"
-                class="bar_field"
-            >
-                <span>Room</span>
-                <select
-                    v-model="roomIdModel"
-                    class="bar_select"
-                    :title="selectedName(rooms, roomIdModel, 'All rooms')"
-                >
-                    <option value="">All rooms</option>
-                    <option
-                        v-for="room in rooms"
-                        :key="room.id"
-                        :value="room.id"
-                    >{{ room.name }}</option>
-                </select>
-            </label>
-
-            <label
-                v-if="showPersonFilter"
-                class="bar_field"
-            >
-                <span>Person</span>
-                <select
-                    v-model="personIdModel"
-                    class="bar_select"
-                    :title="selectedName(people, personIdModel, 'Anyone')"
-                >
-                    <option value="">Anyone</option>
-                    <option
-                        v-for="person in people"
-                        :key="person.id"
-                        :value="person.id"
-                    >{{ person.name }}</option>
-                </select>
-            </label>
+                <Icon
+                    name="material-symbols:filter-alt-outline"
+                    aria-hidden="true"
+                />
+                Filters
+                <span
+                    v-if="activeFilterCount"
+                    class="bar_filters-count"
+                >{{ activeFilterCount }}</span>
+            </button>
         </div>
 
         <!--
@@ -243,23 +147,14 @@
 <script setup lang="ts">
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
 import ScheduleBlockedDayButton from '~/components/schedule/ScheduleBlockedDayButton.vue';
-import type { NamedRow, Term } from '~/composables/schedule';
 
-const props = defineProps<{
+defineProps<{
     /** The visible week and its real dates, for "I can't teach this week". */
     week?: number;
     activeDays?: number[];
     slotDateOf?: (week: number, dayOfWeek: number) => Date | null;
-    terms: Term[];
-    /**
-     * WHAT THIS CALLER CAN SEE, not what the tenant has. For an administrator
-     * these are the full directory; for somebody reading their own timetable they
-     * are the groups, rooms and people appearing in it. The filters are built
-     * from them, which is why they need no permission of their own.
-     */
-    groups: NamedRow[];
-    rooms: NamedRow[];
-    people: NamedRow[];
+    /** How many of Group/Room/Person are currently narrowing the view. */
+    activeFilterCount: number;
     violationCount: number;
     canReadViolations: boolean;
     canTriggerSolver: boolean;
@@ -274,30 +169,8 @@ const props = defineProps<{
 
 defineEmits<{ 'toggle-create': [] }>();
 
-/**
- * The full text of what a select shows. The selects truncate with an ellipsis,
- * so the visible value can be a prefix; the open list and screen readers already
- * have the whole name, this adds it for the mouse.
- */
-function selectedName(rows: readonly { id: string; name: string }[], id: string, fallback: string): string {
-    return rows.find((row) => row.id === id)?.name ?? fallback;
-}
-
-// Filter values are owned by useScheduleFilters() and reach this component as
-// models — the toolbar renders and edits them, it does not own them.
-const termIdModel = defineModel<string>('termId', { required: true });
-const groupIdModel = defineModel<string>('groupId', { required: true });
-const roomIdModel = defineModel<string>('roomId', { required: true });
-const personIdModel = defineModel<string>('personId', { required: true });
-const includeNestedModel = defineModel<boolean>('includeNested', { required: true });
-
-/**
- * A filter is offered when it can narrow something — more than one option — or
- * when it is already narrowing, so an active one is always clearable.
- */
-const showGroupFilter = computed(() => props.groups.length > 1 || Boolean(groupIdModel.value));
-const showRoomFilter = computed(() => props.rooms.length > 1 || Boolean(roomIdModel.value));
-const showPersonFilter = computed(() => props.people.length > 1 || Boolean(personIdModel.value));
+// Owned by the page, toggling `ScheduleFilterPanel` — not a data filter itself.
+const filtersOpenModel = defineModel<boolean>('filtersOpen', { required: true });
 
 // View state, owned by the page: neither affects the API query.
 const rowHeightModel = defineModel<number>('rowHeight', { required: true });
@@ -382,6 +255,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
            costs 303px before any schedule appears. */
         gap: var(--space-5) var(--space-7);
         #{&}_select,
+        #{&}_filters-toggle,
         #{&}_violations-toggle {
             min-height: 44px;
         }
@@ -459,33 +333,14 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         background: $surface0;
 
         &:focus-visible {
-            outline: 2px solid $primary400;
+            outline: 2px solid $primary600;
             outline-offset: 1px;
         }
     }
 
-    &_check {
-        display: flex;
-        gap: var(--space-3);
-        align-items: center;
-
-        /*
-         * OPTICAL, not rhythmic — the one off-scale value left on this screen
-         * and deliberately so. It sits the checkbox's centre on the same line as
-         * the selects' text, compensating for the label those carry above them;
-         * snapping it to 6 or 8 would visibly misalign the row. A spacing scale
-         * governs intervals between things, not corrections inside one.
-         */
-        padding-bottom: 7px;
-
-        font-size: var(--font-size-sm);
-        color: $content6;
-
-        input { accent-color: $primary500; }
-    }
-
     &_muted { color: $content7; }
 
+    &_filters-toggle,
     &_violations-toggle {
         cursor: pointer;
 
@@ -516,7 +371,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         }
 
         &:focus-visible {
-            outline: 2px solid $primary400;
+            outline: 2px solid $primary600;
             outline-offset: 1px;
         }
 
@@ -525,6 +380,19 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
             color: $content2;
             background: varToRgba('primary500', 0.16);
         }
+    }
+
+    // Same treatment as `ManageList.vue`'s `.list_badge` — a small filled count,
+    // not a new badge language.
+    &_filters-count {
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-sm);
+
+        font-size: var(--font-size-xs);
+        font-weight: 650;
+        color: $primary700;
+
+        background: varToRgba('primary500', 0.16);
     }
 }
 </style>

@@ -235,7 +235,7 @@ async function finish() {
 .login {
     &_title {
         margin: 0;
-        font-size: 32px;
+        font-size: var(--font-size-2xl);
         font-weight: bold;
     }
 
@@ -258,14 +258,14 @@ async function finish() {
 
     &_changed {
         margin: 0 0 4px;
-        font-size: 13px;
-        line-height: 1.5;
+        font-size: var(--font-size-md);
+        line-height: var(--leading-prose);
         color: $success300;
     }
 
     &_note {
         margin: 8px 0 0;
-        font-size: 12px;
+        font-size: var(--font-size-sm);
         color: $content7;
     }
 

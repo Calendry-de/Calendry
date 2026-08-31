@@ -38,7 +38,10 @@ defineSlots<{ default: () => unknown }>();
     p {
         margin: 0;
         font-size: var(--font-size-md);
-        line-height: 1.55;
+
+        /* This component reached the right prose leading first, as a literal;
+           the token carries its decision to the rest of the app. */
+        line-height: var(--leading-prose);
         color: $content7;
     }
 }

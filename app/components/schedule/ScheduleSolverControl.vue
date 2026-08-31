@@ -383,7 +383,16 @@ const doneSummary = computed(() => {
     if (doneMeta.value?.hardViolations !== undefined) {
         const n = doneMeta.value.hardViolations;
 
-        parts.push(`${n} issue${n === 1 ? '' : 's'}`);
+        /*
+         * "hard violation", not "issue". One quantity had four names across a
+         * single task — "issues" here, "Unresolved" on the proposals list,
+         * "violations" in the toolbar and inspector, "flagged" in the panel —
+         * and `violation` is the product's own word for it (the table, the
+         * permission key, TAXONOMY §3). "hard" is not jargon padding either:
+         * this counts `hardViolations` only, so dropping it would report a
+         * clean-but-imperfect proposal as having nothing wrong with it.
+         */
+        parts.push(`${n} hard violation${n === 1 ? '' : 's'}`);
     }
 
     return parts.join(' · ');

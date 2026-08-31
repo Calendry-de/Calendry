@@ -4,7 +4,7 @@
         navigation this DOM cannot deliver — there are no `role="row"` wrappers
         because a multi-block chip SPANS rows and cannot belong to one. Naming is
         solved instead by every chip and target assembling its own full label.
-    --    -->
+    -->
     <div
         class="grid"
         :class="{ 'grid--placing': placing, 'grid--swapping': swapping }"
@@ -33,7 +33,7 @@
                 Named only when this day's blocks do not start at the gutter's
                 times: the rows are shared, so a day with its own breaks cannot
                 be drawn at its own offsets.
-            --            -->
+            -->
             <span
                 v-if="dayDiffers(day)"
                 class="grid_day-note"
@@ -45,7 +45,7 @@
             The time column shares its rows with the blocks it labels, so
             whatever makes a row taller moves its label with it. Nothing is
             computed, so nothing can drift.
-        --        -->
+        -->
         <template
             v-for="row in rows"
             :key="`${row.kind}-${row.index}`"
@@ -71,7 +71,7 @@
                     placement mode cannot target it. A Session may not START in a
                     gap: there is no block index for it. One band across every
                     day, because these are the UNIVERSAL gaps.
-                --                -->
+                -->
                 <div
                     class="grid_gap"
                     :style="{ gridRow: row.line, gridColumn: '2 / -1' }"
@@ -415,7 +415,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
             &:focus-visible {
                 background: varToRgba('primary500', 0.14);
-                outline: 2px solid $primary400;
+                outline: 2px solid $primary600;
                 outline-offset: -2px;
 
                 &::after { opacity: 1; }

@@ -1,229 +1,151 @@
 <template>
     <section class="rev">
-        <h2 class="rev_heading">What this proposal does</h2>
-
         <!--
-            TWO READINGS, NOT TWO PANELS.
+            THE RISK LINE.
 
-            The counts are not commensurable and must not be rendered as a
-            delta: `current` comes from constraint_violation, which this app's
-            evaluator fills using only the structural double-booking rules
-            (STRUCTURAL_CONSTRAINT_TYPES — the count is derived, never written
-            out, because it went stale once when Stage 7a made it four), while
-            `proposed` is the solver reporting on all 14 constraint
-            types. Measured on the same timetable they disagree — the solver
-            reported 23 where the app's evaluator then found 41 rows. "0 → 23"
-            would be the most misleading thing this screen could say.
-
-            THAT ARGUMENT USED TO BE DEFEATED BY THE LAYOUT. Two equal cards
-            side by side, headed "Now" and "Proposed", each showing one big
-            numeral in identical type: adjacency plus symmetry IS an arrow, and
-            the sentence denying it sat underneath in 11px italic — the most
-            recessed text on the screen carrying the most interpretive weight.
-
-            So the shape now matches the claim. The proposal's own count is the
-            card, because it is the number the decision turns on. The current
-            schedule's count is a footing line — present, findable, deliberately
-            not a rival numeral. The disclaimer leads, at reading weight.
+            This was a tinted panel holding a 32px numeral, a note, a type list
+            and a reassurance — four elements of chrome to say "nothing is
+            wrong", and on a clean proposal the largest thing on the page was a
+            `0`. The panel is gone. A clean result is one sentence; a breach gets
+            the weight, because a breach is the only thing here that should stop
+            somebody.
         -->
-        <p class="rev_incomparable">
-            The two counts below come from different rule sets and are not a
-            like-for-like difference.
-        </p>
+        <div class="rev_argument">
+        <div
+            v-if="violations.proposed.hard > 0"
+            class="rev_risk"
+        >
+            <p class="rev_risk-head">
+                <Icon
+                    name="material-symbols:error"
+                    aria-hidden="true"
+                />
+                <strong>{{ violations.proposed.hard }}</strong>
+                hard-rule issue{{ violations.proposed.hard === 1 ? '' : 's' }}
+                survive{{ violations.proposed.hard === 1 ? 's' : '' }} in this proposal
+            </p>
 
-        <div class="rev_state">
-            <article
-                class="rev_panel"
-                :class="{ 'rev_panel--flagged': violations.proposed.hard > 0 }"
+            <ul class="rev_types">
+                <li
+                    v-for="row in proposedTypes"
+                    :key="row.type"
+                >
+                    <span class="rev_types-count">{{ row.count }}</span>
+                    {{ row.label }}
+                </li>
+            </ul>
+
+            <!--
+                Reported, never netted out: these name Sessions the solver
+                invented under a synthetic key that appears nowhere in the
+                placements, so no row can be pointed at.
+            -->
+            <p
+                v-if="violations.proposed.unmappable > 0"
+                class="rev_note"
             >
-                <h3 class="rev_panel-title">
-                    <Icon
-                        v-if="violations.proposed.hard > 0"
-                        name="material-symbols:error"
-                        class="rev_panel-icon"
-                        aria-hidden="true"
-                    />
-                    In this proposal
-                </h3>
-
-                <p class="rev_count">
-                    <!--
-                        Never hue alone (DESIGN.md): the count carries an icon
-                        above it, a tinted panel, a border, and this text, which
-                        is the only part a screen reader or a greyscale display
-                        gets. `sr-only` rather than aria-label so the visible
-                        numeral keeps its own reading order.
-                    -->
-                    <span class="rev_sr">{{ violations.proposed.hard > 0
-                        ? 'Unresolved hard-rule issues:'
-                        : 'Hard-rule issues:' }}</span>
-                    {{ violations.proposed.hard }}
-                </p>
-
-                <p class="rev_panel-note">
-                    unresolved hard-rule issue{{ violations.proposed.hard === 1 ? '' : 's' }},
-                    reported by the solver across 14 constraint types
-                </p>
-
-                <ul
-                    v-if="proposedTypes.length"
-                    class="rev_types"
-                >
-                    <li
-                        v-for="row in proposedTypes"
-                        :key="row.type"
-                    >
-                        <span class="rev_types-count">{{ row.count }}</span>
-                        {{ row.label }}
-                    </li>
-                </ul>
-
-                <p
-                    v-else
-                    class="rev_types-none"
-                >Every hard rule the solver checks is satisfied.</p>
-
-                <!--
-                    Reported, never netted out: these name Sessions the solver
-                    invented, using a synthetic key that appears nowhere in the
-                    placements, so they cannot be attached to any row.
-                -->
-                <p
-                    v-if="violations.proposed.unmappable > 0"
-                    class="rev_unmappable"
-                >
-                    {{ locatable }} of {{ violations.proposed.sessionReferences }} session references
-                    can be located; {{ violations.proposed.unmappable }} name sessions the solver
-                    created and cannot be pinned to a slot.
-                </p>
-            </article>
-
-            <div class="rev_current">
-                <p class="rev_current-line">
-                    For comparison, Calendry's own {{ structuralRuleCount }} structural checks
-                    currently find
-                    <strong>{{ violations.current.hard }}</strong>
-                    issue{{ violations.current.hard === 1 ? '' : 's' }} on the live schedule.
-                    They re-run after applying.
-                </p>
-
-                <ul
-                    v-if="currentTypes.length"
-                    class="rev_types rev_types--inline"
-                >
-                    <li
-                        v-for="row in currentTypes"
-                        :key="row.type"
-                    >
-                        <span class="rev_types-count">{{ row.count }}</span>
-                        {{ row.label }}
-                    </li>
-                </ul>
-            </div>
+                {{ locatable }} of {{ violations.proposed.sessionReferences }} session references
+                can be located; {{ violations.proposed.unmappable }} name sessions the solver
+                created and cannot be pinned to a slot.
+            </p>
         </div>
 
-        <div class="rev_facts">
-            <div class="rev_fact">
-                <span class="rev_fact-label">Changes</span>
-                <span class="rev_fact-value">
-                    <strong>{{ plan.created }}</strong> added ·
-                    <strong>{{ plan.moved }}</strong> moved ·
-                    {{ plan.unchanged }} unchanged ·
-                    <strong :class="{ 'rev_destructive': plan.deleted > 0 }">{{ plan.deleted }}</strong> removed
-                </span>
-            </div>
+        <p
+            v-else
+            class="rev_clear"
+        >
+            <Icon
+                name="material-symbols:check-circle-outline"
+                aria-hidden="true"
+            />
+            Every hard rule the solver checks is satisfied.
+        </p>
 
+        <!--
+            THE COMPARISON, AS ONE SENTENCE THAT CANNOT STRAND.
+
+            The counts are not commensurable and must not read as a delta:
+            `current` comes from this app's evaluator, which fills
+            constraint_violation from the STRUCTURAL double-booking rules only,
+            while `proposed` is the solver reporting across all 14 constraint
+            types. Measured on the same timetable they disagree — the solver
+            reported 23 where this evaluator then found 41.
+
+            THE OLD LAYOUT DEFEATED THAT ARGUMENT TWICE. First as two symmetric
+            cards, where adjacency plus symmetry IS an arrow. Then as a `3fr/2fr`
+            grid whose second column was described in the code as "a footing
+            line" and rendered, at 1440, as a stranded aside six hundred pixels
+            from the panel it was meant to foot — a reviewer circled it and
+            asked what it was.
+
+            A caveat cannot strand if it is inside the same sentence as the fact
+            it qualifies. One paragraph, subordinate clause, no second numeral
+            competing for the eye.
+        -->
+        <p class="rev_compare">
+            Separately, Calendry's own {{ structuralRuleCount }} structural checks find
+            <strong>{{ violations.current.hard }}</strong>
+            issue{{ violations.current.hard === 1 ? '' : 's' }} on the live schedule — a
+            different rule set, so the two counts are not a like-for-like difference.<template v-if="decidable"> They re-run after applying.</template>
+        </p>
+
+        </div>
+
+        <dl class="rev_facts">
             <div
                 v-if="plan.skippedLocked"
                 class="rev_fact"
             >
-                <span class="rev_fact-label">Locked</span>
-                <span class="rev_fact-value">
+                <dt>Locked</dt>
+                <dd>
                     {{ plan.skippedLocked }} session{{ plan.skippedLocked === 1 ? '' : 's' }}
                     left exactly as they are
-                </span>
+                </dd>
             </div>
 
             <div
                 v-if="plan.placementsUnmapped"
-                class="rev_fact"
+                class="rev_fact rev_fact--warn"
             >
-                <span class="rev_fact-label">Unplaceable</span>
-                <!--
-                    Was "N placement(s) cannot be stored", which is this
-                    codebase's sentence rather than the reviewer's: what they
-                    need to know is that the proposal wants sessions this
-                    schedule has nowhere to put.
-                -->
-                <span class="rev_fact-value">
+                <dt>Unplaceable</dt>
+                <dd>
                     {{ plan.placementsUnmapped }}
                     session{{ plan.placementsUnmapped === 1 ? '' : 's' }} this proposal wants
                     cannot be recorded, and will not be created
-                </span>
+                </dd>
             </div>
 
             <div class="rev_fact">
-                <span class="rev_fact-label">Run</span>
-                <span class="rev_fact-value">
+                <dt>Run</dt>
+                <dd>
                     {{ terminationSentence(run?.terminationReason ?? null) }}
                     <template v-if="run?.elapsedMillis">
                         Took {{ (run.elapsedMillis / 1000).toFixed(1) }}s.
                     </template>
-                </span>
+                </dd>
             </div>
 
             <!--
                 The objective is a RELATIVE score with no absolute scale — two
                 proposals for the same term measured 430 and 33,955 — so it is
-                said as a comparable quantity rather than a bare number, and
-                pointed at the one place a comparison exists.
+                said as a comparable quantity and pointed at the one place a
+                comparison exists.
             -->
             <div
                 v-if="run?.objective !== null && run?.objective !== undefined"
                 class="rev_fact"
             >
-                <span class="rev_fact-label">Score</span>
-                <span class="rev_fact-value">
+                <dt>Score</dt>
+                <dd>
                     {{ run.objective.toLocaleString() }} — lower is better, and only
                     comparable with other proposals for the same term.
                     <NuxtLink
                         class="rev_link"
                         to="/schedule/proposals"
                     >Compare proposals</NuxtLink>
-                </span>
+                </dd>
             </div>
-        </div>
-
-        <!--
-            A removal means the solver REFUSED to place that Session — the one
-            destructive part of applying — so it gets named, not counted.
-        -->
-        <details
-            v-if="deletedByOffering.length"
-            class="rev_deleted"
-            open
-        >
-            <summary>
-                <Icon
-                    name="material-symbols:delete-outline"
-                    aria-hidden="true"
-                />
-                {{ plan.deleted }} session{{ plan.deleted === 1 ? '' : 's' }} will be removed
-            </summary>
-            <ul>
-                <li
-                    v-for="row in deletedByOffering"
-                    :key="row.offeringId"
-                >
-                    <strong>{{ row.count }}</strong> from
-                    {{ row.code ? `${row.code} · ${row.title}` : row.title }}
-                </li>
-            </ul>
-            <p class="rev_panel-note">
-                The solver could not place these. Applying deletes them rather than
-                leaving them where the solver rejected them.
-            </p>
-        </details>
+        </dl>
     </section>
 </template>
 
@@ -232,11 +154,21 @@ import { STRUCTURAL_CONSTRAINT_TYPES, constraintTypeLabel } from '#shared/constr
 import { terminationSentence } from '~/composables/generationReview';
 import type { ReviewPreview } from '~/composables/generationReview';
 
+/**
+ * The proposal's risk and provenance, as a strip rather than a dashboard.
+ *
+ * `deletedByOffering` used to render here as its own block. It does not any
+ * more: `ScheduleReviewChanges` names every removal against the Offering it
+ * belongs to, destructive rows first, which is the same information attached to
+ * the thing it happened to. Two lists of the same removals is one list too
+ * many.
+ */
 const props = defineProps<{
     plan: NonNullable<ReviewPreview['plan']>;
     violations: ReviewPreview['violations'];
-    deletedByOffering: ReviewPreview['deletedByOffering'];
     run: ReviewPreview['run'];
+    /** READY, so "they re-run after applying" is a true statement about a future. */
+    decidable: boolean;
 }>();
 
 /**
@@ -257,7 +189,6 @@ const toRows = (byType: Record<string, number>) => Object.entries(byType)
     .map(([type, count]) => ({ type, count, label: constraintTypeLabel(type) }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
-const currentTypes = computed(() => toRows(props.violations.current.byType));
 const proposedTypes = computed(() => toRows(props.violations.proposed.byType));
 
 const locatable = computed(() => (
@@ -271,87 +202,123 @@ const locatable = computed(() => (
     flex-direction: column;
     gap: var(--space-6);
 
-    &_heading {
-        font-size: var(--font-size-lg);
-        color: $content2;
-    }
-
-    /**
-     * Screen-reader-only, and NOT display:none — the numeral needs a spoken
-     * label because its meaning lives in the panel around it, which a linear
-     * reading order does not deliver.
+    /*
+     * TWO COLUMNS FROM `pc()`, and this is a correction to my own first pass.
+     *
+     * Capping the whole strip at the prose measure left a 750px column of text
+     * with roughly 600px of empty page beside it at 1440, and the `<dl>`'s rule
+     * stopped dead in the middle of the screen. The band above and the grid
+     * below both run full width, so the argument between them read as a stranded
+     * left-hand column: the same "weird layout" complaint this redesign started
+     * from, one section lower.
+     *
+     * The verdict and its caveat keep a reading measure; the provenance facts sit
+     * beside them instead of under them. Below `pc()` it stacks, which is correct
+     * for one column.
      */
-    &_sr {
-        position: absolute;
-
-        overflow: hidden;
-
-        width: 1px;
-        height: 1px;
-
-        white-space: nowrap;
-
-        clip-path: inset(50%);
+    @include pc() {
+        flex-direction: row;
+        gap: var(--space-9);
+        align-items: flex-start;
     }
 
-    // Leads the two readings rather than trailing them, at reading weight
-    // rather than as a footnote: it is the instruction for how to read both.
-    &_incomparable {
-        font-size: var(--font-size-md);
-        color: $content6;
-    }
-
-    &_state {
+    /*
+     * THE FLEX BASIS BELONGS INSIDE `pc()`, and leaving it outside was a real
+     * defect rather than a redundancy.
+     *
+     * `.rev` is a COLUMN below 1366px, so `flex: 1 1 46ch` is a main-axis
+     * HEIGHT there, not a width. Measured on the 390 capture: blank bands of
+     * 126px, 120px and 235px around this one component, with the change list
+     * pushed a full screen further down. Invisible at 1440, where the row
+     * direction makes the same declaration mean what it was written to mean.
+     */
+    &_argument {
         display: flex;
         flex-direction: column;
         gap: var(--space-6);
-    }
+        max-width: var(--review-measure, 78ch);
 
-    &_panel {
-        padding: var(--space-6);
-        border-left: var(--space-1) solid $surface5;
-        border-radius: var(--radius-lg);
-        background: $surface1;
-
-        // Warn-and-allow, made visible. A residual hard violation is the whole
-        // reason this screen can be applied at all, and it used to render in the
-        // same near-black as a clean result.
-        &--flagged {
-            border-left-color: $error600;
-            background: varToRgba('error600', 0.08);
+        @include pc() {
+            flex: 1 1 46ch;
         }
     }
 
-    &_panel-title {
+    /*
+     * THE ONE PLACE THIS PAGE STILL FILLS A BOX, and it is the only state that
+     * earns one: a surviving hard violation is the whole reason warn-and-allow
+     * lets this proposal be applied at all.
+     *
+     * `$surface2`, not `$surface1`. Panels here were `$surface1` on a `$surface1`
+     * body — the same value in both themes, so every card on this page rendered
+     * invisible and the composition existed only in the source. Fixed at page
+     * scope; the token roles in DESIGN.md that made it possible are their own
+     * change.
+     */
+    &_risk {
         display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+
+        /*
+         * A 1px edge, not the 2px coloured gutter. That gutter is the DIFF
+         * vocabulary, where each placement state overrides only
+         * `border-left-color`/`-style`. This redesign spent it on six
+         * unrelated callouts, which devalues it and trips the floor's own
+         * rule about coloured left borders above 1px. The error tint, the
+         * icon and the red numeral are already three channels.
+         */
+        padding: var(--space-6);
+        border: 1px solid $surface5;
+        border-radius: var(--radius-lg);
+
+        background:
+            linear-gradient(varToRgba('error600', 0.08), varToRgba('error600', 0.08)),
+            $surface2;
+    }
+
+    &_risk-head {
+        display: flex;
+        flex-wrap: wrap;
         gap: var(--space-3);
-        align-items: center;
+        align-items: baseline;
 
-        font-size: var(--font-size-xs);
-        font-weight: 600;
-        color: $content6;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    &_panel-icon {
-        width: 15px;
-        height: 15px;
-        color: $error600;
-    }
-
-    &_count {
-        font-size: var(--font-size-2xl);
-        font-weight: 600;
+        font-size: var(--font-size-md);
         font-variant-numeric: tabular-nums;
         color: $content1;
 
-        .rev_panel--flagged & { color: $error700; }
+        strong {
+            font-size: var(--font-size-lg);
+            font-weight: 600;
+            color: $error700;
+        }
+
+        .iconify {
+            flex: none;
+            align-self: center;
+
+            width: 16px;
+            height: 16px;
+
+            color: $error700;
+        }
     }
 
-    &_panel-note {
-        font-size: var(--font-size-sm);
+    // Never hue alone: the clean state carries its own icon and its own words,
+    // so it survives greyscale and a screen reader.
+    &_clear {
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+
+        font-size: var(--font-size-md);
         color: $content6;
+
+        .iconify {
+            flex: none;
+            width: 16px;
+            height: 16px;
+            color: $success700;
+        }
     }
 
     &_types {
@@ -359,18 +326,9 @@ const locatable = computed(() => (
         flex-direction: column;
         gap: var(--space-2);
 
-        margin-top: var(--space-4);
-
         font-size: var(--font-size-sm);
         color: $content2;
         list-style: none;
-
-        &--inline {
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: var(--space-2) var(--space-5);
-            margin-top: var(--space-3);
-        }
 
         li {
             display: flex;
@@ -386,45 +344,47 @@ const locatable = computed(() => (
         text-align: right;
     }
 
-    &_types-none {
-        margin-top: var(--space-4);
-        font-size: var(--font-size-sm);
-        color: $content6;
-    }
-
-    &_unmappable {
-        margin-top: var(--space-4);
+    &_note {
         padding-top: var(--space-4);
         border-top: 1px solid $surface5;
-
         font-size: var(--font-size-sm);
         color: $content6;
     }
 
-    // Deliberately not a card: a second panel is a second numeral, and a second
-    // numeral is the delta this screen refuses to draw.
-    &_current {
-        padding-left: var(--space-6);
-        border-left: 1px solid $surface5;
-    }
-
-    &_current-line {
+    &_compare {
         font-size: var(--font-size-md);
         font-variant-numeric: tabular-nums;
+        line-height: var(--leading-prose);
         color: $content6;
 
         strong { color: $content2; }
     }
 
+    /*
+     * A definition list, and the semantics are the point: every row here is a
+     * label and its value, which is what `<dl>` means. It rendered as anonymous
+     * `<span>`s inside `<div>`s before, so nothing but proximity said the label
+     * belonged to the value.
+     */
     &_facts {
         display: flex;
         flex-direction: column;
         gap: var(--space-5);
 
-        padding: var(--space-6);
-        border-radius: var(--radius-lg);
+        padding-top: var(--space-6);
+        border-top: 1px solid $surface5;
 
-        background: $surface1;
+        // Beside the argument rather than under it, so the rule that separated
+        // the two vertically becomes the seam between two columns. The basis is
+        // scoped here for the same reason as `_argument`'s.
+        @include pc() {
+            flex: 1 1 34ch;
+
+            padding-top: 0;
+            padding-left: var(--space-7);
+            border-top: 0;
+            border-left: 1px solid $surface5;
+        }
     }
 
     &_fact {
@@ -432,83 +392,33 @@ const locatable = computed(() => (
         flex-wrap: wrap;
         gap: var(--space-4);
         align-items: baseline;
-    }
 
-    &_fact-label {
-        min-width: 104px;
+        dt {
+            min-width: 92px;
 
-        font-size: var(--font-size-xs);
-        font-weight: 600;
-        color: $content6;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+            color: $content6;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
 
-    &_fact-value {
-        font-size: var(--font-size-md);
-        font-variant-numeric: tabular-nums;
-        color: $content2;
+        dd {
+            flex: 1 1 24ch;
+            font-size: var(--font-size-md);
+            font-variant-numeric: tabular-nums;
+            color: $content2;
+        }
+
+        // The one fact that is a warning rather than provenance: sessions this
+        // proposal wants and cannot store are silently absent after applying.
+        &--warn dd { color: $warning800; }
     }
 
     &_link {
         color: $primary700;
         text-decoration: underline;
         text-underline-offset: 2px;
-    }
-
-    // A removal is the one destructive part of applying, so it is the one count
-    // that carries state colour in the otherwise neutral facts row.
-    &_destructive {
-        color: $error700;
-    }
-
-    &_deleted {
-        padding: var(--space-6);
-        border-left: var(--space-1) solid $error600;
-        border-radius: var(--radius-lg);
-        background: varToRgba('error600', 0.08);
-
-        summary {
-            cursor: pointer;
-
-            display: flex;
-            gap: var(--space-3);
-            align-items: center;
-
-            font-size: var(--font-size-md);
-            font-weight: 600;
-            font-variant-numeric: tabular-nums;
-            color: $content1;
-
-            svg {
-                width: 16px;
-                height: 16px;
-                color: $error700;
-            }
-        }
-
-        ul {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
-
-            margin: var(--space-4) 0;
-
-            font-size: var(--font-size-sm);
-            font-variant-numeric: tabular-nums;
-            color: $content2;
-            list-style: none;
-        }
-    }
-
-    // Wide enough for two columns, the panel and its footing sit side by side —
-    // still not symmetrical, because they are not peers.
-    @include pc() {
-        &_state {
-            display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-            align-items: start;
-        }
     }
 }
 </style>

@@ -24,6 +24,7 @@ defineRouteMeta({
                         type: 'array',
                         maxItems: 500,
                         items: {
+                            type: 'object',
                             oneOf: [
                                 {
                                     type: 'object',
@@ -39,7 +40,6 @@ defineRouteMeta({
                                         },
                                         label: {
                                             type: 'string',
-                                            minLength: 1,
                                         },
                                         dayOfWeek: {
                                             type: 'integer',

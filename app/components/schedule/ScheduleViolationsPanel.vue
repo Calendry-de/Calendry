@@ -1,7 +1,15 @@
 <template>
     <section class="panel">
         <div class="panel_head">
-            <h2>Current violations</h2>
+            <!--
+                "Current" said nothing: every row here is current by
+                construction — `refreshViolations` rewrites them inside each
+                mutation, and there is no historical view to distinguish them
+                from. The scope that DOES need saying is the term, and the empty
+                state says it once, where mistaking absence for a filtered view
+                is the actual risk.
+            -->
+            <h2>Violations</h2>
 
             <!--
                 THE OFFER LIVES AT THE PROBLEM. `refreshViolations` runs inside
@@ -40,10 +48,18 @@
             it never changes the timetable on its own.
         </p>
 
+        <!--
+            "in this term", not "in this view" — the old copy was a FACTUAL
+            error, not a wording preference. This list is fetched per term
+            (`/api/violations?termId=`) and is not narrowed by the Group, Room or
+            Person filters above it, so a reader who had filtered to one cohort
+            was told that cohort was clean while the panel beside them held the
+            whole term's breaches.
+        -->
         <p
             v-if="!violations.length"
             class="panel_muted"
-        >Nothing flagged in this view.</p>
+        >No violations in this term.</p>
 
         <ul v-else>
             <li

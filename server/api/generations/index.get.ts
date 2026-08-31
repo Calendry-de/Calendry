@@ -34,11 +34,26 @@ export default defineEventHandler(async (event) => {
             where: {
                 tenantId: identity.tenantId,
                 ...(query.status ? { status: query.status } : {}),
+                /*
+                 * IN THE QUERY, so `take` applies to the filtered set. This used
+                 * to filter AFTER the fetch, on `run.termId` — which meant
+                 * `?termId=X&limit=100` took the newest 100 proposals across
+                 * every term and then kept whichever happened to belong to X, so
+                 * a term with older proposals showed none of them and the list
+                 * reported that as "no proposals yet".
+                 */
+                ...(query.termId ? { termId: query.termId } : {}),
             },
             select: GENERATION_SELECT,
-            // Newest proposal first: the list's job is "what could I apply?",
-            // and that is almost always the most recent one.
-            orderBy: { version: 'desc' },
+            /*
+             * BY DATE, not by version. Versions restart at 1 per term, so
+             * ordering an unfiltered list by version interleaves terms by an
+             * index that means nothing across them — Semester 1's v3 would
+             * outrank Semester 2's v1 for no reason. `createdAt` is what "newest
+             * proposal first" always meant; it simply used to coincide with
+             * version while the series was tenant-wide.
+             */
+            orderBy: { createdAt: 'desc' },
             take: query.limit ?? 25,
         });
 
@@ -47,15 +62,13 @@ export default defineEventHandler(async (event) => {
             run: await runSummaryFor(tx, identity.tenantId, generation.id),
         })));
 
-        /**
-         * Term filtering happens HERE rather than in the query because a
-         * Generation carries no term — only its run does, and a manual
-         * Generation has no run at all. Filtering by term therefore means "runs
-         * for this term", and a manual baseline is correctly excluded from that
-         * question rather than silently included.
+        /*
+         * The term filter is in the query above now that a Generation carries
+         * its own `term_id`. One behaviour changed with it and is worth naming:
+         * a tenant-wide MANUAL_BASELINE (`term_id IS NULL`) is excluded from a
+         * term-filtered list, which is the same answer the old run-based filter
+         * gave — a baseline has no run, so it never matched either.
          */
-        return query.termId
-            ? withRuns.filter((g) => g.run?.termId === query.termId)
-            : withRuns;
+        return withRuns;
     });
 });

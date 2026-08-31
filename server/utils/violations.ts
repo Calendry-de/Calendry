@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { PER_SESSION_CONSTRAINT_TYPES, RELATION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
 import type { StructuralConstraintType } from '../../shared/constraintTypes';
 import { gapsWithinSpan } from '../../shared/timeGrid';
+import { isPlacedSession } from '../../shared/sessionPlacement';
 import type { Tx } from './tenantDb';
 import { conflictGroupIds, descendantGroupIds } from './groupClosure';
 
@@ -318,10 +319,18 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     }
 
     /**
-     * PER-SESSION: one Session, its own TimeGrid, no counterpart. Grids are
+     * PER-SESSION: one Session, its own fact, no counterpart. Grids are
      * fetched ONCE per distinct `timeGridId` among the seeds, not once per
      * (constraint, seed) — the pairwise loop above re-uses precomputed closures
      * for the same reason.
+     *
+     * DISPATCHED BY TYPE, the same shape as `describeCollision` for the
+     * pairwise types below: `no_unplaced_session` needs no TimeGrid at all — it
+     * is a fact about whether the seed has a placement, not about the grid a
+     * placement sits in — so folding it into the grid-gap body would either
+     * skip it for every seed with no grid or run break-gap arithmetic against a
+     * NULL block/day, which is exactly the crash the old single-purpose loop
+     * had no case to avoid once a second per-session type existed.
      */
     if (perSessionEnabled.length > 0) {
         const gridIds = [...new Set(seeds.map((s) => s.timeGridId).filter((id): id is string => id !== null))];
@@ -341,10 +350,36 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
 
         for (const constraint of perSessionEnabled) {
             for (const seed of seeds) {
-                // No grid, nothing to check against — the same "named rather
-                // than filtered" reasoning `fitsGrid` callers already follow:
-                // a null timeGridId here means there is no rule to violate,
-                // not that the rule passed.
+                /**
+                 * Only ever true when a caller hands this function a banked
+                 * seed — today, no caller does: `bank.post.ts` writes this
+                 * violation directly instead of calling this function (see its
+                 * file comment), and every other route only reaches this
+                 * function with a Session it just confirmed is placed. Handled
+                 * here anyway so the type means something the day a future
+                 * caller does pass one, rather than silently falling through to
+                 * the break-gap check below.
+                 */
+                if (constraint.type === 'no_unplaced_session') {
+                    if (isPlacedSession(seed)) {
+                        continue;
+                    }
+
+                    detected.push({
+                        constraintId: constraint.id,
+                        sessionId: seed.id,
+                        severity: constraint.severity as 'HARD' | 'SOFT',
+                        penalty: constraint.severity === 'SOFT' ? constraint.weight : null,
+                        detail: { reason: 'session_unplaced' },
+                    });
+
+                    continue;
+                }
+
+                // no_session_spanning_break. No grid, nothing to check against
+                // — the same "named rather than filtered" reasoning `fitsGrid`
+                // callers already follow: a null timeGridId here means there is
+                // no rule to violate, not that the rule passed.
                 const grid = seed.timeGridId ? gridById.get(seed.timeGridId) : undefined;
 
                 if (!grid) {

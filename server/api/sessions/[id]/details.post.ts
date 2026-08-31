@@ -28,7 +28,7 @@ defineRouteMeta({
                     schema: {
                         type: 'object',
                         properties: {
-                            title: { type: 'string', minLength: 1, description: 'Cannot be cleared; an Event has no Offering to take a name from.' },
+                            title: { type: 'string', description: 'Cannot be cleared; an Event has no Offering to take a name from.' },
                             kindId: { type: 'string' },
                             groupIds: { type: 'array', items: { type: 'string' } },
                             personIds: { type: 'array', items: { type: 'string' } },

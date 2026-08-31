@@ -22,6 +22,16 @@ const PUBLIC_API_PATHS = [
      * no cookie still gets 401 — one line further down.
      */
     '/api/screens/board',
+    /*
+     * The ics_link stream is reachable with no cookie for the same reason the
+     * board is: the `token` query parameter IS its credential, verified by
+     * the handler itself via `icsLinkResolver` — deliberately NOT through
+     * this middleware's `activeResolver`, which excludes it on purpose (see
+     * `IcsLinkIdentity`'s comment in tenantResolver.ts). Listing it here only
+     * stops this middleware answering a bare 401 before the handler can name
+     * the actual reason.
+     */
+    '/api/ics/stream.ics',
 ];
 
 /**

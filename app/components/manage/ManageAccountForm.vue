@@ -329,6 +329,72 @@
                 Signing out reaches every institution the login is used at, which is allowed
                 because its holder can sign straight back in with the password they know.
             </p>
+
+            <!--
+                API tokens this Person has minted, scoped to THIS institution
+                (`ApiToken.tenantId`) — unlike the rest of this section, nothing
+                here reaches other tenants a shared login also serves. Listing and
+                revoking only; minting stays self-service on the holder's own
+                account page, because a token is a delegation of whatever the
+                CALLER currently holds — an admin has no permission set of the
+                holder's to delegate from.
+            -->
+            <section class="account_tokens">
+                <h3 class="account_tokens_title">API tokens</h3>
+
+                <p
+                    v-if="tokensOpError"
+                    class="account_note account_note--error"
+                    role="alert"
+                >{{ tokensOpError }}</p>
+
+                <ul
+                    v-if="tokens.length"
+                    class="account_tokens_list"
+                >
+                    <li
+                        v-for="tokenRow in tokens"
+                        :key="tokenRow.id"
+                        class="account_tokens_row"
+                    >
+                        <div class="account_tokens_row_main">
+                            <span class="account_tokens_row_name">{{ tokenRow.name }}</span>
+
+                            <dl class="account_facts">
+                                <div>
+                                    <dt>Created</dt>
+                                    <dd>{{ formatWhen(tokenRow.createdAt) }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Last used</dt>
+                                    <dd>{{ tokenRow.lastUsedAt ? formatWhen(tokenRow.lastUsedAt) : 'Never' }}</dd>
+                                </div>
+                                <div>
+                                    <dt>Expires</dt>
+                                    <dd>{{ tokenRow.expiresAt ? formatWhen(tokenRow.expiresAt) : 'Never' }}</dd>
+                                </div>
+                            </dl>
+
+                            <p class="account_tokens_row_keys">
+                                <code>{{ tokenRow.permissions.join(', ') }}</code>
+                            </p>
+                        </div>
+
+                        <CommonButton
+                            :disabled="revokingTokenId === tokenRow.id"
+                            icon="material-symbols:delete-outline"
+                            size="S"
+                            type="destructive"
+                            @click="revokeToken(tokenRow.id)"
+                        >{{ revokingTokenId === tokenRow.id ? 'Revoking…' : 'Revoke' }}</CommonButton>
+                    </li>
+                </ul>
+
+                <p
+                    v-else-if="tokensData.status.value === 'success'"
+                    class="account_ops_hint"
+                >No API tokens.</p>
+            </section>
         </section>
     </div>
 </template>
@@ -675,6 +741,57 @@ function detach() {
         await router.push('/manage/accounts');
     });
 }
+
+interface ApiTokenRow {
+    id: string;
+    name: string;
+    permissions: string[];
+    isActive: boolean;
+    expiresAt: string | null;
+    lastUsedAt: string | null;
+    createdAt: string;
+}
+
+function formatWhen(iso: string): string {
+    return new Date(iso).toLocaleString();
+}
+
+/**
+ * TOLERANT and CLIENT-ONLY, same reasoning as `candidatesData` above: a
+ * secondary list on a page whose own top-level await is the row itself.
+ * Guarded on `mode === 'edit'` because there is no account id — and therefore
+ * no Person — until the row exists.
+ */
+const tokensData = useAsyncData(
+    `account-form:tokens:${row.value?.id ?? 'new'}`,
+    () => (props.mode === 'edit' && row.value?.id
+        ? request<ApiTokenRow[]>(`/api/accounts/${row.value.id}/api-tokens`)
+        : Promise.resolve([] as ApiTokenRow[])),
+    { default: () => [] as ApiTokenRow[], server: false },
+);
+
+const tokens = computed(() => tokensData.data.value ?? []);
+
+const revokingTokenId = ref('');
+const tokensOpError = ref('');
+
+async function revokeToken(tokenId: string) {
+    if (revokingTokenId.value) {
+        return;
+    }
+
+    revokingTokenId.value = tokenId;
+    tokensOpError.value = '';
+
+    try {
+        await request(`/api/accounts/${row.value?.id}/api-tokens/${tokenId}`, { method: 'DELETE' });
+        await tokensData.refresh();
+    } catch (error) {
+        tokensOpError.value = messageOf(error);
+    } finally {
+        revokingTokenId.value = '';
+    }
+}
 </script>
 
 <style scoped lang="scss">
@@ -853,6 +970,68 @@ function detach() {
             margin: 0;
             font-size: var(--font-size-sm);
             color: $content7;
+        }
+    }
+
+    &_tokens {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+
+        padding-top: var(--space-5);
+        border-top: 1px solid $surface3;
+
+        &_title {
+            margin: 0;
+            font-size: var(--font-size-sm);
+            font-weight: 650;
+            color: $content4;
+        }
+
+        &_list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-3);
+
+            margin: 0;
+            padding: 0;
+
+            list-style: none;
+        }
+
+        &_row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-4);
+            align-items: center;
+            justify-content: space-between;
+
+            padding: var(--space-4);
+            border: 1px solid $surface4;
+            border-radius: var(--radius-lg);
+
+            &_main {
+                display: flex;
+                flex-direction: column;
+                gap: var(--space-2);
+                min-width: 0;
+            }
+
+            &_name {
+                font-size: var(--font-size-sm);
+                font-weight: 600;
+                color: $content3;
+            }
+
+            &_keys {
+                margin: 0;
+                font-size: var(--font-size-xs);
+                color: $content7;
+
+                code {
+                    font-family: monospace;
+                }
+            }
         }
     }
 }

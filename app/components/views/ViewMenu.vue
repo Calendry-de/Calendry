@@ -136,11 +136,6 @@ onMounted(() => {
             height: 22px;
         }
 
-        &:focus-visible {
-            outline: 2px solid $primary400;
-            outline-offset: var(--space-1);
-        }
-
         @include navCollapsed() {
             display: flex;
         }
@@ -198,10 +193,6 @@ onMounted(() => {
             }
         }
 
-        &:focus-visible {
-            outline: 2px solid $primary400;
-            outline-offset: var(--space-1);
-        }
         @include mobile() { display: none; }
     }
 }

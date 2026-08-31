@@ -286,9 +286,15 @@ function countFor(day: number): number {
             background: $surface3;
         }
 
+        // Recession by token, not by opacity — the same fix as the grid's, for
+        // the same measured reason: `opacity: 0.6` flattens the chip background
+        // into its own text before compositing, which put the majority state's
+        // title at 4.19:1 against a 4.5:1 floor.
         &--unchanged {
             border-left-color: transparent;
-            opacity: 0.6;
+            background: $surface2;
+
+            .ragenda_chip-title { color: $content6; }
         }
 
         &--delete {

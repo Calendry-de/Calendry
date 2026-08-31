@@ -13,6 +13,14 @@ import type { Tx } from './tenantDb';
 export const GENERATION_SELECT = {
     id: true,
     version: true,
+    /**
+     * The Generation's OWN term, not its run's. Null means tenant-wide (a
+     * MANUAL_BASELINE or an import). Every consumer that used to reach through
+     * `run.termId` should read this instead: a version number only means
+     * something alongside the term it counts within, and a Generation with no
+     * run still has to say which term it belongs to.
+     */
+    termId: true,
     source: true,
     status: true,
     isCurrent: true,

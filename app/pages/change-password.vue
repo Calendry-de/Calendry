@@ -117,7 +117,7 @@ async function submit() {
 .cp {
     &_title {
         margin: 0;
-        font-size: 26px;
+        font-size: var(--font-size-2xl);
         font-weight: bold;
     }
 
@@ -130,20 +130,24 @@ async function submit() {
 
     &_lead {
         margin: 0 0 4px;
-        font-size: 13px;
-        line-height: 1.5;
+        font-size: var(--font-size-md);
+        line-height: var(--leading-prose);
         color: $content6;
     }
 
+    /* `$content7`, not `$surface7`. The ramps are named by ROLE — surfaces are
+       what things sit ON, content is what sits on them — so a surface token used
+       as text is reading off the wrong ramp entirely, and at ~2:1 against the
+       page it was the least legible text on a security screen. */
     &_hint {
         margin: -4px 0 0;
-        font-size: 11.5px;
-        color: $surface7;
+        font-size: var(--font-size-xs);
+        color: $content7;
     }
 
     &_error {
         margin: 0;
-        font-size: 13px;
+        font-size: var(--font-size-md);
         color: $error400;
     }
 }

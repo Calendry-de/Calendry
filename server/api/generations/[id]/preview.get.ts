@@ -73,6 +73,7 @@ export default defineEventHandler(async (event) => {
                     run,
                     plan: emptyCounts(),
                     deletedByOffering: [],
+                    changesByOffering: { rows: [], untouchedOfferings: 0 },
                     violations: {
                         current: await summarizeCurrentViolations(tx, identity.tenantId, stored?.termId),
                         proposed: { hard: 0, byType: {}, unmappable: 0, sessionReferences: 0 },
@@ -103,6 +104,26 @@ export default defineEventHandler(async (event) => {
                 // deletion means the solver REFUSED to place that Session, and
                 // "8 deleted" is not something a human can act on.
                 deletedByOffering: await deletedByOffering(tx, identity.tenantId, plan),
+                /**
+                 * THE CHANGE LIST, and the reason it lives on the server.
+                 *
+                 * The review page leads with what changes grouped by OFFERING
+                 * rather than by slot, because a proposal that moves 187 of 260
+                 * Sessions cannot be reviewed one week at a time — thirteen
+                 * `<select>` interactions is not a review, it is a search.
+                 *
+                 * It cannot be built on the client: `placements` is fetched per
+                 * `termWeek` (the grid renders a week at a time and the full
+                 * output can be ~1000 placements), so no client ever holds the
+                 * whole term. `plan` does, right here, already computed for the
+                 * counts.
+                 */
+                changesByOffering: await changesByOffering(
+                    tx,
+                    identity.tenantId,
+                    plan,
+                    new Set(scope.offeringIds ?? []),
+                ),
                 violations: {
                     current: await summarizeCurrentViolations(tx, identity.tenantId, stored.termId),
                     proposed: summarizeProposedViolations(output.hardViolations),
@@ -196,6 +217,137 @@ async function summarizeCurrentViolations(tx: Tx, tenantId: string, termId: stri
 }
 
 /** Which Offerings lose Sessions, and how many each. */
+/**
+ * What this proposal does to each Offering, over the WHOLE term.
+ *
+ * Only Offerings something HAPPENS to are returned. An Offering whose every
+ * Session is reproduced where it already sits is not a change, and listing it
+ * would rebuild the wall of "UNCHANGED" the grid already showed 142 times: the
+ * count of those is reported once, as a number, by `untouchedOfferings`.
+ *
+ * `outOfScope` is the granularity that finally makes `movedCollateral`
+ * actionable. The plan reports it as a term-level integer ("12 of them outside
+ * what you asked for"), which is the sharpest warning on the screen and, until
+ * now, the one with nothing to click. Scope is an OFFERING-level property —
+ * `scopeOfferingIds` is what the run was allowed to place — so the Offerings
+ * whose Sessions the solver moved on its own initiative can be named, which is
+ * exactly the resolution a reviewer needs. A repair run (`LOCK_POLICY_MINIMIZE_
+ * MOVEMENT`, empty scope) makes every moved Offering out-of-scope; that is the
+ * mode working, not a fault.
+ */
+async function changesByOffering(
+    tx: Tx,
+    tenantId: string,
+    plan: MaterializationPlan,
+    scopeOfferingIds: Set<string>,
+) {
+    type Row = {
+        created: number;
+        moved: number;
+        unchanged: number;
+        deleted: number;
+        /** Every term week this Offering changes in, so a row can jump the grid. */
+        weeks: Set<number>;
+    };
+
+    const rows = new Map<string, Row>();
+
+    const rowFor = (offeringId: string): Row => {
+        const existing = rows.get(offeringId);
+
+        if (existing) {
+            return existing;
+        }
+
+        const fresh: Row = { created: 0, moved: 0, unchanged: 0, deleted: 0, weeks: new Set() };
+
+        rows.set(offeringId, fresh);
+
+        return fresh;
+    };
+
+    /**
+     * The plan's action names and the reviewer's count names are NOT the same
+     * words: the plan says what was done (`create`, `move`), a count says how
+     * many are in that state (`created`, `moved`). Indexing a row by the raw
+     * action wrote to a key that does not exist, which typecheck caught and a
+     * looser type would have shipped as a silent zero on every created session.
+     */
+    const COUNTER = { create: 'created', move: 'moved', unchanged: 'unchanged' } as const;
+
+    for (const placement of plan.placements) {
+        const row = rowFor(placement.offeringId);
+
+        row[COUNTER[placement.action]]++;
+
+        // Only a CHANGE contributes a week. An unchanged placement's week is
+        // not somewhere the reviewer needs to be sent.
+        if (placement.action !== 'unchanged') {
+            row.weeks.add(placement.placement.termWeek);
+        }
+    }
+
+    for (const del of plan.deletes) {
+        // Same reasoning as `deletedByOffering`: skipped rather than coerced, so
+        // an Event that somehow reached the delete partition under-reports by
+        // one instead of inventing an Offering named "null".
+        if (del.offeringId === null) {
+            continue;
+        }
+
+        const row = rowFor(del.offeringId);
+
+        row.deleted++;
+        row.weeks.add(del.placement.termWeek);
+    }
+
+    const changedIds = [...rows.entries()]
+        .filter(([, row]) => row.created + row.moved + row.deleted > 0)
+        .map(([offeringId]) => offeringId);
+
+    const untouchedOfferings = rows.size - changedIds.length;
+
+    if (!changedIds.length) {
+        return { rows: [], untouchedOfferings };
+    }
+
+    const offerings = await tx.offering.findMany({
+        where: { tenantId, id: { in: changedIds } },
+        select: { id: true, title: true, code: true },
+    });
+
+    const named = new Map(offerings.map((offering) => [offering.id, offering]));
+
+    return {
+        rows: changedIds
+            .map((offeringId) => {
+                const row = rows.get(offeringId)!;
+                const offering = named.get(offeringId);
+
+                return {
+                    offeringId,
+                    // An Offering the tenant cannot read falls back to null
+                    // rather than the raw id: a truncated UUID in a list row is
+                    // not "visibly wrong", it is unreadable.
+                    title: offering?.title ?? null,
+                    code: offering?.code ?? null,
+                    created: row.created,
+                    moved: row.moved,
+                    unchanged: row.unchanged,
+                    deleted: row.deleted,
+                    weeks: [...row.weeks].sort((a, b) => a - b),
+                    outOfScope: !scopeOfferingIds.has(offeringId),
+                };
+            })
+            // Destructive first, then most-changed: a removal is the one thing
+            // applying cannot undo, so it leads regardless of volume.
+            .sort((a, b) => (b.deleted - a.deleted)
+                || ((b.created + b.moved) - (a.created + a.moved))
+                || (a.title ?? '').localeCompare(b.title ?? '')),
+        untouchedOfferings,
+    };
+}
+
 async function deletedByOffering(tx: Tx, tenantId: string, plan: MaterializationPlan) {
     if (!plan.deletes.length) {
         return [];

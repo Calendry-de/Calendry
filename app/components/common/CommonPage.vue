@@ -50,7 +50,7 @@ defineSlots<{
     }
 
     /*
-     * Matches `ManageShell`, the app's other page shell, exactly:
+     * Matches `CommonAppShell`, the app's other page shell, exactly:
      * `--font-size-xl` at 680. This was `38px`/`bold` — a size the scale does
      * not contain and which `tokens-root.scss` records as deliberately retired
      * ("was 32, 38 — display"). Every other h1 in the app already uses

@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         description="Whether a newly created Person is granted an access role automatically."
         title="Access defaults"
     >
@@ -81,12 +81,12 @@
                 >{{ saveError }}</p>
             </div>
         </form>
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**

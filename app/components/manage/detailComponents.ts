@@ -6,6 +6,7 @@ import ManageConstraintBuilder from '~/components/manage/ManageConstraintBuilder
 import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
 import ManageGroupForm from '~/components/manage/ManageGroupForm.vue';
 import ManageGroupTree from '~/components/manage/ManageGroupTree.vue';
+import ManageOfferingPlanForm from '~/components/manage/ManageOfferingPlanForm.vue';
 import ManageScreenForm from '~/components/manage/ManageScreenForm.vue';
 import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
 
@@ -30,6 +31,9 @@ import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
  *   ConstraintBuilder type, severity, weight and params constrain each other;
  *                    as four independent controls they would compose states the
  *                    database CHECK rejects
+ *   OfferingPlanForm a plan's item list is an ORDERED sequence
+ *                    (`OfferingPlanItem.position`), which the generic
+ *                    `relations` mechanism cannot express — it replaces a SET
  *
  * Offering is NOT here, and that is the point. It references a Term, a Kind and
  * a Role and holds three many-to-many sets — the hub of the whole model — but
@@ -38,6 +42,7 @@ import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
  */
 export const DETAIL_COMPONENTS: Record<string, Component> = {
     GroupForm: ManageGroupForm,
+    OfferingPlanForm: ManageOfferingPlanForm,
     ScreenForm: ManageScreenForm,
     TimeGridEditor: ManageTimeGridEditor,
     ConstraintBuilder: ManageConstraintBuilder,

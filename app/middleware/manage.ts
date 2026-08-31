@@ -10,8 +10,9 @@ import { useSession } from '~/composables/session';
  *                            permission problem, and saying "no access" would
  *                            be a lie that sends the user hunting for a
  *                            permission that does not exist.
- *   no read permission     → redirect to /manage, matching what the navigation
- *                            already shows: the section simply is not there.
+ *   no read permission     → redirect to /dashboard, matching what the
+ *                            sidebar already shows: the section simply is
+ *                            not there.
  *
  * This is convenience, not enforcement. Every API route re-checks the same
  * permission inside the tenant transaction; defeating this middleware reaches a
@@ -31,6 +32,6 @@ export default defineNuxtRouteMiddleware((to) => {
     const held = new Set(session.value?.permissions ?? []);
 
     if (!held.has(entityPermission(entity, 'read'))) {
-        return navigateTo('/manage');
+        return navigateTo('/dashboard');
     }
 });

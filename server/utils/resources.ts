@@ -841,6 +841,37 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         searchFields: ['name', 'title', 'code'],
     },
 
+    /**
+     * A reusable, ORDERED bundle of offering-templates — applying one to a
+     * Group creates that Group's whole course load in one action.
+     *
+     * Item membership/order and the apply action are SEPARATE top-level
+     * resources (`server/api/offering-plan-items/`, `server/api/offering-
+     * plan-apply/`), the same way `group-sources` sits beside `groups`
+     * rather than under it — nesting them under `offering-plans/[id]/`
+     * shadows this generic route for the bare `/api/offering-plans` path
+     * (a literal directory wins over the `[resource]` sibling for anything
+     * under it, even at a depth the literal branch has no handler for).
+     * Also not the generic `[relation]` mechanism: that replaces a SET, and
+     * a plan's items are an ORDERED SEQUENCE.
+     */
+    'offering-plans': {
+        model: 'offeringPlan',
+        create: z.object({
+            name: z.string().min(1),
+            description: z.string().nullish(),
+            nextPlanId: optionalId,
+        }),
+        update: z.object({
+            name: z.string().min(1).optional(),
+            description: z.string().nullish(),
+            nextPlanId: optionalId,
+        }),
+        filters: z.object({}),
+        orderBy: { name: 'asc' },
+        searchFields: ['name', 'description'],
+    },
+
     'time-grids': {
         model: 'timeGrid',
         // Backed by the partial unique index time_grid_one_default_per_tenant

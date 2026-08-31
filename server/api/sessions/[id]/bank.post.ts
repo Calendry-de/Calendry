@@ -24,6 +24,13 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
  * (already carefully-balanced) function to reason about a placement that
  * does not exist.
  *
+ * ONE ROW SURVIVES THE CLEAR: `no_unplaced_session` (shared/constraintTypes.ts)
+ * is the exact opposite shape — a fact about the ABSENCE of a placement — so
+ * it is written directly here rather than through `refreshViolations()`, which
+ * never sees a banked Session at all. `move.post.ts` clears it again the
+ * moment this Session is re-placed, the same way it clears any other
+ * structural violation.
+ *
  * WHY LOCKED IS REFUSED RATHER THAN SILENTLY UNLOCKED. `Move…` and `Swap…`
  * both require an unlock first (TAXONOMY.md §3: a lock is the tenant's own
  * decision to protect a placement) — cancelling one out from under that
@@ -91,6 +98,31 @@ export default defineEventHandler(async (event) => {
         await tx.constraintViolation.deleteMany({
             where: { tenantId: identity.tenantId, sessionId: session.id },
         });
+
+        // The one exception: report the bank itself, if the tenant has asked to
+        // be warned about it. `isEnabled: false` (or no row at all, on a tenant
+        // provisioned before this type existed) means silently skipped, same as
+        // every other structural rule a tenant has switched off.
+        const unplacedConstraint = await tx.constraint.findFirst({
+            where: { tenantId: identity.tenantId, type: 'no_unplaced_session', isEnabled: true },
+            select: { id: true, severity: true, weight: true },
+        });
+
+        if (unplacedConstraint) {
+            await tx.constraintViolation.create({
+                data: {
+                    tenantId: identity.tenantId,
+                    constraintId: unplacedConstraint.id,
+                    sessionId: session.id,
+                    offeringId: null,
+                    severity: unplacedConstraint.severity,
+                    penalty: unplacedConstraint.severity === 'SOFT' ? unplacedConstraint.weight : null,
+                    detail: { reason: 'session_unplaced' },
+                    detectedByEventId: logged.id,
+                    generationId,
+                },
+            });
+        }
 
         return { session: updated, event: logged };
     });

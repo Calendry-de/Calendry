@@ -122,20 +122,29 @@ values. **Never hardcode an open value into logic** — never assume a Role call
 - **Timezone is per-Person and display-only** — never affects grid resolution,
   constraint evaluation, or "same day" logic. All of that is tenant-local time.
 
-### Three principals, and only one can hold a permission
+### Four principals, and which may hold a permission
 
-`RequestIdentity` is a discriminated union — `kind: 'account' | 'screen' |
-'system'` — matching the three ways a request arrives: a human with a session
-cookie, a lobby display with a device key, and the background poller.
+`RequestIdentity` is a discriminated union — `kind: 'account' | 'token' |
+'screen' | 'system'` — matching the four ways a request arrives: a human with a
+session cookie, a script with a bearer API token, a lobby display with a device
+key, and the background poller.
 
-**Only `account` has an acting Person, and that is the whole authorization
-model.** `heldPermissions()` throws 403 when `actorPersonId` is null, so a screen
-key and the poller cannot satisfy ANY permission check — including ones added
-later by somebody who has never heard of screens. A device's authority is its own
-scope (`ScreenIdentity.roomIds`) and nothing else, enforced at the one route that
-reads it.
+**Only `account` and `token` have an acting Person, and that is the whole
+authorization model.** `heldPermissions()` throws 403 when `actorPersonId` is
+null, so a screen key and the poller cannot satisfy ANY permission check —
+including ones added later by somebody who has never heard of screens. A
+device's authority is its own scope (`ScreenIdentity.roomIds`) and nothing
+else, enforced at the one route that reads it.
 
-Never give a non-account principal an `actorPersonId` to make a check pass. The
+A `token` is a Person's own authority DELEGATED AND NARROWED, never a new
+grant: minting one (`POST /api/me/api-tokens`, self-service) refuses any key
+the creator does not hold, and `heldPermissions()` intersects the stored
+ceiling with the Person's LIVE permissions on every request — so revoking an
+AccessRole narrows every token derived from it, immediately. Tokens are managed
+by a session only (`kind === 'account'`): a token can never mint or revoke
+tokens, or a leaked one could launder itself into a permanent one.
+
+Never give a screen or the poller an `actorPersonId` to make a check pass. The
 check is the boundary; widen the route deliberately, or add a scope the way
 screens did.
 
@@ -368,7 +377,7 @@ The rest are area-specific: read the section before working in that area.
 |---|---|---|
 | Schedule permissions | `sessionReadScope()` is the single definition of "visible"; `/api/sessions` and `/api/schedule/context` must agree exactly. "My own" walks the closure **UP**. | § "`session.read_own`" |
 | Accounts | `accounts` is NOT in `CRUD_RESOURCES` (no `tenant_id`, no RLS). Visibility IS the join; `assertSoleTenant` / `assertDetachable` are exact complements. | § "Accounts in the management area" |
-| `/manage` | One scaffold from `manageRegistry.ts`, which is also the nav source. Bespoke means one slot, never a page. `custom: true` or the field is dropped from saves silently. | § "Management area" |
+| `/manage` | Entity routes (`/manage/<entity>[/…]`) are one scaffold from `manageRegistry.ts`, which is also the nav source. Bespoke means one slot, never a page. `custom: true` or the field is dropped from saves silently. `/manage` itself is a redirect stub to `/dashboard`, which now renders the overview cards and carries `CommonAppShell` (the renamed, broadened former `ManageShell`) — the sidebar it backs is not manage-only, it's `useAppSections()`'s full reachable set. | § "Management area" |
 | Display settings | Singleton keyed by `tenant_id`, absent row = defaults. Colour is RESOLVED and may be **null** — never a fallback accent. | § "Schedule display" |
 | TimeGrid breaks | Never reach the solver — a multi-block Session spanning one is LEGAL, drawn honestly, never sent. `blockTime()`/`blockOfMinute()`/`gapsWithinSpan()` are the single definition of block boundaries and of what a span does not teach. | §§ "TimeGrid breaks", "A Session that spans a break" |
 | Calendar periods | `classifyWeeks` is the one classifier; `EXAM` touches the week, `BREAK`/`HOLIDAY` cover it. | § "Academic calendar periods" |

@@ -628,6 +628,6 @@ describe('the pages', () => {
         });
 
         expect(res.status).toBe(302);
-        expect(res.headers.get('location')).toBe('/manage');
+        expect(res.headers.get('location')).toBe('/dashboard');
     });
 });

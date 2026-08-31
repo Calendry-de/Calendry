@@ -1,8 +1,17 @@
 <template>
+    <!--
+        `tabindex="-1"` and the data attribute exist for ONE caller: the page
+        restores focus here after an edit whose subject left the view, so a
+        keyboard user lands on the panel that still describes what they changed
+        rather than on `<body>`. Not in the tab order — -1 is programmatic focus
+        only — and already named, so it announces as a region on arrival.
+    -->
     <aside
         class="inspector"
         :class="{ 'inspector--open': !!session }"
         aria-label="Session details"
+        tabindex="-1"
+        data-inspector-root
     >
         <div
             v-if="!session"
@@ -768,8 +777,6 @@ const attendeeNames = computed(() => attendees.value
             inset: -12px;
         }
 
-        &:focus-visible { outline: 2px solid $primary400; }
-
         @include hover() {
             &:hover {
                 color: $content5;
@@ -861,7 +868,11 @@ const attendeeNames = computed(() => attendees.value
 
             font-size: var(--font-size-sm);
             font-weight: 650;
-            color: $warning700;
+
+            /* One step darker than $warning700, which measured 3.23:1 on this
+               panel's own soft tint — under the 4.5:1 text minimum, on the
+               heading that names the product's signature state. */
+            color: $warning800;
             text-transform: uppercase;
             letter-spacing: 0.03em;
 

@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         :back-label="entity.plural"
         :back-to="`/manage/${entity.key}`"
         :title="title"
@@ -28,6 +28,12 @@
                 type="secondary"
             >New {{ entity.label.toLowerCase() }}</CommonButton>
         </template>
+
+        <ManageSaveAsTemplate
+            v-if="entity.saveAsTemplate && form.row.value"
+            :config="entity.saveAsTemplate"
+            :row="form.row.value"
+        />
 
         <component
             :is="bespoke ?? ManageEntityForm"
@@ -58,14 +64,15 @@
             @cancel="confirming = false"
             @confirm="confirmDelete"
         />
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import ManageDeleteDialog from '~/components/manage/ManageDeleteDialog.vue';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageRelationsPanel from '~/components/manage/ManageRelationsPanel.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import ManageSaveAsTemplate from '~/components/manage/ManageSaveAsTemplate.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import { resolveDetailComponent } from '~/components/manage/detailComponents';
 import { useEntityForm } from '~/composables/entityForm';
 import { useEntityRelations } from '~/composables/entityRelations';

@@ -121,10 +121,6 @@
             </article>
         </div>
 
-        <p
-            v-if="!placements.length"
-            class="rgrid_empty"
-        >{{ emptyMessage }}</p>
     </div>
 </template>
 
@@ -151,6 +147,11 @@ import type { Placement, ReviewPlacement } from '~/composables/generationReview'
  *
  * NOT THE MOBILE PRESENTATION — `ScheduleReviewAgenda` renders the same data
  * below 1365px.
+ *
+ * AN EMPTY WEEK IS NOT THIS COMPONENT'S TO DRAW. It used to render the message
+ * as the last child of the grid element, which auto-placed into a row after all
+ * the explicitly-assigned ones — 869.75px of empty cells above a centred
+ * sentence. The page now renders the grid only when there is something in it.
  */
 const props = defineProps<{
     grid: TimeGrid;
@@ -160,7 +161,6 @@ const props = defineProps<{
         offering: (id: string) => string;
         room: (id: string) => string;
     };
-    emptyMessage: string;
 }>();
 
 
@@ -426,12 +426,29 @@ const slots = computed(() => {
             background: $surface3;
         }
 
-        // No stripe at all rather than a faint one: the absence reads as "no
-        // state" next to three present borders, and encodes nothing that would
-        // then need to meet a contrast floor it cannot.
+        /*
+         * No stripe at all rather than a faint one: the absence reads as "no
+         * state" next to three present borders, and encodes nothing that would
+         * then need to meet a contrast floor it cannot.
+         *
+         * RECESSION BY TOKEN, NOT BY OPACITY. This was `opacity: 0.6`, which
+         * measured 4.19:1 on the 12px/600 title — an AA failure, and the
+         * majority state on almost every proposal (264 of 264 on the applied
+         * one). Opacity is the trap: it flattens the chip's own background
+         * TOGETHER with its text into one layer before compositing, so the
+         * rendered colour is neither the computed `color` nor anything the token
+         * ramp can predict — a reviewer reading what did NOT change was reading
+         * the least legible text on the screen.
+         *
+         * Recessing the surface toward the ground and the text one ramp step
+         * instead gets the same "this is background" reading with values that
+         * stay measurable: both land near 9:1.
+         */
         &--unchanged {
             border-left-color: transparent;
-            opacity: 0.6;
+            background: $surface2;
+
+            .rgrid_chip-title { color: $content6; }
         }
 
         &--delete {
@@ -537,14 +554,5 @@ const slots = computed(() => {
         }
     }
 
-    &_empty {
-        grid-column: 1 / -1;
-
-        padding: var(--space-8);
-
-        font-size: var(--font-size-sm);
-        color: $content6;
-        text-align: center;
-    }
 }
 </style>

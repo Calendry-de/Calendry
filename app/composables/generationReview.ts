@@ -71,6 +71,16 @@ export interface ReviewPreview {
         placementsUnmapped: number;
     };
     deletedByOffering: { offeringId: string; title: string; code: string | null; count: number }[];
+    /**
+     * What the proposal does to each Offering over the whole term — the page's
+     * primary evidence. Server-aggregated because `placements` is fetched one
+     * `termWeek` at a time, so no client holds the term.
+     */
+    changesByOffering: {
+        rows: OfferingChange[];
+        /** Offerings the proposal reproduces exactly. A number, never a list. */
+        untouchedOfferings: number;
+    };
     violations: {
         current: { hard: number; soft: number; byType: Record<string, number> };
         proposed: {
@@ -85,6 +95,27 @@ export interface ReviewPreview {
     offerings: { id: string; title: string; code: string | null }[];
     placements?: ReviewPlacement[];
     computedAt: string;
+}
+
+/** One Offering's whole-term change record. `title`/`code` are null when the
+ *  caller cannot read that Offering — never the raw id, which is unreadable. */
+export interface OfferingChange {
+    offeringId: string;
+    title: string | null;
+    code: string | null;
+    created: number;
+    moved: number;
+    unchanged: number;
+    deleted: number;
+    /** Term weeks this Offering changes in, ascending. Empty is impossible here. */
+    weeks: number[];
+    /**
+     * The solver moved this Offering's Sessions without being asked to — the
+     * per-Offering resolution of the plan's `movedCollateral` integer. Always
+     * true for every moved Offering under a repair, where the scope is empty by
+     * design and that is the mode working.
+     */
+    outOfScope: boolean;
 }
 
 /**
@@ -404,11 +435,56 @@ export function useGenerationReview(generationId: string) {
         { watch: [termWeek, groupId, roomId, personId] },
     );
 
+    /**
+     * WHICH EVIDENCE LEADS. `list` is the term-wide change list, `grid` the week
+     * the reviewer drilled into.
+     *
+     * Default `list`, and that is the redesign: the week grid was the primary
+     * view, and a proposal moving 187 of 260 Sessions cannot be read one week at
+     * a time — the grid answers "what is in week 4", never "what does this do".
+     * It is now where you go once you know which Offering you are checking.
+     */
+    const view = ref<'list' | 'grid'>('list');
+
+    /**
+     * The Offering the reviewer drilled in on, or null for the whole week.
+     *
+     * Filtered on the CLIENT rather than adding an `offeringId` query param: the
+     * week fetch already returns every placement in the week, so a round trip
+     * would buy nothing, and the four server-side filters exist because they
+     * change which rows the SERVER may reveal. This one only narrows what is
+     * already on screen.
+     */
+    const offeringId = ref<string>('');
+
     const placements = computed(() => {
         const all = weekData.data.value?.placements ?? [];
 
-        return changesOnly.value ? all.filter((p) => p.action !== 'unchanged') : all;
+        const scoped = offeringId.value
+            ? all.filter((p) => p.offeringId === offeringId.value)
+            : all;
+
+        return changesOnly.value ? scoped.filter((p) => p.action !== 'unchanged') : scoped;
     });
+
+    /**
+     * Send the reviewer to one Offering's changes in the grid.
+     *
+     * Sets the week as well as the filter, because an Offering that changes in
+     * weeks 6–8 is invisible from week 1 and "show in grid" that lands on an
+     * empty grid teaches the reviewer the feature is broken.
+     */
+    function showInGrid(change: { offeringId: string; weeks: number[] }): void {
+        offeringId.value = change.offeringId;
+
+        const first = change.weeks[0];
+
+        if (first !== undefined) {
+            termWeek.value = first;
+        }
+
+        view.value = 'grid';
+    }
 
     /**
      * TWO flags: a single `applying` ref relabelled Apply to "Applying…" and
@@ -419,6 +495,19 @@ export function useGenerationReview(generationId: string) {
     const discarding = ref(false);
     const busy = computed(() => applying.value || discarding.value);
     const actionError = ref<string | null>(null);
+
+    /**
+     * A THIRD flag, for the same reason as the two above.
+     *
+     * `refresh()` awaits `summary.refresh()` and then `weekData.refresh()` — two
+     * sequential round trips — and reported nothing for their whole duration, so
+     * the control the staleness notice actively tells the reviewer to press
+     * ("over 2h ago — refresh before applying") looked inert when pressed.
+     *
+     * Deliberately NOT folded into `busy`: that gates Apply and Discard, and a
+     * refresh must not disable the decision it exists to make safe.
+     */
+    const refreshing = ref(false);
 
     /**
      * `apply()` used to end in `navigateTo('/schedule')` — the highest-stakes
@@ -503,12 +592,21 @@ export function useGenerationReview(generationId: string) {
     return {
         summary, preview, plan, term, grid, loadError, weekCount,
         offerings, rooms, people, groups, lookup,
-        termWeek, groupId, roomId, personId, changesOnly,
+        termWeek, groupId, roomId, personId, changesOnly, offeringId, view, showInGrid,
         placements, weekPending: computed(() => weekData.pending.value),
-        applying, discarding, busy, outcome, actionError, apply, discard,
+        applying, discarding, busy, refreshing, outcome, actionError, apply, discard,
         refresh: async () => {
-            await summary.refresh();
-            await weekData.refresh();
+            refreshing.value = true;
+
+            // `finally` rather than a trailing assignment: the failure path here
+            // already has a destination (the load-error branch), and a flag left
+            // true would leave the control permanently disabled behind it.
+            try {
+                await summary.refresh();
+                await weekData.refresh();
+            } finally {
+                refreshing.value = false;
+            }
         },
         /** The page awaits this — the one await, at setup top level. */
         ready: summary,

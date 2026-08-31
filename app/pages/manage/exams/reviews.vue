@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         description="Exams lecturers have asked for on their own modules, waiting on a decision."
         title="Exam review"
     >
@@ -92,7 +92,7 @@
                 </li>
             </ul>
         </section>
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">

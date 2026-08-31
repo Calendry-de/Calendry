@@ -50,9 +50,11 @@ export default defineEventHandler(async (event) => {
     const identity = requireIdentity(event);
 
     return withRequestTenant(event, async (tx) => {
-        if (identity.kind === 'account') {
-            // A human previewing the board still needs the ordinary key; the
-            // screen path is exempt because it has no Person to check.
+        if (identity.kind !== 'screen') {
+            // Everyone but the device pays the ordinary permission — a human
+            // previewing, an API token just the same. `!== 'screen'` rather
+            // than `=== 'account'` so a principal added later is gated here by
+            // default instead of slipping through unchecked.
             await requirePermission(event, tx, 'session.read');
         }
 

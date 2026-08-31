@@ -96,6 +96,83 @@ export async function resolveScreenKey(key: string): Promise<ScreenIdentityRow |
     return rows[0] ?? null;
 }
 
+export interface ApiTokenIdentityRow {
+    token_id: string;
+    tenant_id: string;
+    federation_id: string | null;
+    person_id: string;
+    person_active: boolean;
+    /** Ceiling selected at creation; the live intersection happens in heldPermissions(). */
+    permissions: string[];
+    is_active: boolean;
+    expires_at: Date | null;
+}
+
+/**
+ * Resolves a raw bearer token to its row, or null when none carries it.
+ *
+ * IN THIS MODULE for the same reason `resolveScreenKey` is: the tenant is not
+ * known until the secret has been resolved. The privileged step is
+ * `calendry_internal.api_token_identity()`, parameterised by the secret alone.
+ *
+ * Returns the row even when inactive, expired, or its Person deactivated; the
+ * resolver in tenantResolver.ts is the single place those become "no identity",
+ * so the policy lives in code the tests can see.
+ */
+export async function resolveApiToken(token: string): Promise<ApiTokenIdentityRow | null> {
+    const prisma = getPrisma();
+    const rows = await prisma.$queryRaw<ApiTokenIdentityRow[]>`
+        SELECT * FROM calendry_internal.api_token_identity(${hashToken(token)})
+    `;
+
+    return rows[0] ?? null;
+}
+
+/**
+ * Stamp `last_used_at`, throttled to once a minute inside the SECURITY DEFINER
+ * function itself. A plain UPDATE from here would match zero rows under FORCE
+ * ROW LEVEL SECURITY — the exact bug the screen board's `lastSeenAt` shipped
+ * with — because no tenant context exists at resolution time.
+ */
+export async function touchApiToken(tokenId: string): Promise<void> {
+    await getPrisma().$executeRaw`SELECT calendry_internal.touch_api_token(${tokenId})`;
+}
+
+export interface IcsLinkIdentityRow {
+    link_id: string;
+    tenant_id: string;
+    federation_id: string | null;
+    person_id: string;
+    person_active: boolean;
+    scope: 'ALL' | 'TERM';
+    term_id: string | null;
+    weeks_ahead: number | null;
+}
+
+/**
+ * Resolves a raw ics_link token to its row, or null when none carries it.
+ *
+ * IN THIS MODULE for the same reason `resolveScreenKey`/`resolveApiToken`
+ * are: the tenant is not known until the token has been resolved. The
+ * privileged step is `calendry_internal.ics_link_identity()`, parameterised
+ * by the token alone. Unlike the other two, the token itself is not hashed —
+ * see `IcsLink`'s own comment — but the lookup still needs to happen before
+ * `withTenant()` can open, so the SECURITY DEFINER function stays.
+ */
+export async function resolveIcsLink(token: string): Promise<IcsLinkIdentityRow | null> {
+    const prisma = getPrisma();
+    const rows = await prisma.$queryRaw<IcsLinkIdentityRow[]>`
+        SELECT * FROM calendry_internal.ics_link_identity(${token})
+    `;
+
+    return rows[0] ?? null;
+}
+
+/** Stamp `last_used_at`, throttled to once a minute — same shape as `touchApiToken`. */
+export async function touchIcsLink(linkId: string): Promise<void> {
+    await getPrisma().$executeRaw`SELECT calendry_internal.touch_ics_link(${linkId})`;
+}
+
 /** The tenants this account can act in. */
 export async function listAccountIdentities(accountId: string): Promise<AccountIdentityRow[]> {
     const prisma = getPrisma();

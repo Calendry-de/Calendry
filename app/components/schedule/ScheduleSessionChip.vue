@@ -3,10 +3,12 @@
         type="button"
         class="chip"
         :aria-label="accessibleName"
+        :data-session-id="session.id"
         :class="[
             `chip--${severity}`,
             { 'chip--selected': selected, 'chip--dimmed': dimmed,
-            'chip--targetable': targetable, 'chip--locked': session.isLocked },
+            'chip--targetable': targetable, 'chip--locked': session.isLocked,
+            'chip--edge-band': edgeBand },
             `chip--${delivery}`,
         ]"
         :style="{
@@ -182,6 +184,15 @@ const props = defineProps<{
      * control inert. The accessible name is assembled separately and unaffected.
      */
     dense?: boolean;
+    /**
+     * A left-edge kind/offering colour stripe, alongside the dot rather than
+     * instead of it. Opt-in and off by default: the grid's own dot-not-stripe
+     * choice (see `_dot` below) is about ITS density, not a system-wide rule,
+     * and stays untouched. `ScheduleAgenda` is the one caller that sets this —
+     * its rows are roomy enough (58px, one session each) for a stripe to read
+     * as structure rather than noise.
+     */
+    edgeBand?: boolean;
 }>();
 
 defineEmits<{ select: [] }>();
@@ -502,6 +513,18 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     &--online {
         border-color: var(--online-color, #{$content6});
         border-style: dashed;
+    }
+
+    /*
+     * A NON-TEXT indicator only — border colour needs 3:1, not text's 4.5:1,
+     * so this is safe against an arbitrary tenant-picked kind colour where a
+     * full-fill background would not be. Overrides only the left edge of the
+     * base `border` shorthand above; top/right/bottom stay the surface5
+     * hairline that reads occupancy.
+     */
+    &--edge-band {
+        border-left-color: var(--kind-color, transparent);
+        border-left-width: 4px;
     }
 
     &_dot {

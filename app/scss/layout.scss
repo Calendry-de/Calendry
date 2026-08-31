@@ -13,6 +13,16 @@ html, body {
     font-optical-sizing: auto;
     font-weight: 400;
     font-style: normal;
+
+    /*
+     * STATED, not inherited. Nothing in this app set a line height, so every
+     * element rendered at whatever the user agent picked (~1.2 for this face) —
+     * a value nobody chose and no stylesheet recorded. Declaring the tight step
+     * here changes almost nothing visually and makes the default a decision:
+     * chrome is single-line and lives in px-exact rows, so it stays tight, and
+     * wrapping prose opts up to `--leading-prose` where it is set.
+     */
+    line-height: var(--leading-tight);
     color: $content4;
     text-size-adjust: 100%;
 

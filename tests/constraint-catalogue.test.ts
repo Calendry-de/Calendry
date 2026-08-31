@@ -536,16 +536,16 @@ describe('constraint → wire mapping (Stage 3d)', () => {
      * never rewritten. `defaultConstraintRow` seeds params from the catalogue
      * defaults, so this pins the product's opinion in the one place it lives.
      */
-    it('provisions a new tenant with the room-rank direction set, but still disabled', () => {
+    it('provisions a new tenant with the room-rank direction set, and enabled', () => {
         const type = findConstraintType('minimize_high_ranking_rooms')!;
         const seeded = defaultConstraintRow(type);
 
         expect(seeded.params).toEqual({ invert: true });
 
-        // Unchanged convention: only the structural rules start enabled, because
-        // switching a solver-steering rule on would silently change every
-        // existing tenant's next timetable.
-        expect(seeded.isEnabled).toBe(false);
+        // `defaultEnabled: true` (2026-08-31), tuned to match the `test`
+        // tenant's live settings — a per-type opt-in, not the structural-only
+        // default every OTHER unlisted solver-steering type still gets.
+        expect(seeded.isEnabled).toBe(true);
     });
 
     it('carries weight for SOFT types and zeroes it for HARD ones', () => {

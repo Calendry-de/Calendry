@@ -85,6 +85,7 @@
 
                 <ScheduleSessionChip
                     :grid="grid"
+                    edge-band
                     :room-name="roomName"
                     :virtual-room-ids="virtualRoomIds"
                     :display="display"
@@ -208,7 +209,7 @@ function countFor(day: number): number {
         }
 
         &:focus-visible {
-            outline: 2px solid $primary400;
+            outline: 2px solid $primary600;
             outline-offset: -2px;
         }
     }

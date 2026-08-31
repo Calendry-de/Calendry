@@ -81,6 +81,13 @@
                 :group-id="String(form.row.value.id)"
                 :readonly="readonly"
             />
+
+            <!-- Same edit-only reasoning again: applying a plan needs a real Group id to attach Offerings to. -->
+            <ManageGroupApplyPlan
+                v-if="mode === 'edit' && form.row.value"
+                :group-id="String(form.row.value.id)"
+                :readonly="readonly"
+            />
         </template>
     </ManageEntityForm>
 </template>
@@ -89,6 +96,7 @@
 import type { useEntityForm } from '~/composables/entityForm';
 import type { EntityRow } from '~/utils/manageRegistry';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
+import ManageGroupApplyPlan from '~/components/manage/ManageGroupApplyPlan.vue';
 import ManageGroupAvailability from '~/components/manage/ManageGroupAvailability.vue';
 import ManageGroupSources from '~/components/manage/ManageGroupSources.vue';
 import { descendantIds, indentedOptions } from '~/utils/groupTree';

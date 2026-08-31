@@ -25,7 +25,7 @@ defineRouteMeta({
                         properties: {
                             email: { type: 'string', format: 'email' },
                             currentPassword: { type: 'string' },
-                            newPassword: { type: 'string', minLength: 12 },
+                            newPassword: { type: 'string', description: 'At least 12 characters.' },
                         },
                     },
                 },

@@ -18,6 +18,7 @@ defineRouteMeta({
             content: {
                 'application/json': {
                     schema: {
+                        type: 'object',
                         oneOf: [
                             {
                                 title: 'persons',
@@ -25,11 +26,9 @@ defineRouteMeta({
                                 properties: {
                                     givenName: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     familyName: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     email: {
                                         type: 'string',
@@ -58,7 +57,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     description: {
                                         type: 'string',
@@ -77,7 +75,6 @@ defineRouteMeta({
                                     },
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     description: {
                                         type: 'string',
@@ -97,11 +94,9 @@ defineRouteMeta({
                                 properties: {
                                     code: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     capacity: {
                                         type: 'integer',
@@ -129,7 +124,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     description: {
                                         type: 'string',
@@ -152,7 +146,6 @@ defineRouteMeta({
                                     },
                                     title: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     color: {
                                         type: 'string',
@@ -208,7 +201,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     blockLengthMinutes: {
                                         type: 'integer',
@@ -258,7 +250,6 @@ defineRouteMeta({
                                                 },
                                                 label: {
                                                     type: 'string',
-                                                    minLength: 1,
                                                 },
                                                 dayOfWeek: {
                                                     type: 'integer',
@@ -284,7 +275,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     startDate: {
                                         type: 'string',
@@ -309,7 +299,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     severity: {
                                         type: 'string',
@@ -369,7 +358,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     color: {
                                         type: 'string',
@@ -396,7 +384,6 @@ defineRouteMeta({
                                     },
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     startDate: {
                                         type: 'string',
@@ -418,7 +405,6 @@ defineRouteMeta({
                                 properties: {
                                     name: {
                                         type: 'string',
-                                        minLength: 1,
                                     },
                                     description: {
                                         type: 'string',

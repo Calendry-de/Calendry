@@ -30,10 +30,16 @@ export function shouldCreateGeneration(status: string): boolean {
 export async function createGenerationForRun(tx: Tx, options: {
     tenantId: string;
     runId: string;
+    /**
+     * The Term this run solved. It becomes the Generation's own `termId`, which
+     * is what scopes its version series and its "current" flag — see the
+     * allocation below.
+     */
+    termId: string;
     result: unknown;
     requestedById: string | null;
 }): Promise<string | null> {
-    const { tenantId, runId, result, requestedById } = options;
+    const { tenantId, runId, termId, result, requestedById } = options;
 
     if (!result) {
         return null;
@@ -50,32 +56,47 @@ export async function createGenerationForRun(tx: Tx, options: {
     }
 
     /**
-     * Version allocation races: `@@unique([tenantId, version])` with
-     * `version = max + 1` lets two concurrent applies compute the same number.
-     * A transaction-scoped advisory lock on the tenant serialises just the
-     * allocation, is released at COMMIT, and involves no network call inside —
-     * the same shape as the Stage 4 claim.
+     * Version allocation races: `version = max + 1` under a unique index lets
+     * two concurrent applies compute the same number. A transaction-scoped
+     * advisory lock serialises just the allocation, is released at COMMIT, and
+     * involves no network call inside — the same shape as the Stage 4 claim.
+     *
+     * KEYED ON THE TERM as well as the tenant, now that the series is per term:
+     * locking the tenant would serialise allocations for terms that cannot
+     * collide, and locking the term alone would let two tenants share a lock.
      */
     // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void, and
     // Prisma cannot deserialize a void column — it fails with "Failed to
     // deserialize column of type 'void'", which reads like a schema problem
     // rather than the wrong client method.
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tenantId}), hashtext('generation_version'))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tenantId} || ':' || ${termId}), hashtext('generation_version'))`;
 
+    /*
+     * PER TERM. This was the tenant-wide maximum, which is what made six terms
+     * with one proposal each read v1..v6 — a version that told you the order
+     * runs happened to finish in across the whole institution, and nothing about
+     * the term you were looking at.
+     */
     const latest = await tx.generation.findFirst({
-        where: { tenantId },
+        where: { tenantId, termId },
         orderBy: { version: 'desc' },
         select: { version: true },
     });
 
+    /*
+     * The lineage parent is the term's OWN current schedule. Tenant-wide, a
+     * proposal for Semester 2 claimed Semester 1's applied schedule as the
+     * baseline it was computed against.
+     */
     const current = await tx.generation.findFirst({
-        where: { tenantId, isCurrent: true },
+        where: { tenantId, termId, isCurrent: true },
         select: { id: true },
     });
 
     const generation = await tx.generation.create({
         data: {
             tenantId,
+            termId,
             version: (latest?.version ?? 0) + 1,
             // Lineage: what this proposal was computed against.
             parentGenerationId: current?.id ?? null,

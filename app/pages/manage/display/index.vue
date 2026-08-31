@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         description="How this institution's schedule is drawn — the standards every session falls back to."
         title="Display"
     >
@@ -225,12 +225,12 @@
                 >{{ saveError }}</p>
             </div>
         </form>
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageColorField from '~/components/manage/ManageColorField.vue';
 import { COLOR_SOURCES, DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { ColorSource, DisplaySettings } from '#shared/sessionColor';

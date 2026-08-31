@@ -361,9 +361,16 @@ const getAttrs = computed(() => {
         /* `.button` clears the outline globally. On a filled variant the
            background change carries focus on its own; with no fill at rest
            there is nothing left to see, so keyboard focus would be invisible.
-           Matches the ring used across the schedule components. */
+
+           The colour is the GLOBAL ring's (`:focus-visible` in layout.scss), not
+           a local choice — only the inset offset is local, because an outward
+           ring on a button sitting flush in a toolbar gets clipped. This used to
+           say it matched "the ring used across the schedule components", which
+           was true and was the problem: those components had each copied
+           `$primary400`, the value the global rule was written to eliminate at
+           2.31:1. */
         &:focus-visible {
-            outline: 2px solid $primary400;
+            outline: 2px solid $primary600;
             outline-offset: -2px;
         }
     }
@@ -381,6 +388,25 @@ const getAttrs = computed(() => {
         width: 40px;
         height: 40px;
         padding: var(--space-4);
+    }
+
+    /*
+     * 44px ON A PHONE ONLY — the rule this codebase already applies to every
+     * other thumb-reached control (`ScheduleAgenda`'s day tabs,
+     * `ScheduleWeekNav`'s steppers, `ScheduleToolbar`'s selects and toggles,
+     * `ScheduleFilterPanel`'s close), and which the buttons those controls sit
+     * beside were never given. At 40px the default button was the shortest
+     * thing in every mobile row it shared.
+     *
+     * Not raised on desktop: 40px matches the ~34px selects and 35px toggles it
+     * lines up with there, and the comment on those rules is explicit that
+     * forcing 44px on a pointer device makes one control taller than its
+     * neighbours for nobody's benefit.
+     */
+    @include mobileOnly {
+        &--size-M {
+            min-height: 44px;
+        }
     }
 
     &--size-S {

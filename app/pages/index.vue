@@ -9,6 +9,7 @@
             <main id="main">
                 <LandingHero/>
 
+
                 <LandingSection
                     id="what"
                     title="A timetable you can hold, and one you can ask for"
@@ -18,6 +19,7 @@
                 >
                     <LandingCapabilityList :items="FEATURES"/>
                 </LandingSection>
+
 
                 <LandingSection
                     id="built"

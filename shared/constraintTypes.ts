@@ -37,6 +37,7 @@ export type StructuralConstraintType = (typeof STRUCTURAL_CONSTRAINT_TYPES)[numb
  */
 export const PER_SESSION_CONSTRAINT_TYPES = [
     'no_session_spanning_break',
+    'no_unplaced_session',
 ] as const;
 
 export type PerSessionConstraintType = (typeof PER_SESSION_CONSTRAINT_TYPES)[number];
@@ -284,6 +285,18 @@ export interface ConstraintTypeDef {
      * present an empty required input.
      */
     defaultWeight?: number;
+    /**
+     * Overrides `defaultConstraintRow`'s isEnabled heuristic (structural +
+     * per-session types only) for THIS type specifically.
+     *
+     * ABSENT, NOT `false`, is the safe default for a type not listed here: a
+     * brand-new catalogue entry — or one nobody has opted in yet — falls back
+     * to the heuristic and is seeded disabled, so `backfill:constraints
+     * --all-missing` can never silently switch on a new solver-steering rule
+     * for every existing tenant. Setting `true` is a deliberate, per-type
+     * decision, not a blanket toggle.
+     */
+    defaultEnabled?: boolean;
     params: ConstraintParamDef[];
     /**
      * Set for a RELATION type (ADR-0028 in calendry-solver): this type's
@@ -387,6 +400,32 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultWeight: 5,
         params: [],
     },
+    {
+        key: 'no_unplaced_session',
+        label: 'Every session must be placed',
+        description:
+            'A Session an Offering still owes must sit somewhere on the grid. Flags one '
+            + 'cancelled to the spare bank (issue #22) that has not been re-placed or '
+            + 'removed — a hole in the timetable, not a preference.',
+        evaluator: 'app',
+        /*
+         * HARD, unlike its per-session sibling above: an unplaced Session is
+         * teaching that is not happening, not a preference about where it
+         * happens. Still enabled by default like every structural/per-session
+         * type (`defaultConstraintRow`) — it can never make a term infeasible,
+         * since it reports a state that already exists rather than creating one.
+         *
+         * PRODUCED ONLY BY `bank.post.ts`, the sole route that sets a Session's
+         * placement fields to NULL: it writes this violation directly rather
+         * than through `refreshViolations()` — see that route's file comment
+         * for why `refreshViolations()` never runs against a banked Session.
+         * `refreshViolations()`'s per-session pass still knows this type, so
+         * `move.post.ts` re-placing the Session (the only restore path) clears
+         * the row the same way it clears any other structural violation.
+         */
+        severity: 'HARD',
+        params: [],
+    },
 
     // ---- Structural, evaluated here, RELATION-BASED (ADR-0028) --------------
     {
@@ -412,6 +451,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Hard, solver-owned --------------------------------------------------
     {
         key: 'exact_frequency_per_offering',
+        defaultEnabled: true,
         wireField: 'exactFrequency',
         label: 'Exact session count per offering',
         description: 'Each offering gets exactly the number of sessions it declares — no more, no fewer.',
@@ -421,6 +461,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'lecturer_veto',
+        defaultEnabled: true,
         wireField: 'lecturerVeto',
         label: 'Lecturer unavailability',
         description: 'Days or blocks an individual has blocked out.',
@@ -430,6 +471,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'group_veto',
+        defaultEnabled: true,
         wireField: 'groupVeto',
         label: 'Honour group availability windows',
         description:
@@ -453,6 +495,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'online_onsite_same_day_exclusion',
+        defaultEnabled: true,
         wireField: 'onlineOnsiteSameDay',
         /*
          * SOFT since the reclassification, and the label moved with it: the solver
@@ -481,6 +524,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'max_online_ratio_per_group',
+        defaultEnabled: true,
         wireField: 'maxOnlineShare',
         label: 'Cap online share per group',
         description: 'At most this share of a group\'s sessions may be online across the term.',
@@ -539,6 +583,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_block_usage',
+        defaultEnabled: true,
         gridRelative: true,
         wireField: 'minimizeBlockUsage',
         label: 'Avoid particular blocks',
@@ -581,6 +626,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_specifc_day',
+        defaultEnabled: true,
         wireField: 'minimizeDayUsage',
         label: 'Avoid particular days',
         description:
@@ -604,6 +650,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_high_ranking_rooms',
+        defaultEnabled: true,
         wireField: 'minimizeRoomRank',
         /*
          * Named for the AXIS, not for one direction along it.
@@ -650,6 +697,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_exam_week_sessions',
+        defaultEnabled: true,
         wireField: 'minimizeExamWeek',
         /*
          * Named for the AXIS, not for one direction along it — the same
@@ -691,6 +739,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'compactness',
+        defaultEnabled: true,
         gridRelative: true,
         wireField: 'compactness',
         label: 'Keep the day compact',
@@ -724,6 +773,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_online_sessions',
+        defaultEnabled: true,
         wireField: 'minimizeOnline',
         label: 'Prefer on-site',
         description: 'Prefer on-site delivery where either would satisfy the offering.',
@@ -734,6 +784,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'person_preference_fit',
+        defaultEnabled: true,
         /*
          * CROSSES THE WIRE, and this line had to land in the same change as the
          * solver's evaluator — never before it.
@@ -775,6 +826,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'group_size_fits_room',
+        defaultEnabled: true,
         wireField: 'groupSizeFitsRoom',
         label: 'Rooms must fit the groups actually attending',
         description:
@@ -798,6 +850,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'room_consistency',
+        defaultEnabled: true,
         wireField: 'roomConsistency',
         label: 'Keep an offering in the same room',
         description:
@@ -822,6 +875,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_weekday_imbalance',
+        defaultEnabled: true,
         wireField: 'minimizeWeekdayImbalance',
         label: 'Spread a group\u2019s week evenly',
         description:
@@ -846,6 +900,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_concurrent_online_sessions',
+        defaultEnabled: true,
         wireField: 'maxConcurrentOnlineSessions',
         label: 'Cap online sessions running at once',
         description:
@@ -941,6 +996,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_capacity_waste',
+        defaultEnabled: true,
         wireField: 'minimizeCapacityWaste',
         label: 'Reward a good room-size fit',
         description:
@@ -975,6 +1031,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_weekly_teaching_load',
+        defaultEnabled: true,
         gridRelative: true,
         wireField: 'maxWeeklyTeachingLoad',
         label: 'Cap a lecturer\u2019s teaching per week',
@@ -1113,6 +1170,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_location_change',
+        defaultEnabled: true,
         wireField: 'minimizeLocationChange',
         label: 'Keep a day on one site',
         description:
@@ -1161,6 +1219,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_same_day',
+        defaultEnabled: true,
         appliesToKindType: 'EXAM',
         wireField: 'examSpacingSameDay',
         label: 'No two exams for a group on one day',
@@ -1185,6 +1244,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_window',
+        defaultEnabled: true,
         appliesToKindType: 'EXAM',
         wireField: 'examSpacingWindow',
         label: 'Clear days between a group\u2019s exams',
@@ -1263,6 +1323,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'distributed_pattern_adherence',
+        defaultEnabled: true,
         wireField: 'distributedPatternAdherence',
         label: 'Hold a weekly slot for spread-out courses',
         description:
@@ -1291,6 +1352,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'block_pattern_adherence',
+        defaultEnabled: true,
         wireField: 'blockPatternAdherence',
         label: 'Keep intensive courses in one window',
         description:
@@ -1315,6 +1377,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'lecturer_consistency',
+        defaultEnabled: true,
         wireField: 'lecturerConsistency',
         label: 'Keep an offering’s lecturer stable',
         description:
@@ -1331,7 +1394,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * never charged for having exactly that one.
          */
         severity: 'SOFT',
-        defaultWeight: 3,
+        defaultWeight: 5,
         params: [],
     },
 
@@ -1356,6 +1419,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_offering_sessions_per_day',
+        defaultEnabled: true,
         wireField: 'maxOfferingSessionsPerDay',
         label: 'Cap an offering’s sessions per day',
         description:
@@ -1383,6 +1447,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_consecutive_offering_blocks',
+        defaultEnabled: true,
         gridRelative: true,
         wireField: 'maxConsecutiveOfferingBlocks',
         label: 'Cap an offering’s blocks in a row',
@@ -1946,11 +2011,15 @@ export function defaultConstraintTypes(): ConstraintTypeDef[] {
 /**
  * The row a tenant's default for `type` should be created with.
  *
- * ENABLED-BY-DEFAULT IS LIMITED TO THE STRUCTURAL RULES: those are evaluated by
+ * STRUCTURAL AND PER-SESSION RULES ARE ALWAYS ENABLED: those are evaluated by
  * THIS app and produce the double-booking warnings a user expects without
- * configuring anything. The other nine steer the SOLVER, and enabling them on
- * upgrade would silently change the timetable every existing tenant gets from
- * their next run.
+ * configuring anything. Every other type is enabled by default only when its
+ * catalogue entry says `defaultEnabled: true` — a per-type opt-in, tuned to
+ * match what a real tenant (`test`) actually runs, not a blanket flip. A type
+ * with no opinion here stays OFF: `backfill:constraints --all-missing` seeds
+ * missing rows for EXISTING tenants too, so a brand-new solver-steering type
+ * with no explicit `defaultEnabled` must never come back on for everyone the
+ * moment it is backfilled.
  *
  * A disabled row is not a dormant rule — it is a rule the tenant can see and
  * switch on.
@@ -1989,7 +2058,8 @@ export function defaultConstraintRow(type: ConstraintTypeDef): {
          * structural default row already is.
          */
         isEnabled: STRUCTURAL_CONSTRAINT_TYPES.includes(type.key as never)
-            || PER_SESSION_CONSTRAINT_TYPES.includes(type.key as never),
+            || PER_SESSION_CONSTRAINT_TYPES.includes(type.key as never)
+            || type.defaultEnabled === true,
         isDefault: true,
         params: Object.fromEntries(
             type.params

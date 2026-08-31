@@ -81,6 +81,42 @@ $navCollapseAt: 819px;
     }
 }
 
+/*
+ * WHERE THE LANDING BAR'S LOCKUP STOPS FITTING — its own measurement, for the
+ * same reason `$navCollapseAt` above has one. The landing bar carries two
+ * controls, not four, so the app header's 819px would collapse it ~380px early.
+ *
+ * Measured min-content of `LandingTopBar` at phone padding:
+ *
+ *   12px padding + 275px lockup (CommonLogo size 64, wordmark)
+ * + 12px gap + 127px nav ("Sign in" 38 + 16 gap + "Get in touch" 83)
+ * + 12px padding
+ * = 438px
+ *
+ * Below that the bar could not hold its contents and did not try: `_measure`
+ * does not wrap and neither child could shrink, so a 390px phone rendered a
+ * 426px document. The whole page scrolled sideways and 83px of "Get in touch"
+ * — the ONLY conversion control on a phone, by that component's own design —
+ * sat past the right edge.
+ *
+ * 640 rather than 438, and the gap is not padding — it is the second language.
+ * This repo has already measured German running ~30% longer (see
+ * `ScheduleToolbar`), and the bar's own labels are the ones that grow:
+ * "Kontakt aufnehmen" takes the button from 132px to ~180 and "Anmelden" the
+ * link from 61 to ~72, so the same bar needs ~571px. A threshold at 560 would
+ * have re-broken the bar the day i18n landed, in the one band where the lockup
+ * is shown — which is exactly the failure this comment was written to prevent.
+ * Re-measure it if either label changes.
+ */
+$landingBarCollapseAt: 640px;
+
+/** Narrow: the lockup drops to its mark, which is a capital C and reads alone. */
+@mixin landingBarCollapsed() {
+    @media all and (max-width: $landingBarCollapseAt) {
+        @content;
+    }
+}
+
 @mixin mobileSafariOnly() {
     @include mobileOnly() {
         @supports (-webkit-hyphens:none) {

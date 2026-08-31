@@ -91,6 +91,20 @@ import { CONTACT_EMAIL } from '~/utils/landingContent';
         color: $content6;
         text-decoration: none;
 
+        /*
+         * 27px is not a phone target. These sit in a `<nav>`, not inline in a
+         * sentence, so WCAG 2.5.8's inline exemption does not cover them the
+         * way it covers the address in the contact aside — they are standalone
+         * controls and get the full 44px this repo already gives thumb-reached
+         * rows elsewhere. Centred rather than padded so "Sign in" does not
+         * grow a 44px-tall underline on hover.
+         */
+        @include mobileOnly {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+        }
+
         @include hover {
             &:hover {
                 color: $content2;

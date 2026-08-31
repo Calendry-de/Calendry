@@ -17,19 +17,32 @@
         -->
         <h1 class="schedule_sr">{{ data.scope.value === 'own' ? 'Your schedule' : 'Schedule' }}</h1>
 
+        <!--
+            TWO ELEMENTS FOR ONE SENTENCE, and the split is load-bearing.
+
+            This region is mounted for the life of the page and is never
+            `display: none`, because a screen reader announces a CHANGE inside a
+            region it was already observing: a region that appears with its text
+            already in it, or that is hidden at the moment the text changes, is
+            reliably announced by nothing. The visible strip below is ordinary
+            content and carries `aria-hidden`, so the same sentence is not read
+            twice.
+
+            It sits above every branch on purpose — an edit's outcome must be
+            announceable whichever state the body is in.
+        -->
+        <p
+            class="schedule_sr"
+            role="status"
+            aria-live="polite"
+        >{{ feedback }}</p>
+
         <ScheduleToolbar
             ref="toolbar"
-            v-model:term-id="filters.termId.value"
-            v-model:group-id="filters.groupId.value"
-            v-model:room-id="filters.roomId.value"
-            v-model:person-id="filters.personId.value"
-            v-model:include-nested="filters.includeNested.value"
+            v-model:filters-open="filtersOpen"
             v-model:row-height="rowHeight"
             v-model:show-violations="showViolations"
-            :terms="data.terms.value"
-            :groups="data.groups.value"
-            :rooms="data.rooms.value"
-            :people="data.people.value"
+            :active-filter-count="activeFilterCount"
             :violation-count="data.violations.value.length"
             :can-read-violations="data.canReadViolations.value"
             :can-trigger-solver="canTriggerSolver"
@@ -41,6 +54,22 @@
             :active-days="data.grid.value?.activeDays ?? []"
             :slot-date-of="data.slotDateOf"
             @toggle-create="editing.toggleCreating"
+        />
+
+        <ScheduleFilterPanel
+            v-model:open="filtersOpen"
+            v-model:term-id="filters.termId.value"
+            v-model:group-id="filters.groupId.value"
+            v-model:room-id="filters.roomId.value"
+            v-model:person-id="filters.personId.value"
+            v-model:include-nested="filters.includeNested.value"
+            v-model:week="filters.week.value"
+            :terms="data.terms.value"
+            :groups="data.groups.value"
+            :rooms="data.rooms.value"
+            :people="data.people.value"
+            :term="data.term.value"
+            :total-weeks="data.totalWeeks.value"
         />
 
         <p
@@ -67,11 +96,54 @@
             Pick a slot for the new event. Press Escape to cancel.
         </p>
 
+        <!--
+            THE ACKNOWLEDGEMENT. A move, swap, lock or room change used to end in
+            silence — the mode dropped, the grid refetched, and nothing said what
+            had happened or what it cost. Same slot and same shape as the placing
+            strip above, because it is the other half of that conversation: one
+            line says what to do next, this one says what was done.
+
+            Dismisses itself (see `feedbackTimer`) rather than carrying a close
+            button: an outcome is transient by nature, and a control to
+            acknowledge an acknowledgement is chrome.
+        -->
+        <p
+            v-if="feedback"
+            class="schedule_done"
+            aria-hidden="true"
+        >
+            <Icon
+                name="material-symbols:check-circle-outline"
+                aria-hidden="true"
+            />
+            {{ feedback }}
+        </p>
+
+        <!--
+            DISMISSIBLE, unlike before: `editing.error` is cleared only by the
+            next mutation attempt, so a failed move's message sat above the grid
+            indefinitely — including long after the reader had moved on to
+            something unrelated, where it reads as a fresh failure of whatever
+            they are doing now.
+        -->
         <p
             v-if="editing.error.value"
             class="schedule_error"
             role="alert"
-        >{{ editing.error.value }}</p>
+        >
+            <span>{{ editing.error.value }}</span>
+            <button
+                type="button"
+                class="schedule_error-dismiss"
+                aria-label="Dismiss this error"
+                @click="editing.error.value = ''"
+            >
+                <Icon
+                    name="material-symbols:close"
+                    aria-hidden="true"
+                />
+            </button>
+        </p>
 
         <!--
             THE FAILURE BRANCH COMES FIRST. "No time grid configured" is a claim
@@ -162,7 +234,7 @@
                     :term-week="filters.week.value"
                     :slot-date-of="data.slotDateOf"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
-                    @select="editing.select"
+                    @select="onSelect"
                     @place="placeAt"
                     @wheel="stepWeekOnWheel"
                 />
@@ -197,7 +269,7 @@
                     :show-person="!filters.personId.value"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @wheel="stepWeekOnWheel"
-                    @select="editing.select"
+                    @select="onSelect"
                     @place="placeAt"
                 />
 
@@ -253,7 +325,7 @@
                     v-if="data.offGridSessions.value.length"
                     :sessions="data.offGridSessions.value"
                     :grid="data.grid.value"
-                    @select="editing.select"
+                    @select="onSelect"
                 />
 
                 <!--
@@ -275,7 +347,7 @@
                     :lookup="data.lookup"
                     :session-title="data.sessionTitle"
                     :can-repair="canTriggerSolver"
-                    @select="editing.select"
+                    @select="onSelect"
                     @repair="toolbar?.startRepair()"
                 />
             </aside>
@@ -288,27 +360,23 @@ import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
 import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
-import { formatSlotDate, sessionLabel } from '~/composables/schedule';
+import { blockTime, formatSlotDate, sessionLabel, weekdayName } from '~/composables/schedule';
+import type { ScheduleAction } from '~/composables/scheduleEditing';
 import { useViewerLocale } from '~/composables/locale';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
 import ScheduleInspector from '~/components/schedule/ScheduleInspector.vue';
 import ScheduleOffGridTray from '~/components/schedule/ScheduleOffGridTray.vue';
 import ScheduleSpareBank from '~/components/schedule/ScheduleSpareBank.vue';
+import ScheduleFilterPanel from '~/components/schedule/ScheduleFilterPanel.vue';
 import ScheduleToolbar from '~/components/schedule/ScheduleToolbar.vue';
 import ScheduleWeekNav from '~/components/schedule/ScheduleWeekNav.vue';
 import ScheduleViolationsPanel from '~/components/schedule/ScheduleViolationsPanel.vue';
 import { isPlacedSession } from '#shared/sessionPlacement';
 import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
-import {
-    resolveTermId,
-    scheduleFiltersFromQuery,
-    scheduleFiltersToQuery,
-    useScheduleFilters,
-} from '~/composables/scheduleFilters';
+import { resolveTermId, useScheduleFilters } from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
 import { useWheelStep } from '~/composables/wheelStep';
-import { useStore } from '~/store';
 
 /**
  * Composition only. Three composables own the state, seven components own the
@@ -403,10 +471,35 @@ const stepWeekOnWheel = useWheelStep({
     },
 });
 
+/**
+ * A STALE LIST MUST NOT BE ACTIONABLE.
+ *
+ * `.schedule_main--pending` sets `pointer-events: none` while the week
+ * refetches, which stops a MOUSE from reaching a chip that is one render from
+ * being replaced — and does nothing at all about the keyboard, so a focused chip
+ * could still be Entered against a list about to be discarded. That is the
+ * precise hazard the rule's own comment says it exists to prevent.
+ *
+ * The guard lives here rather than in the two grids because every selection
+ * path — grid, agenda, off-grid tray, violations panel — already funnels
+ * through this page, and none of them needs to know why.
+ */
+function onSelect(id: string) {
+    if (data.pending.value) {
+        return;
+    }
+
+    editing.select(id);
+}
+
 function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
     if (editing.creating.value) {
         pendingSlot.value = target;
 
+        return;
+    }
+
+    if (data.pending.value) {
         return;
     }
 
@@ -448,6 +541,14 @@ function cancelCreate() {
  * One request per control, matching how rooms already save. Not a form with a
  * Save button: a single button over four independent fields could half-succeed
  * with one error message covering all of them.
+ *
+ * BARE `$fetch` IS CORRECT HERE, and it is worth saying so next to
+ * `scheduleData.ts`'s long argument for the opposite. That rule is about fetches
+ * that run during SSR: on the server `$fetch` sends no browser cookie, so an
+ * authenticated call 401s and the page renders its empty state. These three
+ * handlers only ever run from a click, on the client, where `$fetch` carries
+ * cookies natively — `useRequestFetch()` would add a setup-scope binding and
+ * change nothing. What would make them wrong is moving one into a setup path.
  */
 async function saveEventDetails(patch: Record<string, unknown>) {
     const target = editing.selected.value;
@@ -570,41 +671,87 @@ const canLock = useHasPermission('session.lock');
 /** Cancel to, or place from, the spare bank (issue #22). */
 const canBankSession = useHasPermission('session.bank');
 
-const route = useRoute();
-const router = useRouter();
-const store = useStore();
-
 const filters = useScheduleFilters();
 
-/*
- * #74/#73: seeded SYNCHRONOUSLY, before `useScheduleData` fires its fetch —
- * not via a watcher, which Vue never flushes during SSR (the same reason
- * `ScheduleToolbar`'s `<option>` needs an explicit `:selected`). The Term
- * follows the precedence rule the two tickets agreed on; every other filter
- * is whatever the URL says, or the composable's own default.
+/**
+ * The schedule page's own view/session settings, held as ONE JSON cookie
+ * rather than one cookie per field (term (#73), density, violations panel).
+ *
+ * A cookie rather than `localStorage`, for the reason `useFirstVisit` sets
+ * out: every one of these has to be legible on the SERVER, never swapped in
+ * after hydration. `termId` decides WHICH term's data the awaited SSR fetch
+ * below asks for, so reading it client-only would render the wrong term's
+ * whole schedule and then replace it once hydration catches up. `density`
+ * decides the grid's row height in the first HTML the same way — client-only
+ * would render every visit at 60px and then jump to the stored value. The
+ * violations panel is the same story one step smaller: a timetabler keeps it
+ * open all day, and it closed on every return from the proposals list.
+ *
+ * First-party, functional, and holding exactly these three fields: no
+ * identifier, no timestamp, nothing that distinguishes one reader from
+ * another.
  */
-const queryFilters = scheduleFiltersFromQuery(route.query);
-
-filters.termId.value = resolveTermId(queryFilters.termId, store.selectedTermId);
-
-if (queryFilters.week !== undefined) {
-    filters.week.value = queryFilters.week;
+interface ScheduleSettings {
+    density: number;
+    violationsOpen: boolean;
+    termId: string;
 }
 
-if (queryFilters.groupId !== undefined) {
-    filters.groupId.value = queryFilters.groupId;
+/** The grid's own row-height steps (DESIGN.md). */
+const DENSITIES = [44, 60, 84];
+
+const COOKIE_YEAR = 60 * 60 * 24 * 365;
+
+/**
+ * A COOKIE IS USER INPUT TOO — hand-edited, written by an older build that
+ * only knew one or two of these fields, or otherwise not shaped like
+ * `ScheduleSettings`. Every read of the cookie goes through this, never
+ * `settingsCookie.value` directly, so a garbled or partial cookie degrades
+ * to defaults FIELD BY FIELD — a bad `density` cannot blank the toolbar's
+ * `<select>`, and a missing `termId` cannot throw out a valid `density`.
+ */
+function coerceScheduleSettings(raw: unknown): ScheduleSettings {
+    const value = (raw && typeof raw === 'object' ? raw : {}) as Partial<ScheduleSettings>;
+
+    return {
+        density: DENSITIES.includes(Number(value.density)) ? Number(value.density) : 60,
+        violationsOpen: value.violationsOpen === true,
+        termId: typeof value.termId === 'string' ? value.termId : '',
+    };
 }
 
-if (queryFilters.roomId !== undefined) {
-    filters.roomId.value = queryFilters.roomId;
+const settingsCookie = useCookie<ScheduleSettings>('calendry-schedule-settings', {
+    default: () => ({ density: 60, violationsOpen: false, termId: '' }),
+    sameSite: 'lax',
+    path: '/',
+    maxAge: COOKIE_YEAR,
+});
+
+const scheduleSettings = computed(() => coerceScheduleSettings(settingsCookie.value));
+
+function patchScheduleSettings(patch: Partial<ScheduleSettings>) {
+    settingsCookie.value = { ...scheduleSettings.value, ...patch };
 }
 
-if (queryFilters.personId !== undefined) {
-    filters.personId.value = queryFilters.personId;
-}
+/*
+ * #73's cookie fallback, layered on `useScheduleFilters()`'s own URL sync
+ * rather than duplicating it: that composable already owns reading AND
+ * writing every filter's query param (`term`/`week`/`group`/`room`/`person`/
+ * `nested`), coalescing rapid writes so two sets in one tick cannot silently
+ * lose one of them — a second, page-level write-back would just fight it for
+ * the query string. The ONE thing it does not do is remember a Term across a
+ * fresh navigation with no `?term=` at all, which is what #73 actually asked
+ * for — so this seeds ONLY that gap, through the composable's own setter,
+ * before the first fetch fires. `resolveTermId(undefined, …)` reads oddly
+ * with a literal `undefined`, but it is the same precedence rule #73/#74
+ * agreed on: empty here always means "the URL had nothing to say".
+ */
+if (!filters.termId.value) {
+    const remembered = resolveTermId(undefined, scheduleSettings.value.termId);
 
-if (queryFilters.includeNested !== undefined) {
-    filters.includeNested.value = queryFilters.includeNested;
+    if (remembered) {
+        filters.termId.value = remembered;
+    }
 }
 
 // The composable is synchronous by design; this is the single await, at setup
@@ -616,33 +763,16 @@ const data = useScheduleData(filters);
 await data.ready;
 
 /*
- * Whichever Term ends up selected — from the URL, the store, or the server's
- * own default once `useScheduleData`'s watchEffect resolves one — becomes the
- * store's remembered Term, so the NEXT navigation (#73) can fall back to it.
+ * Whichever Term ends up selected — from the URL, the cookie, or the
+ * server's own default once `useScheduleData`'s watchEffect resolves one —
+ * becomes the cookie's remembered Term, so the NEXT navigation OR reload
+ * (#73) can fall back to it.
  */
 watch(filters.termId, (termId) => {
     if (termId) {
-        store.selectedTermId = termId;
+        patchScheduleSettings({ termId });
     }
 }, { immediate: true });
-
-/*
- * #74's write side. `router.replace`, not `push`: a filter tweak is not a
- * navigation worth a history entry, and `push`-ing on every chip change would
- * make the back button step through filter states instead of leaving the page.
- * Never fires during SSR (no watcher flush there), so this is purely a
- * client-side reaction to the reader changing something.
- */
-watch(() => scheduleFiltersToQuery({
-    termId: filters.termId.value,
-    week: filters.week.value,
-    groupId: filters.groupId.value,
-    roomId: filters.roomId.value,
-    personId: filters.personId.value,
-    includeNested: filters.includeNested.value,
-}), (query) => {
-    router.replace({ query });
-});
 
 const editing = useScheduleEditing({
     // Both buckets (issue #22): a selection made from `ScheduleSpareBank` must
@@ -661,9 +791,282 @@ const selectedPlacement = computed(() => (
     editing.selected.value && isPlacedSession(editing.selected.value) ? editing.selected.value : null
 ));
 
-/** Page-local: neither value reaches the API query. */
-const rowHeight = ref(60);
-const showViolations = ref(false);
+/**
+ * PAGE-LOCAL because neither value reaches the API query — and PERSISTED via
+ * `scheduleSettings` above, because that is a different question from being
+ * addressable.
+ */
+const rowHeight = computed<number>({
+    get: () => scheduleSettings.value.density,
+    set: (value) => {
+        patchScheduleSettings({ density: DENSITIES.includes(value) ? value : 60 });
+    },
+});
+
+const showViolations = computed<boolean>({
+    get: () => scheduleSettings.value.violationsOpen,
+    set: (value) => {
+        patchScheduleSettings({ violationsOpen: value });
+    },
+});
+
+/**
+ * Whether `ScheduleFilterPanel` is open — UI-only, unlike the filter VALUES
+ * it edits (those stay URL-backed via `useScheduleFilters()`). A plain ref,
+ * not persisted: reopening the panel on the next visit is not a state worth
+ * remembering.
+ */
+const filtersOpen = ref(false);
+
+/** How many of Group/Room/Person are narrowing the view — the toolbar's badge. */
+const activeFilterCount = computed(() => [
+    filters.groupId.value, filters.roomId.value, filters.personId.value,
+].filter(Boolean).length);
+
+/**
+ * Naive English pluralization, matching the rest of this app's chrome. i18n is a
+ * decided-and-deliberately-unstarted card, not an oversight; when it lands, this
+ * is one of the strings it takes over, and pretending otherwise here would mean
+ * shipping a plural-rules engine for one sentence.
+ */
+function plural(count: number, noun: string): string {
+    return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * What an edit COST, named at the moment it lands.
+ *
+ * Warn-and-allow means a hard violation survives the edit that caused it
+ * (TAXONOMY.md §3), so the reader has to be told — the alternative, which is
+ * what shipped until now, is a schedule that quietly acquires clashes while the
+ * only signal is a colour shift on one chip and a count in the far corner.
+ *
+ * SILENT WHEN THE CALLER CANNOT READ VIOLATIONS. "Nothing flagged" would be a
+ * claim about state this screen is not allowed to see, and the reference wave
+ * degrades a 403 to `[]` — so an empty list means "none" and "not permitted"
+ * indistinguishably. Saying nothing is the honest branch.
+ */
+function violationClause(sessionId: string): string {
+    if (!data.canReadViolations.value) {
+        return '';
+    }
+
+    const rows = data.violationsBySessionId.value.get(sessionId) ?? [];
+
+    if (!rows.length) {
+        // "violations", matching the toolbar, the inspector, the panel and the
+        // solver summary. "Nothing flagged" was a fifth word for one quantity —
+        // mine, from the pass that added this sentence.
+        return ' No violations.';
+    }
+
+    const hard = rows.filter((row) => row.severity === 'HARD').length;
+    const soft = rows.length - hard;
+
+    const parts = [
+        ...(hard ? [plural(hard, 'hard violation')] : []),
+        ...(soft ? [plural(soft, 'soft violation')] : []),
+    ];
+
+    return ` ${parts.join(' and ')} recorded.`;
+}
+
+function describeAction(action: ScheduleAction): string {
+    switch (action.kind) {
+        case 'move': {
+            const grid = data.grid.value;
+            // The clock time, not the block number: a timetabler checks a
+            // placement against a wall clock. `blockTime` is passed the day so a
+            // per-day break override moves the boundary it actually moves.
+            const at = grid
+                ? blockTime(grid, action.blockIndex, action.dayOfWeek).start
+                : `block ${action.blockIndex + 1}`;
+
+            return `Moved ${action.label} to ${weekdayName(action.dayOfWeek, locale.value)} ${at}.`;
+        }
+        case 'swap':
+            return `Swapped ${action.label} with ${action.partnerLabel}.`;
+        case 'lock':
+            return action.locked
+                ? `Locked ${action.label} in place. The next solve will leave it alone.`
+                : `Unlocked ${action.label}. The next solve may move it.`;
+        case 'rooms':
+            return action.roomCount === 0
+                ? `Removed every room from ${action.label}.`
+                : `Rooms updated for ${action.label}.`;
+    }
+}
+
+const announcement = computed(() => {
+    const action = editing.lastAction.value;
+
+    return action ? describeAction(action) + violationClause(action.sessionId) : '';
+});
+
+/**
+ * A filter named in the URL that this caller cannot see — see `reconcileFilters`.
+ * Reported rather than silently corrected: a link that said "week 7, Class A"
+ * and renders the whole institution has lied to whoever opened it.
+ */
+const filterNotice = ref('');
+
+/** One channel, because one line is all either message needs. */
+const feedback = computed(() => announcement.value || filterNotice.value);
+
+/**
+ * FOCUS FOLLOWS THE EDIT, for the two actions whose control disappears under it.
+ *
+ * A grid cell carries `:disabled="!placing"`, so the cell just activated is
+ * disabled the instant the move resolves and focus falls to `<body>` — verified
+ * over CDP for the create flow, which is why `restoreCreateFocus` exists. The
+ * move path is the same failure on the interaction taken hundreds of times a
+ * session rather than once.
+ *
+ * Lock and rooms are deliberately EXCLUDED: their controls live in the inspector
+ * and survive the mutation, so moving focus to the chip would steal it from the
+ * button the reader just pressed.
+ *
+ * Found by attribute rather than threaded through two components, for the reason
+ * `restoreCreateFocus` gives: what matters is that a control still exists to
+ * receive focus. When the edit sent the session out of this view entirely —
+ * another week, or outside the active filter — no chip exists, and focus goes to
+ * the inspector, which still describes it.
+ */
+function restoreEditFocus(sessionId: string) {
+    nextTick(() => {
+        /*
+         * ALL matches, then the one actually rendered. The week grid and the day
+         * agenda are BOTH mounted at every width — each is hidden by
+         * `display: none` at the other's breakpoint rather than unmounted, which
+         * is what lets a breakpoint change keep the selection — so this session
+         * has two chips and `querySelector` returns whichever comes first in the
+         * document. `focus()` on a `display: none` element is a silent no-op, so
+         * taking the first match would have left focus on `<body>` on exactly one
+         * of the two layouts. `offsetParent` is null for a hidden element and is
+         * the cheapest question that distinguishes them.
+         */
+        const chips = [...document.querySelectorAll<HTMLElement>(`[data-session-id="${sessionId}"]`)];
+        const visible = chips.find((chip) => chip.offsetParent !== null);
+
+        (visible ?? document.querySelector<HTMLElement>('[data-inspector-root]'))?.focus();
+    });
+}
+
+/**
+ * The acknowledgement clears itself. Long enough to read two clauses without
+ * hurrying, short enough that it is gone before it can be mistaken for the
+ * outcome of the next edit.
+ */
+const FEEDBACK_MS = 9000;
+
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+function holdFeedback(clear: () => void) {
+    if (feedbackTimer) {
+        clearTimeout(feedbackTimer);
+    }
+
+    feedbackTimer = setTimeout(clear, FEEDBACK_MS);
+}
+
+watch(() => editing.lastAction.value, (action) => {
+    if (!action) {
+        return;
+    }
+
+    holdFeedback(() => {
+        editing.lastAction.value = null;
+    });
+
+    if (action.kind === 'move' || action.kind === 'swap') {
+        restoreEditFocus(action.sessionId);
+    }
+});
+
+watch(filterNotice, (notice) => {
+    if (notice) {
+        holdFeedback(() => {
+            filterNotice.value = '';
+        });
+    }
+});
+
+// A timer outliving its page would fire against a disposed ref.
+onBeforeUnmount(() => {
+    if (feedbackTimer) {
+        clearTimeout(feedbackTimer);
+    }
+});
+
+/**
+ * THE URL IS UNTRUSTED INPUT, and every one of these failures renders as an
+ * empty grid indistinguishable from a term with nothing in it.
+ *
+ * `?week=999` outruns the term. `?group=<id>` may name a cohort this caller
+ * cannot see, or one that has since been deleted — and then the toolbar's
+ * `<select>` finds no matching option and sits blank while the filter is
+ * demonstrably active, so the screen misrepresents its own state.
+ *
+ * THE EMPTY-LIST GUARD IS THE WHOLE SUBTLETY. The directory fetches degrade a
+ * 403 to `[]` on purpose (`scheduleData.optional`), so "not in the list" means
+ * either "no such group" or "you may not enumerate groups" — and clearing a
+ * perfectly valid filter because the reader lacks `group.read` would break the
+ * one case the filter exists for. Reconciliation therefore only runs against a
+ * list that actually arrived.
+ */
+function reconcileFilters() {
+    if (data.pending.value || data.loadError.value) {
+        return;
+    }
+
+    const total = data.totalWeeks.value;
+
+    if (filters.week.value > total) {
+        filters.week.value = total;
+    }
+
+    // Cleared rather than corrected: `useScheduleData`'s watchEffect seeds the
+    // term the SERVER resolved as soon as this is empty, which is the one value
+    // that cannot disagree with the chips on screen.
+    if (filters.termId.value
+        && data.terms.value.length
+        && !data.terms.value.some((term) => term.id === filters.termId.value)) {
+        filters.termId.value = '';
+        filterNotice.value = 'That term no longer exists — showing the current one.';
+
+        return;
+    }
+
+    const dropped: string[] = [];
+
+    if (filters.groupId.value && data.groups.value.length
+        && !data.groups.value.some((group) => group.id === filters.groupId.value)) {
+        filters.groupId.value = '';
+        dropped.push('group');
+    }
+
+    if (filters.roomId.value && data.rooms.value.length
+        && !data.rooms.value.some((room) => room.id === filters.roomId.value)) {
+        filters.roomId.value = '';
+        dropped.push('room');
+    }
+
+    if (filters.personId.value && data.people.value.length
+        && !data.people.value.some((person) => person.id === filters.personId.value)) {
+        filters.personId.value = '';
+        dropped.push('person');
+    }
+
+    if (dropped.length) {
+        filterNotice.value = `Could not apply the ${dropped.join(' and ')} filter from this link — showing everything.`;
+    }
+}
+
+watch(
+    [() => data.pending.value, () => data.totalWeeks.value, filters.query],
+    reconcileFilters,
+    { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">
@@ -732,6 +1135,7 @@ const showViolations = ref(false);
         p {
             max-width: 52ch;
             font-size: var(--font-size-md);
+            line-height: var(--leading-prose);
             color: $content6;
         }
     }
@@ -759,7 +1163,40 @@ const showViolations = ref(false);
         strong { font-weight: 650; }
     }
 
+    /*
+     * THE OUTCOME LINE, in the placing strip's shape and slot — one line says
+     * what to do next, the other says what was done, so they read as one
+     * conversation rather than two systems. `$success` rather than the accent:
+     * the accent is spent on "where a session may land" (DESIGN.md) and an
+     * acknowledgement is not an offer.
+     */
+    &_done {
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+
+        margin: 0;
+        padding: var(--space-5) var(--space-6);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-md);
+        color: $content4;
+
+        background: varToRgba('success600', 0.14);
+
+        svg {
+            flex: none;
+            width: var(--space-6);
+            height: var(--space-6);
+            color: $success700;
+        }
+    }
+
     &_error {
+        display: flex;
+        gap: var(--space-4);
+        align-items: flex-start;
+
         margin: 0;
         padding: var(--space-4) var(--space-6);
         border-radius: var(--radius-lg);
@@ -768,6 +1205,43 @@ const showViolations = ref(false);
         color: $error700;
 
         background: rgb(169, 45, 70, 0.16);
+
+        span { flex: 1; }
+
+        &-dismiss {
+            cursor: pointer;
+
+            display: flex;
+            flex: none;
+            align-items: center;
+            justify-content: center;
+
+            /* 28px of hit area for a 16px glyph — the smallest control on the
+               page still has to be hittable. */
+            width: var(--space-7);
+            height: var(--space-7);
+            margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1) 0 0;
+            border: 0;
+            border-radius: var(--radius-sm);
+
+            color: $error700;
+
+            background: none;
+
+            transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+            &:hover { background: rgb(169, 45, 70, 0.16); }
+
+            &:focus-visible {
+                outline: 2px solid $error700;
+                outline-offset: 1px;
+            }
+
+            svg {
+                width: var(--space-6);
+                height: var(--space-6);
+            }
+        }
     }
 
     &_body {

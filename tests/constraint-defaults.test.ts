@@ -67,34 +67,45 @@ describe('the catalogue half', () => {
         }
     });
 
-    it('enables exactly the structural and per-session rules, and nothing else', () => {
+    it('enables exactly the structural/per-session rules plus each catalogue '
+        + 'entry opted in via defaultEnabled, and nothing else', () => {
         // PER_SESSION types joined structural ones as auto-enabled-by-default:
         // both are purely informational reports with no way to make a term
         // infeasible, so both start on for a freshly-provisioned tenant.
+        // Everything past that is a per-type, explicit `defaultEnabled: true`
+        // in the catalogue — tuned on 2026-08-31 to match what the `test`
+        // tenant actually runs, not a blanket flip. A type with no opinion
+        // stays off, so `backfill:constraints --all-missing` can never
+        // silently switch a new solver-steering rule on for every tenant.
         const enabled = defaultConstraintTypes()
             .map(defaultConstraintRow)
             .filter((row) => row.isEnabled)
             .map((row) => row.type)
             .sort();
 
+        const optedIn = CONSTRAINT_TYPES.filter((t) => t.defaultEnabled).map((t) => t.key);
+
         expect(enabled).toEqual(
-            [...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES].sort(),
+            [...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES, ...optedIn].sort(),
         );
     });
 
-    it('does NOT auto-enable person_preference_fit', () => {
+    it('auto-enables person_preference_fit now that its solver evaluator has shipped', () => {
         /*
-         * Two reasons it must ship off. It steers the SOLVER, and enabling a
-         * previously-off rule for every tenant on upgrade changes the timetable
-         * they get from their next run — not a change a backfill is entitled to
-         * make. And its proto field has not shipped, so an enabled row would be
-         * skipped at assembly time anyway.
+         * Used to ship off: enabling a previously-off, solver-steering rule
+         * for every tenant on upgrade changes the timetable they get from
+         * their next run, and its proto field had not shipped yet either.
+         * Neither holds any more — the evaluator landed in calendry-solver
+         * 41f6227, and this is now a per-type `defaultEnabled: true` opt-in
+         * (2026-08-31), not a blanket change: `backfill:constraints
+         * --all-missing` still leaves any type with no such opt-in off for
+         * every existing tenant.
          */
         const type = CONSTRAINT_TYPES.find((candidate) => candidate.key === 'person_preference_fit')!;
         const row = defaultConstraintRow(type);
 
-        expect(row.isEnabled).toBe(false);
-        // SOFT, so the CHECK demands a weight even while disabled.
+        expect(row.isEnabled).toBe(true);
+        // SOFT, so the CHECK demands a weight even while enabled.
         expect(row.severity).toBe('SOFT');
         expect(row.weight).toBeGreaterThan(0);
     });

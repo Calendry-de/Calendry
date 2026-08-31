@@ -56,10 +56,13 @@
                 >{{ saveError }}</p>
             </div>
         </form>
+
+        <ApiTokensPanel/>
     </CommonPage>
 </template>
 
 <script setup lang="ts">
+import ApiTokensPanel from '~/components/my/ApiTokensPanel.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonPage from '~/components/common/CommonPage.vue';
 import { isUsableLocale } from '#shared/locale';

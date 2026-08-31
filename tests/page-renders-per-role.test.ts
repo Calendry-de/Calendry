@@ -224,17 +224,25 @@ const PAGES = [
         why: 'a stated denial, from the review middleware\'s new gate',
     },
     {
+        /*
+         * `/manage` itself is now a redirect stub to `/dashboard` (the
+         * standalone hub page folded into the dashboard); `fetch` follows it
+         * by default, so this still exercises the same content, just
+         * relocated. The marker is a manage entity's card label rather than
+         * the old page title, since the title is now the tenant's name.
+         */
         path: '/manage',
         roles: ['admin'],
-        marker: 'Manage',
-        why: 'the manage index renders whatever sections the role may read',
+        marker: 'Rooms',
+        why: 'the dashboard\'s manage-entities grid renders whatever sections the role may read',
     },
     {
         /*
          * The viewer holds ONLY `session.read`, which after this change reaches
          * no management section at all — Display and Proposals were the last two
-         * it did reach. The index must therefore say so rather than render an
-         * empty card grid, which would be indistinguishable from a failed load.
+         * it did reach. The dashboard must therefore say so rather than render
+         * an empty card grid, which would be indistinguishable from a failed
+         * load.
          *
          * Paired with the admin row above deliberately: "the empty message is
          * present" proves nothing unless the same page fills for somebody.
@@ -804,7 +812,7 @@ describe('every page renders for every role that can reach it', () => {
 
     /**
      * The manage sections a role may not read are not there AT ALL — no nav
-     * entry, and a direct URL redirects to /manage. Asserted as a REDIRECT
+     * entry, and a direct URL redirects to /dashboard. Asserted as a REDIRECT
      * rather than as an absent marker: "the page did not contain X" passes just
      * as well for a page that failed to render, which is the trap this whole
      * file exists to catch.
@@ -817,7 +825,7 @@ describe('every page renders for every role that can reach it', () => {
             });
 
             expect(res.status, `${role} should be redirected away`).toBe(302);
-            expect(res.headers.get('location')).toBe('/manage');
+            expect(res.headers.get('location')).toBe('/dashboard');
         }
 
         // The control: the section EXISTS and renders for someone. Without this
@@ -1002,7 +1010,7 @@ describe('every page renders for every role that can reach it', () => {
         expect(await header('entityEditor')).toContain('Home');
     });
 
-    it('offers both administrator availability screens on the /manage index', async () => {
+    it('offers both administrator availability screens on the dashboard', async () => {
         const manage = async (role: string) => fetch(`${BASE}/manage`, { headers: { cookie: cookies[role]! } })
             .then((res) => res.text())
             .then((html) => html.split('<script type="application/json"')[0] ?? '');

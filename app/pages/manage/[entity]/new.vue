@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         :back-label="entity.plural"
         :back-to="`/manage/${entity.key}`"
         :description="`Create a new ${entity.label.toLowerCase()} in this institution.`"
@@ -29,13 +29,13 @@
             mode="create"
             :relations="relations"
         />
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageRelationsPanel from '~/components/manage/ManageRelationsPanel.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageTemplateStarter from '~/components/manage/ManageTemplateStarter.vue';
 import { resolveDetailComponent } from '~/components/manage/detailComponents';
 import { useEntityForm } from '~/composables/entityForm';

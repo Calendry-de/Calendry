@@ -61,18 +61,47 @@ export default defineEventHandler(async (event) => {
                 return { generation, applied: 0, skippedLocked: 0, event: null, alreadyCurrent: true };
             }
 
+            /**
+             * THE TERM'S OWN CURRENT SCHEDULE, not the tenant's.
+             *
+             * This looked up `{tenantId, isCurrent: true}` with no term
+             * condition and then marked what it found SUPERSEDED — so applying
+             * Semester 3's proposal marked Semester 1's live schedule as
+             * superseded, and the demo tenant ended up with five terms' records
+             * reading "discarded or superseded" that nobody had discarded. The
+             * partial unique index was tenant-wide too, so the two agreed with
+             * each other and disagreed with the product.
+             *
+             * `generation.termId` is the scope: matching on it means a NULL-term
+             * tenant-wide baseline supersedes only another tenant-wide one,
+             * which is the invariant the two partial indexes now enforce.
+             */
             const previous = await tx.generation.findFirst({
-                where: { tenantId: identity.tenantId, isCurrent: true },
+                where: {
+                    tenantId: identity.tenantId,
+                    termId: generation.termId,
+                    isCurrent: true,
+                },
                 select: { id: true, version: true },
             });
 
-            // Locked Sessions keep their manual placement and their old baseline.
+            /*
+             * Locked Sessions keep their manual placement and their old
+             * baseline — counted WITHIN THE TERM being applied, since that is
+             * the only set this apply can touch. Tenant-wide, the number
+             * reported to the user included locks in terms nothing was
+             * happening to.
+             */
             const lockedCount = await tx.session.count({
-                where: { tenantId: identity.tenantId, isLocked: true },
+                where: {
+                    tenantId: identity.tenantId,
+                    isLocked: true,
+                    ...(generation.termId ? { termId: generation.termId } : {}),
+                },
             });
 
             // Clear the current flag before setting the new one: a partial unique
-            // index permits only one current Generation per tenant, so the order
+            // index permits only one current Generation per term, so the order
             // matters.
             await mapDbErrors(async () => {
                 if (previous) {
@@ -131,12 +160,23 @@ export default defineEventHandler(async (event) => {
              * a human placed it, so "which solver run produced this" has the
              * answer NONE, and overwriting that with a Generation id would make
              * the row indistinguishable from solver output.
+             *
+             * THE GENERATION'S OWN TERM FIRST, its run's only as a fallback. The
+             * term used to come from the run alone, which left the same hole one
+             * case over: a Generation carrying a term but NO run — an import, or
+             * a solver row whose run was cleaned up — matched no term condition
+             * at all and rebased every term in the tenant, which is the very
+             * thing the paragraph above describes fixing. A term-less
+             * tenant-wide Generation still rebases tenant-wide, which is what it
+             * means.
              */
+            const rebaseTermId = generation.termId ?? run?.termId ?? null;
+
             const rebased = await tx.session.updateMany({
                 where: {
                     tenantId: identity.tenantId,
                     isLocked: false,
-                    ...(run?.termId ? { termId: run.termId } : {}),
+                    ...(rebaseTermId ? { termId: rebaseTermId } : {}),
                     offeringId: { not: null },
                 },
                 data: { generationId: generation.id },

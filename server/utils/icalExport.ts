@@ -62,24 +62,25 @@ function icsText(value: string): string {
         .replace(/\n/g, '\\n');
 }
 
+/** One Term's worth of Sessions, resolved against that Term's own grid. */
+export interface ExportTermGroup {
+    termStartDate: Date;
+    grid: BlockGrid;
+    sessions: ExportSession[];
+}
+
 /**
- * `.ics` text for one Person's Sessions — the one-off export half of #15. The
- * subscribe-feed half is a separate, unbuilt card sharing a link-identity
- * question with `A student viewing their schedule with no account`.
- *
- * NO IDENTITY QUESTION HERE: this is a downloaded file behind an ordinary
- * authenticated request, not a link that has to stand in for one.
+ * `.ics` text for one Person's Sessions, across one or several Terms — issue
+ * #15's stream half (`server/api/ics/stream.ics.get.ts`), and the one-off
+ * download it replaced. GROUPED BY TERM because `resolveInstant` needs each
+ * Session's own Term start date and TimeGrid, and an "all Terms" stream can
+ * legitimately span several.
  */
-export function buildIcs(
-    sessions: ExportSession[],
-    termStartDate: Date,
-    grid: BlockGrid,
-    timeZone: string,
-): string {
+export function buildIcs(groups: ExportTermGroup[], timeZone: string): string {
     const now = icsUtc(new Date());
 
-    const events = sessions.map((session) => {
-        const { start, end } = resolveInstant(session, termStartDate, grid, timeZone);
+    const events = groups.flatMap((group) => group.sessions.map((session) => {
+        const { start, end } = resolveInstant(session, group.termStartDate, group.grid, timeZone);
 
         return [
             'BEGIN:VEVENT',
@@ -93,7 +94,7 @@ export function buildIcs(
             ...(session.location ? [`LOCATION:${icsText(session.location)}`] : []),
             'END:VEVENT',
         ].join('\r\n');
-    });
+    }));
 
     return [
         'BEGIN:VCALENDAR',

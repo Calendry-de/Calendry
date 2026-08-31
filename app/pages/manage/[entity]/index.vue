@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         :title="entity.plural"
         :description="entity.description"
     >
@@ -22,12 +22,12 @@
             :entity="entity"
             :list="list"
         />
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import ManageList from '~/components/manage/ManageList.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import { resolveListComponent } from '~/components/manage/detailComponents';
 import { useEntityList, useEntityPermissions } from '~/composables/entityList';
 import { findManageEntity } from '~/utils/manageRegistry';

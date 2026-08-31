@@ -1,6 +1,8 @@
 import type { H3Event } from 'h3';
 import { SESSION_COOKIE } from './auth';
-import { resolveScreenKey, resolveSessionToken } from './authDb';
+import {
+    resolveApiToken, resolveIcsLink, resolveScreenKey, resolveSessionToken, touchApiToken, touchIcsLink,
+} from './authDb';
 
 /**
  * Resolved request identity. Everything downstream — RLS context, explicit
@@ -45,6 +47,29 @@ export interface ScreenIdentity extends IdentityBase {
 }
 
 /**
+ * A script or integration, acting through a bearer API token
+ * (`Authorization: Bearer …`) minted at POST /api/me/api-tokens.
+ *
+ * UNLIKE a screen this HAS an acting Person — the token is that Person's own
+ * authority, delegated — so permission checks pass, which is the feature. What
+ * keeps it least-privilege is `heldPermissions()`: for this kind it intersects
+ * the Person's LIVE permissions with `grantedPermissions`, the subset selected
+ * at creation. Both sides narrow: the token cannot outgrow its ceiling, and it
+ * cannot keep authority its Person has lost since.
+ *
+ * A token can never mint or revoke tokens — the /api/me/api-tokens routes
+ * require `kind === 'account'` — or a leaked short-lived one could launder
+ * itself into a permanent one.
+ */
+export interface TokenIdentity extends IdentityBase {
+    kind: 'token';
+    actorPersonId: string;
+    tokenId: string;
+    /** Ceiling selected at creation — a subset of what the creator held then. */
+    grantedPermissions: string[];
+}
+
+/**
  * The background solver poller — CLAUDE.md's third tenant-isolation exception.
  *
  * It runs when nobody is logged in, so there is no account and no session, and
@@ -62,14 +87,52 @@ export interface SystemIdentity extends IdentityBase {
 }
 
 /**
- * Every principal this app recognises. Exactly three, matching the three ways a
- * request can arrive: a human with a session, a device with a key, and the
- * background job.
+ * A calendar app streaming one Person's own Sessions, acting through the
+ * secret in an ics_link URL (issue #15, stream half).
  *
- * Only the first can hold permissions, because only the first has an acting
- * Person and `heldPermissions()` refuses without one.
+ * HAS an acting Person, like a token — the stream is always exactly one
+ * Person's own timetable — but grants NO permission of any kind. Two things
+ * make that hold, and both are load-bearing:
+ *
+ *  1. `heldPermissions()` refuses outright for `kind === 'ics_link'`, the same
+ *     way it refuses a null `actorPersonId` — see that function's own note.
+ *  2. UNLIKE every other variant, this one is never produced by the global
+ *     resolver chain (`activeResolver`, below) — only
+ *     `GET /api/ics/stream.ics` constructs it, from its OWN reading of the
+ *     `token` query parameter, and calls `withTenant()` directly rather than
+ *     going through `event.context.identity`. A stray `?token=<this-secret>`
+ *     on any OTHER route therefore resolves as whatever that route's own
+ *     cookie/header/key would have given it (typically nothing) — never as
+ *     this Person. Wiring it into `activeResolver` instead was tried and
+ *     reverted: `actorPersonId` being non-null is exactly what every
+ *     `/api/me/*` route (settings, preferences, availability) uses to act as
+ *     the caller with NO further permission check, so a globally-resolved
+ *     ics_link would have let a leaked calendar-subscription link — a secret
+ *     designed to be pasted into third-party apps, not guarded like a
+ *     password — submit unavailability or change settings as that Person.
  */
-export type RequestIdentity = AccountIdentity | ScreenIdentity | SystemIdentity;
+export interface IcsLinkIdentity extends IdentityBase {
+    kind: 'ics_link';
+    actorPersonId: string;
+    linkId: string;
+    scope: 'ALL' | 'TERM';
+    termId: string | null;
+    weeksAhead: number | null;
+}
+
+/**
+ * Every principal this app recognises: a human with a session, a script with
+ * a bearer token, a device with a key, a calendar app with a stream link, and
+ * the background job.
+ *
+ * Only `account` and `token` can hold permissions, because only they have an
+ * acting Person AND route their checks through `heldPermissions()`, which
+ * refuses without one — the token's set is further intersected with its
+ * stored ceiling. `ics_link` also has an acting Person, but is refused by
+ * `heldPermissions()` explicitly, AND — unlike every other member — is never
+ * attached by the global resolver chain at all; see its own comment.
+ */
+export type RequestIdentity = AccountIdentity | TokenIdentity | ScreenIdentity | SystemIdentity | IcsLinkIdentity;
 
 /**
  * A tenant resolver turns an inbound request into a RequestIdentity, or returns
@@ -158,9 +221,103 @@ const screenKeyResolver: TenantResolver = async (event) => {
     };
 };
 
-/** The single swap point. Replace this binding to change how identity works. */
+/**
+ * Bearer-token resolver, tried only when there is no session cookie — the same
+ * ordering rationale as screens: a signed-in human stays themselves, and "what
+ * am I acting as" never depends on a stray header.
+ *
+ * Revoked, expired, and Person-deactivated tokens all resolve to null, which
+ * the middleware answers with a plain 401. Deliberately indistinguishable from
+ * "no such token": a more specific answer would let an unauthenticated caller
+ * probe which secrets exist.
+ */
+const apiTokenResolver: TenantResolver = async (event) => {
+    const header = getRequestHeader(event, 'authorization');
+
+    if (!header?.startsWith('Bearer ')) {
+        return null;
+    }
+
+    const secret = header.slice('Bearer '.length).trim();
+
+    if (!secret) {
+        return null;
+    }
+
+    const token = await resolveApiToken(secret);
+
+    if (!token || !token.is_active || !token.person_active) {
+        return null;
+    }
+
+    if (token.expires_at && token.expires_at.getTime() <= Date.now()) {
+        return null;
+    }
+
+    // Liveness stamp ("is anything still using this?"), throttled in SQL.
+    await touchApiToken(token.token_id);
+
+    return {
+        kind: 'token',
+        tenantId: token.tenant_id,
+        federationId: token.federation_id,
+        actorPersonId: token.person_id,
+        tokenId: token.token_id,
+        grantedPermissions: token.permissions,
+    };
+};
+
+/**
+ * ics_link resolver — DELIBERATELY NOT part of `activeResolver` below. Every
+ * other resolver in this file is safe to attach to `event.context.identity`
+ * for ANY `/api/*` route, because the middleware runs before routing decides
+ * which handler answers. This one is not: see `IcsLinkIdentity`'s own comment
+ * for why a globally-resolved ics_link would let a leaked calendar-
+ * subscription link act on `/api/me/*` routes with no permission check at
+ * all. `GET /api/ics/stream.ics` is the ONLY caller — it reads `token` and
+ * calls `withTenant()` directly, never through `withRequestTenant()`.
+ *
+ * The token travels in the query string for the same reason a screen key
+ * does: an external calendar app is configured once by pasting a URL and then
+ * left to refetch it unattended — there is nowhere to put a header.
+ * Revoked/deleted/deactivated resolves to null; the stream route answers with
+ * a plain 401 rather than naming which case it was, the same reasoning the
+ * API-token resolver gives below.
+ */
+export const icsLinkResolver: TenantResolver = async (event) => {
+    const token = getQuery(event).token;
+
+    if (typeof token !== 'string' || !token) {
+        return null;
+    }
+
+    const link = await resolveIcsLink(token);
+
+    if (!link || !link.person_active) {
+        return null;
+    }
+
+    // Liveness stamp ("is anything still using this?"), throttled in SQL.
+    await touchIcsLink(link.link_id);
+
+    return {
+        kind: 'ics_link',
+        tenantId: link.tenant_id,
+        federationId: link.federation_id,
+        actorPersonId: link.person_id,
+        linkId: link.link_id,
+        scope: link.scope,
+        termId: link.term_id,
+        weeksAhead: link.weeks_ahead,
+    };
+};
+
+/**
+ * The single swap point for the routes THIS middleware covers.
+ * `icsLinkResolver` is intentionally excluded — see its own comment.
+ */
 const activeResolver: TenantResolver = async (event) => (
-    await sessionCookieResolver(event) ?? screenKeyResolver(event)
+    await sessionCookieResolver(event) ?? await apiTokenResolver(event) ?? screenKeyResolver(event)
 );
 
 export async function resolveIdentity(event: H3Event): Promise<RequestIdentity | null> {

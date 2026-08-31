@@ -1247,9 +1247,11 @@ deliberately by re-rendering with a disabled checkbox instead of static text
 
 ## The scaffold itself, in one page
 
-`/manage` is one scaffold: three route files render every entity from
-`app/utils/manageRegistry.ts`, which is also the nav source — sidebar,
-index, header, palette can't drift from each other or the entity list.
+`/manage/<entity>[/…]` is one scaffold: three route files render every
+entity from `app/utils/manageRegistry.ts`, which is also the nav source —
+sidebar, header, palette can't drift from each other or the entity list.
+(`/manage` bare is a redirect to `/dashboard` as of 2026-09-01, below — the
+separate index page these routes used to hand off to is gone.)
 
 - **Permission rule, uniform**: no `.read` → hidden entirely; `.read`
   without write → visible read-only, rendered as **static text, not
@@ -1283,9 +1285,40 @@ The verification behind these — the `paramField()` divergence, the
 invisible-deprecated-types bug, the ten-file `vartorgba` styling bug and the
 read-only-path test — is the first half of this section.
 
----
+## 2026-09-01 — `/manage`'s own hub page folded into `/dashboard`
 
-# Academic calendar periods — why the preview earns its place
+Signing in used to be three hops from anything useful: `/dashboard` (a bare
+"you're signed in" page) → `/manage` (a separate cards-grid hub, itself just
+picking a section) → an entity page. The middle hop existed only because
+`ManageShell` — the sidebar+header frame every `/manage/*` page already
+used — had never been asked to back anything else.
+
+`ManageShell` renamed to `CommonAppShell` (moved
+`components/manage/` → `components/common/`, matching that folder's
+`Common*` convention) and broadened in two ways: its `NAV_GROUPS` gained a
+`Schedule` (`/schedule`, not just `/schedule/proposals`) and a `My settings`
+group, and its section source moved from `useManageSections()` (manage
+entities only) to a new `useAppSections()` — every reachable destination
+except `home` and the `account` section. `/dashboard` now wraps
+`CommonAppShell` directly, rendering the manage-entities overview cards
+`/manage/index.vue` used to own (with that grid's own empty state, scoped to
+"no management section," since the sidebar may still offer Schedule/My
+settings even then) plus the session's own permission list and sign-out
+actions in the shell's `actions` slot.
+
+`/manage/index.vue` is now a one-line `redirect: '/dashboard'` stub — kept
+rather than deleted so an old bookmark still lands somewhere real.
+`middleware/manage.ts`'s denial redirect and the sidebar's own "Home" link
+both point at `/dashboard` now instead. The header's separate `Manage` nav
+entry was removed outright (not repointed) — once it went to the same place
+`Home` already did, keeping both was two buttons for one destination; this
+also deleted the `hasManageSection` hub-visibility filter in
+`useNavEntries()`, which existed only to decide whether to show that entry.
+
+No entity page changed behavior — every one of them already had its own
+back-link pointed at its own list, never at `/manage` itself, which is what
+made the rename a mechanical import swap across those eight files rather
+than a redesign.
 
 The mapping from two dates to week kinds is genuinely unpredictable, and this
 is not hypothetical: a real probe period (2027-09-27 → 2027-10-18) marked

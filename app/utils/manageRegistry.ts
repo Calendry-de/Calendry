@@ -318,6 +318,22 @@ export interface ManageEntity {
         /** Gates the picker's own fetch — absent permission hides it rather than 403ing. */
         readPermission: string;
     };
+    /**
+     * The reverse of `startFromTemplate`: capture an EXISTING row's shape into a
+     * new template, shown on the EDIT page only (a template needs values to
+     * copy, and the create page has none yet). Kept generic for the same
+     * reason `startFromTemplate` is — a resource, a permission and a builder
+     * function, not Offering-specific machinery — even though Offering is the
+     * only declarer today.
+     */
+    saveAsTemplate?: {
+        /** API resource the new template is created against. */
+        resource: string;
+        /** Row → template creation payload. Only the fields worth fixing. */
+        buildTemplate: (row: EntityRow) => Record<string, unknown>;
+        /** Gates the action — absent permission hides it rather than 403ing. */
+        createPermission: string;
+    };
     /** Bespoke detail body, resolved by name. Generic form when absent. */
     detailComponent?: string;
     /**
@@ -347,6 +363,18 @@ export interface ManageEntity {
     relations?: RelationDef[];
 }
 
+/**
+ * The Offering fields a template shape can fix, shared by both directions of
+ * the copy: `startFromTemplate.apply` reads a template ONTO a new Offering's
+ * draft, `saveAsTemplate.buildTemplate` reads an Offering INTO a new
+ * template. One list, so the two can never silently name a different shape.
+ */
+const OFFERING_TEMPLATE_SHAPE_FIELDS = [
+    'title', 'kindId', 'code', 'color', 'frequency', 'durationBlocks',
+    'schedulingPattern', 'requiredRoleId', 'requiredCapacity',
+    'requiredRoomCount', 'allowOnline', 'notes',
+] as const;
+
 export const OFFERING_ENTITY: ManageEntity = {
     key: 'offerings',
     permissionPrefix: 'offering',
@@ -368,13 +396,7 @@ export const OFFERING_ENTITY: ManageEntity = {
              * '' or 0 over the freshly-seeded draft would silently overwrite
              * that choice with a value nobody chose.
              */
-            const copyable = [
-                'title', 'kindId', 'code', 'color', 'frequency', 'durationBlocks',
-                'schedulingPattern', 'requiredRoleId', 'requiredCapacity',
-                'requiredRoomCount', 'allowOnline', 'notes',
-            ] as const;
-
-            for (const key of copyable) {
+            for (const key of OFFERING_TEMPLATE_SHAPE_FIELDS) {
                 const value = row[key];
 
                 if (value !== null && value !== undefined) {
@@ -386,6 +408,16 @@ export const OFFERING_ENTITY: ManageEntity = {
             // own comment. Nothing ever reads this back to resolve a field.
             draft.createdFromTemplateId = row.id;
         },
+    },
+    saveAsTemplate: {
+        resource: 'offering-templates',
+        createPermission: 'offering_template.create',
+        // The reverse copy — same fields, same reasoning about null meaning
+        // "not fixed", just read from an Offering instead of written to one.
+        buildTemplate: (row) => Object.fromEntries(
+            OFFERING_TEMPLATE_SHAPE_FIELDS
+                .map((key) => [key, row[key] ?? null] as const),
+        ),
     },
     title: (row) => [row.code, row.title].filter(Boolean).join(' · ') || 'Offering',
     columns: [
@@ -689,6 +721,53 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
         { key: 'requiredRoomCount', label: 'Rooms needed at once', type: 'number', min: 1, max: MAX_ROOMS_PER_SESSION },
         { key: 'allowOnline', label: 'May be scheduled online', type: 'boolean' },
         { key: 'notes', label: 'Notes', type: 'textarea' },
+    ],
+};
+
+/**
+ * A reusable, ORDERED bundle of Offering templates — "this is what Jahrgang
+ * 10 takes this term" — so applying one to a Group creates that Group's
+ * whole course load in one action instead of one Offering at a time.
+ *
+ * BESPOKE DETAIL, unlike Offering itself: the item list is an ORDERED
+ * sequence (`OfferingPlanItem.position`), which the generic `relations`
+ * mechanism cannot express — it replaces a SET. See `ManageOfferingPlanItems`.
+ */
+export const OFFERING_PLAN_ENTITY: ManageEntity = {
+    key: 'offering-plans',
+    permissionPrefix: 'offering_plan',
+    label: 'Curriculum plan',
+    plural: 'Curriculum plans',
+    icon: 'material-symbols:playlist-add-check',
+    description: 'A cohort’s whole course load, bundled — apply it to a group to create every offering at once.',
+    keywords: ['plan', 'curriculum', 'jahrgang', 'cohort', 'bundle', 'template', 'load'],
+    title: (row) => String(row.name ?? 'Curriculum plan'),
+    detailComponent: 'OfferingPlanForm',
+    columns: [
+        { key: 'name', label: 'Name' },
+        { key: 'description', label: 'Description', secondary: true },
+    ],
+    fields: [
+        { key: 'name', label: 'Name', type: 'text', required: true },
+        { key: 'description', label: 'Description', type: 'textarea' },
+        {
+            key: 'nextPlanId',
+            label: 'Successor plan',
+            help: 'What a Group on this plan moves to next — "Semester 3" names "Semester 4". '
+                + 'Lets a Group advance with no picker: the Term defaults to whichever starts next.',
+            type: 'reference',
+            // A plan cannot name itself as its own successor — the option
+            // list excludes the row being edited, which no static registry
+            // entry can express (it depends on which row that is). See
+            // `ManageOfferingPlanForm`.
+            custom: true,
+            reference: {
+                resource: 'offering-plans',
+                label: (row) => String(row.name ?? row.id),
+                nullable: true,
+                emptyHint: 'No other plans to point at yet.',
+            },
+        },
     ],
 };
 
@@ -1133,6 +1212,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
 
     OFFERING_ENTITY,
     OFFERING_TEMPLATE_ENTITY,
+    OFFERING_PLAN_ENTITY,
     CONSTRAINT_ENTITY,
 
     {

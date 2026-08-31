@@ -1,7 +1,8 @@
 /**
  * Builds a demo institution for one tenant: a grid, a vocabulary, a group tree,
- * six terms, every module of the six-semester curriculum and a first week of
- * placements in each term.
+ * six terms, every module of the six-semester curriculum — as reusable
+ * OfferingTemplates bundled into per-term curriculum plans, applied to their
+ * cohorts — and a first week of placements in each term.
  *
  * SEPARATE FROM SEEDING, AND THE LINE IS NOT ARBITRARY.
  *
@@ -16,7 +17,9 @@
  *
  * Offerings in particular can only ever live here. There is no default Offering
  * and there cannot be one — an Offering is the institution's own curriculum, so
- * seeding one would be inventing a course nobody teaches.
+ * seeding one would be inventing a course nobody teaches. Templates and plans
+ * are the SAME story one level up: this script's own opinion of how the
+ * curriculum is shaped, not something any tenant is owed.
  *
  *   bun run seed:demo -- --tenant test [--reset]
  *
@@ -30,6 +33,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 import { LECTURER_ROLE_KEY } from '../shared/roles';
+import { applyOfferingPlanItems } from '../server/utils/offeringPlans';
 import {
     BREAKS, GRID, GROUPS, GROUP_SOURCES, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
 } from './lib/demoData';
@@ -230,62 +234,176 @@ async function main() {
             });
         }
 
-        // --- offerings -------------------------------------------------------
+        // --- offering templates ------------------------------------------------
         /*
-         * ONE Offering per module, carrying every Group in `m.groups` directly.
-         * TAXONOMY.md § "What attaching several Groups to one Offering MEANS":
-         * two-or-more Groups on one Offering is N independent parallel Session
-         * series, one per Group — the app does the splitting. Not modelled as
-         * separate `-S1`/`-S2` Offerings, which is the union-shaped workaround
-         * that note exists to retire.
+         * ONE OfferingTemplate per module — the reusable shape a curriculum
+         * plan bundles, rather than an Offering created directly. Every
+         * series still gets the FULL contact hours, not a share of them: the
+         * hours are what one student sits through, and a second Group
+         * doubles the teaching rather than dividing it.
          */
-        let offeringCount = 0;
-        const offeringIds: string[] = [];
+        const templateByCode = new Map<string, Awaited<ReturnType<typeof prisma.offeringTemplate.upsert>>>();
 
         for (const m of MODULES) {
-            const termId = termByKey.get(m.term)!;
-            const id = `${t}-offering-${m.code}`;
-            /*
-             * Every series gets the FULL contact hours, not a share of them —
-             * the hours are what one student sits through, and a second Group
-             * doubles the teaching rather than dividing it. Halving here would
-             * quietly under-schedule every multi-group module.
-             */
+            const id = `${t}-offering-template-${m.code}`;
             const frequency = Math.max(1, Math.round(m.hours / 2));
 
-            await prisma.offering.upsert({
+            const template = await prisma.offeringTemplate.upsert({
                 where: { id },
                 create: {
-                    id, tenantId: t, termId, kindId: kindByKey.get(m.kind)!,
-                    code: m.code, title: m.title,
+                    id, tenantId: t, name: `${m.code} — ${m.title}`,
+                    title: m.title, kindId: kindByKey.get(m.kind)!, code: m.code,
                     frequency,
-                    /*
-                     * ONE block, which IS 90 minutes here — the slot a
-                     * module fills in the source timetable. It was 2 while
-                     * a block was 45.
-                     */
+                    // ONE block, which IS 90 minutes here — the slot a module
+                    // fills in the source timetable. It was 2 while a block
+                    // was 45.
                     durationBlocks: 1,
                     requiredRoleId: lecturerRole?.id ?? null,
                 },
-                update: { frequency, durationBlocks: 1 },
+                update: {
+                    name: `${m.code} — ${m.title}`, title: m.title, kindId: kindByKey.get(m.kind)!,
+                    frequency, durationBlocks: 1, requiredRoleId: lecturerRole?.id ?? null,
+                },
             });
 
-            await prisma.offeringGroup.deleteMany({ where: { offeringId: id } });
-            await prisma.offeringGroup.createMany({
-                data: m.groups.map((g) => ({ tenantId: t, offeringId: id, groupId: groupByKey.get(g)! })),
+            templateByCode.set(m.code, template);
+        }
+
+        // --- curriculum plans ----------------------------------------------
+        /*
+         * One plan per (term, audience). Most terms have a single plan for
+         * the whole cohort — `m.groups` defaulting to `['s1', 's2']`, per
+         * `demoData.ts`'s own comment — and Semester 4-6 additionally split
+         * into a Systemtechnik and a Management plan for the modules scoped
+         * to just one of those tracks. Grouping by `m.groups` rather than
+         * hand-declaring the plans keeps this in sync with `MODULES` by
+         * construction: a module moved between tracks moves its plan too.
+         */
+        interface PlanGroup { termKey: string; groupKeys: readonly string[]; moduleCodes: string[] }
+        const planGroups = new Map<string, PlanGroup>();
+
+        for (const m of MODULES) {
+            const key = `${m.term}:${[...m.groups].sort().join('+')}`;
+            const group = planGroups.get(key) ?? { termKey: m.term, groupKeys: m.groups, moduleCodes: [] };
+
+            group.moduleCodes.push(m.code);
+            planGroups.set(key, group);
+        }
+
+        const termNameByKey = new Map(TERMS.map((term) => [term.key, term.name]));
+        const groupNameByKey = new Map(GROUPS.map((g) => [g.key, g.name]));
+
+        let offeringCount = 0;
+        const offeringIds: string[] = [];
+        const seenOfferingIds = new Set<string>();
+        const offeringIdByModuleCode = new Map<string, string>();
+
+        for (const [key, plan] of planGroups) {
+            /*
+             * The full-cohort plan is just the term's own name; a track plan
+             * says so — "Semester 4 — Systemtechnik" — since the term alone
+             * would collide with the cohort plan sharing that term.
+             */
+            const planName = plan.groupKeys.length === 1
+                ? `${termNameByKey.get(plan.termKey)} — ${groupNameByKey.get(plan.groupKeys[0]!)}`
+                : termNameByKey.get(plan.termKey)!;
+
+            const planId = `${t}-plan-${key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+
+            await prisma.offeringPlan.upsert({
+                where: { id: planId },
+                create: { id: planId, tenantId: t, name: planName },
+                update: { name: planName },
             });
 
-            await prisma.offeringLecturer.deleteMany({ where: { offeringId: id } });
+            // Deterministic ids so re-running without --reset updates rather
+            // than duplicates, matching every other upsert in this script.
+            await prisma.offeringPlanItem.deleteMany({ where: { planId } });
+            await prisma.offeringPlanItem.createMany({
+                data: plan.moduleCodes.map((code, position) => ({
+                    id: `${planId}-item-${code}`,
+                    tenantId: t,
+                    planId,
+                    templateId: templateByCode.get(code)!.id,
+                    position,
+                })),
+            });
+
+            const items = plan.moduleCodes.map((code) => ({
+                templateId: templateByCode.get(code)!.id,
+                template: templateByCode.get(code)!,
+            }));
+
+            /*
+             * APPLIED ONCE PER GROUP IN THE PLAN'S AUDIENCE, through the SAME
+             * function `/api/offering-plan-apply` uses — the demo curriculum
+             * is built the way a tenant would build it, not a second
+             * definition of what applying a plan means. A two-group plan's
+             * second apply finds the first apply's Offerings already exist
+             * and joins them (TAXONOMY.md § "What attaching several Groups to
+             * one Offering MEANS"), so this never creates a `-S1`/`-S2` pair.
+             */
+            for (const groupKey of plan.groupKeys) {
+                const results = await applyOfferingPlanItems(prisma, {
+                    tenantId: t,
+                    termId: termByKey.get(plan.termKey)!,
+                    groupId: groupByKey.get(groupKey)!,
+                    items,
+                });
+
+                results.forEach((result, index) => {
+                    const code = plan.moduleCodes[index]!;
+
+                    offeringIdByModuleCode.set(code, result.id);
+
+                    if (!seenOfferingIds.has(result.id)) {
+                        seenOfferingIds.add(result.id);
+                        offeringIds.push(result.id);
+                        offeringCount++;
+                    }
+                });
+            }
+        }
+
+        /*
+         * SUCCESSION: "Semester 3" points at "Semester 4" for the SAME
+         * audience — the core cohort plan chains to the next core cohort
+         * plan, Systemtechnik's to Systemtechnik's — so advancing a Group
+         * from the Group page needs no picker. A second pass, not folded
+         * into the loop above, because linking a Term's plan to the NEXT
+         * Term's needs that next plan to already exist.
+         */
+        for (const key of planGroups.keys()) {
+            const [termKey, audienceKey] = key.split(':') as [string, string];
+            const nextTermKey = `s${Number(termKey.slice(1)) + 1}`;
+            const nextKey = `${nextTermKey}:${audienceKey}`;
+
+            if (!planGroups.has(nextKey)) {
+                continue;
+            }
+
+            const planId = `${t}-plan-${key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+            const nextPlanId = `${t}-plan-${nextKey.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
+
+            await prisma.offeringPlan.update({ where: { id: planId }, data: { nextPlanId } });
+        }
+
+        /*
+         * THE SPECIFIC PERSON, named on the Offering itself, same as the real
+         * `/manage` flow: a template only ever carries the "lecturer pool"
+         * ROLE hint (`requiredRoleId` above), never an individual.
+         */
+        for (const m of MODULES) {
+            const offeringId = offeringIdByModuleCode.get(m.code)!;
+
+            await prisma.offeringLecturer.deleteMany({ where: { offeringId } });
             await prisma.offeringLecturer.create({
                 data: {
-                    tenantId: t, offeringId: id,
+                    tenantId: t, offeringId,
                     personId: personByKey.get(m.lecturer)!,
                     roleId: lecturerRole?.id ?? null,
                 },
             });
-
-            offeringIds.push(id);
-            offeringCount++;
         }
 
         // --- a baseline generation -------------------------------------------
@@ -299,10 +417,25 @@ async function main() {
          * point is legal and any break-spanning session in the UI came from an
          * edit or a solve rather than from here.
          */
-        const generation = await prisma.generation.upsert({
-            where: { tenantId_version: { tenantId: t, version: 1 } },
-            create: { tenantId: t, version: 1, source: 'MANUAL_BASELINE', status: 'APPLIED', isCurrent: true },
-            update: {},
+        /*
+         * findFirst + create rather than upsert: `@@unique([tenantId, version])`
+         * is gone, because versions are per TERM now and a tenant-wide unique
+         * would forbid Semester 1 and Semester 2 both having a v1. The two
+         * replacement indexes are partial (`WHERE term_id IS NULL` / `IS NOT
+         * NULL`), which Prisma cannot express and therefore cannot offer as a
+         * compound-unique `where`.
+         *
+         * This baseline is deliberately term-LESS: it is one snapshot the whole
+         * demo tenant starts from, which is exactly the case `term_id IS NULL`
+         * exists for.
+         */
+        const generation = await prisma.generation.findFirst({
+            where: { tenantId: t, termId: null, version: 1 },
+        }) ?? await prisma.generation.create({
+            data: {
+                tenantId: t, termId: null, version: 1,
+                source: 'MANUAL_BASELINE', status: 'APPLIED', isCurrent: true,
+            },
         });
 
         /*
@@ -409,7 +542,8 @@ async function main() {
         console.log(`  grid '${grid.name}': ${GRID.blocksPerDay} x ${GRID.blockLengthMinutes}min, ${BREAKS.length} breaks, ${GRID.activeDays.length} days`);
         console.log(`  ${TERMS.length} terms, ${GROUPS.length} groups, ${GROUP_TERMS.length} group-term scopes, ${GROUP_SOURCES.length} group sources`);
         console.log(`  ${LECTURERS.length} lecturers, ${rooms.length} rooms`);
-        console.log(`  ${offeringCount} offerings across all ${TERMS.length} terms, each with a lecturer and one or two groups`);
+        console.log(`  ${templateByCode.size} offering templates, ${planGroups.size} curriculum plans`);
+        console.log(`  ${offeringCount} offerings applied from those plans across all ${TERMS.length} terms, each with a lecturer and one or two groups`);
         console.log(`  ${placed} baseline sessions in week 1 — the rest is the solver's job`);
         console.log('Done.');
     } catch (error) {

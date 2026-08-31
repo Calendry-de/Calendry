@@ -1,5 +1,5 @@
 <template>
-    <ManageShell
+    <CommonAppShell
         description="Unavailability people have declared for themselves, waiting on a decision."
         title="Unavailability review"
     >
@@ -216,7 +216,7 @@
                 </li>
             </ul>
         </section>
-    </ManageShell>
+    </CommonAppShell>
 </template>
 
 <script setup lang="ts">
@@ -224,7 +224,7 @@ import type { TermWindow } from '#shared/availability';
 import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
 import AvailabilityHolidayForm from '~/components/availability/AvailabilityHolidayForm.vue';
-import ManageShell from '~/components/manage/ManageShell.vue';
+import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { describeWindow } from '~/utils/availabilityLabels';
 import { useHasPermission } from '~/composables/session';

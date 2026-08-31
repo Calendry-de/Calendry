@@ -223,6 +223,9 @@ export async function recoverRunResult(tx: Tx, run: {
         ? null
         : await createGenerationForRun(tx, {
             tenantId: run.tenantId,
+            // The run's own term: it scopes the Generation's version series and
+            // its current flag, and a run always has one.
+            termId: fresh.termId,
             runId: run.id,
             result: fresh.result,
             requestedById: fresh.requestedById,
@@ -354,6 +357,7 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
             ? null
             : await createGenerationForRun(tx, {
                 tenantId: run.tenantId,
+                termId: fresh.termId,
                 runId: run.id,
                 result: fresh.result,
                 requestedById: fresh.requestedById,

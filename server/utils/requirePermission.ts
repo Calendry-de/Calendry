@@ -43,7 +43,16 @@ export async function loadPermissions(tx: Tx, personId: string): Promise<Set<str
 async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
     const identity = requireIdentity(event);
 
-    if (!identity.actorPersonId) {
+    /*
+     * `ics_link` DOES carry a real `actorPersonId` — `ownSessionClause()` needs
+     * it to build "this Person's own Sessions" — but it must never satisfy a
+     * permission check with it, or a stray `?token=` on an unrelated route
+     * would silently borrow whatever that Person can do everywhere else. Same
+     * discipline `screen`'s null `actorPersonId` enforces structurally; this
+     * kind needs an explicit refusal instead because the field it must not
+     * grant access via is also the field the stream route legitimately reads.
+     */
+    if (!identity.actorPersonId || identity.kind === 'ics_link') {
         throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
     }
 
@@ -51,6 +60,20 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
 
     if (!held) {
         held = await loadPermissions(tx, identity.actorPersonId);
+
+        /*
+         * An API token is its Person's authority NARROWED: the effective set is
+         * the intersection of what the Person holds LIVE and the ceiling chosen
+         * at creation. Computed here, at the single point permissions are
+         * loaded, so no route can forget it — and cached only per request, so
+         * revoking an AccessRole narrows every derived token immediately.
+         */
+        if (identity.kind === 'token') {
+            const ceiling = new Set(identity.grantedPermissions);
+
+            held = new Set([...held].filter((key) => ceiling.has(key)));
+        }
+
         event.context.permissions = held;
     }
 

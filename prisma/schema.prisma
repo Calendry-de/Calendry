@@ -361,6 +361,8 @@ model Tenant {
   groupTerms                   GroupTerm[]
   groupAvailability            GroupTermAvailability[]
   screens                      Screen[]
+  apiTokens                    ApiToken[]
+  icsLinks                     IcsLink[]
   screenRooms                  ScreenRoom[]
   memberships                  Membership[]
   personRoles                  PersonRole[]
@@ -378,6 +380,8 @@ model Tenant {
   offeringLecturers            OfferingLecturer[]
   offeringEquipment            OfferingEquipment[]
   offeringTemplates            OfferingTemplate[]
+  offeringPlans                OfferingPlan[]
+  offeringPlanItems            OfferingPlanItem[]
   sessions                     Session[]
   sessionGroups                SessionGroup[]
   sessionPeople                SessionPerson[]
@@ -449,6 +453,8 @@ model Person {
   authSessions      AuthSession[]
   accessRoles       PersonAccessRole[]
   solverRuns        SolverRun[]
+  apiTokens         ApiToken[]
+  icsLinks          IcsLink[]
 
   /// Unavailability declared ABOUT this person (TAXONOMY.md §7, LecturerVeto).
   unavailability          PersonUnavailability[] @relation("PersonUnavailabilitySubject")
@@ -1005,8 +1011,10 @@ model Term {
   offerings            Offering[]
   sessions             Session[]
   solverRuns           SolverRun[]
+  generations          Generation[]
   groups               GroupTerm[]
   groupAvailability    GroupTermAvailability[]
+  icsLinks             IcsLink[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -1531,11 +1539,94 @@ model OfferingTemplate {
   requiredRole Role?        @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
 
   seededOfferings Offering[]
+  planItems       OfferingPlanItem[]
 
   @@index([tenantId])
   @@index([kindId])
   @@index([requiredRoleId])
   @@map("offering_template")
+}
+
+/// A reusable, ORDERED set of `OfferingTemplate`s — "this is what a cohort's
+/// whole term looks like" (Math, German, PE, ...), so applying one to a Group
+/// creates its entire course load in one action instead of one Offering at a
+/// time. A template fixes ONE Offering's shape; a plan bundles several.
+///
+/// The plan does not copy its items' shapes into itself — `OfferingPlanItem`
+/// only references a template's id. Applying a plan reads each template's
+/// CURRENT shape at apply time, the same "copy happens at use, not at
+/// authoring" rule `OfferingTemplate` itself already follows for Offerings.
+/// Editing a template after a plan that references it has already been
+/// applied changes nothing about the Offerings that earlier apply created —
+/// only what the NEXT apply produces.
+model OfferingPlan {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  name        String
+  description String?
+
+  /// This plan's successor — "Semester 3" points at "Semester 4" — so a Group
+  /// already on this plan can move forward with no picker: the Term defaults
+  /// to whichever starts next after the one it's currently on, per
+  /// `nextPlanId`'s own read site. SET NULL on delete: a chain losing its
+  /// next link degrades to "no suggested successor", never a dangling id.
+  ///
+  /// NOT a chain the schema verifies is acyclic or single-stranded — a self
+  /// link, a cycle, or two plans both pointing at a third are all storable.
+  /// Nothing here walks more than one hop, so nothing is CORRUPTED by one;
+  /// it would just make a bad suggestion, the same failure mode as pointing
+  /// it at the wrong plan by hand.
+  nextPlanId String? @map("next_plan_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nextPlan OfferingPlan? @relation("PlanSuccession", fields: [nextPlanId], references: [id], onDelete: SetNull)
+  items    OfferingPlanItem[]
+
+  /// The plan(s) that name this one as their successor — never walked in
+  /// application code (a plan doesn't need to know who points at it), kept
+  /// only because Prisma requires the relation's other side to exist.
+  precededBy OfferingPlan[] @relation("PlanSuccession")
+
+  @@index([tenantId])
+  @@index([nextPlanId])
+  @@map("offering_plan")
+}
+
+/// One template's membership in one plan, ordered. No shape data of its own —
+/// see `OfferingPlan`'s own comment for why applying reads the template
+/// fresh rather than a shape frozen at the time it was added.
+///
+/// CASCADES ON BOTH FOREIGN KEYS, unlike `Offering.createdFromTemplateId`'s
+/// SET NULL: that column is pure provenance on a row that is already a
+/// complete Offering without it, but a plan item IS the reference — deleting
+/// its template leaves nothing behind worth keeping a dangling row for, so it
+/// simply drops out of the plan rather than becoming a phantom entry no UI
+/// can name.
+model OfferingPlanItem {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  planId     String @map("plan_id")
+  templateId String @map("template_id")
+
+  /// Display/apply order within the plan. Not unique — a full reorder writes
+  /// every item's position in one request rather than shuffling by delta.
+  position Int
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     OfferingPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  template OfferingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([templateId])
+  @@map("offering_plan_item")
 }
 
 /// PLACED INSTANCE: one atomic Session at a specific week/day/block. This is
@@ -1885,7 +1976,24 @@ model Generation {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
-  /// Sequential per tenant.
+  /// The Term this snapshot describes, or NULL for a tenant-wide one.
+  ///
+  /// NULL is a real case, not a gap: a MANUAL_BASELINE covers the whole tenant,
+  /// and an IMPORT may span terms. A solver Generation always has one — it is
+  /// backfilled from the SolverRun that produced it.
+  ///
+  /// Frozen by `generation_content_immutable`: which term a snapshot describes
+  /// is part of what the snapshot IS, like `version` and `source`.
+  termId String? @map("term_id")
+
+  /// Sequential per TERM (per tenant for a term-less one). Two partial unique
+  /// indexes in the companion migration enforce the two cases separately —
+  /// Prisma cannot express either, and a single `@@unique([tenantId, termId,
+  /// version])` would treat every tenant-wide row as unique against itself.
+  ///
+  /// It was tenant-sequential until 20260901040000, which made six terms with
+  /// one proposal each read v1..v6 and a version number say nothing about the
+  /// history of any one term.
   version Int
 
   parentGenerationId String? @map("parent_generation_id")
@@ -1893,8 +2001,12 @@ model Generation {
   source GenerationSource
   status GenerationStatus @default(PENDING)
 
-  /// Exactly one Generation per tenant is current, enforced by a partial
-  /// unique index in the companion migration.
+  /// Exactly one current Generation per TERM, and at most one tenant-wide one,
+  /// enforced by two partial unique indexes in the companion migration.
+  ///
+  /// It was one per TENANT, which meant a tenant could not hold an applied
+  /// schedule for two terms at once — and `apply` superseded across terms
+  /// because of it. § 20260901040000.
   isCurrent Boolean @default(false) @map("is_current")
 
   /// Solver run metadata: seed, wall time, penalty score, algorithm params.
@@ -1908,6 +2020,9 @@ model Generation {
   appliedAt   DateTime? @map("applied_at") @db.Timestamptz(3)
 
   tenant           Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// SetNull, not Cascade: `generation_no_delete` denies every DELETE here, so a
+  /// cascade could not fire and would fail the Term's deletion instead.
+  term             Term?        @relation(fields: [termId], references: [id], onDelete: SetNull)
   parentGeneration Generation?  @relation("GenerationLineage", fields: [parentGenerationId], references: [id], onDelete: SetNull)
   children         Generation[] @relation("GenerationLineage")
   createdBy        Person?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
@@ -1917,8 +2032,8 @@ model Generation {
   violations ConstraintViolation[]
   solverRuns SolverRun[]
 
-  @@unique([tenantId, version])
   @@index([tenantId])
+  @@index([tenantId, termId])
   @@index([parentGenerationId])
   @@map("generation")
 }
@@ -2360,4 +2475,118 @@ model GroupSource {
   @@index([tenantId])
   @@index([sourceGroupId])
   @@map("group_source")
+}
+
+/// A personal API credential (import scripts, integrations). Acts AS ITS
+/// PERSON, but only within the permission subset selected at creation — and
+/// never more than that Person holds at the moment of use: `heldPermissions()`
+/// intersects `permissions` with the Person's live set on every request, so
+/// revoking an AccessRole also narrows every token derived from it.
+///
+/// Bound to a Person, not an Account: permissions are per-Person, so a token is
+/// one tenant identity. Resolution is privileged the same way `Screen` is —
+/// `calendry_internal.api_token_identity()`, by the secret alone — and the
+/// table itself is tenant-scoped and RLS-protected like everything else.
+model ApiToken {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+  personId String @map("person_id")
+
+  /// What a human calls it when revoking the right one.
+  name String
+
+  /// SHA-256 of the presented token, never the token itself. Unique GLOBALLY
+  /// because the lookup happens before any tenant is known.
+  tokenHash String @map("token_hash")
+
+  /// Permission keys selected at creation. A CEILING, not a grant.
+  permissions String[]
+
+  /// Revocation without deletion, so a token disabled during an incident keeps
+  /// its name and its `lastUsedAt` trail.
+  isActive Boolean @default(true) @map("is_active")
+
+  /// NULL = does not expire. Enforced at resolution, not by a sweep.
+  expiresAt DateTime? @map("expires_at") @db.Timestamptz(3)
+
+  /// Last successful resolution, throttled to once a minute in SQL — the only
+  /// way to answer "is anything still using this?" before revoking it.
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([tenantId])
+  @@index([personId])
+  @@map("api_token")
+}
+
+/// ALL streams every Term the Person has a Session in, bounded by
+/// `weeksAhead`; TERM streams exactly `termId`, unbounded (a Term is already a
+/// bounded range).
+enum IcsLinkScope {
+  ALL
+  TERM
+
+  @@map("ics_link_scope")
+}
+
+/// A personal calendar-subscription link (issue #15, the stream half — the
+/// one-off download it replaces was the other half, `buildIcs`/
+/// `schedule.ics.get.ts`). A signed-in Person mints one and pastes it into an
+/// external calendar app, which re-fetches it on its own schedule.
+///
+/// THE SECRET IS STORED PLAIN, unlike ApiToken/Screen. Deliberately: this is
+/// not a one-time bearer credential, it is a "capability URL" a person must be
+/// able to come back and re-copy — into a second device, after clearing a
+/// calendar app's subscriptions — without losing sync elsewhere by rotating
+/// it. It is read-only, scoped to exactly this Person's own Sessions, and
+/// revoked by deleting the row.
+///
+/// Resolution is privileged the same way Screen/ApiToken are —
+/// `calendry_internal.ics_link_identity()`, by the token alone — and the
+/// table itself is tenant-scoped and RLS-protected like everything else.
+model IcsLink {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+  personId String @map("person_id")
+
+  /// What a human calls it when deleting the right one.
+  name String
+
+  /// The bearer secret itself — see the model comment for why this is not a
+  /// hash. Unique GLOBALLY because the lookup happens before any tenant is
+  /// known.
+  token String
+
+  scope IcsLinkScope
+
+  /// Set only when `scope` is TERM.
+  termId String? @map("term_id")
+
+  /// Rolling window in weeks from "now", ALL scope only. A Term already
+  /// bounds itself; "all Terms" does not, and an external calendar app that
+  /// refetches on its own schedule needs a request that stays cheap no matter
+  /// how many Terms this Person has ever had a Session in.
+  weeksAhead Int? @map("weeks_ahead")
+
+  /// Last successful stream fetch, throttled to once a minute in SQL — the
+  /// only way to tell a link a calendar app still polls from one nobody uses.
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  term   Term?  @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([tenantId])
+  @@index([personId])
+  @@map("ics_link")
 }

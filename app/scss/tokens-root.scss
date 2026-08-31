@@ -7,13 +7,58 @@
 // The SCSS aliases in tokens.scss point at these properties; the px values
 // exist only here.
 :root {
-    // Font size — 6 steps, collapsed from 14 values.
-    --font-size-xs: 11px;    // was 10, 10.5, 11, 11.5 — uppercase labels, meta
-    --font-size-sm: 12.5px;  // was 12, 12.5 — secondary text, chips
-    --font-size-md: 13px;    // was 13, 13.5, 14 — body default, the most-used value
+    // Font size — 6 steps, collapsed from 14 values. ONE ROLE PER STEP, which is
+    // what the middle of this scale had stopped being: `sm` was 12.5 and `md`
+    // was 13, half a pixel apart, both meaning "text", with no rule for choosing
+    // between them. The usage counts show how that resolved itself — 210 call
+    // sites reached for `sm` and 103 for `md`, so `sm` had quietly become the
+    // body size while `md`'s own comment still called itself "the most-used
+    // value". Two tokens competing for one job, separated by nothing anyone
+    // could see, which is why size carried no hierarchy on the densest surface
+    // in the product and two near-identical greys were left doing the work.
+
+    // Respaced so each step is a role somebody can pick on purpose. Still
+    // COMPRESSED — 11 through 17 for the whole app — because density is a
+    // committed decision (DESIGN.md), not an oversight to be corrected upward.
+    // That commitment is also why the web's ordinary 16px body floor does not
+    // apply here: this is the dense-role exemption, taken deliberately.
+    --font-size-xs: 11px;    // labels (uppercase, 0.05em) and fine metadata
+    --font-size-sm: 12px;    // secondary text, chips, table meta — the workhorse
+    --font-size-md: 14px;    // body prose and values: forms, panels, review copy
     --font-size-lg: 17px;    // panel and section titles
     --font-size-xl: 24px;    // page titles
     --font-size-2xl: 32px;   // was 32, 38 — display
+
+    // xs and sm sit 1px apart, which would be the very fault above if size were
+    // the only thing separating them. It is not: xs carries either uppercase
+    // with 0.05em tracking (the label register) or tabular fine print, and both
+    // read as a different KIND of text rather than a smaller one. Steps that
+    // must be told apart by size alone are 12 / 14 / 17, and those are 2px and
+    // 3px.
+
+    // Line height — 3 steps, collapsed from 14 values. The same consolidation
+    // the font sizes above already had, on the axis nobody did it for. Leading
+    // was never missing: it was declared 91 times across components in FOURTEEN
+    // distinct values — 1.5 (45×), 1.6 (16×), 1.75 (7×), 1.45 (5×), 1.55 (3×),
+    // 1.4 (3×), 1.35 (3×), 1.25 (2×), and six more used once or twice each.
+    // Nothing was choosing between them, because there was nothing to choose
+    // from.
+
+    // The values are the codebase's own, not new taste: 1.5 is what 45 call
+    // sites already settled on, and `ScheduleEmptyState` had independently
+    // arrived at prose leading as a local literal. Absorbed 1.45/1.55/1.6 into
+    // prose and 1.15–1.35 into tight. Applied to WRAPPING text only: chrome is
+    // single-line and sits in px-exact rows where extra leading pushes glyphs
+    // off-centre, which is why the schedule grid must never take the prose step.
+    --leading-tight: 1.25;   // chrome: labels, chips, table cells, buttons
+    --leading-prose: 1.5;    // anything that wraps: paragraphs, hints, empty states
+    --leading-loose: 1.75;   // the landing surface's airier measure, Persuade only
+
+    // Deliberately NOT a step: `line-height: 1` on an icon or a logo glyph means
+    // "no leading at all" rather than a tighter text role, and folding it into
+    // `--leading-tight` would start centring icons 25% off. Same treatment the
+    // 40px empty-state padding gets — a value with no scale match stays a
+    // literal and says why.
 
     // Display step for the public landing surface only. Added deliberately
     // rather than hardcoding a literal in a landing component: the app screens
