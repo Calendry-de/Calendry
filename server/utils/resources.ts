@@ -731,6 +731,14 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             allowOnline: z.boolean().optional(),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
+            /*
+             * PROVENANCE ONLY (issue #8) — set once, at creation, by the "start
+             * from a template" picker. Absent from `update`: which template an
+             * Offering started from cannot change after the fact any more than
+             * `termId` can. Never consulted to resolve a field's current value —
+             * see `Offering.createdFromTemplateId`'s own schema comment.
+             */
+            createdFromTemplateId: optionalId,
         }),
         update: z.object({
             kindId: id.optional(),
@@ -775,6 +783,62 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         }),
         orderBy: { title: 'asc' },
         searchFields: ['title', 'code', 'notes'],
+    },
+
+    /**
+     * A reusable Offering SHAPE (issue #8), structurally mirroring
+     * `defaultConstraintRow`'s "stored shape a new row is seeded from" — but
+     * tenant-authored data rather than code, so it is a resource here rather
+     * than a catalogue function. Every field is optional: a template states
+     * only the part of the shape it wants to fix.
+     *
+     * NOT federation-ownable: a template names how THIS institution talks
+     * about its own recurring shapes, not a resource shared across a
+     * federation the way a Room or an Offering can be.
+     */
+    'offering-templates': {
+        model: 'offeringTemplate',
+        create: z.object({
+            name: z.string().min(1),
+            title: z.string().nullish(),
+            kindId: optionalId,
+            code: z.string().nullish(),
+            color: z.string().nullish(),
+            frequency: z.number().int().min(1).nullish(),
+            durationBlocks: z.number().int().min(1).nullish(),
+            schedulingPattern: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['DISTRIBUTED', 'BLOCK']).nullish(),
+            ),
+            requiredRoleId: optionalId,
+            requiredCapacity: z.number().int().nonnegative().nullish(),
+            requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
+            allowOnline: z.boolean().nullish(),
+            notes: z.string().nullish(),
+        }),
+        update: z.object({
+            name: z.string().min(1).optional(),
+            title: z.string().nullish(),
+            kindId: optionalId,
+            code: z.string().nullish(),
+            color: z.string().nullish(),
+            frequency: z.number().int().min(1).nullish(),
+            durationBlocks: z.number().int().min(1).nullish(),
+            schedulingPattern: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['DISTRIBUTED', 'BLOCK']).nullish(),
+            ),
+            requiredRoleId: optionalId,
+            requiredCapacity: z.number().int().nonnegative().nullish(),
+            requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
+            allowOnline: z.boolean().nullish(),
+            notes: z.string().nullish(),
+        }),
+        filters: z.object({
+            kindId: z.string().optional(),
+        }),
+        orderBy: { name: 'asc' },
+        searchFields: ['name', 'title', 'code'],
     },
 
     'time-grids': {

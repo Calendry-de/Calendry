@@ -5,6 +5,12 @@
         :description="`Create a new ${entity.label.toLowerCase()} in this institution.`"
         :title="`New ${entity.label.toLowerCase()}`"
     >
+        <ManageTemplateStarter
+            v-if="entity.startFromTemplate"
+            :config="entity.startFromTemplate"
+            :draft="form.draft.value"
+        />
+
         <component
             :is="bespoke ?? ManageEntityForm"
             v-model:draft="form.draft.value"
@@ -30,6 +36,7 @@
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageRelationsPanel from '~/components/manage/ManageRelationsPanel.vue';
 import ManageShell from '~/components/manage/ManageShell.vue';
+import ManageTemplateStarter from '~/components/manage/ManageTemplateStarter.vue';
 import { resolveDetailComponent } from '~/components/manage/detailComponents';
 import { useEntityForm } from '~/composables/entityForm';
 import { useEntityRelations } from '~/composables/entityRelations';
