@@ -150,6 +150,14 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'generation.read', category: 'generation', description: 'View solver proposals and their previews' },
     { key: 'generation.apply', category: 'generation', description: 'Promote a Generation to the current baseline' },
     { key: 'solver.trigger', category: 'solver', description: 'Request a solver run' },
+    /*
+     * Separate from `solver.trigger` deliberately: the snapshot is a tenant's
+     * whole scheduling configuration at one moment — people, groups, rooms,
+     * preferences — the single most sensitive payload the app stores. Being
+     * able to start or watch a run should not imply being able to download
+     * everyone's data.
+     */
+    { key: 'solver.snapshot.read', category: 'solver', description: 'Download the full SolverInput a run sent' },
     { key: 'violation.read', category: 'violation', description: 'View current constraint violations' },
     { key: 'notification.preview', category: 'notification', description: 'Resolve who a Session change affects' },
 

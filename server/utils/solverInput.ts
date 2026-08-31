@@ -1608,6 +1608,16 @@ export async function assembleSolverInput(
 }
 
 /**
+ * The wire bytes of a `SolverInput` — what `hashInput` digests and what
+ * `SolverInputSnapshot.compressedInput` gzips (issue #24). One encode, not
+ * one per caller, so a snapshot and its own run's `inputHash` can never
+ * describe two different encodings of what was, in memory, the same object.
+ */
+export function encodeInput(input: SolverInput): Buffer {
+    return Buffer.from(SolverInput.encode(input).finish());
+}
+
+/**
  * Hash of the ENCODED protobuf, not of a JSON rendering.
  *
  * Two inputs that encode identically are the same problem to the solver, which
@@ -1615,7 +1625,7 @@ export async function assembleSolverInput(
  * order and with how BigInt happened to stringify.
  */
 export function hashInput(input: SolverInput): string {
-    return createHash('sha256').update(SolverInput.encode(input).finish()).digest('hex');
+    return createHash('sha256').update(encodeInput(input)).digest('hex');
 }
 
 export { TermEndedError };

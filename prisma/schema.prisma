@@ -191,10 +191,11 @@ model SolverRun {
   finishedAt    DateTime? @map("finished_at") @db.Timestamptz(3)
   lastPolledAt  DateTime? @map("last_polled_at") @db.Timestamptz(3)
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  term        Term        @relation(fields: [termId], references: [id], onDelete: Cascade)
-  generation  Generation? @relation(fields: [generationId], references: [id], onDelete: SetNull)
-  requestedBy Person?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  term        Term                  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  generation  Generation?           @relation(fields: [generationId], references: [id], onDelete: SetNull)
+  requestedBy Person?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  snapshot    SolverInputSnapshot?
 
   /// At most one PENDING/QUEUED/RUNNING run per term, enforced by the partial
   /// unique index `solver_run_one_active_per_term` in migration
@@ -205,6 +206,46 @@ model SolverRun {
   @@index([tenantId, termId])
   @@index([generationId])
   @@map("solver_run")
+}
+
+/// The full `SolverInput` a run actually sent, not just its hash (issue #24).
+///
+/// Keyed by `SolverRun`, not `Generation`: `inputHash` already lives on the
+/// run, a Generation can have several runs (retries before one succeeds), and
+/// only one of them is "the run that produced this Generation"
+/// (`SolverRun.generationId`). Answering "what was configured when this
+/// calendar was generated" is `SolverRun.findFirst({ where: { generationId } })`,
+/// then this table — the snapshot follows the same owner its hash already has
+/// rather than inventing a second relationship to the same fact.
+///
+/// A DEDICATED table, not a column on `solver_run`: this is the single
+/// largest and most sensitive payload the app stores (a tenant's whole
+/// scheduling configuration — people, groups, rooms, preferences — at one
+/// moment), so it must not bloat the hot `solver_run` table that every
+/// ordinary status query touches, and its own read path can carry a stricter
+/// permission (`solver.snapshot.read`) than triggering or watching a run
+/// needs.
+///
+/// Compressed rather than raw: gzip over the SAME ENCODED PROTOBUF BYTES
+/// `inputHash` is a SHA-256 digest of — never a JSON rendering, for the exact
+/// reason `hashInput`'s own doc comment gives (key order, BigInt stringifying).
+/// Storing the encoding `inputHash` already committed to, rather than
+/// re-deriving one, is what keeps the two facts about the same run from ever
+/// disagreeing.
+model SolverInputSnapshot {
+  id          String @id @default(uuid(7))
+  tenantId    String @map("tenant_id")
+  solverRunId String @unique @map("solver_run_id")
+
+  compressedInput Bytes @map("compressed_input")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  solverRun SolverRun @relation(fields: [solverRunId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("solver_input_snapshot")
 }
 
 enum GenerationStatus {
@@ -334,6 +375,7 @@ model Tenant {
   accessRolePermissions        AccessRolePermission[]
   personAccessRoles            PersonAccessRole[]
   solverRuns                   SolverRun[]
+  solverInputSnapshots         SolverInputSnapshot[]
   personUnavailability         PersonUnavailability[]
   personPreferences            PersonPreference[]
   personPreferenceRoomFeatures PersonPreferenceRoomFeature[]

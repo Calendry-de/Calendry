@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { z } from 'zod';
 import { findPgCodeIsUniqueViolation } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
@@ -10,7 +11,7 @@ import {
     startRun,
     toWireU64,
 } from '../../../utils/solverClient';
-import { TermEndedError, assembleSolverInput } from '../../../utils/solverInput';
+import { TermEndedError, assembleSolverInput, encodeInput } from '../../../utils/solverInput';
 import { hashScope, resolveScope, toWireScope } from '../../../utils/solverScope';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '../../../../shared/solverBudget';
 import { SOLVER_MODES } from '../../../../shared/solverMode';
@@ -123,6 +124,20 @@ export default defineEventHandler(async (event) => {
                     inputHash: assembled.inputHash,
                     meta: { report: assembled.report as object },
                     requestedById: identity.actorPersonId,
+                },
+            });
+
+            /*
+             * Same transaction as the run itself (issue #24): built from the
+             * SAME `assembled.input` object `inputHash` above was computed
+             * from, so the two can never describe different problems.
+             * gzip over the encoded protobuf, not JSON — see `encodeInput`.
+             */
+            await tx.solverInputSnapshot.create({
+                data: {
+                    tenantId: identity.tenantId,
+                    solverRunId: run.id,
+                    compressedInput: gzipSync(encodeInput(assembled.input)),
                 },
             });
 
