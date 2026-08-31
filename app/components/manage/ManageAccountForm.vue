@@ -68,7 +68,7 @@
                         :id="personControlId"
                         class="field_control"
                         :value="String(draft.personId ?? '')"
-                        @change="draft.personId = ($event.target as HTMLSelectElement).value || null"
+                        @change="selectPerson(($event.target as HTMLSelectElement).value || null)"
                     >
                         <option
                             :selected="!draft.personId"
@@ -531,6 +531,37 @@ const selectedPersonLabel = computed(() => {
 
 /** The server's flag, never its wording. See `useEntityForm().errorData`. */
 const accountExists = computed(() => Boolean(props.form.errorData.value?.accountExists));
+
+/**
+ * The value THIS component last put into the email field, so a person switch
+ * can tell "still what we prefilled" from "the visitor typed over it" without
+ * a watcher racing its own writes.
+ */
+const emailPrefill = ref<string | null>(null);
+
+/**
+ * Only on create: the login's address is free-text days before it is anyone's
+ * real credential, so defaulting it to the acted-as Person's contact email
+ * saves a retype in the common case while staying fully editable. Never
+ * overwrites a value the visitor put there themselves — matched against the
+ * last value THIS function wrote, not against "empty", so re-picking a person
+ * after a manual edit leaves that edit alone.
+ */
+function selectPerson(personId: string | null) {
+    draft.value.personId = personId;
+
+    if (props.mode !== 'create' || !personId) {
+        return;
+    }
+
+    const candidate = options.value.find((person) => person.id === personId);
+    const currentEmail = typeof draft.value.email === 'string' ? draft.value.email : '';
+
+    if (candidate?.email && (!currentEmail || currentEmail === emailPrefill.value)) {
+        draft.value.email = candidate.email;
+        emailPrefill.value = candidate.email;
+    }
+}
 
 /*
  * Generated on the CLIENT, after hydration, so the server never renders a secret
