@@ -49,7 +49,10 @@ export async function seedPermissions(
         }
     }
 
-    const desiredKeys = new Set(PERMISSIONS.map((p) => p.key));
+    // Widened to `string`: compared against `existingKeys`, which is a plain DB
+    // column and therefore can legitimately hold a key that is no longer a
+    // `PermissionKey` at all — that mismatch is exactly what `stale` reports.
+    const desiredKeys = new Set<string>(PERMISSIONS.map((p) => p.key));
     const stale = [...existingKeys].filter((key) => !desiredKeys.has(key)).sort();
 
     let pruned = 0;
