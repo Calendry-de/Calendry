@@ -326,6 +326,8 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     }
 
     return {
+        /** So a generic form body can consult entity-level UI hooks (e.g. `advancedFieldsForMode`) without a second prop. */
+        entity,
         fields,
         draft,
         row,

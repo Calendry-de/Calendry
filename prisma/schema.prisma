@@ -1352,12 +1352,33 @@ model TenantDisplaySettings {
   /// per-tenant, not per-Federation, matching the issue's own framing.
   defaultLocale String? @map("default_locale")
 
+  /// Issue #8. A DEFAULT-BEHAVIOUR bias, not a fork: it decides which Offering
+  /// fields the form leads with and which constraint types the catalogue
+  /// suggests first, never what an Offering IS or which rules exist. Living on
+  /// THIS singleton — rather than a table of its own — is deliberate: the
+  /// ticket that added it was explicit that a tenant must not gain a second
+  /// "settings exist, absent means defaults" mechanism to keep straight
+  /// alongside this one. UNIVERSITY is the default because it is what every
+  /// tenant before this field got by construction.
+  mode TenantMode @default(UNIVERSITY)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_display_settings")
+}
+
+/// Issue #8. UI/UX bias only (form field prominence, suggested constraint
+/// types) — TAXONOMY.md's fixed entity model does not branch on this, and
+/// never should: a mode that changed what an Offering IS would be two
+/// products sharing a database.
+enum TenantMode {
+  UNIVERSITY
+  SCHOOL
+
+  @@map("tenant_mode")
 }
 
 model OfferingGroup {

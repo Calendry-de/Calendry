@@ -28,6 +28,42 @@
             @submit.prevent="save"
         >
             <section class="panel_group">
+                <h2>Institution type</h2>
+                <p class="panel_hint">
+                    A default-behaviour bias, not a fork: this never changes what an offering
+                    is or which constraint rules exist — only which offering-form fields are
+                    shown first and which constraint types the catalogue suggests. Every field
+                    and every rule stays fully reachable in both modes.
+                </p>
+
+                <div
+                    v-if="!canEdit"
+                    class="panel_mode-static"
+                >{{ MODE_LABEL[form.mode] }}</div>
+
+                <div
+                    v-else
+                    class="panel_mode"
+                    role="radiogroup"
+                >
+                    <label
+                        v-for="option in TENANT_MODES"
+                        :key="option"
+                        class="panel_mode-option"
+                        :class="{ 'panel_mode-option--on': form.mode === option }"
+                    >
+                        <input
+                            v-model="form.mode"
+                            name="tenant-mode"
+                            type="radio"
+                            :value="option"
+                        >
+                        <span>{{ MODE_LABEL[option] }}</span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="panel_group">
                 <h2>Online sessions</h2>
                 <p class="panel_hint">
                     Online delivery is a <strong>virtual room</strong>, not a flag on the
@@ -199,6 +235,8 @@ import ManageColorField from '~/components/manage/ManageColorField.vue';
 import { COLOR_SOURCES, DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { ColorSource, DisplaySettings } from '#shared/sessionColor';
 import { isUsableLocale } from '#shared/locale';
+import { DEFAULT_TENANT_MODE, TENANT_MODES } from '#shared/tenantMode';
+import type { TenantMode } from '#shared/tenantMode';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
@@ -254,12 +292,17 @@ const SOURCE_LABEL: Record<ColorSource, string> = {
     kind: 'The session kind’s colour',
 };
 
+const MODE_LABEL: Record<TenantMode, string> = {
+    UNIVERSITY: 'University — offerings, required session counts, a lecturer pool',
+    SCHOOL: 'School — a subject, a weekly count, a named teacher',
+};
+
 const canEdit = useHasPermission('tenant.update');
 const request = useRequestFetch();
 
 const settings = useAsyncData(
     'display-settings',
-    () => request<DisplaySettings & { defaultLocale: string | null; configured: boolean }>('/api/display-settings'),
+    () => request<DisplaySettings & { defaultLocale: string | null; mode: TenantMode; configured: boolean }>('/api/display-settings'),
 );
 
 await settings;
@@ -276,6 +319,7 @@ const form = reactive({
     colorSourceOrder: [...(settings.data.value?.colorSourceOrder ?? DISPLAY_DEFAULTS.colorSourceOrder)],
     defaultColor: settings.data.value?.defaultColor ?? null,
     defaultLocale: settings.data.value?.defaultLocale ?? null as string | null,
+    mode: settings.data.value?.mode ?? DEFAULT_TENANT_MODE,
 });
 
 // A separate text ref rather than binding `form.defaultLocale` directly:
@@ -447,6 +491,48 @@ async function save() {
         flex-direction: column;
         gap: var(--space-3);
         list-style: none;
+    }
+
+    &_mode {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+    }
+
+    &_mode-option {
+        cursor: pointer;
+
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+
+        padding: var(--space-4) var(--space-5);
+        border: 1px solid $surface4;
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-sm);
+        color: $content5;
+
+        transition: 0.12s;
+
+        input { accent-color: $primary600; }
+
+        &--on {
+            border-color: $primary500;
+            color: $primary700;
+            background: varToRgba('primary500', 0.1);
+        }
+    }
+
+    &_mode-static {
+        padding: var(--space-4) var(--space-5);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: $content4;
+
+        background: $surface2;
     }
 
     &_locale {

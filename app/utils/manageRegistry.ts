@@ -2,6 +2,8 @@ import type { PermissionRequirement } from '#shared/permissions';
 import { resourcePermissions } from '#shared/permissions';
 import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
 import { SESSION_KIND_TYPES, SESSION_KIND_TYPE_HELP, SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
+import type { TenantMode } from '#shared/tenantMode';
+import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
 
 /**
  * The management area's entity registry — a client mirror of the server's
@@ -286,6 +288,18 @@ export interface ManageEntity {
      * (Role.isSystem, AccessRole.isSystem).
      */
     systemFlag?: string;
+    /**
+     * Fields to collapse behind "More fields" for the given tenant mode
+     * (issue #8) — a UI/UX bias only, never a change to what is stored or
+     * required. Absent means no field is ever de-emphasised, which is the
+     * correct answer for every entity except Offering today.
+     *
+     * A function of `TenantMode` rather than a flat set, so a mode's meaning
+     * lives in `shared/tenantMode.ts` — the one place a role author or this
+     * file's own reviewer needs to check the classification — instead of
+     * being duplicated per entity here.
+     */
+    advancedFieldsForMode?: (mode: TenantMode) => ReadonlySet<string>;
     /** Bespoke detail body, resolved by name. Generic form when absent. */
     detailComponent?: string;
     /**
@@ -324,6 +338,7 @@ export const OFFERING_ENTITY: ManageEntity = {
     description: 'What must be scheduled — the recurring demand sessions are placed from.',
     keywords: ['offering', 'course', 'module', 'subject', 'demand', 'curriculum', 'lecture'],
     federationOwnable: true,
+    advancedFieldsForMode: offeringFieldsToDeemphasize,
     title: (row) => [row.code, row.title].filter(Boolean).join(' · ') || 'Offering',
     columns: [
         { key: 'code', label: 'Code', format: 'code' },

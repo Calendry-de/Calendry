@@ -32,7 +32,7 @@
             />
 
             <ManageField
-                v-for="field in genericFields"
+                v-for="field in primaryFields"
                 :key="field.key"
                 v-model="draft[field.key]"
                 :error="form.fieldErrors.value[field.key]"
@@ -41,6 +41,29 @@
                 :reference-rows="field.reference ? form.references.value[field.reference.resource] : undefined"
                 :note="noteFor(field)"
             />
+
+            <!--
+                PROGRESSIVE DISCLOSURE, NEVER REMOVAL (issue #8): a tenant's
+                mode only decides which fields lead — every one of them is
+                still reachable, saved and validated exactly as before.
+            -->
+            <details
+                v-if="advancedFields.length"
+                class="entity-form_advanced"
+            >
+                <summary>More fields</summary>
+
+                <ManageField
+                    v-for="field in advancedFields"
+                    :key="field.key"
+                    v-model="draft[field.key]"
+                    :error="form.fieldErrors.value[field.key]"
+                    :field="field"
+                    :readonly="readonly || form.isFieldLocked(field)"
+                    :reference-rows="field.reference ? form.references.value[field.reference.resource] : undefined"
+                    :note="noteFor(field)"
+                />
+            </details>
         </div>
 
         <footer
@@ -110,6 +133,19 @@ defineSlots<{ fields?: (props: { readonly: boolean }) => unknown }>();
  * bespoke detail component through the `fields` slot.
  */
 const genericFields = computed(() => props.form.fields.filter((field) => !field.custom));
+
+/**
+ * Split by the entity's own `advancedFieldsForMode` hook (issue #8) — a UI
+ * bias, so it is computed here rather than in the registry, which stays pure
+ * data. Most entities declare no hook and get an empty advanced set, i.e. no
+ * behaviour change from before this existed.
+ */
+const tenantMode = useTenantMode();
+
+const advancedKeys = computed(() => props.form.entity.advancedFieldsForMode?.(tenantMode.value) ?? new Set());
+
+const primaryFields = computed(() => genericFields.value.filter((field) => !advancedKeys.value.has(field.key)));
+const advancedFields = computed(() => genericFields.value.filter((field) => advancedKeys.value.has(field.key)));
 
 /**
  * Server-computed notes for fields declaring `derived`.
@@ -230,6 +266,25 @@ const saveLabel = computed(() => (props.mode === 'create' ? 'Create' : 'Save cha
         display: flex;
         flex-direction: column;
         gap: var(--space-6);
+    }
+
+    &_advanced {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-6);
+
+        padding-top: var(--space-2);
+        border-top: 1px dashed $surface3;
+
+        > summary {
+            cursor: pointer;
+
+            padding: var(--space-2) 0;
+
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: $content6;
+        }
     }
 
     &_banner {

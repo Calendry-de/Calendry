@@ -1,6 +1,7 @@
 import { SESSION_COOKIE } from '../../utils/auth';
 import { listAccountIdentities, resolveSessionToken } from '../../utils/authDb';
 import { resolveLocale } from '../../../shared/locale';
+import { DEFAULT_TENANT_MODE } from '../../../shared/tenantMode';
 import { loadPermissions } from '../../utils/requirePermission';
 import { withTenant } from '../../utils/tenantDb';
 
@@ -45,10 +46,11 @@ export default defineEventHandler(async (event) => {
             availableTenants,
             // No Person or Tenant resolved yet — the header is all there is.
             locale: resolveLocale({ acceptLanguage }),
+            tenantMode: DEFAULT_TENANT_MODE,
         };
     }
 
-    const { permissions, locale } = await withTenant(
+    const { permissions, locale, tenantMode } = await withTenant(
         {
             kind: 'account',
             tenantId: session.tenant_id,
@@ -63,7 +65,7 @@ export default defineEventHandler(async (event) => {
                 tx.person.findUnique({ where: { id: session.person_id as string }, select: { locale: true } }),
                 tx.tenantDisplaySettings.findUnique({
                     where: { tenantId: session.tenant_id as string },
-                    select: { defaultLocale: true },
+                    select: { defaultLocale: true, mode: true },
                 }),
             ]);
 
@@ -74,6 +76,9 @@ export default defineEventHandler(async (event) => {
                     tenantDefaultLocale: display?.defaultLocale,
                     acceptLanguage,
                 }),
+                // Issue #8. Absent row = default, same rule as everything
+                // else read off this singleton.
+                tenantMode: display?.mode ?? DEFAULT_TENANT_MODE,
             };
         },
     );
@@ -95,5 +100,6 @@ export default defineEventHandler(async (event) => {
         permissions: [...permissions].sort(),
         availableTenants,
         locale,
+        tenantMode,
     };
 });
