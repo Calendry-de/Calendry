@@ -98,6 +98,11 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'group_size_fits_room',
     'group_veto',
     'compactness',
+    'lecturer_consistency',
+    'minimize_offering_day_split',
+    'max_offering_sessions_per_day',
+    'max_consecutive_offering_blocks',
+    'max_daily_session_count',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -189,7 +194,12 @@ export type WireConstraintField =
     | 'roomConsistency'
     | 'groupSizeFitsRoom'
     | 'groupVeto'
-    | 'compactness';
+    | 'compactness'
+    | 'lecturerConsistency'
+    | 'minimizeOfferingDaySplit'
+    | 'maxOfferingSessionsPerDay'
+    | 'maxConsecutiveOfferingBlocks'
+    | 'maxDailySessionCount';
 
 export interface ConstraintTypeDef {
     key: string;
@@ -1301,6 +1311,144 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         severity: 'SOFT',
         defaultWeight: 8,
         params: [],
+    },
+
+    {
+        key: 'lecturer_consistency',
+        wireField: 'lecturerConsistency',
+        label: 'Keep an offering’s lecturer stable',
+        description:
+            'Once a lecturer holds one session of a recurring offering, they should hold '
+            + 'the rest of it too, rather than switching week to week.',
+        evaluator: 'solver',
+        /*
+         * The Lecturer half of `room_consistency`, buildable now that pool
+         * selection (issue #61) and the evaluator itself both exist. Aggregate
+         * over an entire Offering's Sessions across the whole term, priced
+         * against `max(0, distinct_lecturers - required_lecturer_count)` — it
+         * only ever fires for an Offering with a genuine lecturer POOL
+         * (candidates > required), so an Offering with one fixed lecturer is
+         * never charged for having exactly that one.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
+        params: [],
+    },
+
+    {
+        key: 'minimize_offering_day_split',
+        wireField: 'minimizeOfferingDaySplit',
+        label: 'Keep an offering’s day together',
+        description:
+            'Discourage a class’s sessions for one offering landing in two separate runs '
+            + 'on the same day, with unrelated teaching wedged between them.',
+        evaluator: 'solver',
+        /*
+         * NOT the same question `compactness` asks. A day packed solid with
+         * OTHER offerings between two runs of this one has zero gaps and still
+         * splits it — this counts non-contiguous runs of the SAME offering,
+         * minus one, so a single run (including a lone session) costs nothing.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [],
+    },
+
+    {
+        key: 'max_offering_sessions_per_day',
+        wireField: 'maxOfferingSessionsPerDay',
+        label: 'Cap an offering’s sessions per day',
+        description:
+            '“Maths, 4x a week” means four different days unless a tenant says '
+            + 'otherwise — caps how many of one offering’s sessions may land on the '
+            + 'same day.',
+        evaluator: 'solver',
+        /*
+         * A raw SESSION count, not blocks — not `gridRelative`, unlike its
+         * per-Offering sibling below. Distinct from `max_daily_session_count`,
+         * which caps a Group's or Person's WHOLE day across every offering.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'maxPerDay',
+            label: 'Sessions of this offering allowed per day',
+            type: 'number',
+            min: 1,
+            required: true,
+            help: 'No default: how many repeats of one offering belong on a single day is a '
+                + 'scheduling-policy figure, not something to guess on a tenant’s behalf.',
+        }],
+    },
+
+    {
+        key: 'max_consecutive_offering_blocks',
+        gridRelative: true,
+        wireField: 'maxConsecutiveOfferingBlocks',
+        label: 'Cap an offering’s blocks in a row',
+        description:
+            'Caps how many blocks of ONE offering may run back to back in a day — a triple '
+            + 'lecture with no break, say.',
+        evaluator: 'solver',
+        /*
+         * The Offering-scoped sibling of `max_consecutive_blocks`, which caps a
+         * GROUP's or PERSON's unbroken run across every offering at once. This
+         * one is about a single offering monopolising the day, so it carries no
+         * scope selector — there is only one axis, the offering itself.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'maxConsecutive',
+            label: 'Blocks in a row before it counts',
+            type: 'number',
+            min: 1,
+            required: true,
+            help: 'No default, for the same reason the sessions-per-day cap above has none. '
+                + 'In BLOCKS — how long a block is comes from your time grid.',
+        }],
+    },
+
+    {
+        key: 'max_daily_session_count',
+        wireField: 'maxDailySessionCount',
+        label: 'Cap sessions per day',
+        description:
+            'Caps a raw session COUNT per day for a group and/or a person — the volume '
+            + 'sibling of “Cap how long a day runs” (elapsed time) and “Cap teaching '
+            + 'without a break” (continuity). A day can satisfy both of those and still be '
+            + 'overloaded, e.g. six sessions split three plus a gap plus three.',
+        evaluator: 'solver',
+        /*
+         * A raw COUNT, not blocks — not `gridRelative`. Priced once the cap is
+         * exceeded rather than refused, the same reasoning `max_weekly_teaching_load`
+         * and ADR-0025 give: a hard cap on a count only fully known as
+         * placements accumulate risks the same dead-end-construction problem.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group’s day and a person’s day are different sets — a lecturer '
+                + 'teaching three cohorts has a day none of those cohorts can see.',
+        }, {
+            key: 'maxPerDay',
+            label: 'Sessions allowed per day',
+            type: 'number',
+            min: 1,
+            required: true,
+            help: 'No default: a daily session cap is a scheduling-policy figure, not '
+                + 'something to guess on a tenant’s behalf.',
+        }],
     },
 
 ];

@@ -581,6 +581,18 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
         case 'compactness':
             return { scope: compactnessScope(params.scope) };
 
+        case 'max_offering_sessions_per_day':
+            return { maxPerDay: Number(params.maxPerDay) };
+
+        case 'max_consecutive_offering_blocks':
+            return { maxConsecutive: Number(params.maxConsecutive) };
+
+        case 'max_daily_session_count':
+            return {
+                scope: compactnessScope(params.scope),
+                maxPerDay: Number(params.maxPerDay),
+            };
+
         case 'minimize_exam_week_sessions':
             /*
              * SENT EXPLICITLY, though `{}` happens to reach the solver as false
