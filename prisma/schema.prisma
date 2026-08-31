@@ -370,6 +370,7 @@ model Tenant {
   offeringGroups               OfferingGroup[]
   offeringLecturers            OfferingLecturer[]
   offeringEquipment            OfferingEquipment[]
+  offeringTemplates            OfferingTemplate[]
   sessions                     Session[]
   sessionGroups                SessionGroup[]
   sessionPeople                SessionPerson[]
@@ -487,6 +488,7 @@ model Role {
   sessionPeople     SessionPerson[]
   offerings         Offering[]
   offeringLecturers OfferingLecturer[]
+  offeringTemplates OfferingTemplate[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -1220,9 +1222,10 @@ model SessionKind {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  offerings        Offering[]
-  sessions         Session[]
-  constraintScopes ConstraintScope[]
+  offerings         Offering[]
+  sessions          Session[]
+  constraintScopes  ConstraintScope[]
+  offeringTemplates OfferingTemplate[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -1301,13 +1304,25 @@ model Offering {
   /// False by default: opting into online delivery is a tenant decision.
   allowOnline Boolean @default(false) @map("allow_online")
 
+  /// Issue #8. PROVENANCE ONLY — which OfferingTemplate this was seeded from,
+  /// for UI convenience ("created from Maths — 4x/week") and analytics.
+  ///
+  /// NOTHING MAY READ THIS TO RESOLVE A CURRENT FIELD VALUE. The template's
+  /// shape is COPIED onto the row at creation time, once; editing the template
+  /// afterward must not reach back into Offerings already made from it, or a
+  /// term's history changes under it. SET NULL on delete for the same reason —
+  /// deleting a template must not touch a single field of an Offering that
+  /// merely started from it.
+  createdFromTemplateId String? @map("created_from_template_id")
+
   isActive  Boolean  @default(true) @map("is_active")
   notes     String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant       Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  federation   Federation? @relation(fields: [federationId], references: [id], onDelete: Cascade)
+  tenant              Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  federation          Federation?       @relation(fields: [federationId], references: [id], onDelete: Cascade)
+  createdFromTemplate OfferingTemplate? @relation(fields: [createdFromTemplateId], references: [id], onDelete: SetNull)
   term         Term        @relation(fields: [termId], references: [id], onDelete: Cascade)
   kind         SessionKind @relation(fields: [kindId], references: [id], onDelete: Restrict)
   requiredRole Role?       @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
@@ -1323,6 +1338,7 @@ model Offering {
   @@index([tenantId])
   @@index([federationId])
   @@index([termId])
+  @@index([createdFromTemplateId])
   @@map("offering")
   examRequests ExamRequest[]
 }
@@ -1366,12 +1382,33 @@ model TenantDisplaySettings {
   /// per-tenant, not per-Federation, matching the issue's own framing.
   defaultLocale String? @map("default_locale")
 
+  /// Issue #8. A DEFAULT-BEHAVIOUR bias, not a fork: it decides which Offering
+  /// fields the form leads with and which constraint types the catalogue
+  /// suggests first, never what an Offering IS or which rules exist. Living on
+  /// THIS singleton — rather than a table of its own — is deliberate: the
+  /// ticket that added it was explicit that a tenant must not gain a second
+  /// "settings exist, absent means defaults" mechanism to keep straight
+  /// alongside this one. UNIVERSITY is the default because it is what every
+  /// tenant before this field got by construction.
+  mode TenantMode @default(UNIVERSITY)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_display_settings")
+}
+
+/// Issue #8. UI/UX bias only (form field prominence, suggested constraint
+/// types) — TAXONOMY.md's fixed entity model does not branch on this, and
+/// never should: a mode that changed what an Offering IS would be two
+/// products sharing a database.
+enum TenantMode {
+  UNIVERSITY
+  SCHOOL
+
+  @@map("tenant_mode")
 }
 
 model OfferingGroup {
@@ -1426,6 +1463,72 @@ model OfferingEquipment {
   @@index([equipmentId])
   @@index([tenantId])
   @@map("offering_equipment")
+}
+
+/// Issue #8. A REUSABLE SHAPE, not a live link: creating an Offering "from" a
+/// template COPIES these field values onto the new row once, at creation time.
+/// Nothing may resolve an Offering's current fields through this table — see
+/// `Offering.createdFromTemplateId`'s own comment. Editing a template only
+/// ever affects Offerings created from it AFTER the edit, which is what keeps
+/// a term's already-scheduled history from changing under a tenant editing
+/// their own catalogue of shapes.
+///
+/// Closest existing machinery is `defaultConstraintRow` (`shared/
+/// constraintTypes.ts`): a stored shape a NEW row is seeded from. The
+/// difference is authorship — that catalogue is code, this one is tenant data,
+/// so it is a table and CRUD routes rather than a function and a backfill
+/// script.
+///
+/// Deliberately NOT federation-ownable: a template is "how this institution
+/// names its own recurring shapes", not a resource a federation shares the way
+/// a Room or an Offering itself can be.
+model OfferingTemplate {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  /// The template's own name in the picker — "Maths — 4x/week", not the
+  /// Offering title it seeds. Kept distinct from `title` below because a
+  /// template is reused across many concrete Offerings, each of which may want
+  /// its own title (a specific class, a specific cohort).
+  name String
+
+  /// Every field below mirrors an Offering column it seeds and is OPTIONAL:
+  /// a template states only the part of the shape it wants to fix, and a
+  /// blank one leaves that field for the person creating the Offering to
+  /// decide, exactly as it would if they had started from nothing.
+  title             String?
+  kindId            String? @map("kind_id")
+  code              String?
+  color             String?
+  frequency         Int?
+  durationBlocks    Int?    @map("duration_blocks")
+  schedulingPattern SchedulingPattern? @map("scheduling_pattern")
+
+  /// The "lecturer pool" hint (TAXONOMY.md's Role, not a specific Person): a
+  /// school's "Mr Schmidt" is named on the created Offering's `lecturers`
+  /// relation, one Person at a time, through the ordinary Offering form —
+  /// this stays a Role reference so the shape itself never hardcodes an
+  /// individual.
+  requiredRoleId String? @map("required_role_id")
+
+  requiredCapacity  Int?     @map("required_capacity")
+  requiredRoomCount Int?     @map("required_room_count")
+  allowOnline       Boolean? @map("allow_online")
+  notes             String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind         SessionKind? @relation(fields: [kindId], references: [id], onDelete: SetNull)
+  requiredRole Role?        @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
+
+  seededOfferings Offering[]
+
+  @@index([tenantId])
+  @@index([kindId])
+  @@index([requiredRoleId])
+  @@map("offering_template")
 }
 
 /// PLACED INSTANCE: one atomic Session at a specific week/day/block. This is

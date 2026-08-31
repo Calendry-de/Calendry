@@ -22,6 +22,15 @@ export const CRUD_RESOURCES = {
     rooms: 'room',
     equipment: 'equipment',
     offerings: 'offering',
+    /**
+     * Issue #8. A REUSABLE SHAPE a tenant authors, not the constraint
+     * catalogue's code-level defaults it takes its structural cue from —
+     * hence its own CRUD permissions rather than folding into `offering.*`.
+     * Reading a template and reading the Offerings it seeded are genuinely
+     * separate authorities: a lecturer who may see the timetable has no
+     * business editing the tenant's library of reusable shapes.
+     */
+    'offering-templates': 'offering_template',
     'time-grids': 'time_grid',
     terms: 'term',
     constraints: 'constraint',

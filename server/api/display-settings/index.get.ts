@@ -1,4 +1,5 @@
 import { DISPLAY_DEFAULTS } from '../../../shared/sessionColor';
+import { DEFAULT_TENANT_MODE } from '../../../shared/tenantMode';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
@@ -37,7 +38,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     });
 
     if (!row) {
-        return { ...DISPLAY_DEFAULTS, defaultLocale: null, configured: false };
+        return { ...DISPLAY_DEFAULTS, defaultLocale: null, mode: DEFAULT_TENANT_MODE, configured: false };
     }
 
     return {
@@ -50,6 +51,10 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         // consumes; this is a different concern that happens to share the
         // same tenant-singleton table and page.
         defaultLocale: row.defaultLocale,
+        // Issue #8. Same reasoning as `defaultLocale` just above: a UI/UX
+        // bias that happens to share this singleton rather than open a
+        // second "absent row means defaults" mechanism.
+        mode: row.mode,
         configured: true,
     };
 }));

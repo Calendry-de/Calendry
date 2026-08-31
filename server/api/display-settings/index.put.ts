@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COLOR_SOURCES } from '../../../shared/sessionColor';
 import { isUsableLocale } from '../../../shared/locale';
+import { TENANT_MODES } from '../../../shared/tenantMode';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -54,6 +55,12 @@ const schema = z.object({
      */
     defaultLocale: z.string().nullish()
         .refine((value) => value == null || isUsableLocale(value), 'Not a recognised locale.'),
+    /**
+     * Issue #8. No `null` here, unlike `defaultLocale`: a mode bias has no
+     * "unset" reading distinct from its default, so there is nothing a null
+     * could mean that `UNIVERSITY` does not already say.
+     */
+    mode: z.enum(TENANT_MODES).optional(),
 });
 
 export default defineEventHandler(async (event) => {
@@ -81,6 +88,7 @@ export default defineEventHandler(async (event) => {
                 colorSourceOrder: row.colorSourceOrder,
                 defaultColor: row.defaultColor,
                 defaultLocale: row.defaultLocale,
+                mode: row.mode,
                 configured: true,
             };
         });

@@ -57,6 +57,17 @@
                     v-if="superseded"
                     class="crow_tag crow_tag--superseded"
                 >Superseded</span>
+
+                <!--
+                    NEVER REPLACES THE TOGGLE — issue #8 is a suggestion, not
+                    a restriction. This tenant is in SCHOOL mode and this rule
+                    is the kind whose value shows up in a large, multi-building,
+                    partly-online institution; it stays fully switchable here.
+                -->
+                <span
+                    v-if="lessRelevant"
+                    class="crow_tag crow_tag--low-relevance"
+                >Less common for schools</span>
             </span>
         </div>
 
@@ -302,6 +313,12 @@ const props = defineProps<{
     /** This row's type has been replaced by a newer one. */
     superseded?: boolean;
     supersededBy?: string;
+    /**
+     * Issue #8: this tenant's mode does not suggest this type first. A
+     * labelling difference only — the toggle, weight and scope controls
+     * behave identically either way.
+     */
+    lessRelevant?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -468,6 +485,11 @@ function toggleKind(kindId: string) {
         &--superseded {
             color: $warning700;
             background: varToRgba('warning500', 0.18);
+        }
+
+        &--low-relevance {
+            color: $content7;
+            background: $surface2;
         }
     }
 

@@ -1,3 +1,6 @@
+import type { TenantMode } from '#shared/tenantMode';
+import { DEFAULT_TENANT_MODE } from '#shared/tenantMode';
+
 /**
  * Client-side view of the authenticated session.
  *
@@ -24,6 +27,12 @@ export interface SessionState {
     availableTenants: SessionTenant[];
     /** Resolved server-side (issue #17) — see `shared/locale.ts`'s `resolveLocale`. */
     locale: string;
+    /**
+     * UI/UX bias only (issue #8) — see `shared/tenantMode.ts`. Never gates
+     * what data may be stored; only which form fields and constraint types
+     * a page leads with.
+     */
+    tenantMode: TenantMode;
 }
 
 /** The single generic message shown for every authentication failure. */
@@ -79,6 +88,17 @@ export function useHasPermission(permission: string) {
     const session = useSession();
 
     return computed(() => session.value?.permissions.includes(permission) ?? false);
+}
+
+/**
+ * The active tenant's mode bias (issue #8), or the default for a signed-out
+ * visitor or a tenant that never set one — same "absent means default" rule
+ * every other reader of this setting follows.
+ */
+export function useTenantMode() {
+    const session = useSession();
+
+    return computed<TenantMode>(() => session.value?.tenantMode ?? DEFAULT_TENANT_MODE);
 }
 
 export async function logout() {

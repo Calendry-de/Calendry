@@ -58,6 +58,7 @@
                     :can-update="canUpdate"
                     :heading="entry.type.label"
                     :kinds="kinds"
+                    :less-relevant="!isConstraintTypeSuggested(entry.type.key, tenantMode)"
                     :row="entry.row"
                     :type="entry.type"
                     @update:enabled="setEnabled(entry.row, $event)"
@@ -190,6 +191,7 @@ import type { useEntityList } from '~/composables/entityList';
 import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
 import { CONSTRAINT_TYPES, defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
+import { isConstraintTypeSuggested } from '#shared/tenantMode';
 
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
@@ -226,6 +228,7 @@ type ConstraintRow = ConstraintRowData;
 
 const request = useRequestFetch();
 const { canUpdate } = useEntityPermissions(props.entity);
+const tenantMode = useTenantMode();
 
 const busy = ref(new Set<string>());
 const error = ref<string | null>(null);
@@ -327,7 +330,7 @@ interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
  * them to adopt what is superseded.
  */
 function entriesFor(severity: 'HARD' | 'SOFT', deprecated: boolean): Entry[] {
-    return CONSTRAINT_TYPES
+    const entries = CONSTRAINT_TYPES
         .filter((type) => (type.severity ?? 'HARD') === severity)
         .filter((type) => Boolean(type.deprecatedBy) === deprecated)
         .map((type) => {
@@ -336,6 +339,20 @@ function entriesFor(severity: 'HARD' | 'SOFT', deprecated: boolean): Entry[] {
             return row ? { type, row } : null;
         })
         .filter((entry): entry is Entry => entry !== null);
+
+    /*
+     * Issue #8. A STABLE re-sort, not a filter: every rule stays fully
+     * reachable and switchable in both modes, this only decides which ones a
+     * tenant scrolls past first. `Array#sort` in V8 is stable, so entries
+     * tying on suggestion (the common case in UNIVERSITY mode, where nothing
+     * is deprioritised) keep the catalogue's own order.
+     */
+    return [...entries].sort((a, b) => {
+        const aSuggested = isConstraintTypeSuggested(a.type.key, tenantMode.value) ? 0 : 1;
+        const bSuggested = isConstraintTypeSuggested(b.type.key, tenantMode.value) ? 0 : 1;
+
+        return aSuggested - bSuggested;
+    });
 }
 
 /** What replaced this type, in the tenant's language rather than as a key. */

@@ -2,6 +2,8 @@ import type { PermissionRequirement } from '#shared/permissions';
 import { resourcePermissions } from '#shared/permissions';
 import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
 import { SESSION_KIND_TYPES, SESSION_KIND_TYPE_HELP, SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
+import type { TenantMode } from '#shared/tenantMode';
+import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
 
 /**
  * The management area's entity registry — a client mirror of the server's
@@ -286,6 +288,36 @@ export interface ManageEntity {
      * (Role.isSystem, AccessRole.isSystem).
      */
     systemFlag?: string;
+    /**
+     * Fields to collapse behind "More fields" for the given tenant mode
+     * (issue #8) — a UI/UX bias only, never a change to what is stored or
+     * required. Absent means no field is ever de-emphasised, which is the
+     * correct answer for every entity except Offering today.
+     *
+     * A function of `TenantMode` rather than a flat set, so a mode's meaning
+     * lives in `shared/tenantMode.ts` — the one place a role author or this
+     * file's own reviewer needs to check the classification — instead of
+     * being duplicated per entity here.
+     */
+    advancedFieldsForMode?: (mode: TenantMode) => ReadonlySet<string>;
+    /**
+     * Issue #8: an optional "start from a template" picker shown above the
+     * CREATE form. Copies field VALUES from the chosen row onto the draft
+     * once, at selection time — never a live link, and never anything this
+     * entity's own save path treats differently afterward. Only Offering
+     * declares this today; kept generic (a resource, a label and an `apply`
+     * function) so a future entity can reuse the same picker rather than
+     * this becoming Offering-specific machinery.
+     */
+    startFromTemplate?: {
+        /** API resource the picker fetches candidates from. */
+        resource: string;
+        label: (row: EntityRow) => string;
+        /** Mutates `draft` in place with the chosen row's shape. */
+        apply: (row: EntityRow, draft: Record<string, unknown>) => void;
+        /** Gates the picker's own fetch — absent permission hides it rather than 403ing. */
+        readPermission: string;
+    };
     /** Bespoke detail body, resolved by name. Generic form when absent. */
     detailComponent?: string;
     /**
@@ -324,6 +356,37 @@ export const OFFERING_ENTITY: ManageEntity = {
     description: 'What must be scheduled — the recurring demand sessions are placed from.',
     keywords: ['offering', 'course', 'module', 'subject', 'demand', 'curriculum', 'lecture'],
     federationOwnable: true,
+    advancedFieldsForMode: offeringFieldsToDeemphasize,
+    startFromTemplate: {
+        resource: 'offering-templates',
+        label: (row) => String(row.name ?? 'Template'),
+        readPermission: 'offering_template.read',
+        apply: (row, draft) => {
+            /*
+             * SKIP NULL, DO NOT COERCE. A template field left blank means
+             * "let whoever creates the offering decide" — copying a coerced
+             * '' or 0 over the freshly-seeded draft would silently overwrite
+             * that choice with a value nobody chose.
+             */
+            const copyable = [
+                'title', 'kindId', 'code', 'color', 'frequency', 'durationBlocks',
+                'schedulingPattern', 'requiredRoleId', 'requiredCapacity',
+                'requiredRoomCount', 'allowOnline', 'notes',
+            ] as const;
+
+            for (const key of copyable) {
+                const value = row[key];
+
+                if (value !== null && value !== undefined) {
+                    draft[key] = value;
+                }
+            }
+
+            // Informational only — see `Offering.createdFromTemplateId`'s
+            // own comment. Nothing ever reads this back to resolve a field.
+            draft.createdFromTemplateId = row.id;
+        },
+    },
     title: (row) => [row.code, row.title].filter(Boolean).join(' · ') || 'Offering',
     columns: [
         { key: 'code', label: 'Code', format: 'code' },
@@ -491,6 +554,16 @@ export const OFFERING_ENTITY: ManageEntity = {
         },
         { key: 'isActive', label: 'Active', type: 'boolean' },
         { key: 'notes', label: 'Notes', type: 'textarea' },
+        /*
+         * NEVER RENDERED — `custom: true` with no bespoke component to supply
+         * a control, which is deliberate here rather than the usual
+         * "picker lives in the detail component" reading of that flag.
+         * `startFromTemplate.apply()` is the only writer, so the field still
+         * has to be declared to take part in the draft and the save payload
+         * at all (an undeclared key is silently dropped — see `splitChildren`
+         * on the server and `useEntityForm.save()`'s per-field loop here).
+         */
+        { key: 'createdFromTemplateId', label: 'Started from template', type: 'text', custom: true, createOnly: true },
     ],
     relations: [
         {
@@ -535,6 +608,87 @@ export const OFFERING_ENTITY: ManageEntity = {
             quantity: { key: 'quantity', label: 'Count' },
             emptyHint: 'No equipment defined yet.',
         },
+    ],
+};
+
+/**
+ * Issue #8. A REUSABLE SHAPE, structurally mirroring `defaultConstraintRow`
+ * (`shared/constraintTypes.ts`) — a stored shape a new row is seeded from —
+ * except tenant-authored, so it is a resource here rather than a catalogue
+ * function.
+ *
+ * Every field is optional and there is no `required: true` anywhere below,
+ * unlike `OFFERING_ENTITY`: a template states only the part of the shape it
+ * wants to fix, and a blank field leaves that decision to whoever creates an
+ * Offering from it. `createOnly` is absent for the same reason it is absent
+ * from most of Offering's own fields — nothing here is an identifier fixed
+ * at creation, just a value that may or may not be copied later.
+ */
+export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
+    key: 'offering-templates',
+    permissionPrefix: 'offering_template',
+    label: 'Offering template',
+    plural: 'Offering templates',
+    icon: 'material-symbols:content-copy-outline',
+    description: 'Reusable offering shapes — "Maths, 4x/week" — a new offering can start from.',
+    keywords: ['template', 'offering', 'shape', 'reuse', 'preset', 'copy'],
+    title: (row) => String(row.name ?? 'Offering template'),
+    columns: [
+        { key: 'name', label: 'Name' },
+        { key: 'title', label: 'Offering title', secondary: true },
+        { key: 'frequency', label: 'Sessions', format: 'number' },
+        { key: 'durationBlocks', label: 'Blocks', format: 'number' },
+    ],
+    fields: [
+        {
+            key: 'name',
+            label: 'Template name',
+            type: 'text',
+            required: true,
+            help: 'What you pick this template by — not the title it gives the offering.',
+        },
+        { key: 'title', label: 'Offering title', type: 'text', help: 'Leave blank to name each offering individually.' },
+        {
+            key: 'kindId',
+            label: 'Kind',
+            type: 'reference',
+            reference: {
+                resource: 'session-kinds',
+                label: (row) => String(row.name ?? row.key),
+                nullable: true,
+                emptyHint: 'Create a session kind first — lecture, lesson, whatever you call them.',
+            },
+        },
+        { key: 'code', label: 'Code', type: 'text' },
+        { key: 'color', label: 'Colour', type: 'color' },
+        { key: 'frequency', label: 'Sessions per term', type: 'number', min: 1 },
+        { key: 'durationBlocks', label: 'Length in blocks', type: 'number', min: 1 },
+        {
+            key: 'schedulingPattern',
+            label: 'How the sessions spread',
+            type: 'select',
+            options: [
+                { value: '', label: 'Not decided' },
+                { value: 'DISTRIBUTED', label: 'Spread across the term' },
+                { value: 'BLOCK', label: 'Concentrated into a window' },
+            ],
+        },
+        {
+            key: 'requiredRoleId',
+            label: 'Required role',
+            type: 'reference',
+            help: 'The "lecturer pool" hint. A specific person is named on the offering itself, not here.',
+            reference: {
+                resource: 'roles',
+                label: (row) => String(row.name ?? row.key),
+                nullable: true,
+                emptyHint: 'No roles defined yet.',
+            },
+        },
+        { key: 'requiredCapacity', label: 'Required room capacity', type: 'number', min: 0 },
+        { key: 'requiredRoomCount', label: 'Rooms needed at once', type: 'number', min: 1, max: MAX_ROOMS_PER_SESSION },
+        { key: 'allowOnline', label: 'May be scheduled online', type: 'boolean' },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
     ],
 };
 
@@ -978,6 +1132,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
     },
 
     OFFERING_ENTITY,
+    OFFERING_TEMPLATE_ENTITY,
     CONSTRAINT_ENTITY,
 
     {
