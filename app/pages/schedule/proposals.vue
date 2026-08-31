@@ -104,7 +104,7 @@
                     </p>
                     <p class="props_meta">
                         {{ row.termName ?? 'Term unknown' }} ·
-                        <time :datetime="row.createdAt">{{ formatDate(row.createdAt) }}</time>
+                        <time :datetime="row.createdAt">{{ formatDate(row.createdAt, locale) }}</time>
                     </p>
                 </div>
 
@@ -157,7 +157,10 @@
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
+import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
+
+const locale = useViewerLocale();
 
 /**
  * Gated on `generation.read`, matching the API route behind it and the review

@@ -234,6 +234,20 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             permission: 'availability.manage_own',
             to: '/my/preferences',
         },
+        {
+            id: 'my.account',
+            label: 'My account',
+            description: 'Your own display locale — dates and numbers, not UI language.',
+            icon: 'material-symbols:translate',
+            section: 'my',
+            keywords: ['locale', 'language', 'date', 'format', 'account', 'my'],
+            // Deliberately NO permission — anyone signed in may set their own
+            // locale, unlike every other `/my` entry which needs
+            // `availability.manage_own`. Reachability still inherits the hub's
+            // own gate (the `my` entry above) until that is revisited on its
+            // own terms; not this card's fix to make.
+            to: '/my/account',
+        },
 
         ...manageEntries(),
 

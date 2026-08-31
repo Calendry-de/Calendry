@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     });
 
     if (!row) {
-        return { ...DISPLAY_DEFAULTS, configured: false };
+        return { ...DISPLAY_DEFAULTS, defaultLocale: null, configured: false };
     }
 
     return {
@@ -45,6 +45,11 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         onlineColor: row.onlineColor,
         colorSourceOrder: row.colorSourceOrder,
         defaultColor: row.defaultColor,
+        // Issue #17. Deliberately not folded into `DisplaySettings` — that
+        // type is specifically the colour resolution `scheduleData.ts`
+        // consumes; this is a different concern that happens to share the
+        // same tenant-singleton table and page.
+        defaultLocale: row.defaultLocale,
         configured: true,
     };
 }));

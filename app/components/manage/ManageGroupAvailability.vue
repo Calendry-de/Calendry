@@ -84,7 +84,7 @@
             >
                 <span class="avail_term">
                     {{ term.name }}
-                    <span class="avail_span">{{ formatDate(term.startDate) }} – {{ formatDate(term.endDate) }}</span>
+                    <span class="avail_span">{{ formatDate(term.startDate, locale) }} – {{ formatDate(term.endDate, locale) }}</span>
                 </span>
 
                 <template v-if="readonly">
@@ -137,7 +137,10 @@
 
 <script setup lang="ts">
 import { blackedOutWeeks, weekCountOf } from '#shared/academicCalendar';
+import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
+
+const locale = useViewerLocale();
 
 /**
  * A Group's per-Term availability window.
@@ -319,12 +322,12 @@ function describe(term: TermRow): string {
     }
 
     if (window.availableFrom && window.availableTo) {
-        return `${formatDate(window.availableFrom)} – ${formatDate(window.availableTo)}`;
+        return `${formatDate(window.availableFrom, locale.value)} – ${formatDate(window.availableTo, locale.value)}`;
     }
 
     return window.availableFrom
-        ? `From ${formatDate(window.availableFrom)}`
-        : `Until ${formatDate(window.availableTo)}`;
+        ? `From ${formatDate(window.availableFrom, locale.value)}`
+        : `Until ${formatDate(window.availableTo, locale.value)}`;
 }
 
 /**

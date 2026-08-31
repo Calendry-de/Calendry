@@ -106,6 +106,35 @@
                 />
             </section>
 
+            <section class="panel_group">
+                <h2>Dates and numbers</h2>
+                <p class="panel_hint">
+                    A BCP-47 tag (e.g. <code>de-DE</code>, <code>en-GB</code>) this institution's
+                    dates and numbers default to. A person's own setting under
+                    <NuxtLink to="/my/account">My account</NuxtLink> overrides this; leaving it empty
+                    defers straight to whatever language the visitor's browser requests. This never
+                    changes what any label or button SAYS — that stays English until
+                    <a href="https://github.com/MindCollaps/Calendry/issues/19" target="_blank" rel="noopener">i18n</a>
+                    ships.
+                </p>
+
+                <label class="panel_locale">
+                    <span>Default locale</span>
+                    <input
+                        v-model="localeInput"
+                        :disabled="!canEdit"
+                        placeholder="e.g. de-DE — leave empty for none"
+                        type="text"
+                    >
+                </label>
+
+                <p
+                    v-if="localeError"
+                    class="note note--error"
+                    role="alert"
+                >{{ localeError }}</p>
+            </section>
+
             <!--
                 A live preview, because every control on this page is about how
                 something LOOKS and nothing else on the page shows it. Reading a
@@ -169,6 +198,7 @@ import ManageShell from '~/components/manage/ManageShell.vue';
 import ManageColorField from '~/components/manage/ManageColorField.vue';
 import { COLOR_SOURCES, DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { ColorSource, DisplaySettings } from '#shared/sessionColor';
+import { isUsableLocale } from '#shared/locale';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
@@ -229,7 +259,7 @@ const request = useRequestFetch();
 
 const settings = useAsyncData(
     'display-settings',
-    () => request<DisplaySettings & { configured: boolean }>('/api/display-settings'),
+    () => request<DisplaySettings & { defaultLocale: string | null; configured: boolean }>('/api/display-settings'),
 );
 
 await settings;
@@ -245,10 +275,18 @@ const form = reactive({
     onlineColor: settings.data.value?.onlineColor ?? null,
     colorSourceOrder: [...(settings.data.value?.colorSourceOrder ?? DISPLAY_DEFAULTS.colorSourceOrder)],
     defaultColor: settings.data.value?.defaultColor ?? null,
+    defaultLocale: settings.data.value?.defaultLocale ?? null as string | null,
 });
 
+// A separate text ref rather than binding `form.defaultLocale` directly:
+// an in-progress keystroke ("d", "de", "de-") is invalid `Intl` input and
+// must not flip `dirty`/fail validation on every character — only the
+// commit into `form.defaultLocale` (on save) is validated.
+const localeInput = ref(form.defaultLocale ?? '');
+const localeError = ref('');
+
 const initial = JSON.stringify(form);
-const dirty = computed(() => JSON.stringify(form) !== initial);
+const dirty = computed(() => JSON.stringify(form) !== initial || localeInput.value !== (form.defaultLocale ?? ''));
 
 /**
  * Enabled sources first, in their stated order, then the disabled ones. Both
@@ -320,6 +358,18 @@ async function save() {
     saving.value = true;
     saved.value = false;
     saveError.value = '';
+    localeError.value = '';
+
+    const trimmedLocale = localeInput.value.trim();
+
+    if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
+        localeError.value = 'Not a recognised locale — try a tag like "de-DE" or "en-GB".';
+        saving.value = false;
+
+        return;
+    }
+
+    form.defaultLocale = trimmedLocale || null;
 
     try {
         await request('/api/display-settings', { method: 'PUT', body: { ...form } });
@@ -397,6 +447,31 @@ async function save() {
         flex-direction: column;
         gap: var(--space-3);
         list-style: none;
+    }
+
+    &_locale {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+
+        max-width: 24ch;
+
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: $content4;
+
+        input {
+            padding: var(--space-3) var(--space-5);
+            border: 1px solid $surface4;
+            border-radius: var(--radius-lg);
+
+            font-family: inherit;
+            font-size: var(--font-size-md);
+            font-weight: 400;
+            color: $content4;
+
+            background: $surface0;
+        }
     }
 
     &_source {

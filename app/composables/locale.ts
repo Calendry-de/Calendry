@@ -1,3 +1,5 @@
+import { FALLBACK_LOCALE, parseAcceptLanguage } from '#shared/locale';
+
 /**
  * The locale to format dates and times in.
  *
@@ -23,10 +25,26 @@
  * every date on every load to produce the same text. Where they DO differ, the
  * header is the better answer anyway: it is what the user configured their
  * browser to request content in.
+ *
+ * EXTENDED FOR ISSUE #17: a signed-in visitor's session already carries the
+ * fully resolved locale (`SessionState.locale`, computed server-side by
+ * `resolveLocale` from Person → Tenant → this same header parse — see
+ * `shared/locale.ts`). That value wins when present; the header-only
+ * `useState` below is now specifically the ANONYMOUS-route answer
+ * (`auth.global.ts`'s `ANONYMOUS_ROUTES` never call `fetchSession()`, so
+ * there is no session to prefer) and the value used before the session
+ * finishes loading on an authenticated route.
  */
-const FALLBACK = 'en-GB';
-
 export function useViewerLocale() {
+    const session = useSession();
+    const header = useHeaderLocale();
+
+    return computed(() => session.value?.locale ?? header.value);
+}
+
+const FALLBACK = FALLBACK_LOCALE;
+
+function useHeaderLocale() {
     return useState<string>('viewer-locale', () => {
         if (import.meta.server) {
             const header = useRequestHeaders(['accept-language'])['accept-language'];
@@ -40,26 +58,4 @@ export function useViewerLocale() {
     });
 }
 
-/**
- * The first tag from an `Accept-Language` header.
- *
- * Quality values are deliberately ignored: browsers send their preferred tag
- * first, and honouring `q=` would mean ranking languages this app does not
- * translate into. The tag is used for NUMBER AND DATE SHAPE, not for
- * translation — "5 Oct" versus "Oct 5" versus "10月5日".
- */
-export function parseAcceptLanguage(header: string | undefined): string | null {
-    const first = header?.split(',')[0]?.split(';')[0]?.trim();
-
-    if (!first) {
-        return null;
-    }
-
-    // A malformed header must not reach Intl, which throws a RangeError on an
-    // invalid tag and would take the whole page down for a bad request header.
-    try {
-        return new Intl.DateTimeFormat(first).resolvedOptions().locale;
-    } catch {
-        return null;
-    }
-}
+export { parseAcceptLanguage };

@@ -1,5 +1,6 @@
 import { SESSION_COOKIE } from '../../utils/auth';
 import { listAccountIdentities, resolveSessionToken } from '../../utils/authDb';
+import { resolveLocale } from '../../../shared/locale';
 import { loadPermissions } from '../../utils/requirePermission';
 import { withTenant } from '../../utils/tenantDb';
 
@@ -33,6 +34,8 @@ export default defineEventHandler(async (event) => {
         isActive: i.person_active,
     }));
 
+    const acceptLanguage = getHeader(event, 'accept-language');
+
     if (!session.person_id || !session.tenant_id) {
         return {
             accountId: session.account_id,
@@ -40,10 +43,12 @@ export default defineEventHandler(async (event) => {
             activeTenant: null,
             permissions: [],
             availableTenants,
+            // No Person or Tenant resolved yet — the header is all there is.
+            locale: resolveLocale({ acceptLanguage }),
         };
     }
 
-    const permissions = await withTenant(
+    const { permissions, locale } = await withTenant(
         {
             kind: 'account',
             tenantId: session.tenant_id,
@@ -52,7 +57,25 @@ export default defineEventHandler(async (event) => {
             accountId: session.account_id,
             sessionId: session.session_id,
         },
-        (tx) => loadPermissions(tx, session.person_id as string),
+        async (tx) => {
+            const [perms, person, display] = await Promise.all([
+                loadPermissions(tx, session.person_id as string),
+                tx.person.findUnique({ where: { id: session.person_id as string }, select: { locale: true } }),
+                tx.tenantDisplaySettings.findUnique({
+                    where: { tenantId: session.tenant_id as string },
+                    select: { defaultLocale: true },
+                }),
+            ]);
+
+            return {
+                permissions: perms,
+                locale: resolveLocale({
+                    personLocale: person?.locale,
+                    tenantDefaultLocale: display?.defaultLocale,
+                    acceptLanguage,
+                }),
+            };
+        },
     );
 
     const active = identities.find((i) => i.person_id === session.person_id);
@@ -71,5 +94,6 @@ export default defineEventHandler(async (event) => {
             : null,
         permissions: [...permissions].sort(),
         availableTenants,
+        locale,
     };
 });

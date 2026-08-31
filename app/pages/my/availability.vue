@@ -278,9 +278,9 @@
                         submitted a minute ago.
                     -->
                     <span class="rows_when">
-                        Submitted {{ formatDate(row.createdAt) }}<template
+                        Submitted {{ formatDate(row.createdAt, locale) }}<template
                             v-if="row.decidedAt"
-                        > · decided {{ formatDate(row.decidedAt) }}</template>
+                        > · decided {{ formatDate(row.decidedAt, locale) }}</template>
                     </span>
 
                     <span
@@ -330,7 +330,10 @@ import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityHolidayForm from '~/components/availability/AvailabilityHolidayForm.vue';
 import AvailabilityWeekPainter from '~/components/availability/AvailabilityWeekPainter.vue';
 import { describeWindow } from '~/utils/availabilityLabels';
+import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
+
+const locale = useViewerLocale();
 
 definePageMeta({ middleware: 'my' });
 

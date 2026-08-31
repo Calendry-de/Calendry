@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COLOR_SOURCES } from '../../../shared/sessionColor';
+import { isUsableLocale } from '../../../shared/locale';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -45,6 +46,14 @@ const schema = z.object({
         .refine((list) => new Set(list).size === list.length, 'Each colour source may appear once.')
         .optional(),
     defaultColor: z.string().nullish(),
+    /**
+     * Issue #17. `null` clears the tenant default (defer to Accept-Language);
+     * checked against `Intl` here rather than left to degrade silently at
+     * read time — a setting that saves and does nothing is exactly the
+     * failure shape `colorSourceOrder`'s own comment above warns about.
+     */
+    defaultLocale: z.string().nullish()
+        .refine((value) => value == null || isUsableLocale(value), 'Not a recognised locale.'),
 });
 
 export default defineEventHandler(async (event) => {
@@ -71,6 +80,7 @@ export default defineEventHandler(async (event) => {
                 onlineColor: row.onlineColor,
                 colorSourceOrder: row.colorSourceOrder,
                 defaultColor: row.defaultColor,
+                defaultLocale: row.defaultLocale,
                 configured: true,
             };
         });

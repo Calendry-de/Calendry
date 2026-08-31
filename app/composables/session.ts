@@ -22,6 +22,8 @@ export interface SessionState {
     activePerson?: { id: string; givenName: string; familyName: string } | null;
     permissions: string[];
     availableTenants: SessionTenant[];
+    /** Resolved server-side (issue #17) — see `shared/locale.ts`'s `resolveLocale`. */
+    locale: string;
 }
 
 /** The single generic message shown for every authentication failure. */

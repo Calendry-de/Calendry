@@ -408,6 +408,13 @@ model Person {
   /// Display/export only (TAXONOMY.md §8). Never used in scheduling logic.
   timezone String?
 
+  /// BCP-47 tag (e.g. "de-DE"). NULL = inherit the tenant's `defaultLocale`,
+  /// which itself falls back to the request's Accept-Language header — see
+  /// `server/utils/locale.ts`'s `resolveLocale`. Display/formatting only,
+  /// same as `timezone`: never affects what UI text says (issue #19's
+  /// territory), only how dates and numbers are drawn (issue #17).
+  locale String?
+
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1335,6 +1342,15 @@ model TenantDisplaySettings {
 
   /// The chip colour when nothing else supplies one.
   defaultColor String? @map("default_color")
+
+  /// BCP-47 tag. Middle tier of the three-source resolution (issue #17):
+  /// a Person's own `locale` wins if set, this is the institution's stated
+  /// fallback, and an unauthenticated/unconfigured request falls back
+  /// further still to Accept-Language. NULL = no tenant default, defer
+  /// straight to the header. Wrong for a Federation whose member
+  /// institutions may want different languages — that is why this is
+  /// per-tenant, not per-Federation, matching the issue's own framing.
+  defaultLocale String? @map("default_locale")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
