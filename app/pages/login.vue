@@ -101,6 +101,7 @@
 
 <script setup lang="ts">
 import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
+import { useStore } from '~/store';
 import { HOME_ROUTE, LANDING_ROUTE, isInternalPath } from '~/utils/routes';
 
 /**
@@ -118,6 +119,7 @@ useHead({ title: 'Sign in' });
 
 const route = useRoute();
 const session = useSession();
+const store = useStore();
 
 const step = ref<'credentials' | 'tenant'>('credentials');
 const email = ref('');
@@ -138,11 +140,14 @@ if (route.query.select === '1' && session.value?.availableTenants.length) {
 function destination(): string {
     const redirect = route.query.redirect;
 
-    if (typeof redirect !== 'string' || !isInternalPath(redirect)) {
-        return HOME_ROUTE;
+    if (typeof redirect === 'string' && isInternalPath(redirect)) {
+        return redirect;
     }
 
-    return redirect;
+    // #73: an ordinary sign-in with no `?redirect=` returns a visitor to where
+    // they left off rather than always HOME_ROUTE — empty on a session's first
+    // sign-in, since nothing has been visited yet.
+    return store.lastVisitedPage || HOME_ROUTE;
 }
 
 async function submitCredentials() {

@@ -146,7 +146,7 @@
             </span>
             <CommonButton
                 type="secondary"
-                to="/schedule"
+                :to="scheduleUrl"
             >Open the schedule</CommonButton>
         </div>
         </Transition>
@@ -273,7 +273,7 @@
                 >Try again</CommonButton>
                 <CommonButton
                     type="link"
-                    to="/schedule"
+                    :to="scheduleUrl"
                 >Back to the schedule</CommonButton>
             </div>
         </div>
@@ -449,6 +449,7 @@ import ScheduleReviewAgenda from '~/components/schedule/ScheduleReviewAgenda.vue
 import ScheduleReviewGrid from '~/components/schedule/ScheduleReviewGrid.vue';
 import ScheduleReviewSummary from '~/components/schedule/ScheduleReviewSummary.vue';
 import { applyConsequence, useGenerationReview } from '~/composables/generationReview';
+import { scheduleLinkForTerm } from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
 
 /**
@@ -470,6 +471,15 @@ const {
 } = useGenerationReview(generationId);
 
 const canApply = useHasPermission('generation.apply');
+
+/**
+ * #75: the run's own `termId`, not the resolved `term` above — that one is
+ * null whenever `/api/terms` came back empty or forbidden, even though the id
+ * itself was in the preview all along. Both "Open the schedule" links use
+ * this so the schedule opens on the Term just reviewed, not whichever Term
+ * `startDate: 'desc'` sorts first.
+ */
+const scheduleUrl = computed(() => scheduleLinkForTerm(preview.value?.run?.termId ?? null));
 
 /**
  * Plays on arrival, every time — deliberately unlike the landing page, which

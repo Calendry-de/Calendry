@@ -280,9 +280,15 @@ import ScheduleWeekNav from '~/components/schedule/ScheduleWeekNav.vue';
 import ScheduleViolationsPanel from '~/components/schedule/ScheduleViolationsPanel.vue';
 import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
-import { useScheduleFilters } from '~/composables/scheduleFilters';
+import {
+    resolveTermId,
+    scheduleFiltersFromQuery,
+    scheduleFiltersToQuery,
+    useScheduleFilters,
+} from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
 import { useWheelStep } from '~/composables/wheelStep';
+import { useStore } from '~/store';
 
 /**
  * Composition only. Three composables own the state, seven components own the
@@ -500,7 +506,42 @@ const canMove = useHasPermission('session.move');
 const canSwap = useHasPermission('session.swap');
 const canLock = useHasPermission('session.lock');
 
+const route = useRoute();
+const router = useRouter();
+const store = useStore();
+
 const filters = useScheduleFilters();
+
+/*
+ * #74/#73: seeded SYNCHRONOUSLY, before `useScheduleData` fires its fetch —
+ * not via a watcher, which Vue never flushes during SSR (the same reason
+ * `ScheduleToolbar`'s `<option>` needs an explicit `:selected`). The Term
+ * follows the precedence rule the two tickets agreed on; every other filter
+ * is whatever the URL says, or the composable's own default.
+ */
+const queryFilters = scheduleFiltersFromQuery(route.query);
+
+filters.termId.value = resolveTermId(queryFilters.termId, store.selectedTermId);
+
+if (queryFilters.week !== undefined) {
+    filters.week.value = queryFilters.week;
+}
+
+if (queryFilters.groupId !== undefined) {
+    filters.groupId.value = queryFilters.groupId;
+}
+
+if (queryFilters.roomId !== undefined) {
+    filters.roomId.value = queryFilters.roomId;
+}
+
+if (queryFilters.personId !== undefined) {
+    filters.personId.value = queryFilters.personId;
+}
+
+if (queryFilters.includeNested !== undefined) {
+    filters.includeNested.value = queryFilters.includeNested;
+}
 
 // The composable is synchronous by design; this is the single await, at setup
 // top level where Nuxt keeps its instance context. SSR must resolve before the
@@ -509,6 +550,35 @@ const filters = useScheduleFilters();
 const data = useScheduleData(filters);
 
 await data.ready;
+
+/*
+ * Whichever Term ends up selected — from the URL, the store, or the server's
+ * own default once `useScheduleData`'s watchEffect resolves one — becomes the
+ * store's remembered Term, so the NEXT navigation (#73) can fall back to it.
+ */
+watch(filters.termId, (termId) => {
+    if (termId) {
+        store.selectedTermId = termId;
+    }
+}, { immediate: true });
+
+/*
+ * #74's write side. `router.replace`, not `push`: a filter tweak is not a
+ * navigation worth a history entry, and `push`-ing on every chip change would
+ * make the back button step through filter states instead of leaving the page.
+ * Never fires during SSR (no watcher flush there), so this is purely a
+ * client-side reaction to the reader changing something.
+ */
+watch(() => scheduleFiltersToQuery({
+    termId: filters.termId.value,
+    week: filters.week.value,
+    groupId: filters.groupId.value,
+    roomId: filters.roomId.value,
+    personId: filters.personId.value,
+    includeNested: filters.includeNested.value,
+}), (query) => {
+    router.replace({ query });
+});
 
 const editing = useScheduleEditing({
     sessions: data.allSessions,
