@@ -92,6 +92,10 @@ export default defineEventHandler(async (event) => {
                 // tenant-scoped by the same transaction.
                 offering: { select: { id: true, title: true, code: true, color: true } },
                 kind: { select: { id: true, key: true, name: true, color: true } },
+                // Issue #30: who is COVERING this occurrence, if anyone. Read
+                // alongside `people` rather than replacing it — the original
+                // lecturer's `session_person` row is untouched by a substitution.
+                substitution: { select: { coveringPersonId: true } },
             },
         });
     });

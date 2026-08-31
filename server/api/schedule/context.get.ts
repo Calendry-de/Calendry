@@ -102,11 +102,18 @@ export default defineEventHandler(async (event) => {
                 rooms: { select: { roomId: true } },
                 people: { select: { personId: true } },
                 groups: { select: { groupId: true } },
+                // Issue #30: a substitute is never in `people` (their
+                // `session_person` row is deliberately untouched), so without
+                // this the inspector's "Covered by …" would resolve nothing.
+                substitution: { select: { coveringPersonId: true } },
             },
         });
 
         const roomIds = [...new Set(visible.flatMap((s) => s.rooms.map((r) => r.roomId)))];
-        const personIds = [...new Set(visible.flatMap((s) => s.people.map((p) => p.personId)))];
+        const personIds = [...new Set(visible.flatMap((s) => [
+            ...s.people.map((p) => p.personId),
+            ...(s.substitution ? [s.substitution.coveringPersonId] : []),
+        ]))];
         const referencedGroupIds = [...new Set(visible.flatMap((s) => s.groups.map((g) => g.groupId)))];
 
         /*

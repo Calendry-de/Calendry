@@ -286,6 +286,15 @@ enum SessionEventType {
   /// ambiguous (apply the snapshot, the events, or both?).
   APPLY_GENERATION
 
+  /// Somebody else covers a Session's placement — Vertretung (issue #30). NOT
+  /// `SET_LECTURERS`: that overwrites `session_person` permanently and needs the
+  /// Session locked first, because it collides with the next solve. A
+  /// substitution changes nothing the solver touches — it is a `SessionSubstitution`
+  /// overlay read at display/read time — so it needs no lock and the original
+  /// lecturer assignment is never edited. Written for BOTH covering and
+  /// reverting (`payload.to: null`), so the log states "who, when" for each.
+  SUBSTITUTE
+
   @@map("session_event_type")
 }
 
@@ -380,6 +389,7 @@ model Tenant {
   personUnavailability         PersonUnavailability[]
   personPreferences            PersonPreference[]
   personPreferenceRoomFeatures PersonPreferenceRoomFeature[]
+  sessionSubstitutions         SessionSubstitution[]
 
   @@index([federationId])
   @@map("tenant")
@@ -440,6 +450,10 @@ model Person {
   unavailabilityDecided   PersonUnavailability[] @relation("PersonUnavailabilityDecider")
 
   preference PersonPreference?
+
+  /// Sessions this Person is COVERING for somebody else (issue #30) — never the
+  /// original lecturer's own row, which stays in `sessionPeople`.
+  substitutionsCovering SessionSubstitution[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, externalRef])
@@ -1494,6 +1508,11 @@ model Session {
   events            SessionEvent[] @relation("EventSubject")
   counterpartEvents SessionEvent[] @relation("EventCounterpart")
 
+  /// Who is covering THIS occurrence right now, if anyone (issue #30). At most
+  /// one active substitute per Session — see the model's own comment for why a
+  /// unique `session_id` needs no date range.
+  substitution SessionSubstitution?
+
   @@index([tenantId])
   @@index([federationId])
   @@index([offeringId])
@@ -1501,6 +1520,41 @@ model Session {
   @@index([tenantId, termId, termWeek, dayOfWeek, blockIndex])
   @@map("session")
   examRequests ExamRequest[]
+}
+
+/// An overlay recording who COVERS one Session occurrence — Vertretung (issue
+/// #30). The original lecturer assignment (`session_person`, role = lecturer)
+/// is never touched: "Frau Müller's lesson, covered by Herr Schmidt" is a fact
+/// ON TOP of "Frau Müller's lesson", not a replacement of it.
+///
+/// KEYED 1:1 BY `session_id`, NOT A DATE RANGE. A Session already IS one placed
+/// occurrence (TAXONOMY.md §2) — a recurring lecture is many Session rows, one
+/// per week — so "next week it reverts" is automatic: next week's Session is a
+/// DIFFERENT row with no substitution of its own. Covering a run of Sessions
+/// while somebody is ill is calling this route once per Session in that range,
+/// not a temporal concept the storage needs to express.
+///
+/// SAME-SLOT, SAME-ROOM ONLY (deliberate, issue #30): nothing here can move the
+/// Session or its room. Room-changed substitutions are out of scope.
+model SessionSubstitution {
+  id       String @id @default(uuid(7))
+  tenantId String @map("tenant_id")
+
+  sessionId        String @unique @map("session_id")
+  coveringPersonId String @map("covering_person_id")
+
+  reason String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session        Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  coveringPerson Person  @relation(fields: [coveringPersonId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([coveringPersonId])
+  @@map("session_substitution")
 }
 
 // --- Assignment: three explicit tables, not one polymorphic table. ----------

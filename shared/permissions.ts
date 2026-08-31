@@ -131,6 +131,14 @@ const EXPLICIT_PERMISSIONS = [
      * which is a materially bigger authority than the label promises.
      */
     { key: 'session.assign_lecturer', category: 'session', description: 'Override which lecturer leads a locked session' },
+    /**
+     * Covering a Session someone cannot teach — Vertretung (issue #30). A
+     * SEPARATE KEY FROM `session.assign_lecturer` and `session.update`: covering
+     * is an operational act (today's absence handled), not an editing authority
+     * over the Session or the Offering behind it, and does not need the Session
+     * locked — nothing here touches `session_person` or the solver's next input.
+     */
+    { key: 'session.substitute', category: 'session', description: 'Cover a session someone else cannot teach, without changing who normally leads it' },
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
 
     // Operations
