@@ -4,7 +4,7 @@ import type { RequestIdentity } from './tenantResolver';
 
 export type EventType =
     | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'SET_LECTURERS'
-    | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
+    | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION' | 'BANK';
 
 /**
  * Appends to the immutable edit log (TAXONOMY.md §3).
@@ -80,12 +80,22 @@ export async function requireBaselineGeneration(tx: Tx, tenantId: string, sessio
     return current.id;
 }
 
-/** Placement fields captured in event payloads. */
+/**
+ * Placement fields captured in event payloads.
+ *
+ * `termWeek`/`dayOfWeek`/`blockIndex` are nullable so this also accepts a
+ * BANKED Session — `bank.post.ts` records the placement it is leaving in
+ * exactly the same shape `move.post.ts` and `delete.ts` already use, and
+ * `move.post.ts` records one going the other way. Every existing caller
+ * passes an already-placed Session, so their payloads are unaffected;
+ * nothing here loosens what gets WRITTEN, only what this helper is willing to
+ * read.
+ */
 export function placementOf(session: {
     termId: string;
-    termWeek: number;
-    dayOfWeek: number;
-    blockIndex: number;
+    termWeek: number | null;
+    dayOfWeek: number | null;
+    blockIndex: number | null;
     durationBlocks: number;
     timeGridId: string | null;
 }) {

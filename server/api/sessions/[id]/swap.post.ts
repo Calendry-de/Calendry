@@ -40,6 +40,18 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
+        /**
+         * A swap exchanges two PLACEMENTS (issue #22) — a banked Session has
+         * none to offer, so "swap with it" has no meaning. `bank`/`move` are
+         * the routes that give one back a placement or take it away.
+         */
+        if (a.termWeek === null || b.termWeek === null) {
+            throw createError({
+                statusCode: 409,
+                statusMessage: 'A Session in the spare bank has no placement to swap — place it first.',
+            });
+        }
+
         const generationId = await requireBaselineGeneration(tx, identity.tenantId, a.generationId ?? b.generationId);
         const placementA = placementOf(a);
         const placementB = placementOf(b);

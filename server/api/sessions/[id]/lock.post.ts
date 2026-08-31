@@ -29,6 +29,18 @@ export default defineEventHandler(async (event) => {
             return { session, event: null, alreadyLocked: true };
         }
 
+        /**
+         * A lock protects a PLACEMENT from the next solve (TAXONOMY.md §3) — a
+         * banked Session (issue #22) has none to protect, and the next solve
+         * was never going to touch it anyway (it is not sent as occupancy).
+         */
+        if (session.termWeek === null) {
+            throw createError({
+                statusCode: 409,
+                statusMessage: 'A Session in the spare bank has no placement to lock.',
+            });
+        }
+
         const generationId = await requireBaselineGeneration(tx, identity.tenantId, session.generationId);
         const updated = await tx.session.update({ where: { id: session.id }, data: { isLocked: true } });
 

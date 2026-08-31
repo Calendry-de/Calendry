@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue';
-import type { ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
+import type { PlacedScheduleSession, ScheduleSession, Term, TimeGrid, Violation } from '~/composables/schedule';
 import { isOnGrid, sessionLabel } from '~/composables/schedule';
+import { isPlacedSession } from '#shared/sessionPlacement';
 import { slotDate, weekCountOf } from '#shared/academicCalendar';
 import { describeScheduleFailure } from '~/composables/httpError';
 import { DISPLAY_DEFAULTS } from '#shared/sessionColor';
@@ -126,10 +127,23 @@ export function useScheduleData(filters: {
          */
         const resolvedTermId = context.resolvedTermId;
 
-        const [sessions, violations, groupRows, roomRows, personRows, kindRows] = await Promise.all([
+        const [sessions, bankedSessions, violations, groupRows, roomRows, personRows, kindRows] = await Promise.all([
             resolvedTermId
                 ? request<ScheduleSession[]>('/api/sessions', {
                     query: { ...filters.query.value, termId: resolvedTermId },
+                })
+                : Promise.resolve([] as ScheduleSession[]),
+            /**
+             * The spare bank (issue #22): NOT scoped by week — a banked
+             * Session has none — so this is a second, independent fetch
+             * rather than a filter composed with the one above. Gated the
+             * same way `sessions` itself is (permission enforced server-side
+             * by `sessionReadScope`, this just skips the request without a
+             * term to scope it to).
+             */
+            resolvedTermId
+                ? request<ScheduleSession[]>('/api/sessions', {
+                    query: { termId: resolvedTermId, banked: true },
                 })
                 : Promise.resolve([] as ScheduleSession[]),
             resolvedTermId && canReadViolations.value
@@ -177,6 +191,7 @@ export function useScheduleData(filters: {
             people: people.map((p) => ({ id: p.id, name: `${p.givenName} ${p.familyName}` })),
             kinds: kindRows,
             sessions,
+            bankedSessions,
             violations,
             resolvedTermId,
         };
@@ -264,15 +279,33 @@ export function useScheduleData(filters: {
         : null));
 
     const allSessions = computed(() => reference.value?.sessions ?? []);
+    /** The spare bank (issue #22) — fetched separately, see the wave above. */
+    const bankedSessions = computed(() => reference.value?.bankedSessions ?? []);
+    /**
+     * Both fetches, for whatever needs to resolve a selection by id regardless
+     * of which bucket it is in — `useScheduleEditing`'s whole `sessions`
+     * option, so selecting a banked Session (from the spare bank list) and
+     * later a placed one (from the grid) both find their subject.
+     */
+    const sessionsForEditing = computed(() => [...allSessions.value, ...bankedSessions.value]);
     const violations = computed(() => reference.value?.violations ?? []);
 
+    /**
+     * `isPlacedSession` FIRST, always — `isOnGrid` already excludes a banked
+     * Session, but filtering here too is what lets `PlacedScheduleSession[]`
+     * type-check as the narrower type `ScheduleGrid`/`ScheduleAgenda`/
+     * `ScheduleOffGridTray` declare, rather than requiring every one of them
+     * to re-prove it never receives a banked row.
+     */
+    const placedSessions = computed<PlacedScheduleSession[]>(() => allSessions.value.filter(isPlacedSession));
+
     const onGridSessions = computed(() => (grid.value
-        ? allSessions.value.filter((s) => isOnGrid(grid.value as TimeGrid, s))
+        ? placedSessions.value.filter((s) => isOnGrid(grid.value as TimeGrid, s))
         : []));
 
     /** Sessions the grid cannot position — surfaced, never silently dropped. */
     const offGridSessions = computed(() => (grid.value
-        ? allSessions.value.filter((s) => !isOnGrid(grid.value as TimeGrid, s))
+        ? placedSessions.value.filter((s) => !isOnGrid(grid.value as TimeGrid, s))
         : []));
 
     const violationsBySessionId = computed(() => {
@@ -355,6 +388,7 @@ export function useScheduleData(filters: {
         scope: computed(() => reference.value?.scope ?? 'own'),
         term, totalWeeks, grid,
         allSessions, onGridSessions, offGridSessions,
+        bankedSessions, sessionsForEditing,
         violations, violationsBySessionId,
         lookup, sessionTitle, slotDateOf,
         pending, loadError, canReadViolations, refreshAll,

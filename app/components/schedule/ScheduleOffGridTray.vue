@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ScheduleSession, TimeGrid } from '~/composables/schedule';
+import type { PlacedScheduleSession, TimeGrid } from '~/composables/schedule';
 import { offGridReason, sessionLabel } from '~/composables/schedule';
 
 /**
@@ -32,9 +32,14 @@ import { offGridReason, sessionLabel } from '~/composables/schedule';
  * a block range running past the end of the day. Both are representable in the
  * schema (the CHECK only bounds 1-7 and >= 0), so a grid that positions by
  * index would drop them invisibly. They surface here instead.
+ *
+ * `PlacedScheduleSession`, not `ScheduleSession`: a banked Session (issue #22)
+ * has no placement to be "outside the grid" — it belongs to the spare bank
+ * (`ScheduleSpareBank`), a different surfacing for a different reason.
+ * `useScheduleData`'s `offGridSessions` already excludes it.
  */
 defineProps<{
-    sessions: ScheduleSession[];
+    sessions: PlacedScheduleSession[];
     grid: TimeGrid;
 }>();
 

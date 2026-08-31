@@ -12,6 +12,13 @@ const querySchema = z.object({
     offeringId: z.string().optional(),
     isLocked: z.coerce.boolean().optional(),
     includeNested: z.coerce.boolean().optional(),
+    /**
+     * The spare bank (issue #22): a banked Session has no `termWeek`, so a
+     * week-scoped fetch never matches it. Explicit rather than inferred from
+     * an absent `termWeek` — see the `where` assembly below for why this is
+     * ALSO the only way in, not merely the way to widen past a week filter.
+     */
+    banked: z.coerce.boolean().optional(),
 });
 
 /**
@@ -49,7 +56,25 @@ export default defineEventHandler(async (event) => {
         const { where } = await sessionReadScope(event, tx, identity);
 
         if (query.termId) where.termId = query.termId;
-        if (query.termWeek !== undefined) where.termWeek = query.termWeek;
+
+        /**
+         * DEFAULT EXCLUDES THE SPARE BANK (issue #22) — not merely "absent
+         * unless a week filter happens to match". A caller that fetches with
+         * no `termWeek` at all (the whole Term) would otherwise see a banked
+         * Session's null placement flow straight into rendering code that has
+         * always assumed one, exactly the failure this route exists to
+         * prevent for every OTHER caller of this endpoint the day one is
+         * added. `banked=true` is the one, explicit way in; it overrides
+         * `termWeek` rather than composing with it, since "week 3, banked" is
+         * an empty result nobody intended and the spare bank is not scoped to
+         * any one week.
+         */
+        if (query.banked) {
+            where.termWeek = null;
+        } else {
+            where.termWeek = query.termWeek !== undefined ? query.termWeek : { not: null };
+        }
+
         if (query.offeringId) where.offeringId = query.offeringId;
         if (query.isLocked !== undefined) where.isLocked = query.isLocked;
 

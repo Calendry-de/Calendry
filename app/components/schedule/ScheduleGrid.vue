@@ -127,7 +127,7 @@
 
 <script setup lang="ts">
 import {
-    type ScheduleSession, type TimeGrid, type Violation,
+    type PlacedScheduleSession, type TimeGrid, type Violation,
     blockTime, formatSlotDate, weekdayName, weekdayShort,
 } from '~/composables/schedule';
 import { useViewerLocale } from '~/composables/locale';
@@ -150,7 +150,8 @@ import ScheduleSessionChip from './ScheduleSessionChip.vue';
  */
 const props = defineProps<{
     grid: TimeGrid;
-    sessions: ScheduleSession[];
+    /** Placed only (issue #22) — a banked Session has nowhere on this grid to draw. */
+    sessions: PlacedScheduleSession[];
     violations: Map<string, Violation[]>;
     selectedId: string | null;
     placing: boolean;

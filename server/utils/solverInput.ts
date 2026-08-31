@@ -22,6 +22,7 @@ import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
 import type { SessionKindType } from '../../shared/sessionKindType';
 import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
 import { LECTURER_ROLE_KEY } from '../../shared/roles';
+import { isPlacedSession } from '../../shared/sessionPlacement';
 // Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
 // scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
@@ -1102,6 +1103,29 @@ export async function assembleSolverInput(
     /** Wire id -> the real Offering id, for the scope the app keeps. */
     const realOfferingIdOf = new Map<string, string>();
 
+    /**
+     * BANKED SESSIONS, GROUPED BY OFFERING (issue #22). A banked Session
+     * cannot be SENT — it has no placement, so `wireSessionRows` below excludes
+     * it — but it must still `requiredSessionCount` toward, or the solver
+     * would see the demand as unmet and invent a brand-new Session to fill
+     * exactly the gap banking exists to hold open, doubling the teaching the
+     * moment anyone next solves. Subtracting it here is the one place that
+     * can happen: nowhere downstream still has both the count and the
+     * Offering's frequency in hand.
+     */
+    const bankedSessionsByOffering = new Map<string, typeof sessionRows>();
+
+    for (const session of sessionRows) {
+        if (session.termWeek !== null || session.offeringId === null) {
+            continue;
+        }
+
+        const bucket = bankedSessionsByOffering.get(session.offeringId) ?? [];
+
+        bucket.push(session);
+        bankedSessionsByOffering.set(session.offeringId, bucket);
+    }
+
     const offerings: Offering[] = offeringRows.flatMap((offering) => {
         for (const link of offering.equipment) {
             if (link.quantity === null) {
@@ -1150,6 +1174,17 @@ export async function assembleSolverInput(
             const capacityGroupIds = seriesGroupId === null ? groupIds : [seriesGroupId];
 
             /**
+             * Matched the same way `wireSessionRows` matches a PLACED Session to
+             * its series below: by which of the series' Groups the Session
+             * actually carries. Unsplit (`seriesGroupId === null`) takes every
+             * banked Session the Offering has, mirroring how an unsplit series
+             * takes every placed one.
+             */
+            const bankedCount = (bankedSessionsByOffering.get(offering.id) ?? [])
+                .filter((s) => seriesGroupId === null || s.groups.some((g) => g.groupId === seriesGroupId))
+                .length;
+
+            /**
              * THE DOCUMENTED BEHAVIOUR, NOW REAL.
              *
              * `requiredCapacity` stays authoritative when a human set it — an
@@ -1187,7 +1222,10 @@ export async function assembleSolverInput(
             id: wireId,
             tenantId: options.tenantId,
             kind: offering.kind.key,
-            requiredSessionCount: offering.frequency,
+            // Reduced by whatever is already banked (issue #22) — see
+            // `bankedSessionsByOffering` above for why the solver must not be
+            // asked to fill a gap a human is holding open on purpose.
+            requiredSessionCount: Math.max(0, offering.frequency - bankedCount),
             durationBlocks: offering.durationBlocks,
             candidateLecturerIds: offering.lecturers.map((link) => link.personId),
             // The app has no separate count: OfferingLecturer IS the assignment
@@ -1281,6 +1319,14 @@ export async function assembleSolverInput(
     let legacyCombinedSessionsOmitted = 0;
 
     const wireSessionRows = sessionRows.filter((session) => {
+        // BANKED, NOT SENT (issue #22). A banked Session has no placement to
+        // put on the wire — `requiredSessionCount` above already accounted
+        // for it, so omitting it here is not a loss, it is the other half of
+        // the same accounting.
+        if (session.termWeek === null) {
+            return false;
+        }
+
         const seriesGroups = session.offeringId
             ? splitOfferingGroupIds.get(session.offeringId)
             : undefined;
@@ -1298,7 +1344,7 @@ export async function assembleSolverInput(
         legacyCombinedSessionsOmitted += 1;
 
         return false;
-    });
+    }).filter(isPlacedSession);
 
     const sessionInputs = wireSessionRows.map((session) => ({
         id: session.id,
