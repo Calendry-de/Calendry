@@ -1,4 +1,5 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
+import { useStore } from '~/store';
 import { HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE, isInternalPath } from '~/utils/routes';
 
 /**
@@ -50,6 +51,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
     const signedIn = isSignedIn(session.value);
     const isPublic = PUBLIC_ROUTES.includes(to.path);
+    const store = useStore();
 
     if (isPublic) {
         // Already signed in and situated — nothing to do on the login page.
@@ -58,7 +60,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
         // to change institution, which is a session mutation rather than a
         // re-login.
         if (signedIn && to.query.select !== '1') {
-            const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : HOME_ROUTE;
+            // #73: no explicit `?redirect=` means this wasn't a bounce FROM
+            // somewhere, so "home" is wherever this visitor last was, not
+            // unconditionally HOME_ROUTE.
+            const redirect = typeof to.query.redirect === 'string'
+                ? to.query.redirect
+                : (store.lastVisitedPage || HOME_ROUTE);
 
             // Only internal paths: an open redirect would let a crafted link
             // bounce a freshly authenticated user to another origin. `/\` is
@@ -76,4 +83,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
             query: to.fullPath === HOME_ROUTE ? undefined : { redirect: to.fullPath },
         });
     }
+
+    // Reached only by a signed-in visit to a protected route — remember it as
+    // "where the user left off," matching the fallback above and the login
+    // page's own destination resolver.
+    store.lastVisitedPage = to.fullPath;
 });

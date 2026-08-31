@@ -21,6 +21,20 @@ export const useStore = defineStore('index', {
             width: 0,
         },
         toasts: [] as Toast[],
+        /**
+         * The Term last selected on the schedule (#73). `scheduleFilters.ts`'s
+         * `resolveTermId` is the only place this is read against a URL value —
+         * never compare the two anywhere else, or the store and the URL can
+         * disagree about which one should win.
+         */
+        selectedTermId: '',
+        /**
+         * Where a signed-in visitor last was, so `auth.global.ts` and the login
+         * page's destination resolver can return them there instead of always
+         * `HOME_ROUTE`. In-memory only, like the rest of this store: it does not
+         * need to survive a full reload, only an in-app detour back to `/login`.
+         */
+        lastVisitedPage: '',
     }),
     actions: {
         addToast(toast: Toast) {
