@@ -1,6 +1,7 @@
 import type { ConstraintViolation, PlacedSession, SolverOutput } from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
 import { LECTURER_ROLE_KEY } from '../../shared/roles';
+import { isPlacedSession } from '../../shared/sessionPlacement';
 import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';
 import { parseWireOfferingId } from './offeringSplit';
@@ -249,6 +250,22 @@ export async function planMaterialization(tx: Tx, options: {
             continue;
         }
 
+        /**
+         * A BANKED `current` (issue #22) SHOULD BE UNREACHABLE — a banked
+         * Session is never sent to the solver as existing occupancy
+         * (`assembleSolverInput` excludes it), so its output cannot legitimately
+         * echo back its id. Counted as unmapped rather than trusted, matching
+         * this function's own rule for every other "should not happen": a
+         * placement naming a Session with no data to place it FROM is not a
+         * move this app understands, so it neither writes one nor mis-narrows
+         * a null placement into a fabricated 0.
+         */
+        if (current && !isPlacedSession(current)) {
+            placementsUnmapped++;
+
+            continue;
+        }
+
         const placement: Placement = {
             termWeek: fromWireWeek(placed.startSlot.week),
             dayOfWeek: placed.startSlot.day,
@@ -322,8 +339,28 @@ export async function planMaterialization(tx: Tx, options: {
                 return false;
             }
 
+            /**
+             * A BANKED Session (issue #22) is never deleted by an apply, for
+             * the same reason an Event never is — the solver was never asked
+             * about it (`assembleSolverInput` excludes it from what it sends,
+             * since it has no placement to send), so its absence from the
+             * output says nothing. Without this, cancelling a Session and then
+             * running ANY solve — rebuild or repair — would silently erase the
+             * very record banking exists to keep: exactly the failure
+             * "cancel to spare bank" was built to avoid, reintroduced one
+             * layer up.
+             */
+            if (s.termWeek === null) {
+                return false;
+            }
+
             return !keptIds.has(s.id) && !s.isLocked && inScope.has(s.offeringId);
         })
+        // Narrows `termWeek`/`dayOfWeek`/`blockIndex` to `number` for the
+        // `Placement` object below — the banked check above already excludes
+        // these, but a boolean-returning filter does not narrow the array's
+        // element type, and `isPlacedSession` is the one predicate that does.
+        .filter(isPlacedSession)
         .map((s) => ({
             sessionId: s.id,
             offeringId: s.offeringId,

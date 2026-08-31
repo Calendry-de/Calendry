@@ -9,6 +9,8 @@
 import type { TimeGridBreak } from '#shared/timeGrid';
 import { blockSpan } from '#shared/timeGrid';
 import { LECTURER_ROLE_KEY } from '#shared/roles';
+import type { Placed } from '#shared/sessionPlacement';
+import { isPlacedSession } from '#shared/sessionPlacement';
 
 export interface TimeGrid {
     id: string;
@@ -49,9 +51,19 @@ export interface ScheduleSession {
     offeringId: string | null;
     termId: string;
     kindId: string;
-    termWeek: number;
-    dayOfWeek: number;
-    blockIndex: number;
+    /**
+     * NULL together with `dayOfWeek`/`blockIndex` means this Session is
+     * BANKED (issue #22, cancel-to-spare-bank) — cancelled but still owed by
+     * its Offering, with nowhere to sit until a human places it again.
+     * `isPlacedSession()` (`#shared/sessionPlacement`) is the one predicate
+     * that reads these three; nothing else should compare them to `null`
+     * directly. `PlacedScheduleSession` is what the grid, the agenda and their
+     * peers still assume — every one of them only ever receives a Session this
+     * predicate has already confirmed.
+     */
+    termWeek: number | null;
+    dayOfWeek: number | null;
+    blockIndex: number | null;
     durationBlocks: number;
     isLocked: boolean;
     groups: { groupId: string }[];
@@ -67,6 +79,16 @@ export interface ScheduleSession {
      */
     substitution: { coveringPersonId: string } | null;
 }
+
+/**
+ * A `ScheduleSession` known to have a real placement — what `ScheduleGrid`,
+ * `ScheduleAgenda`, `ScheduleSessionChip` and `ScheduleOffGridTray` declare as
+ * their prop type. Every one of them is fed a list already filtered through
+ * `isPlacedSession` (`useScheduleData`'s `onGridSessions`/`offGridSessions`),
+ * so their own arithmetic on `dayOfWeek`/`blockIndex` stays exactly as it was
+ * before banked Sessions existed — only the TYPE moved, not the logic.
+ */
+export type PlacedScheduleSession = Placed<ScheduleSession>;
 
 export interface Violation {
     id: string;
@@ -220,19 +242,24 @@ export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'
 }
 
 /**
- * A session belongs on the grid only if its day is one the grid schedules AND
- * it fits within the day's blocks. Anything else is real data the grid cannot
- * position — it goes to the off-grid tray rather than vanishing.
+ * A session belongs on the grid only if it HAS a placement, its day is one the
+ * grid schedules, AND it fits within the day's blocks. A banked Session
+ * (issue #22) fails the first test and belongs to neither this nor the
+ * off-grid tray — `useScheduleData` partitions it out separately before
+ * either bucket is computed, so in practice this only ever sees a real
+ * placement or a banked Session explicitly excluded upstream; the check
+ * stays here anyway so the function is correct on its own, not just as used.
  */
 export function isOnGrid(grid: TimeGrid, session: ScheduleSession): boolean {
     return (
-        grid.activeDays.includes(session.dayOfWeek)
+        isPlacedSession(session)
+        && grid.activeDays.includes(session.dayOfWeek)
         && session.blockIndex >= 0
         && session.blockIndex + session.durationBlocks <= grid.blocksPerDay
     );
 }
 
-export function offGridReason(grid: TimeGrid, session: ScheduleSession): string {
+export function offGridReason(grid: TimeGrid, session: PlacedScheduleSession): string {
     if (!grid.activeDays.includes(session.dayOfWeek)) {
         return `${weekdayName(session.dayOfWeek)} is not a scheduled day on this grid`;
     }
@@ -241,8 +268,8 @@ export function offGridReason(grid: TimeGrid, session: ScheduleSession): string 
 }
 
 /** Sessions keyed by `${dayOfWeek}:${blockIndex}`, so a slot can hold several. */
-export function groupBySlot(sessions: ScheduleSession[]): Map<string, ScheduleSession[]> {
-    const map = new Map<string, ScheduleSession[]>();
+export function groupBySlot(sessions: PlacedScheduleSession[]): Map<string, PlacedScheduleSession[]> {
+    const map = new Map<string, PlacedScheduleSession[]>();
 
     for (const session of sessions) {
         const key = `${session.dayOfWeek}:${session.blockIndex}`;

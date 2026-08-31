@@ -52,18 +52,24 @@
             <dl class="inspector_facts">
                 <div>
                     <dt>When</dt>
-                    <dd>
+                    <!-- BANKED (issue #22): cancelled, still owed, nowhere to
+                         sit. `placedSession` is null exactly then, so nothing
+                         below reads the placement fields without it. -->
+                    <dd v-if="!placedSession">
+                        In the spare bank — not currently placed.
+                    </dd>
+                    <dd v-else>
                         <!-- The full date: "Tuesday, 09:00–12:15" leaves the
                              reader to work out WHICH Tuesday. -->
                         <template v-if="sessionDate">
                             {{ formatSlotDate(sessionDate, locale, 'full') }},
                         </template>
                         <template v-else>
-                            {{ weekdayName(session.dayOfWeek, locale) }},
+                            {{ weekdayName(placedSession.dayOfWeek, locale) }},
                         </template>
-                        {{ blockTime(grid, session.blockIndex, session.dayOfWeek).start }}–{{
-                            blockTime(grid, endBlock, session.dayOfWeek).end }}
-                        <span class="inspector_muted">· week {{ session.termWeek }}</span>
+                        {{ blockTime(grid, placedSession.blockIndex, placedSession.dayOfWeek).start }}–{{
+                            blockTime(grid, endBlock, placedSession.dayOfWeek).end }}
+                        <span class="inspector_muted">· week {{ placedSession.termWeek }}</span>
                     </dd>
                 </div>
                 <div v-if="canMove || session.rooms.length">
@@ -291,15 +297,20 @@
                     width="100%"
                     :disabled="busy || session.isLocked"
                     @click="$emit('toggle-place')"
-                >{{ placing ? 'Cancel move' : 'Move…' }}</CommonButton>
+                >{{ placing ? 'Cancel' : (placedSession ? 'Move…' : 'Place…') }}</CommonButton>
 
                 <p
                     v-if="canMove && session.isLocked"
                     class="inspector_hint"
                 >Unlock this session before moving it.</p>
 
+                <!-- SWAP AND LOCK BOTH NEED A PLACEMENT TO ACT ON — a banked
+                     Session (issue #22) has none, and the server refuses
+                     either against one. Hidden here rather than merely
+                     disabled, matching how Delete is absent for an
+                     Offering-linked Session rather than greyed out. -->
                 <CommonButton
-                    v-if="canSwap"
+                    v-if="canSwap && placedSession"
                     :type="swapping ? 'secondary-black' : 'secondary'"
                     width="100%"
                     :disabled="busy || session.isLocked"
@@ -312,12 +323,32 @@
                 >Now choose the session to swap places with.</p>
 
                 <CommonButton
-                    v-if="canLock"
+                    v-if="canLock && placedSession"
                     type="secondary"
                     width="100%"
                     :disabled="busy"
                     @click="$emit('toggle-lock')"
                 >{{ session.isLocked ? 'Unlock' : 'Lock in place' }}</CommonButton>
+
+                <!--
+                    THE SPARE BANK (issue #22). Only an Offering-linked Session
+                    carries demand worth preserving — an Event has none, and
+                    Delete below is its equivalent. Not a two-step confirm like
+                    Delete: banking is reversible (place it again), unlike
+                    removing an Event entirely.
+                -->
+                <CommonButton
+                    v-if="canBank && placedSession && session.offeringId !== null"
+                    type="secondary"
+                    width="100%"
+                    :disabled="busy || session.isLocked"
+                    @click="$emit('bank')"
+                >{{ busy ? 'Moving…' : 'Move to spare bank' }}</CommonButton>
+
+                <p
+                    v-if="canBank && placedSession && session.offeringId !== null && session.isLocked"
+                    class="inspector_hint"
+                >Unlock this session before moving it to the spare bank.</p>
 
                 <!--
                     EVENTS ONLY. An Offering-linked Session cannot be deleted —
@@ -357,7 +388,7 @@
                 </template>
 
                 <p
-                    v-if="!canMove && !canLock && !canDelete"
+                    v-if="!canMove && !canLock && !canDelete && !canBank"
                     class="inspector_hint"
                 >You have view-only access to this schedule.</p>
             </div>
@@ -366,11 +397,12 @@
 </template>
 
 <script setup lang="ts">
-import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
+import type { PlacedScheduleSession, ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
 import {
     attendeesOf, blockTime, describeViolation, formatSlotDate,
     lecturersOf, sessionLabel, weekdayName,
 } from '~/composables/schedule';
+import { isPlacedSession } from '#shared/sessionPlacement';
 import { useViewerLocale } from '~/composables/locale';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 import type { RelationDef } from '~/utils/manageRegistry';
@@ -384,6 +416,8 @@ const props = defineProps<{
     canLock: boolean;
     canSwap: boolean;
     canDelete: boolean;
+    /** Cancel to, or place from, the spare bank (issue #22). */
+    canBank: boolean;
     canUpdate: boolean;
     /** Separate from `canUpdate`: this also reaches a LOCKED Offering-linked
      * Session, which `session.update` explicitly does not. */
@@ -570,6 +604,8 @@ const emit = defineEmits<{
     'toggle-swap': [];
     'toggle-lock': [];
     delete: [];
+    /** Cancel the selected Session to the spare bank (issue #22). */
+    bank: [];
     /** A partial edit of what this Event IS; one request per control. */
     'set-details': [patch: Record<string, unknown>];
     'set-lecturers': [personIds: string[]];
@@ -588,9 +624,18 @@ function onRoomsChange(event: Event) {
     emit('set-rooms', [...select.selectedOptions].map((option) => option.value));
 }
 
+/**
+ * The selected Session, narrowed to its placed shape, or null when there is
+ * none selected OR it is banked (issue #22) — the one place the template
+ * checks before reading `dayOfWeek`/`blockIndex`/`termWeek`.
+ */
+const placedSession = computed<PlacedScheduleSession | null>(() => (
+    props.session && isPlacedSession(props.session) ? props.session : null
+));
+
 /** Last block the session occupies, so the end time reflects its duration. */
-const endBlock = computed(() => (props.session
-    ? props.session.blockIndex + props.session.durationBlocks - 1
+const endBlock = computed(() => (placedSession.value
+    ? placedSession.value.blockIndex + placedSession.value.durationBlocks - 1
     : 0));
 
 const worst = computed(() => (props.violations.some((v) => v.severity === 'HARD') ? 'hard' : 'soft'));

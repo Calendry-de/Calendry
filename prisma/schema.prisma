@@ -294,6 +294,13 @@ enum SessionEventType {
   /// lecturer assignment is never edited. Written for BOTH covering and
   /// reverting (`payload.to: null`), so the log states "who, when" for each.
   SUBSTITUTE
+  /// Cancel an Offering-linked Session to the spare bank (issue #22): nulls
+  /// its placement but keeps the row, so the teaching stays owed rather than
+  /// silently forgotten. Deliberately NOT `DELETE` — the row survives, so
+  /// `sessionId` stays populated, unlike `DELETE`'s payload-only record.
+  /// `MOVE` restores it, exactly as it repositions any other Session — the
+  /// same event type FROM a null placement TO a real one.
+  BANK
 
   @@map("session_event_type")
 }
@@ -1566,15 +1573,24 @@ model Session {
   kindId     String  @map("kind_id")
   timeGridId String? @map("time_grid_id")
 
-  /// 1-based week within the Term.
-  termWeek Int @map("term_week")
+  /// 1-based week within the Term. NULL means this Session is BANKED — see the
+  /// note above `dayOfWeek`.
+  termWeek Int? @map("term_week")
 
   /// ISO weekday, 1 = Monday … 7 = Sunday. Resolved against TimeGrid.activeDays.
-  dayOfWeek Int @map("day_of_week")
+  ///
+  /// NULLABLE TOGETHER WITH `termWeek` AND `blockIndex` (never one alone —
+  /// `session_placement_sane` enforces all-or-nothing): the "cancel to spare
+  /// bank" state (issue #22). A cancelled Offering-linked Session keeps its
+  /// row — still counted toward `Offering.frequency`, still carrying its
+  /// Groups/People/Rooms — but sits nowhere until a human places it again.
+  /// `isPlacedSession()` (`shared/sessionPlacement.ts`) is the one predicate
+  /// that reads this; nothing should compare `termWeek` to `null` directly.
+  dayOfWeek Int? @map("day_of_week")
 
   /// 0-based block within the day. Resolved against TimeGrid.blocksPerDay —
   /// never `timeslot % 3`.
-  blockIndex Int @map("block_index")
+  blockIndex Int? @map("block_index")
 
   /// Length in blocks; defaults from Offering.durationBlocks.
   durationBlocks Int @default(1) @map("duration_blocks")

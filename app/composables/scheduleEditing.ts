@@ -309,6 +309,34 @@ export function useScheduleEditing(options: {
         }
     }
 
+    /**
+     * Cancel the selected Session to the spare bank (issue #22).
+     *
+     * Deliberately separate from `move` rather than a special target: banking
+     * removes the placement rather than changing it, and the server route it
+     * calls is its own verb (`/bank`) with its own event type, matching how
+     * `swapWith` is its own function rather than two `move` calls.
+     */
+    async function bankSelected() {
+        if (!selected.value || busy.value) {
+            return;
+        }
+
+        busy.value = true;
+        error.value = '';
+
+        try {
+            await $fetch(`/api/sessions/${selected.value.id}/bank`, { method: 'POST', body: {} });
+
+            mode.value = 'idle';
+            await options.onMutated();
+        } catch (e) {
+            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not move that session to the spare bank.';
+        } finally {
+            busy.value = false;
+        }
+    }
+
     async function toggleLock() {
         if (!selected.value || busy.value) {
             return;
@@ -369,6 +397,6 @@ export function useScheduleEditing(options: {
         selectedId, selected, mode, placing, swapping, creating, busy, error, lastAction,
         toggleCreating, endCreating,
         select, clearSelection, setMode, togglePlacing, toggleSwapping,
-        move, swapWith, setRooms, toggleLock,
+        move, swapWith, setRooms, toggleLock, bankSelected,
     };
 }

@@ -149,6 +149,16 @@ const EXPLICIT_PERMISSIONS = [
      */
     { key: 'session.substitute', category: 'session', description: 'Cover a session someone else cannot teach, without changing who normally leads it' },
     { key: 'session.delete', category: 'session', description: 'Delete an Event (a Session with no Offering)' },
+    /**
+     * Cancel an Offering-linked Session to the spare bank, or place a banked
+     * one back onto the grid (issue #22) — a separate key from `session.move`
+     * on purpose. Moving a Session within the week is routine; pulling it off
+     * the timetable entirely — even though the row and its demand survive —
+     * is closer in weight to deleting an Event, and a tenant may want to grant
+     * the two separately rather than folding "cancel teaching" into "reposition
+     * it".
+     */
+    { key: 'session.bank', category: 'session', description: 'Cancel a Session to the spare bank, or place one back' },
 
     // Operations
     /**

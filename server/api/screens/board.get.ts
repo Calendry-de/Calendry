@@ -1,5 +1,6 @@
 import { blockSpan } from '../../../shared/timeGrid';
 import { isoWeekday, weekIndexOf } from '../../../shared/academicCalendar';
+import { isPlacedSession } from '../../../shared/sessionPlacement';
 import { localNow } from '../../utils/solverCalendar';
 import { requireIdentity, withRequestTenant } from '../../utils/tenantDb';
 import { resolveScreenKey } from '../../utils/authDb';
@@ -145,7 +146,14 @@ export default defineEventHandler(async (event) => {
         // `weekIndexOf` is 0-based; `session.term_week` is 1-based.
         const termWeek = weekIndexOf(term.startDate, local.date) + 1;
 
-        const sessions = await tx.session.findMany({
+        /**
+         * `.filter(isPlacedSession)` narrows `blockIndex` to `number` below.
+         * Redundant with the `where` clause at runtime — `termWeek`/`dayOfWeek`
+         * are equality-matched against concrete numbers, so a banked Session
+         * (issue #22, both null) can never be a row here — but a WHERE clause
+         * proves nothing to the type checker.
+         */
+        const sessions = (await tx.session.findMany({
             where: {
                 termId: term.id,
                 termWeek,
@@ -158,7 +166,7 @@ export default defineEventHandler(async (event) => {
                 rooms: { select: { roomId: true } },
                 groups: { include: { group: { select: { name: true } } } },
             },
-        });
+        })).filter(isPlacedSession);
 
         const minutesNow = local.minutes;
 

@@ -104,14 +104,15 @@
 </template>
 
 <script setup lang="ts">
-import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
+import type { PlacedScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
 import type { DisplaySettings } from '#shared/sessionColor';
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
 const props = defineProps<{
     grid: TimeGrid;
-    sessions: ScheduleSession[];
+    /** Placed only (issue #22) — a banked Session has no day to fall under. */
+    sessions: PlacedScheduleSession[];
     violations: Map<string, Violation[]>;
     selectedId: string | null;
     /** Blocks become targets, exactly as the grid's cells do. */

@@ -89,6 +89,26 @@ export default defineEventHandler(async (event) => {
         }
 
         /**
+         * A BANKED Session (issue #22) has no placement to fall BACK to, so the
+         * usual `body.field ?? session.field` pattern would silently resolve to
+         * `null` here. Named explicitly, with the narrowing check doubling as
+         * this route's "you must supply a real target" guard for its whole
+         * "place it here" restore path — reached only when the Session is
+         * banked, since a placed one's own fields are never null.
+         */
+        const termWeek = body.termWeek ?? session.termWeek;
+        const dayOfWeek = body.dayOfWeek ?? session.dayOfWeek;
+        const blockIndex = body.blockIndex ?? session.blockIndex;
+
+        if (termWeek === null || dayOfWeek === null || blockIndex === null) {
+            throw createError({
+                statusCode: 400,
+                statusMessage: 'This Session is in the spare bank and has no current placement to fall back '
+                    + 'on — provide termWeek, dayOfWeek and blockIndex to place it.',
+            });
+        }
+
+        /**
          * The other half of the grid guard. Narrowing a TimeGrid under a Session
          * and moving a Session outside its grid are the same defect, and the
          * zod schema cannot catch this one: `blockIndex` has no upper bound it
@@ -100,8 +120,8 @@ export default defineEventHandler(async (event) => {
          * resolves to no slot at all.
          */
         const target = {
-            dayOfWeek: body.dayOfWeek ?? session.dayOfWeek,
-            blockIndex: body.blockIndex ?? session.blockIndex,
+            dayOfWeek,
+            blockIndex,
             durationBlocks: body.durationBlocks ?? session.durationBlocks,
         };
         // `timeGridId` is nullable, and passing null to a Prisma `id` filter is
@@ -139,9 +159,9 @@ export default defineEventHandler(async (event) => {
                 where: { id: session.id },
                 data: {
                     termId: body.termId ?? session.termId,
-                    termWeek: body.termWeek ?? session.termWeek,
-                    dayOfWeek: body.dayOfWeek ?? session.dayOfWeek,
-                    blockIndex: body.blockIndex ?? session.blockIndex,
+                    termWeek,
+                    dayOfWeek,
+                    blockIndex,
                     durationBlocks: body.durationBlocks ?? session.durationBlocks,
                 },
             }),

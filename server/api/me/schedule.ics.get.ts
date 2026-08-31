@@ -4,6 +4,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
 import { SESSION_READ_PERMISSIONS, ownSessionClause } from '../../utils/scheduleScope';
 import { buildIcs, isoDate, weekRangeOf } from '../../utils/icalExport';
 import type { ExportSession } from '../../utils/icalExport';
+import { isPlacedSession } from '../../../shared/sessionPlacement';
 
 const querySchema = z.object({
     termId: z.string().min(1),
@@ -56,7 +57,15 @@ export default defineEventHandler(async (event) => {
             where: {
                 termId: term.id,
                 AND: [own],
-                ...(range ? { termWeek: { gte: range.first, lte: range.last } } : {}),
+                /**
+                 * BANKED SESSIONS ARE EXCLUDED (issue #22), always — a
+                 * calendar event needs a date, and a banked Session has none.
+                 * `range`'s own `gte`/`lte` already exclude a NULL
+                 * `termWeek` (SQL comparisons against NULL are never true),
+                 * so this only changes behaviour for the "whole Term"
+                 * branch, which previously had no `termWeek` filter at all.
+                 */
+                termWeek: range ? { gte: range.first, lte: range.last } : { not: null },
             },
             include: { offering: { select: { title: true } }, rooms: { include: { room: true } } },
             orderBy: [{ termWeek: 'asc' }, { dayOfWeek: 'asc' }, { blockIndex: 'asc' }],
@@ -65,7 +74,12 @@ export default defineEventHandler(async (event) => {
         // Mirrors `sessionLabel` (app/composables/schedule.ts) deliberately
         // rather than importing it: that module is client-side, and this is
         // the one place server code needs the same three-line rule.
-        const sessions: ExportSession[] = rows.map((row) => ({
+        //
+        // `.filter(isPlacedSession)` narrows `termWeek`/`dayOfWeek`/
+        // `blockIndex` to `number` for the map below — the `where` clause
+        // above already guarantees it at runtime, but a WHERE clause is not
+        // something the type checker can see.
+        const sessions: ExportSession[] = rows.filter(isPlacedSession).map((row) => ({
             id: row.id,
             termWeek: row.termWeek,
             dayOfWeek: row.dayOfWeek,

@@ -223,14 +223,15 @@
                     :swapping="editing.swapping.value"
                     :can-swap="canSwap"
                     :can-delete="canDeleteSession"
+                    :can-bank="canBankSession"
                     :can-update="canUpdateSession"
                     :can-assign-lecturer="canAssignLecturer"
                     :can-substitute="canSubstitute"
                     :kinds="data.kinds.value"
                     :people="data.people.value"
                     :groups="data.groups.value"
-                    :session-date="editing.selected.value
-                    ? data.slotDateOf(editing.selected.value.termWeek, editing.selected.value.dayOfWeek)
+                    :session-date="selectedPlacement
+                    ? data.slotDateOf(selectedPlacement.termWeek, selectedPlacement.dayOfWeek)
                     : null"
                     :rooms="data.rooms.value"
                     :busy="editing.busy.value"
@@ -241,6 +242,7 @@
                     @set-rooms="editing.setRooms"
                     @toggle-lock="editing.toggleLock"
                     @delete="deleteSelectedEvent"
+                    @bank="editing.bankSelected"
                     @set-details="saveEventDetails"
                     @set-lecturers="saveLecturers"
                     @substitute="saveSubstitute"
@@ -251,6 +253,19 @@
                     v-if="data.offGridSessions.value.length"
                     :sessions="data.offGridSessions.value"
                     :grid="data.grid.value"
+                    @select="editing.select"
+                />
+
+                <!--
+                    THE SPARE BANK (issue #22). Read-only, like the off-grid
+                    tray: selecting a row shows it in the Inspector, whose own
+                    "Place…" action (relabelled from "Move…" for a banked
+                    subject) is the whole restore path, so this list does not
+                    duplicate that machinery.
+                -->
+                <ScheduleSpareBank
+                    v-if="data.bankedSessions.value.length"
+                    :sessions="data.bankedSessions.value"
                     @select="editing.select"
                 />
 
@@ -278,9 +293,11 @@ import { useViewerLocale } from '~/composables/locale';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
 import ScheduleInspector from '~/components/schedule/ScheduleInspector.vue';
 import ScheduleOffGridTray from '~/components/schedule/ScheduleOffGridTray.vue';
+import ScheduleSpareBank from '~/components/schedule/ScheduleSpareBank.vue';
 import ScheduleToolbar from '~/components/schedule/ScheduleToolbar.vue';
 import ScheduleWeekNav from '~/components/schedule/ScheduleWeekNav.vue';
 import ScheduleViolationsPanel from '~/components/schedule/ScheduleViolationsPanel.vue';
+import { isPlacedSession } from '#shared/sessionPlacement';
 import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
 import {
@@ -550,6 +567,8 @@ const canReadSessionKinds = useHasPermission('session_kind.read');
 const canMove = useHasPermission('session.move');
 const canSwap = useHasPermission('session.swap');
 const canLock = useHasPermission('session.lock');
+/** Cancel to, or place from, the spare bank (issue #22). */
+const canBankSession = useHasPermission('session.bank');
 
 const route = useRoute();
 const router = useRouter();
@@ -626,9 +645,21 @@ watch(() => scheduleFiltersToQuery({
 });
 
 const editing = useScheduleEditing({
-    sessions: data.allSessions,
+    // Both buckets (issue #22): a selection made from `ScheduleSpareBank` must
+    // resolve here too, or selecting a banked Session would show nothing in
+    // the Inspector the moment `select(id)` looked it up.
+    sessions: data.sessionsForEditing,
     onMutated: data.refreshAll,
 });
+
+/**
+ * The selection's placement, or null when nothing is selected OR it is
+ * banked — the one guard standing between `slotDateOf` and a null
+ * `termWeek`/`dayOfWeek` (issue #22).
+ */
+const selectedPlacement = computed(() => (
+    editing.selected.value && isPlacedSession(editing.selected.value) ? editing.selected.value : null
+));
 
 /** Page-local: neither value reaches the API query. */
 const rowHeight = ref(60);

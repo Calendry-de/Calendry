@@ -135,14 +135,15 @@
 </template>
 
 <script setup lang="ts">
-import type { ScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
+import type { PlacedScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
 import { attendeesOf, blockTime, lecturersOf, sessionLabel, weekdayName } from '~/composables/schedule';
 import { gapsWithinSpan } from '#shared/timeGrid';
 import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 
 const props = defineProps<{
-    session: ScheduleSession;
+    /** Always placed (issue #22) — drawn only by the grid and the agenda, which never show a banked Session. */
+    session: PlacedScheduleSession;
     violations: Violation[];
     selected: boolean;
     dimmed: boolean;
