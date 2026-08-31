@@ -196,6 +196,21 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'exam.request_own', category: 'session', description: 'Request an exam for a module you lead' },
     { key: 'exam.review', category: 'session', description: 'Approve or reject exam requests, and record one for anyone' },
 
+    /**
+     * A lecturer's own choice of HOW their module is taught across the term —
+     * `Offering.schedulingPattern` (issue #28), the same field
+     * `offering.update` already writes for an administrator. This key is a
+     * NARROWER grant of that same write, scoped to Offerings the caller
+     * actually leads, so a tenant can hand it to every lecturer without
+     * handing out `offering.update` (title, groups, capacity, everything
+     * else an Offering is).
+     *
+     * Same shape as `exam.request_own`: the Offering named in the request is
+     * checked against `OfferingLecturer`, never assumed from a role or from
+     * holding this key alone. See `assertLecturesOffering`.
+     */
+    { key: 'offering.set_scheduling_pattern', category: 'offering', description: 'Set the teaching pattern of a module you lead (spread across the term, or kept together)' },
+
     // Administration
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
     { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },
