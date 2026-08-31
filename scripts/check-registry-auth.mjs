@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fails `bun install` with an explanation when the GitHub Packages credential
- * for the @mindcollaps scope is missing — or, worse, present but inert.
+ * for the @calendry-de scope is missing — or, worse, present but inert.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -14,8 +14,8 @@
  * that logged the Authorization header:
  *
  *   .npmrc  //npm.pkg.github.com/:_authToken=<t>          -> sent
- *   bunfig  "@mindcollaps" = { url = "...", token = "<t>" } -> sent
- *   bunfig  "@mindcollaps" = { token = "<t>" }              -> NOT SENT
+ *   bunfig  "@calendry-de" = { url = "...", token = "<t>" } -> sent
+ *   bunfig  "@calendry-de" = { token = "<t>" }              -> NOT SENT
  *
  * bun attaches a scope token to the URL declared in the SAME `install.scopes`
  * entry. A token-only entry is silently ignored even when the registry mapping
@@ -30,7 +30,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-const SCOPE = '@mindcollaps';
+const SCOPE = '@calendry-de';
 const REGISTRY_HOST = 'npm.pkg.github.com';
 
 /**
@@ -39,9 +39,9 @@ const REGISTRY_HOST = 'npm.pkg.github.com';
  * option. This understands exactly the two shapes bun documents for a scope:
  *
  *   [install.scopes]
- *   "@mindcollaps" = { url = "...", token = "..." }
+ *   "@calendry-de" = { url = "...", token = "..." }
  *
- *   [install.scopes."@mindcollaps"]
+ *   [install.scopes."@calendry-de"]
  *   url = "..."
  *   token = "..."
  *
@@ -125,7 +125,7 @@ const NPMRC_AUTH = new RegExp(`^\\s*//${REGISTRY_HOST.replace(/\./g, '\\.')}/:_a
  * A scope→registry mapping in some .npmrc.
  *
  * An auth line ALONE is not a working setup: with no mapping, bun resolves
- * @mindcollaps against registry.npmjs.org and gets a 404 while cheerfully
+ * @calendry-de against registry.npmjs.org and gets a 404 while cheerfully
  * holding a valid credential for a registry it never contacts. Passing on the
  * token alone would be a guard that reports success for a setup that fails —
  * so both halves are required.

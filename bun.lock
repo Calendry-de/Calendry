@@ -5,8 +5,8 @@
     "": {
       "name": "calendry",
       "dependencies": {
+        "@calendry-de/calendry-proto": "^0.15.1",
         "@grpc/grpc-js": "^1.14.4",
-        "@mindcollaps/calendry-proto": "^0.13.0",
         "@nuxt/fonts": "^0.14.0",
         "@nuxt/icon": "^2.5.1",
         "@nuxt/image": "^2.1.0",
@@ -120,6 +120,8 @@
     "@cacheable/memory": ["@cacheable/memory@2.2.0", "", { "dependencies": { "@cacheable/utils": "^2.5.0", "@keyv/bigmap": "^1.3.1", "hookified": "^1.15.1", "keyv": "^5.6.0" } }, "sha512-CTLKqLItRCEixEAewD3/j9DB3/o96gpTPD4eJ1v+DGOlxZRZncRQkGYqqnAGCscYd6RNeXfGeiuCphsPtqyIfQ=="],
 
     "@cacheable/utils": ["@cacheable/utils@2.5.0", "", { "dependencies": { "hashery": "^1.5.1", "keyv": "^5.6.0" } }, "sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA=="],
+
+    "@calendry-de/calendry-proto": ["@calendry-de/calendry-proto@0.15.1", "https://npm.pkg.github.com/download/@calendry-de/calendry-proto/0.15.1/6b00fc488da6f96e1cb918128f089097a7d5165e", { "dependencies": { "protobufjs": "^7.4.0" }, "peerDependencies": { "@grpc/grpc-js": "^1.12.0" } }, "sha512-0QuU4zQ+H0GpneZSC48KkrSf/EV7iHDCpRwuHsklg4QawtfKVooI09ob5DuQgg2o94bwxqHgbtmHR8Rffx8jXw=="],
 
     "@capsizecss/unpack": ["@capsizecss/unpack@4.0.1", "", { "dependencies": { "fontkitten": "^1.0.3" } }, "sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ=="],
 
@@ -374,8 +376,6 @@
     "@kwsites/promise-deferred": ["@kwsites/promise-deferred@1.1.1", "", {}, "sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw=="],
 
     "@mapbox/node-pre-gyp": ["@mapbox/node-pre-gyp@2.0.3", "", { "dependencies": { "consola": "^3.2.3", "detect-libc": "^2.0.0", "https-proxy-agent": "^7.0.5", "node-fetch": "^2.6.7", "nopt": "^8.0.0", "semver": "^7.5.3", "tar": "^7.4.0" }, "bin": { "node-pre-gyp": "bin/node-pre-gyp" } }, "sha512-uwPAhccfFJlsfCxMYTwOdVfOz3xqyj8xYL3zJj8f0pb30tLohnnFPhLuqp4/qoEz8sNxe4SESZedcBojRefIzg=="],
-
-    "@mindcollaps/calendry-proto": ["@mindcollaps/calendry-proto@0.13.0", "https://npm.pkg.github.com/download/@mindcollaps/calendry-proto/0.13.0/8569760acbbdcd8c0143bfab72bcf8b8c0423391", { "dependencies": { "protobufjs": "^7.4.0" }, "peerDependencies": { "@grpc/grpc-js": "^1.12.0" } }, "sha512-sjZ0XMPmYXX7/dM35BQ3qRXkS3mcWU3xS1kMMTBYz2CNHR31kVOEEXq+aiE44Dlv//KZbtiPyR4t4KmfySNqdQ=="],
 
     "@napi-rs/lzma-linux-x64-gnu": ["@napi-rs/lzma-linux-x64-gnu@1.5.1", "", { "os": "linux", "cpu": "x64" }, "sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ=="],
 

@@ -27,4 +27,4 @@
 # Verify without installing:  bun run check:registry-auth
 
 [install.scopes]
-"@mindcollaps" = { url = "https://npm.pkg.github.com/", token = "REPLACE_ME" }
+"@calendry-de" = { url = "https://npm.pkg.github.com/", token = "REPLACE_ME" }

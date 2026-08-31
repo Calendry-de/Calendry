@@ -114,7 +114,7 @@
                     <NuxtLink to="/my/account">My account</NuxtLink> overrides this; leaving it empty
                     defers straight to whatever language the visitor's browser requests. This never
                     changes what any label or button SAYS — that stays English until
-                    <a href="https://github.com/MindCollaps/Calendry/issues/19" target="_blank" rel="noopener">i18n</a>
+                    <a href="https://github.com/Calendry-de/Calendry/issues/19" target="_blank" rel="noopener">i18n</a>
                     ships.
                 </p>
 
