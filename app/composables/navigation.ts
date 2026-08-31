@@ -235,6 +235,23 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             to: '/my/preferences',
         },
         {
+            id: 'my.teaching-pattern',
+            label: 'My teaching pattern',
+            description: 'How each module you lead is placed — spread across the term, or kept together.',
+            icon: 'material-symbols:calendar-view-week-outline',
+            section: 'my',
+            keywords: ['pattern', 'block', 'distributed', 'spread', 'module', 'offering', 'teaching', 'my'],
+            /*
+             * Same shape as `my.exams`: one key names the section's authority
+             * ("may I set my own module's pattern"), and the page's other
+             * fetch — the list of modules to choose from — is scoped to the
+             * SAME key server-side (`GET /api/me/offerings`), so there is no
+             * wider permission for this gate to under-name.
+             */
+            permission: 'offering.set_scheduling_pattern',
+            to: '/my/teaching-pattern',
+        },
+        {
             id: 'my.account',
             label: 'My account',
             description: 'Your own display locale — dates and numbers, not UI language.',
