@@ -376,6 +376,7 @@ model Tenant {
   personAccessRoles            PersonAccessRole[]
   solverRuns                   SolverRun[]
   solverInputSnapshots         SolverInputSnapshot[]
+  authSettings                 TenantAuthSettings?
   personUnavailability         PersonUnavailability[]
   personPreferences            PersonPreference[]
   personPreferenceRoomFeatures PersonPreferenceRoomFeature[]
@@ -1995,6 +1996,9 @@ model AccessRole {
 
   permissions AccessRolePermission[]
   people      PersonAccessRole[]
+  /// Tenants whose default-for-new-People setting points at this role — see
+  /// `TenantAuthSettings.defaultAccessRoleId`'s `onDelete: Restrict`.
+  defaultForTenants TenantAuthSettings[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -2024,6 +2028,12 @@ model PersonAccessRole {
   tenantId     String   @map("tenant_id")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  /// True when this grant came from `TenantAuthSettings.defaultAccessRoleId`
+  /// rather than an explicit `person_access_role.assign` action (issue #25).
+  /// The audit trail the issue asks for: without this, a default grant and a
+  /// human's own decision are the same row and indistinguishable later.
+  isDefaultGrant Boolean @default(false) @map("is_default_grant")
+
   person     Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
   accessRole AccessRole @relation(fields: [accessRoleId], references: [id], onDelete: Cascade)
   tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2032,6 +2042,34 @@ model PersonAccessRole {
   @@index([accessRoleId])
   @@index([tenantId])
   @@map("person_access_role")
+}
+
+/// Authorization configuration — deliberately NOT part of
+/// `TenantDisplaySettings`, which is a display singleton (issue #25 is
+/// explicit that this does not belong there).
+///
+/// Absent row = today's behaviour: nothing is auto-granted, granting stays
+/// `person_access_role.assign`'s job, same "singleton, absence means
+/// defaults" convention `TenantDisplaySettings` already uses.
+model TenantAuthSettings {
+  tenantId String @id @map("tenant_id")
+
+  /// AccessRole granted to a newly created Person, in the same transaction.
+  /// `onDelete: Restrict` is the "fail loudly" the issue asks for: deleting
+  /// an AccessRole that is some tenant's configured default is refused
+  /// outright (surfaced as 409 "Still referenced by other records." by the
+  /// generic delete route's existing FK-violation mapping) rather than
+  /// silently clearing the setting or leaving a dangling reference that
+  /// quietly stops granting.
+  defaultAccessRoleId String? @map("default_access_role_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant            Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultAccessRole AccessRole? @relation(fields: [defaultAccessRoleId], references: [id], onDelete: Restrict)
+
+  @@map("tenant_auth_settings")
 }
 
 /// PENDING until somebody with the review key decides. Mirrors

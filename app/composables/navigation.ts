@@ -262,6 +262,21 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             to: '/manage/display',
         },
         {
+            id: 'manage.access-defaults',
+            label: 'Access defaults',
+            description: 'Whether a newly created Person is granted an access role automatically.',
+            icon: 'material-symbols:admin-panel-settings-outline',
+            section: 'manage',
+            keywords: ['access', 'role', 'default', 'permission', 'grant', 'auto', 'member'],
+            // Same `tenant.read`-to-look pairing `manage.display` uses, for the
+            // same reason: this is the institution's setting, so the nav gate
+            // is the institution's permission, not the wider write gate the
+            // page itself additionally requires (`tenant.update` AND
+            // `person_access_role.assign` — see `/api/auth-settings`).
+            permission: 'tenant.read',
+            to: '/manage/access-defaults',
+        },
+        {
             id: 'manage.exam-reviews',
             label: 'Exam review',
             description: 'Approve or reject exams lecturers have asked for on their own modules.',

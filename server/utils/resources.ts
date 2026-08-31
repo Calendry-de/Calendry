@@ -6,6 +6,7 @@ import { describeOrphans, sessionsOutsideGrid } from './gridBounds';
 import { findConstraintType, validateConstraintShape } from '../../shared/constraintTypes';
 import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
 import { assertTenantRetainsAdministrator } from './accessRoleGuards';
+import { applyDefaultAccessRole } from './defaultAccessRole';
 import { isPermissionKey } from '../../shared/permissions';
 import type { PermissionKey } from '../../shared/permissions';
 
@@ -555,6 +556,15 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         }),
         orderBy: { familyName: 'asc' },
         searchFields: ['givenName', 'familyName', 'email', 'externalRef'],
+        // Issue #25: grants the tenant's configured default AccessRole, if any
+        // — see `applyDefaultAccessRole`'s own doc comment for why this is not
+        // the same thing as the generic-route escalation the `member` role's
+        // comment (provision-tenant.ts) warns against.
+        async afterWrite({ tx, tenantId, id, action }) {
+            if (action === 'create') {
+                await applyDefaultAccessRole(tx, tenantId, id);
+            }
+        },
     },
 
     roles: {
