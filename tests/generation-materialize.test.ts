@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { SolverOutput } from '@mindcollaps/calendry-proto';
+import { SolverOutput } from '@calendry-de/calendry-proto';
 import {
     executePlan, materializeGeneration, planMaterialization,
     summarizePlanByWeek, summarizeProposedViolations,

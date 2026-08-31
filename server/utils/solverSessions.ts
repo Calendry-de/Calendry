@@ -1,4 +1,4 @@
-import type { Session as WireSession } from '@mindcollaps/calendry-proto';
+import type { Session as WireSession } from '@calendry-de/calendry-proto';
 import { MAX_WIRE_ROOMS_PER_SESSION } from '../../shared/solverBudget';
 
 /**

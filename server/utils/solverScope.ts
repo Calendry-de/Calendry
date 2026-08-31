@@ -1,4 +1,4 @@
-import { LockPolicy, SolveScope } from '@mindcollaps/calendry-proto';
+import { LockPolicy, SolveScope } from '@calendry-de/calendry-proto';
 import { createHash } from 'node:crypto';
 import { REPAIR_MOVEMENT_WEIGHT } from '../../shared/solverMode';
 import type { SolverMode } from '../../shared/solverMode';

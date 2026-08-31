@@ -3,4 +3,4 @@
 	url = https://github.com/pbakaus/impeccable
 [submodule "vendor/calendry-solver"]
 	path = vendor/calendry-solver
-	url = https://github.com/MindCollaps/calendry-solver
+	url = https://github.com/Calendry-de/Calendry-Solver

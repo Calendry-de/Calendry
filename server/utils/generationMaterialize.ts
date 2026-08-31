@@ -1,4 +1,4 @@
-import type { ConstraintViolation, PlacedSession, SolverOutput } from '@mindcollaps/calendry-proto';
+import type { ConstraintViolation, PlacedSession, SolverOutput } from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
 import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';

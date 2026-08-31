@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # bun install fetches @mindcollaps/calendry-proto from GitHub Packages.https://github.com/MindCollaps/KIK
+      # bun install fetches @calendry-de/calendry-proto from GitHub Packages.
       # PACKAGES_READ_TOKEN must be a CLASSIC PAT with read:packages — the
       # registry refuses fine-grained tokens. Written outside the build context
       # and passed as a BuildKit secret so it never lands in a layer.
@@ -33,12 +33,12 @@ jobs:
           set -euo pipefail
           umask 077
           install -d "${RUNNER_TEMP}/registry"
-          printf '[install.scopes]\n"@mindcollaps" = { token = "%s", url = "https://npm.pkg.github.com/" }\n' \
+          printf '[install.scopes]\n"@calendry-de" = { token = "%s", url = "https://npm.pkg.github.com/" }\n' \
             "${PACKAGES_TOKEN}" > "${RUNNER_TEMP}/registry/bunfig.toml"
 
           STATUS="$(curl -sS -o /dev/null -w '%{http_code}' \
             -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
-            https://npm.pkg.github.com/@mindcollaps%2fcalendry-proto || echo 000)"
+            https://npm.pkg.github.com/@calendry-de%2fcalendry-proto || echo 000)"
 
           if [ "$STATUS" != "200" ]; then
             echo "::error::registry rejected the token (HTTP ${STATUS}). Set PACKAGES_READ_TOKEN to a classic PAT with read:packages."
@@ -96,7 +96,7 @@ jobs:
             docker pull "$FIRST_TAG"
           fi
 
-          docker tag "$FIRST_TAG" ghcr.io/mindcollaps/calendry:latest
+          docker tag "$FIRST_TAG" ghcr.io/calendry-de/calendry:latest
 
           OWNER_PW="$(openssl rand -hex 16)"
           APP_PW="$(openssl rand -hex 16)"

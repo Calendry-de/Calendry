@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { CompactnessScope, SchedulingPattern, SolverInput } from '@mindcollaps/calendry-proto';
+import { CompactnessScope, SchedulingPattern, SolverInput } from '@calendry-de/calendry-proto';
 import type {
     ConstraintConfig, ExternalOccupancy, Offering, OfferingRelation, Person, Room, SlotRef,
-} from '@mindcollaps/calendry-proto';
+} from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
 import { assertClosedUnderParent, conflictClosure, referencedGroupIds } from './solverGroups';
 import {

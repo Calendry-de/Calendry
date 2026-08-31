@@ -1,5 +1,5 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { SolverInput } from '@mindcollaps/calendry-proto';
+import { SolverInput } from '@calendry-de/calendry-proto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { api, login } from './helpers/client';
 import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';

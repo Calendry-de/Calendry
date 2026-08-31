@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SolverOutput } from '@mindcollaps/calendry-proto';
+import { SolverOutput } from '@calendry-de/calendry-proto';
 import {
     planMaterialization, summarizePlanByWeek, summarizeProposedViolations,
 } from '../../../utils/generationMaterialize';

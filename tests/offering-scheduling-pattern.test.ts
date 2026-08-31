@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { SchedulingPattern } from '@mindcollaps/calendry-proto';
+import { SchedulingPattern } from '@calendry-de/calendry-proto';
 import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { RESOURCES } from '../server/utils/resources';

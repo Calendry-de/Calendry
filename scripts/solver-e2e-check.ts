@@ -21,7 +21,7 @@
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
-import { LockPolicy, RunStatus } from '@mindcollaps/calendry-proto';
+import { LockPolicy, RunStatus } from '@calendry-de/calendry-proto';
 import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { cancelRun, getStatus, startRun, toWireU64 } from '../server/utils/solverClient';

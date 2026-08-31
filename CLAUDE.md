@@ -18,7 +18,7 @@ Multi-tenant timetabling for schools and universities, across three repos:
   solver logic here** — it belongs in that repo, and comes back as a submodule
   pointer.
 - **`calendry-proto`** — the shared schema. Consumed *here* as the npm package
-  `@mindcollaps/calendry-proto` (**GitHub Packages**, not npmjs.org), and by the
+  `@calendry-de/calendry-proto` (**GitHub Packages**, not npmjs.org), and by the
   Rust side as its own nested submodule at
   `vendor/calendry-solver/vendor/calendry-proto`.
 

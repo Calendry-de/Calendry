@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LockPolicy } from '@mindcollaps/calendry-proto';
+import { LockPolicy } from '@calendry-de/calendry-proto';
 import { hashScope, resolveScope, toWireScope } from '../server/utils/solverScope';
 import { REPAIR_MOVEMENT_WEIGHT } from '../shared/solverMode';
 

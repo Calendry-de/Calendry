@@ -1,5 +1,5 @@
 import { gunzipSync } from 'node:zlib';
-import { SolverInput } from '@mindcollaps/calendry-proto';
+import { SolverInput } from '@calendry-de/calendry-proto';
 import { requirePermission } from '../../../../utils/requirePermission';
 import { withRequestTenant } from '../../../../utils/tenantDb';
 

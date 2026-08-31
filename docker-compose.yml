@@ -1,6 +1,6 @@
 services:
   calendry-app:
-    image: ghcr.io/mindcollaps/calendry:latest
+    image: ghcr.io/calendry-de/calendry:latest
     container_name: calendry-app
     environment:
       - NODE_ENV=production
@@ -22,7 +22,7 @@ services:
   solver:
     # Same shape as calendry-app: a published image in production, built from
     # the vendored submodule by the dev override.
-    image: ghcr.io/mindcollaps/calendry-solver:latest
+    image: ghcr.io/calendry-de/calendry-solver:latest
     container_name: calendry-solver
     environment:
       - CALENDRY_SOLVER_ADDR=0.0.0.0:50051

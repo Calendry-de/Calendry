@@ -1,5 +1,5 @@
 import type { SolverRunStatus } from '@prisma/client';
-import { SolverOutput } from '@mindcollaps/calendry-proto';
+import { SolverOutput } from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
 import { createGenerationForRun, shouldCreateGeneration } from './generationFromRun';
 import { MAX_RECOVERY_ATTEMPTS } from './solverPollClaim';

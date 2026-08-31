@@ -1,4 +1,4 @@
-import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@mindcollaps/calendry-proto';
+import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@calendry-de/calendry-proto';
 import type { BlockGrid } from '../../shared/timeGrid';
 import { blockAtMinute } from '../../shared/timeGrid';
 import {

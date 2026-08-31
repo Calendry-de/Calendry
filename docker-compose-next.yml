@@ -1,6 +1,6 @@
 services:
   calendry-app:
-    image: ghcr.io/mindcollaps/calendry:next
+    image: ghcr.io/calendry-de/calendry:next
     container_name: calendry-app
     environment:
       - NODE_ENV=production

@@ -7,7 +7,7 @@ import {
     type GetStatusResponse,
     type StartRunRequest,
     type StartRunResponse,
-} from '@mindcollaps/calendry-proto';
+} from '@calendry-de/calendry-proto';
 import type { SolverRunStatus } from '@prisma/client';
 
 /**

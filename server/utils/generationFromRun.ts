@@ -1,4 +1,4 @@
-import { SolverOutput } from '@mindcollaps/calendry-proto';
+import { SolverOutput } from '@calendry-de/calendry-proto';
 import type { Tx } from './tenantDb';
 
 /**
