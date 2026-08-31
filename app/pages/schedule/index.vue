@@ -225,6 +225,7 @@
                     :can-delete="canDeleteSession"
                     :can-update="canUpdateSession"
                     :can-assign-lecturer="canAssignLecturer"
+                    :can-substitute="canSubstitute"
                     :kinds="data.kinds.value"
                     :people="data.people.value"
                     :groups="data.groups.value"
@@ -242,6 +243,8 @@
                     @delete="deleteSelectedEvent"
                     @set-details="saveEventDetails"
                     @set-lecturers="saveLecturers"
+                    @substitute="saveSubstitute"
+                    @uncover="removeSubstitute"
                     />
 
                 <ScheduleOffGridTray
@@ -334,6 +337,7 @@ const canCreateSession = useHasPermission('session.create');
 const canDeleteSession = useHasPermission('session.delete');
 const canUpdateSession = useHasPermission('session.update');
 const canAssignLecturer = useHasPermission('session.assign_lecturer');
+const canSubstitute = useHasPermission('session.substitute');
 /**
  * A placement carries the week on screen — the grid does not know which week it
  * shows, so the page supplies it. That is what makes a cross-week move possible.
@@ -465,6 +469,47 @@ async function saveLecturers(personIds: string[]) {
         const detail = (caught as { data?: { statusMessage?: string } }).data;
 
         editing.error.value = detail?.statusMessage ?? 'Could not save that change.';
+    }
+}
+
+/**
+ * Cover this Session's occurrence (issue #30). No `offeringId` bail-out and no
+ * lock requirement, unlike `saveLecturers`: a substitution is an overlay the
+ * solver never reads, so it is safe on any Session regardless of Offering or
+ * lock state — `substitute.post.ts`'s whole point is needing neither guard.
+ */
+async function saveSubstitute(personId: string) {
+    const target = editing.selected.value;
+
+    if (!target) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/sessions/${target.id}/substitute`, { method: 'POST', body: { personId } });
+        await data.refreshAll();
+    } catch (caught: unknown) {
+        const detail = (caught as { data?: { statusMessage?: string } }).data;
+
+        editing.error.value = detail?.statusMessage ?? 'Could not cover that session.';
+    }
+}
+
+/** Undoes a substitution — "wrong person picked", not "session cancelled". */
+async function removeSubstitute() {
+    const target = editing.selected.value;
+
+    if (!target) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/sessions/${target.id}/substitute`, { method: 'DELETE', body: {} });
+        await data.refreshAll();
+    } catch (caught: unknown) {
+        const detail = (caught as { data?: { statusMessage?: string } }).data;
+
+        editing.error.value = detail?.statusMessage ?? 'Could not remove that substitution.';
     }
 }
 

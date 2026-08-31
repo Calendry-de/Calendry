@@ -60,6 +60,12 @@ export interface ScheduleSession {
     /** `color` is nullable and null means INHERIT — see `shared/sessionColor.ts`. */
     offering: { id: string; title: string; code: string | null; color?: string | null } | null;
     kind: { id: string; key: string; name: string; color: string | null } | null;
+    /**
+     * Who is COVERING this occurrence right now (issue #30), if anyone. Never
+     * derived from `people` — a substitute is deliberately NOT written into
+     * `session_person`, so the original lecturer's row is unaffected.
+     */
+    substitution: { coveringPersonId: string } | null;
 }
 
 export interface Violation {

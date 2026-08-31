@@ -48,6 +48,8 @@ const ids = {
     sessionSeminar: 'scope-session-seminar',
     sessionSibling: 'scope-session-sibling',
     sessionUnrelated: 'scope-session-unrelated',
+    /** Owen COVERS this one (issue #30) — no membership, no attachment at all. */
+    sessionCovered: 'scope-session-covered',
 };
 
 interface SessionRow { id: string }
@@ -176,6 +178,18 @@ beforeAll(async () => {
         data: { tenantId: TENANT_A, sessionId: ids.sessionUnrelated, roomId: ids.otherRoom },
     });
 
+    /**
+     * Issue #30's addition to "mine": COVERING it, via `session_substitution`
+     * rather than `session_person`. Owen has no membership, no direct
+     * attachment, nothing `ownSessionClause`'s first two branches would ever
+     * find — only the third one does, which is the entire point of asserting
+     * it here rather than trusting the code review.
+     */
+    await makeSession(ids.sessionCovered, 6);
+    await ownerDb.sessionSubstitution.create({
+        data: { tenantId: TENANT_A, sessionId: ids.sessionCovered, coveringPersonId: ids.ownPerson },
+    });
+
     cookies.own = (await login(OWN_VIEWER, TEST_PASSWORD, 'test-a')).cookie;
     cookies.admin = (await login(ACCOUNTS.adminA, TEST_PASSWORD, 'test-a')).cookie;
     cookies.viewer = (await login(ACCOUNTS.viewerA, TEST_PASSWORD, 'test-a')).cookie;
@@ -202,8 +216,27 @@ describe('GET /api/sessions under session.read_own', () => {
          * timetable too, which is precisely what a group-scoped lecture means.
          */
         expect(seen).toEqual(
-            [ids.sessionCohort, ids.sessionDirect, ids.sessionSeminar, 'test-session-a'].sort(),
+            [ids.sessionCohort, ids.sessionDirect, ids.sessionSeminar, ids.sessionCovered, 'test-session-a'].sort(),
         );
+    });
+
+    /**
+     * Issue #30: a THIRD way to be "mine" that has nothing to do with
+     * membership or attachment. Owen holds no `session_person` row here at
+     * all — if this passed for the wrong reason (a bug that widened `own` to
+     * everything), the earlier "sibling"/"unrelated" assertions would already
+     * have failed, so this specifically isolates the substitution branch.
+     */
+    it('includes a session the caller is COVERING, with no session_person row of their own', async () => {
+        const attachment = await ownerDb.sessionPerson.findFirst({
+            where: { sessionId: ids.sessionCovered, personId: ids.ownPerson },
+        });
+
+        expect(attachment, 'the fixture attached Owen directly — that would defeat the point').toBeNull();
+
+        const res = await api<SessionRow[]>('/api/sessions?termId=test-term-a', { cookie: cookies.own });
+
+        expect(res.body.map((row) => row.id)).toContain(ids.sessionCovered);
     });
 
     /**

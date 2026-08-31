@@ -68,7 +68,7 @@ export async function sessionReadScope(
 /**
  * "Sessions this person is in."
  *
- * TWO WAYS TO BE IN ONE, and both are needed:
+ * THREE WAYS TO BE IN ONE, and all three are needed:
  *
  *   1. ATTACHED DIRECTLY (`session_person`) — the lecturer leading it, and
  *      anybody named on it individually. This is the case a naive
@@ -78,6 +78,11 @@ export async function sessionReadScope(
  *      — TAXONOMY.md §6), so the question "is this session mine" starts from the
  *      Groups I am a MEMBER of and asks whether the Session names one of them or
  *      any of their ANCESTORS.
+ *   3. COVERING IT (`session_substitution`, issue #30). The substitute is never
+ *      written into `session_person` — the original lecturer's row survives
+ *      untouched, see the model's own comment — so without this branch a
+ *      substitute's OWN timetable would not show the Session they are standing
+ *      in for, which is the entire point of `session.read_own` existing.
  *
  * Getting direction 2 backwards is the failure this codebase has already met in
  * `violations.ts`: `descendantGroupIds` here would show a Cohort member every
@@ -120,6 +125,7 @@ export async function ownSessionClause(tx: Tx, identity: RequestIdentity): Promi
             ...(attendedGroupIds.length
                 ? [{ groups: { some: { groupId: { in: attendedGroupIds } } } }]
                 : []),
+            { substitution: { coveringPersonId: personId } },
         ],
     };
 }

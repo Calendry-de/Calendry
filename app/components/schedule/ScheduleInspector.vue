@@ -155,6 +155,37 @@
                     >Lock this session to override who teaches it — otherwise the next solve
                         would silently replace your choice.</p>
                 </div>
+
+                <!--
+                    Substitutions / Vertretungen (issue #30). Rendered whenever
+                    THERE IS SOMETHING TO SHOW — an active substitute — OR the
+                    caller may create one, so a substitute reading their own
+                    timetable sees who is covering it even without
+                    `session.substitute`, and a viewer with neither sees nothing
+                    rather than an inert "None assigned" row for a feature they
+                    cannot use.
+
+                    A SEPARATE FACT FROM "Lecturer" ABOVE ON PURPOSE: the
+                    original assignment is untouched by a substitution, so the
+                    two rows can — and often will — disagree, and that
+                    disagreement IS the information this row exists to show.
+                -->
+                <div v-if="session.substitution || canSubstitute">
+                    <dt>Covered by</dt>
+                    <dd v-if="!canSubstitute">{{ lookup.person(session.substitution!.coveringPersonId) }}</dd>
+                    <dd v-else>
+                        <ManageRelationPicker
+                            :def="substituteRelation"
+                            :rows="substituteRows"
+                            :options="people"
+                            :extra-options="[]"
+                            :readonly="busy"
+                            @add="onSubstituteAdd"
+                            @remove="onSubstituteRemove"
+                        />
+                    </dd>
+                </div>
+
                 <div>
                     <dt>{{ attendees.length === 1 ? 'Person' : 'People' }}</dt>
                     <dd
@@ -357,6 +388,12 @@ const props = defineProps<{
     /** Separate from `canUpdate`: this also reaches a LOCKED Offering-linked
      * Session, which `session.update` explicitly does not. */
     canAssignLecturer: boolean;
+    /**
+     * Covering a Session someone cannot teach (issue #30) — its own permission,
+     * separate from `canAssignLecturer`: covering is an operational act, not an
+     * editing authority over the Offering, and needs no lock.
+     */
+    canSubstitute: boolean;
     /** Calendar date of this Session's slot; null before a term resolves. */
     sessionDate: Date | null;
     /** Tenant vocabulary, for the kind picker. */
@@ -441,6 +478,36 @@ const groupRelation: RelationDef = {
     emptyHint: 'No groups available in this term.',
 };
 
+/**
+ * A COMPUTED, unlike the three above: its `resource` names THIS Session, so it
+ * has to stay in sync as the panel is reused for a different one. Candidates
+ * come from `substitute-candidates.get.ts` rather than `/api/persons` — that
+ * route already filters to people free at this Session's own slot (issue #30:
+ * "filter to people who are free, not let a clash be created and warned about
+ * after"), which `/api/persons` has no way to do.
+ *
+ * `valueKey: 'id'` rather than `'personId'`: this relation has no join row of
+ * its own shape to key by — `rows` below is a single synthetic entry standing
+ * in for "the current substitute", built directly from the candidate's `id`.
+ */
+const substituteRelation = computed<RelationDef>(() => ({
+    key: 'substitute',
+    label: 'Covered by',
+    help: 'Somebody else teaches this one occurrence. The original lecturer keeps the '
+        + 'Offering and this reverts on its own next week — nothing here is permanent.',
+    resource: `sessions/${props.session?.id ?? ''}/substitute-candidates`,
+    valueKey: 'id',
+    searchable: true,
+    optionLabel: personOptionLabel,
+    emptyHint: 'Nobody is free to cover this slot right now.',
+    emptyWarning: 'Nobody is covering this session.',
+}));
+
+/** At most one — the picker's "assigned" row is just today's substitute, if any. */
+const substituteRows = computed(() => (props.session?.substitution
+    ? [{ id: props.session.substitution.coveringPersonId }]
+    : []));
+
 /** Each control sends the WHOLE set it owns, matching how rooms already save. */
 function onGroupAdd(value: string) {
     const next = [...(props.session?.groups ?? []).map((g) => g.groupId), value];
@@ -463,6 +530,20 @@ function onLecturerAdd(value: string) {
 
 function onLecturerRemove(value: string) {
     emit('set-lecturers', lecturers.value.map((l) => l.personId).filter((id) => id !== value));
+}
+
+/**
+ * Unlike lecturers/rooms/groups, this is not "send the whole set" — a
+ * substitution has at most one covering Person, so picking a new one simply
+ * REPLACES it server-side (`substitute.post.ts` upserts on `session_id`).
+ */
+function onSubstituteAdd(value: string) {
+    emit('substitute', value);
+}
+
+/** Removes the overlay entirely — "wrong person picked" or "no longer needed". */
+function onSubstituteRemove() {
+    emit('uncover');
 }
 
 function onPersonAdd(value: string) {
@@ -493,6 +574,8 @@ const emit = defineEmits<{
     'set-details': [patch: Record<string, unknown>];
     'set-lecturers': [personIds: string[]];
     'set-rooms': [roomIds: string[]];
+    substitute: [personId: string];
+    uncover: [];
 }>();
 
 /**

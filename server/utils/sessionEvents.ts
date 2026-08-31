@@ -4,7 +4,7 @@ import type { RequestIdentity } from './tenantResolver';
 
 export type EventType =
     | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'SET_LECTURERS'
-    | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION';
+    | 'LOCK' | 'UNLOCK' | 'APPLY_GENERATION' | 'SUBSTITUTE';
 
 /**
  * Appends to the immutable edit log (TAXONOMY.md §3).
