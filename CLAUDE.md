@@ -47,6 +47,18 @@ on the board therefore includes editing `BUILT`/`NEXT` in that file, in the same
 change.** That used to be a test failure; it is now a rule, which is strictly
 weaker, so it is written here.
 
+**The board's status field must change in the same session as the work it
+describes, not as a follow-up.** It is the source of truth named above, and
+nothing offline checks it against reality (no test can — it isn't in the
+repo), so a card left stale is invisible until someone reads the actual code
+behind it and finds the two disagree. That happened on 2026-08-31: a whole
+family of solver-parity constraint type issues had shipped — catalogue entry,
+wire assembly, and config UI, verified end to end with a live wire-assembly
+smoke test — while the board still called every one of them "Partial done."
+Finishing a card's work includes flipping its status (and, where the issue
+body tracks phases like "Solver: done" / "App: not yet reachable", updating
+that body to match) before moving on — never leaving it for a later audit.
+
 ## Fixed vs. open taxonomy
 
 **Fixed** (schema-level, changing = migration): Federation, Tenant, Person,
