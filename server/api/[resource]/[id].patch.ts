@@ -4,6 +4,457 @@ import { crudPermission } from '../../utils/permissions';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Resources'],
+        summary: 'Update one row by id',
+        description: 'Generic update route (permission <resource>.update). The body is the per-resource update schema, matched by the resource path segment (see the oneOf variants); all fields are optional and identifier keys (key, type, termId) are create-only. A cross-tenant id updates zero rows and reports 404. Federation-owned rows are readable but never writable here.',
+        parameters: [
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        oneOf: [
+                            {
+                                title: 'persons',
+                                type: 'object',
+                                properties: {
+                                    givenName: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    familyName: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    email: {
+                                        type: 'string',
+                                        format: 'email',
+                                        nullable: true,
+                                    },
+                                    externalRef: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    timezone: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'Display-only; never affects grid resolution or constraint evaluation.',
+                                    },
+                                    isActive: {
+                                        type: 'boolean',
+                                    },
+                                },
+                                description: 'All fields optional.',
+                            },
+                            {
+                                title: 'roles',
+                                type: 'object',
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                            },
+                            {
+                                title: 'groups',
+                                type: 'object',
+                                properties: {
+                                    parentGroupId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'Groups nest; the closure is rebuilt by a database trigger.',
+                                    },
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    expectedSize: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        nullable: true,
+                                    },
+                                },
+                                description: 'All fields optional.',
+                            },
+                            {
+                                title: 'rooms',
+                                type: 'object',
+                                properties: {
+                                    code: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    capacity: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                    },
+                                    location: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    ranking: {
+                                        type: 'integer',
+                                    },
+                                    isVirtual: {
+                                        type: 'boolean',
+                                    },
+                                    isActive: {
+                                        type: 'boolean',
+                                    },
+                                },
+                                description: 'All fields optional.',
+                            },
+                            {
+                                title: 'equipment',
+                                type: 'object',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'offerings',
+                                type: 'object',
+                                properties: {
+                                    kindId: {
+                                        type: 'string',
+                                        description: 'A session kind of this tenant.',
+                                    },
+                                    code: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    title: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    color: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'Free-form; null inherits the session kind color.',
+                                    },
+                                    frequency: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        description: 'How many Sessions per week the solver must place.',
+                                    },
+                                    durationBlocks: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                    },
+                                    schedulingPattern: {
+                                        type: 'string',
+                                        enum: ['DISTRIBUTED', 'BLOCK'],
+                                        nullable: true,
+                                        description: 'Empty string is treated as null (unclassified).',
+                                    },
+                                    requiredRoleId: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    requiredCapacity: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        nullable: true,
+                                    },
+                                    requiredRoomCount: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        maximum: 4,
+                                        description: 'Hard-capped at 4; above it the solver refuses the whole input.',
+                                    },
+                                    allowOnline: {
+                                        type: 'boolean',
+                                    },
+                                    isActive: {
+                                        type: 'boolean',
+                                    },
+                                    notes: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'time-grids',
+                                type: 'object',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    blockLengthMinutes: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                    },
+                                    blocksPerDay: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                    },
+                                    activeDays: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'integer',
+                                            minimum: 1,
+                                            maximum: 7,
+                                        },
+                                        minItems: 1,
+                                        description: 'ISO weekdays, 1 = Monday.',
+                                    },
+                                    startHour: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        maximum: 23,
+                                    },
+                                    startMinute: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        maximum: 59,
+                                    },
+                                    breakMinutes: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                    },
+                                    breaks: {
+                                        type: 'array',
+                                        items: {
+                                            type: 'object',
+                                            required: ['afterBlockIndex', 'durationMinutes', 'label'],
+                                            properties: {
+                                                afterBlockIndex: {
+                                                    type: 'integer',
+                                                    minimum: 0,
+                                                },
+                                                durationMinutes: {
+                                                    type: 'integer',
+                                                    minimum: 1,
+                                                },
+                                                label: {
+                                                    type: 'string',
+                                                    minLength: 1,
+                                                },
+                                                dayOfWeek: {
+                                                    type: 'integer',
+                                                    minimum: 1,
+                                                    maximum: 7,
+                                                    nullable: true,
+                                                    description: 'null applies the break to every active day.',
+                                                },
+                                            },
+                                        },
+                                        description: 'Replaced wholesale when present.',
+                                    },
+                                    isDefault: {
+                                        type: 'boolean',
+                                        description: 'Exclusive flag; setting it demotes the current default in the same transaction.',
+                                    },
+                                },
+                                description: 'All fields optional.',
+                            },
+                            {
+                                title: 'terms',
+                                type: 'object',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    startDate: {
+                                        type: 'string',
+                                        format: 'date',
+                                        description: 'ISO 8601 date; date-times are coerced.',
+                                    },
+                                    endDate: {
+                                        type: 'string',
+                                        format: 'date',
+                                        description: 'ISO 8601 date; date-times are coerced.',
+                                    },
+                                    timeGridId: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                                description: 'All fields optional.',
+                            },
+                            {
+                                title: 'constraints',
+                                type: 'object',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    severity: {
+                                        type: 'string',
+                                        enum: ['HARD', 'SOFT'],
+                                    },
+                                    weight: {
+                                        type: 'integer',
+                                        nullable: true,
+                                        description: 'HARD rows carry null. Unbounded above by design (only ratios matter); negative values are refused.',
+                                    },
+                                    params: {
+                                        type: 'object',
+                                        description: 'Parameter values validated against the constraint-type catalogue.',
+                                    },
+                                    isEnabled: {
+                                        type: 'boolean',
+                                    },
+                                    timeGridId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'null applies the rule to every grid.',
+                                    },
+                                    scopes: {
+                                        type: 'array',
+                                        nullable: true,
+                                        items: {
+                                            type: 'object',
+                                            required: ['kindId'],
+                                            properties: {
+                                                kindId: {
+                                                    type: 'string',
+                                                },
+                                            },
+                                        },
+                                        description: 'Session-kind scopes. A non-default constraint of a type that already has a default must name at least one.',
+                                    },
+                                    members: {
+                                        type: 'array',
+                                        nullable: true,
+                                        items: {
+                                            type: 'object',
+                                            required: ['offeringId'],
+                                            properties: {
+                                                offeringId: {
+                                                    type: 'string',
+                                                },
+                                            },
+                                        },
+                                        description: 'Ordered operands of a relation-type constraint; array order is the order.',
+                                    },
+                                },
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'session-kinds',
+                                type: 'object',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    color: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    requiresGroup: {
+                                        type: 'boolean',
+                                    },
+                                    type: {
+                                        type: 'string',
+                                        enum: ['TEACHING', 'EXAM', 'ADMIN'],
+                                        description: 'Fixed classification behind the tenant-open key/name.',
+                                    },
+                                },
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'calendar-periods',
+                                type: 'object',
+                                properties: {
+                                    kind: {
+                                        type: 'string',
+                                        enum: ['HOLIDAY', 'BREAK', 'EXAM'],
+                                    },
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    startDate: {
+                                        type: 'string',
+                                        format: 'date',
+                                        description: 'ISO 8601 date; date-times are coerced.',
+                                    },
+                                    endDate: {
+                                        type: 'string',
+                                        format: 'date',
+                                        description: 'ISO 8601 date; date-times are coerced.',
+                                    },
+                                },
+                                description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'access-roles',
+                                type: 'object',
+                                description: 'Requires access_role.manage. All fields optional; key is create-only.',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                        minLength: 1,
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    permissions: {
+                                        type: 'array',
+                                        minItems: 1,
+                                        items: {
+                                            type: 'object',
+                                            required: ['permissionKey'],
+                                            properties: {
+                                                permissionKey: {
+                                                    type: 'string',
+                                                    description: 'A key from the fixed permission catalogue (shared/permissions.ts).',
+                                                },
+                                            },
+                                        },
+                                        description: 'Replaced wholesale; a role holding nothing is refused.',
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+        responses: {
+            200: { description: 'The updated row.' },
+            400: { description: 'Body failed the resource schema.' },
+            404: { description: 'Not found in this tenant.' },
+            409: { description: 'Entity-specific refusal (e.g. narrowing a TimeGrid under placed Sessions).' },
+        },
+    },
+});
+
 /** Update one row by id, scoped to the caller's tenant. */
 export default defineEventHandler(async (event) => {
     const resource = getRouterParam(event, 'resource');

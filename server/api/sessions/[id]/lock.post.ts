@@ -5,6 +5,46 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 
 const bodySchema = z.object({ reason: z.string().nullish() }).optional();
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Lock a session',
+        description: 'Pins a Session so the next solve cannot move it (permission session.lock). Locking changes no placement, so constraints are not re-evaluated. Idempotent: locking an already locked Session returns alreadyLocked: true and emits no event.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: false,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        properties: { reason: { type: 'string', nullable: true } },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Locked (or already was).',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object' },
+                                event: { type: 'object', nullable: true, description: 'Null when the Session was already locked.' },
+                                alreadyLocked: { type: 'boolean' },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'No such Session in this tenant.' },
+        },
+    },
+});
+
 /**
  * Pin a Session so the next solve cannot move it (TAXONOMY.md §3: the solver
  * fills empty slots and never overwrites a lock).

@@ -51,6 +51,39 @@ import { withRequestTenant } from '../../utils/tenantDb';
  */
 const querySchema = z.object({ termId: z.string().optional() });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Schedule'],
+        summary: 'Everything the schedule needs to draw itself',
+        description: 'One endpoint behind the same permission that lets you look at the timetable (session.read or session.read_own). terms and timeGrids (with breaks) are complete, because they are the frame. rooms, people and groups are DERIVED FROM THE VISIBLE SESSIONS only: a read_own caller learns the names appearing on their own timetable and nothing else. The full directory stays behind room.read / group.read / person.read on the generic CRUD routes.',
+        parameters: [
+            { name: 'termId', in: 'query', schema: { type: 'string' }, description: 'Defaults to the most recent term; the resolved id is reported back.' },
+        ],
+        responses: {
+            200: {
+                description: 'Reference data for the resolved term.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                scope: { type: 'string', description: 'Whether the caller sees the whole timetable or only their own sessions.' },
+                                resolvedTermId: { type: 'string' },
+                                terms: { type: 'array', items: { type: 'object' } },
+                                timeGrids: { type: 'array', items: { type: 'object' }, description: 'Including breaks; they change what every block is called.' },
+                                rooms: { type: 'array', items: { type: 'object' } },
+                                people: { type: 'array', items: { type: 'object' } },
+                                groups: { type: 'array', items: { type: 'object' }, description: 'Referenced groups plus their ancestors, for disambiguation.' },
+                            },
+                        },
+                    },
+                },
+            },
+            403: { description: 'Caller holds neither session.read nor session.read_own.' },
+        },
+    },
+});
+
 export default defineEventHandler(async (event) => {
     const query = await getValidatedQuery(event, querySchema.parse);
 

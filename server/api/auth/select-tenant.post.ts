@@ -4,6 +4,44 @@ import { listAccountIdentities, resolveSessionToken, setSessionActivePerson } fr
 
 const bodySchema = z.object({ tenantId: z.string().min(1) });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Auth'],
+        summary: 'Choose or switch the active tenant',
+        description: 'Sets which tenant this session acts in. The requested tenant is validated against the identities the Account actually has; the server decides whether a Person exists there. Switching mutates the session rather than re-authenticating.',
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['tenantId'],
+                        properties: { tenantId: { type: 'string' } },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Tenant selected.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                activeTenant: { type: 'object', properties: { id: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } },
+                                activePersonId: { type: 'string' },
+                            },
+                        },
+                    },
+                },
+            },
+            401: { description: 'Not authenticated.' },
+            403: { description: 'The account has no active identity in that tenant (the tenant may well exist).' },
+        },
+    },
+});
+
 /**
  * Choose (or switch) which tenant this session is acting in.
  *

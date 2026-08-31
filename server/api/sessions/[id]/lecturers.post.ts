@@ -11,6 +11,52 @@ const bodySchema = z.object({
     reason: z.string().nullish(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Override who leads a session',
+        description: 'Replaces the lecturer set of a Session (permission session.assign_lecturer). An Offering-linked Session must be LOCKED first, because an unlocked one gets its lecturer from the next solve and the override would be silently discarded; Events need no lock. A person already attached as a plain attendee is promoted in place; a lecturer dropped from the list has their row deleted.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['personIds'],
+                        properties: {
+                            personIds: { type: 'array', items: { type: 'string' }, description: 'The complete new lecturer set. An empty array removes all lecturers.' },
+                            reason: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Lecturer set replaced.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object', description: 'The updated Session row.' },
+                                event: { type: 'object', description: 'The appended audit event (event-sourced history).' },
+                                violations: { type: 'array', items: { type: 'object' }, description: 'Constraint violations now recorded against the Session. Warn-and-allow: they never block the edit.' },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'Session or a named Person not found in this tenant.' },
+            409: { description: 'The Session belongs to an Offering and is not locked. Lock it first.' },
+            422: { description: 'This tenant has no lecturer role configured.' },
+        },
+    },
+});
+
 /**
  * Override who leads a Session — #7 item 4, "manual per-session override".
  *

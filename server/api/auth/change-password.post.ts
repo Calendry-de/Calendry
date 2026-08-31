@@ -10,6 +10,35 @@ const bodySchema = z.object({
     newPassword: z.string().min(12, 'New password must be at least 12 characters.'),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Auth'],
+        summary: 'Change an account password',
+        description: 'Public by necessity: this is the only way out of a forced or expired password, which deliberately issues no session. Re-authenticates from the credentials in the body rather than trusting a cookie. On success every open session of the account is revoked and there is no auto-login; sign in again with the new password. Rate-limited separately from login.',
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['email', 'currentPassword', 'newPassword'],
+                        properties: {
+                            email: { type: 'string', format: 'email' },
+                            currentPassword: { type: 'string' },
+                            newPassword: { type: 'string', minLength: 12 },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            204: { description: 'Password changed and every open session revoked.' },
+            401: { description: 'Invalid credentials. Deliberately identical for unknown email and wrong password.' },
+            422: { description: 'The new password equals the current one.' },
+        },
+    },
+});
+
 /**
  * Change an Account's password.
  *

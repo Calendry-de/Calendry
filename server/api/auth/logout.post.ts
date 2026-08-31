@@ -1,6 +1,17 @@
 import { SESSION_COOKIE } from '../../utils/auth';
 import { resolveSessionToken, revokeSession } from '../../utils/authDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Auth'],
+        summary: 'Log out',
+        description: 'Revokes the current session server-side (a copied token stops working too) and clears the cookie. Idempotent: logging out without a session is a success, not an error.',
+        responses: {
+            204: { description: 'Session revoked (or there was none) and cookie cleared.' },
+        },
+    },
+});
+
 /**
  * End the current session.
  *

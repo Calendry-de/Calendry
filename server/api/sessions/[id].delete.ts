@@ -3,6 +3,35 @@ import { appendEvent, placementOf, requireBaselineGeneration } from '../../utils
 import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Delete an event',
+        description: 'Deletes an EVENT: a Session with no Offering (permission session.delete). Offering-linked Sessions are refused with 409, because their demand would make the next solve re-create them, so the delete would silently undo itself. The DELETE audit event is written first, carrying the placement that was removed.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+            200: {
+                description: 'Deleted.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                deleted: { type: 'string', description: 'Id of the deleted Session.' },
+                                event: { type: 'object', description: 'The appended DELETE audit event.' },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'No such Session in this tenant.' },
+            409: { description: 'The Session belongs to an Offering and cannot be deleted here.' },
+        },
+    },
+});
+
 /**
  * Delete an EVENT — a Session with no Offering.
  *

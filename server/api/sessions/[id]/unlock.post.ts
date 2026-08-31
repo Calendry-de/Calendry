@@ -5,6 +5,46 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 
 const bodySchema = z.object({ reason: z.string().nullish() }).optional();
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Unlock a session',
+        description: 'Releases a lock, returning the Session to the solver candidate set (permission session.lock). Idempotent: unlocking an already unlocked Session returns alreadyUnlocked: true and emits no event.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: false,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        properties: { reason: { type: 'string', nullable: true } },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Unlocked (or already was).',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object' },
+                                event: { type: 'object', nullable: true, description: 'Null when the Session was already unlocked.' },
+                                alreadyUnlocked: { type: 'boolean' },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'No such Session in this tenant.' },
+        },
+    },
+});
+
 /** Release a lock, returning the Session to the solver's candidate set. */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');

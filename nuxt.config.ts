@@ -31,6 +31,13 @@ export default defineNuxtConfig({
     nitro: {
         experimental: {
             websocket: true,
+            openAPI: true,
+        },
+        openAPI: {
+            meta: {
+                title: "Calendry API",
+                version: "0.0.1-beta",
+            }
         },
         alias: {
             // See server/utils/pgNativeStub.ts — pg's optional native addon,

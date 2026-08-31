@@ -43,6 +43,61 @@ const bodySchema = z.object({
     reason: z.string().nullish(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Create a session or event manually',
+        description: 'Creates a Session without a solver run (permission session.create). Omitting offeringId creates an EVENT: a placement with no recurring demand behind it, structurally exempt from every solve, which must carry its own title. Giving offeringId links the Session to that Offering (same term required) and forbids a title. isLocked defaults to true so the next solver apply cannot move or delete it. Warn-and-allow: a creation that breaks a constraint (e.g. double-books a room) is carried out and the violations are returned; only a placement outside the TimeGrid is refused.',
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['termId', 'kindId', 'termWeek', 'dayOfWeek', 'blockIndex'],
+                        properties: {
+                            termId: { type: 'string' },
+                            kindId: { type: 'string', description: 'A session kind of this tenant.' },
+                            title: { type: 'string', nullable: true, description: 'Required for an Event (no offeringId); refused when offeringId is set.' },
+                            termWeek: { type: 'integer', minimum: 1 },
+                            dayOfWeek: { type: 'integer', minimum: 1, maximum: 7 },
+                            blockIndex: { type: 'integer', minimum: 0 },
+                            durationBlocks: { type: 'integer', minimum: 1, default: 1 },
+                            offeringId: { type: 'string', nullable: true, description: 'Absent or null makes this an Event, permanently outside every solve scope.' },
+                            roomIds: { type: 'array', items: { type: 'string' }, default: [] },
+                            groupIds: { type: 'array', items: { type: 'string' }, default: [] },
+                            lecturerIds: { type: 'array', items: { type: 'string' }, default: [] },
+                            personIds: { type: 'array', items: { type: 'string' }, default: [] },
+                            isLocked: { type: 'boolean', default: true },
+                            reason: { type: 'string', nullable: true, description: 'Recorded on the audit event.' },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            201: {
+                description: 'Created.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object', description: 'The updated Session row.' },
+                                event: { type: 'object', description: 'The appended audit event (event-sourced history).' },
+                                violations: { type: 'array', items: { type: 'object' }, description: 'Constraint violations now recorded against the Session. Warn-and-allow: they never block the edit.' },
+                            },
+                        },
+                    },
+                },
+            },
+            400: { description: 'Title rules violated: an Event needs a title, an Offering-linked Session must not carry one.' },
+            404: { description: 'Term, session kind or Offering not found in this tenant (an Offering must also belong to the same term).' },
+            409: { description: 'The week is outside the term, or the day/block/duration is not a slot in the TimeGrid.' },
+        },
+    },
+});
+
 /**
  * Create a Session directly, without a solver run.
  *

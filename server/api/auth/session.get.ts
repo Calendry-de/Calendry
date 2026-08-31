@@ -4,6 +4,37 @@ import { resolveLocale } from '../../../shared/locale';
 import { loadPermissions } from '../../utils/requirePermission';
 import { withTenant } from '../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Auth'],
+        summary: 'Current session: who am I, where am I, what may I do',
+        description: 'Returns the authenticated identity, the active tenant and the permission keys the active Person holds. The permission list is for driving UI visibility only; every route re-checks server-side. When no tenant is selected yet, tenantSelectionRequired is true and permissions is empty.',
+        responses: {
+            200: {
+                description: 'The session state.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                accountId: { type: 'string' },
+                                tenantSelectionRequired: { type: 'boolean' },
+                                activeTenant: { type: 'object', nullable: true, properties: { id: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } },
+                                activePersonId: { type: 'string' },
+                                activePerson: { type: 'object', nullable: true, properties: { id: { type: 'string' }, givenName: { type: 'string' }, familyName: { type: 'string' } } },
+                                permissions: { type: 'array', items: { type: 'string' } },
+                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' }, personId: { type: 'string' }, isActive: { type: 'boolean' } } } },
+                                locale: { type: 'string' },
+                            },
+                        },
+                    },
+                },
+            },
+            401: { description: 'No session cookie, or the session is expired or revoked.' },
+        },
+    },
+});
+
 /**
  * Who am I, where am I, and what may I do.
  *

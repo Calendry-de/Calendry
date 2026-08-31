@@ -4,6 +4,22 @@ import { crudPermission } from '../../utils/permissions';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Resources'],
+        summary: 'Fetch one row by id',
+        description: 'Generic read route (permission <resource>.read). A guessed id from another tenant reads as 404, never as a permission error that would confirm the row exists. Federation-ownable resources also resolve rows shared into the federation.',
+        parameters: [
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+            200: { description: 'The row.' },
+            404: { description: 'Not found in this tenant (or federation, where applicable).' },
+        },
+    },
+});
+
 /** Fetch one row by id, scoped to the caller's tenant. */
 export default defineEventHandler(async (event) => {
     const resource = getRouterParam(event, 'resource');

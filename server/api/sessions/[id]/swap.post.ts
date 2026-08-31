@@ -10,6 +10,51 @@ const bodySchema = z.object({
     reason: z.string().nullish(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Swap two sessions',
+        description: 'Exchanges the placements of two Sessions atomically (permission session.swap). Emits ONE SWAP audit event referencing both, so a replay can never stop between the halves. Warn-and-allow: resulting constraint violations are returned, never block the edit.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['withSessionId'],
+                        properties: {
+                            withSessionId: { type: 'string' },
+                            reason: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Swapped.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                sessions: { type: 'array', items: { type: 'object' }, description: 'Both Sessions after the swap.' },
+                                event: { type: 'object', description: 'The single SWAP audit event.' },
+                                violations: { type: 'array', items: { type: 'object' } },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'Either Session is missing in this tenant (cross-tenant ids read as not found).' },
+            422: { description: 'Attempted to swap a Session with itself.' },
+        },
+    },
+});
+
 /**
  * Exchange two Sessions' placements.
  *

@@ -14,6 +14,28 @@ const querySchema = z.object({
     includeNested: z.coerce.boolean().optional(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'List sessions (current schedule state)',
+        description: 'Requires session.read (the whole timetable) or session.read_own (only sessions the caller attends or leads, resolved through the group closure). Query filters compose with that scope, never replace it: a read_own caller filtering by another personId gets the sessions the two share. Each row includes its group and room links, its people with role keys, and the labelling fields of its Offering and kind, so no extra reference fetches are needed to draw it.',
+        parameters: [
+            { name: 'termId', in: 'query', schema: { type: 'string' } },
+            { name: 'termWeek', in: 'query', schema: { type: 'integer' } },
+            { name: 'groupId', in: 'query', schema: { type: 'string' } },
+            { name: 'includeNested', in: 'query', schema: { type: 'boolean' }, description: 'Resolve groupId through the group closure, so filtering by a Cohort also surfaces its Seminars.' },
+            { name: 'roomId', in: 'query', schema: { type: 'string' } },
+            { name: 'personId', in: 'query', schema: { type: 'string' } },
+            { name: 'offeringId', in: 'query', schema: { type: 'string' } },
+            { name: 'isLocked', in: 'query', schema: { type: 'boolean' } },
+        ],
+        responses: {
+            200: { description: 'Bare array of Session rows, ordered by week, day, block.', content: { 'application/json': { schema: { type: 'array', items: { type: 'object' } } } } },
+            403: { description: 'Caller holds neither session.read nor session.read_own.' },
+        },
+    },
+});
+
 /**
  * Current schedule state.
  *

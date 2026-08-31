@@ -13,6 +13,54 @@ const bodySchema = z.object({
     reason: z.string().nullish(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Edit what an event is',
+        description: 'Edits the title, kind, groups and people of an EVENT (permission session.update). Offering-linked Sessions are refused with 409: those fields come from the Offering and the solver, so an edit would be silently overwritten by the next apply. Placement is not touched here; that stays on /move. groupIds and personIds replace their whole set when present. Emits an UPDATE_DETAILS audit event carrying before and after for the fields actually changed.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', minLength: 1, description: 'Cannot be cleared; an Event has no Offering to take a name from.' },
+                            kindId: { type: 'string' },
+                            groupIds: { type: 'array', items: { type: 'string' } },
+                            personIds: { type: 'array', items: { type: 'string' } },
+                            reason: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Updated.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object', description: 'The updated Session row.' },
+                                event: { type: 'object', description: 'The appended audit event (event-sourced history).' },
+                                violations: { type: 'array', items: { type: 'object' }, description: 'Constraint violations now recorded against the Session. Warn-and-allow: they never block the edit.' },
+                            },
+                        },
+                    },
+                },
+            },
+            400: { description: 'Attempted to clear the title.' },
+            404: { description: 'Session or session kind not found in this tenant.' },
+            409: { description: 'The Session belongs to an Offering; only Events can be edited this way.' },
+        },
+    },
+});
+
 /**
  * Edit what an EVENT is — its title, kind, groups and people.
  *

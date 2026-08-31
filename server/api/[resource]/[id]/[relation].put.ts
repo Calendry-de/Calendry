@@ -6,6 +6,211 @@ import { crudPermission } from '../../../utils/permissions';
 import { requireAnyPermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Resources'],
+        summary: 'Replace a relation membership set',
+        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
+        parameters: [
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'relation', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'array',
+                        maxItems: 500,
+                        items: {
+                            oneOf: [
+                                {
+                                    type: 'object',
+                                    required: ['afterBlockIndex', 'durationMinutes', 'label'],
+                                    properties: {
+                                        afterBlockIndex: {
+                                            type: 'integer',
+                                            minimum: 0,
+                                        },
+                                        durationMinutes: {
+                                            type: 'integer',
+                                            minimum: 1,
+                                        },
+                                        label: {
+                                            type: 'string',
+                                            minLength: 1,
+                                        },
+                                        dayOfWeek: {
+                                            type: 'integer',
+                                            minimum: 1,
+                                            maximum: 7,
+                                            nullable: true,
+                                            description: 'null applies the break to every active day.',
+                                        },
+                                    },
+                                    title: 'time-grids/breaks',
+                                },
+                                {
+                                    title: 'groups/terms',
+                                    type: 'object',
+                                    required: ['termId'],
+                                    description: 'Terms the group is scoped to. NO ROWS MEANS EVERY TERM: saving an empty array widens the group back to universal.',
+                                    properties: {
+                                        termId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'groups/sources',
+                                    type: 'object',
+                                    required: ['sourceGroupId'],
+                                    description: 'Groups a combined group draws members from; copying the members in is a separate action.',
+                                    properties: {
+                                        sourceGroupId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'groups/availability',
+                                    type: 'object',
+                                    required: ['termId'],
+                                    description: 'When the group is available INSIDE a term. Absent row = the whole term; at least one bound is required.',
+                                    properties: {
+                                        termId: {
+                                            type: 'string',
+                                        },
+                                        availableFrom: {
+                                            type: 'string',
+                                            format: 'date',
+                                            description: 'ISO 8601 date; date-times are coerced.',
+                                            nullable: true,
+                                        },
+                                        availableTo: {
+                                            type: 'string',
+                                            format: 'date',
+                                            description: 'ISO 8601 date; date-times are coerced.',
+                                            nullable: true,
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'offerings/groups',
+                                    type: 'object',
+                                    required: ['groupId'],
+                                    properties: {
+                                        groupId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'offerings/lecturers',
+                                    type: 'object',
+                                    required: ['personId'],
+                                    properties: {
+                                        personId: {
+                                            type: 'string',
+                                        },
+                                        roleId: {
+                                            type: 'string',
+                                            nullable: true,
+                                            description: 'The scheduling role this person fills here, not an access role.',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'offerings/equipment',
+                                    type: 'object',
+                                    required: ['equipmentId'],
+                                    properties: {
+                                        equipmentId: {
+                                            type: 'string',
+                                        },
+                                        quantity: {
+                                            type: 'integer',
+                                            minimum: 1,
+                                            nullable: true,
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'rooms/equipment',
+                                    type: 'object',
+                                    required: ['equipmentId'],
+                                    properties: {
+                                        equipmentId: {
+                                            type: 'string',
+                                        },
+                                        quantity: {
+                                            type: 'integer',
+                                            minimum: 1,
+                                            nullable: true,
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'persons/roles',
+                                    type: 'object',
+                                    required: ['roleId'],
+                                    properties: {
+                                        roleId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'persons/access-roles',
+                                    type: 'object',
+                                    required: ['accessRoleId'],
+                                    description: 'Requires person_access_role.assign, not person.update. The write is refused if it would leave the tenant without an administrator.',
+                                    properties: {
+                                        accessRoleId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'persons/groups',
+                                    type: 'object',
+                                    required: ['groupId'],
+                                    properties: {
+                                        groupId: {
+                                            type: 'string',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'constraints/scopes',
+                                    type: 'object',
+                                    description: 'Either field narrows the constraint; at least one is required. Note: offering-scoped constraints are SKIPPED by the solver-input assembly.',
+                                    properties: {
+                                        offeringId: {
+                                            type: 'string',
+                                            nullable: true,
+                                        },
+                                        kindId: {
+                                            type: 'string',
+                                            nullable: true,
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: { description: 'The new membership set.' },
+            400: { description: 'Body failed the relation item schema.' },
+            404: { description: 'Parent row not found in this tenant (federation-owned parents are readable but not writable).' },
+        },
+    },
+});
+
 /**
  * Replaces a relation's entire membership set.
  *

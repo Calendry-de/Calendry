@@ -14,6 +14,51 @@ const bodySchema = z.object({
     tenantSlug: z.string().optional(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Auth'],
+        summary: 'Log in',
+        description: 'Authenticates an Account and opens a cookie session. Login is global, not tenant-scoped: if the account maps to exactly one Person (or tenantSlug is given) the tenant is selected implicitly, otherwise the session opens with no active Person and the client must call /api/auth/select-tenant. A forced or expired password authenticates but sets no cookie and returns requiresPasswordChange: true; clear it via /api/auth/change-password. Rate-limited per email (10 attempts / 15 min).',
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['email', 'password'],
+                        properties: {
+                            email: { type: 'string', format: 'email' },
+                            password: { type: 'string' },
+                            tenantSlug: { type: 'string', description: 'Optional: skip tenant selection when the caller already knows the slug.' },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Authenticated. The session cookie is set unless requiresPasswordChange is true.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                sessionId: { type: 'string' },
+                                requiresPasswordChange: { type: 'boolean' },
+                                tenantSelectionRequired: { type: 'boolean' },
+                                activeTenant: { type: 'object', nullable: true, properties: { id: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } },
+                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } } },
+                            },
+                        },
+                    },
+                },
+            },
+            401: { description: 'Invalid credentials. Deliberately identical for unknown email and wrong password.' },
+            403: { description: 'Account is active in no tenant, or has no identity in the requested tenantSlug.' },
+        },
+    },
+});
+
 /**
  * Authenticate an Account and open a session.
  *

@@ -1,5 +1,6 @@
 import type { ComputedRef } from 'vue';
 import type { ScheduleSession } from '~/composables/schedule';
+import { sessionLabel } from '~/composables/schedule';
 import { useOverlayActive } from '~/composables/overlay';
 
 /**
@@ -19,6 +20,27 @@ import { useOverlayActive } from '~/composables/overlay';
  */
 export type EditMode = 'idle' | 'place' | 'swap' | 'create';
 
+/**
+ * WHAT JUST HAPPENED — the one thing a successful mutation used to leave unsaid.
+ *
+ * Every path below ended in `await options.onMutated()` and nothing else, so a
+ * move, a swap, a lock and a room change were all indistinguishable from having
+ * clicked nothing at all. The move path is worse than the others: the grid cell
+ * that was activated carries `:disabled="!placing"`, so it is disabled the
+ * instant the mode drops and focus falls to `<body>`.
+ *
+ * STRUCTURED, NOT A FINISHED SENTENCE, because the wording is not this
+ * composable's to own: the weekday name and the block's clock time come from the
+ * grid, the viewer's locale decides how either is spelled, and the violations a
+ * move CREATED are only knowable once `onMutated()` has refreshed them. This
+ * composable knows the act; the page knows how to say it.
+ */
+export type ScheduleAction =
+    | { kind: 'move'; sessionId: string; label: string; dayOfWeek: number; blockIndex: number }
+    | { kind: 'swap'; sessionId: string; label: string; partnerLabel: string }
+    | { kind: 'lock'; sessionId: string; label: string; locked: boolean }
+    | { kind: 'rooms'; sessionId: string; label: string; roomCount: number };
+
 export function useScheduleEditing(options: {
     sessions: ComputedRef<ScheduleSession[]>;
     onMutated: () => Promise<void>;
@@ -35,6 +57,14 @@ export function useScheduleEditing(options: {
     const mode = ref<EditMode>('idle');
     const busy = ref(false);
     const error = ref('');
+
+    /**
+     * The last edit that SUCCEEDED, or null. Cleared by any fresh intent — a new
+     * selection, a new mode, the start of the next mutation — because an outcome
+     * that outlives the interaction it belongs to is the failure mode
+     * `schedule_error` already had.
+     */
+    const lastAction = ref<ScheduleAction | null>(null);
 
     /** Kept so existing callers (`ScheduleGrid`, the page) read unchanged. */
     const placing = computed(() => mode.value === 'place');
@@ -76,6 +106,8 @@ export function useScheduleEditing(options: {
      * placement the user set up for something else.
      */
     function select(id: string) {
+        lastAction.value = null;
+
         if (mode.value === 'swap' && selectedId.value && id !== selectedId.value) {
             void swapWith(id);
 
@@ -91,11 +123,13 @@ export function useScheduleEditing(options: {
         selectedId.value = null;
         snapshot.value = null;
         mode.value = 'idle';
+        lastAction.value = null;
     }
 
     /** Entering either grid mode leaves the other; they cannot both be on. */
     function setMode(next: EditMode) {
         mode.value = selectedId.value && mode.value !== next ? next : 'idle';
+        lastAction.value = null;
     }
 
     function togglePlacing() {
@@ -136,8 +170,17 @@ export function useScheduleEditing(options: {
             return;
         }
 
+        /*
+         * Captured BEFORE the request. `selected` is derived from the sessions
+         * list, which `onMutated()` replaces — so reading the label afterwards
+         * races the refresh, and reading it after a cross-week move reads the
+         * snapshot fallback instead of the row that actually moved.
+         */
+        const subject = selected.value;
+
         busy.value = true;
         error.value = '';
+        lastAction.value = null;
 
         try {
             await $fetch(`/api/sessions/${selected.value.id}/move`, {
@@ -161,6 +204,21 @@ export function useScheduleEditing(options: {
             // Violations are recomputed server-side in the same transaction as
             // the move, so refreshing both reflects one consistent state.
             await options.onMutated();
+
+            /*
+             * AFTER the refresh, not before. The page's sentence names the
+             * violations this move created, and those only exist in the store
+             * once `onMutated()` has resolved — announcing earlier would make
+             * the live region state one thing and then correct itself, which is
+             * two announcements for one act.
+             */
+            lastAction.value = {
+                kind: 'move',
+                sessionId: subject.id,
+                label: sessionLabel(subject),
+                dayOfWeek: target.dayOfWeek,
+                blockIndex: target.blockIndex,
+            };
         } catch (e) {
             error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not move that session.';
         } finally {
@@ -180,8 +238,15 @@ export function useScheduleEditing(options: {
             return;
         }
 
+        const subject = selected.value;
+        // The partner is named in the announcement, and after the swap both rows
+        // have new placements — so it is read from the list that still describes
+        // where they were.
+        const partner = options.sessions.value.find((s) => s.id === otherId) ?? null;
+
         busy.value = true;
         error.value = '';
+        lastAction.value = null;
 
         try {
             await $fetch(`/api/sessions/${selected.value.id}/swap`, {
@@ -191,6 +256,13 @@ export function useScheduleEditing(options: {
 
             mode.value = 'idle';
             await options.onMutated();
+
+            lastAction.value = {
+                kind: 'swap',
+                sessionId: subject.id,
+                label: sessionLabel(subject),
+                partnerLabel: sessionLabel(partner),
+            };
         } catch (e) {
             error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not swap those sessions.';
         } finally {
@@ -211,8 +283,11 @@ export function useScheduleEditing(options: {
             return;
         }
 
+        const subject = selected.value;
+
         busy.value = true;
         error.value = '';
+        lastAction.value = null;
 
         try {
             await $fetch(`/api/sessions/${selected.value.id}/move`, {
@@ -220,6 +295,13 @@ export function useScheduleEditing(options: {
                 body: { roomIds },
             });
             await options.onMutated();
+
+            lastAction.value = {
+                kind: 'rooms',
+                sessionId: subject.id,
+                label: sessionLabel(subject),
+                roomCount: roomIds.length,
+            };
         } catch (e) {
             error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not change the room.';
         } finally {
@@ -232,8 +314,14 @@ export function useScheduleEditing(options: {
             return;
         }
 
+        const subject = selected.value;
+        // The state being MOVED TO, resolved before the request so the sentence
+        // cannot disagree with what was asked for.
+        const locked = !subject.isLocked;
+
         busy.value = true;
         error.value = '';
+        lastAction.value = null;
 
         try {
             await $fetch(`/api/sessions/${selected.value.id}/${selected.value.isLocked ? 'unlock' : 'lock'}`, {
@@ -241,6 +329,13 @@ export function useScheduleEditing(options: {
                 body: {},
             });
             await options.onMutated();
+
+            lastAction.value = {
+                kind: 'lock',
+                sessionId: subject.id,
+                label: sessionLabel(subject),
+                locked,
+            };
         } catch (e) {
             error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not change the lock.';
         } finally {
@@ -271,7 +366,7 @@ export function useScheduleEditing(options: {
     onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
     return {
-        selectedId, selected, mode, placing, swapping, creating, busy, error,
+        selectedId, selected, mode, placing, swapping, creating, busy, error, lastAction,
         toggleCreating, endCreating,
         select, clearSelection, setMode, togglePlacing, toggleSwapping,
         move, swapWith, setRooms, toggleLock,

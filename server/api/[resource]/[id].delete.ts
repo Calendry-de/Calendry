@@ -4,6 +4,23 @@ import { crudPermission } from '../../utils/permissions';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Resources'],
+        summary: 'Delete one row by id',
+        description: 'Generic delete route (permission <resource>.delete). System rows (isSystem) are refused. Entity-specific guards apply, e.g. a Person holding a login cannot be deleted before the login is deleted or reattached.',
+        parameters: [
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+            200: { description: 'Deleted.' },
+            404: { description: 'Not found in this tenant.' },
+            409: { description: 'Refused by an entity-specific guard; the message names the way forward.' },
+        },
+    },
+});
+
 /**
  * Delete one row by id, scoped to the caller's tenant.
  *

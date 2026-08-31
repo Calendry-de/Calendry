@@ -6,6 +6,36 @@ import { withRequestTenant } from '../../utils/tenantDb';
 
 const querySchema = z.object({ session_id: z.string().min(1) });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Schedule'],
+        summary: 'Who is affected by a session',
+        description: 'Resolves the notification audience of a Session (permission notification.preview): assigned lecturers, directly assigned people, and every member of an assigned Group walking the nested tree DOWNWARD only. Delivery is out of scope; this returns the resolved list.',
+        parameters: [
+            { name: 'session_id', in: 'query', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+            200: {
+                description: 'The deduplicated audience.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                sessionId: { type: 'string' },
+                                resolvedGroupIds: { type: 'array', items: { type: 'string' } },
+                                count: { type: 'integer' },
+                                persons: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, givenName: { type: 'string' }, familyName: { type: 'string' }, email: { type: 'string', nullable: true }, timezone: { type: 'string', nullable: true }, reasons: { type: 'array', items: { type: 'string' }, description: 'Why this person is affected: lecturer, directly_assigned, or group:<id>.' } } } },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'No such Session in this tenant.' },
+        },
+    },
+});
+
 /**
  * Resolves the notification audience for a Session (TAXONOMY.md §5).
  *

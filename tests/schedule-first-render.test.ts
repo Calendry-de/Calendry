@@ -29,12 +29,29 @@ let cookie: string;
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
-async function renderSchedule(): Promise<string> {
-    const res = await fetch(`${BASE}/schedule`, { headers: { cookie } });
+async function renderSchedule(query = ''): Promise<string> {
+    const res = await fetch(`${BASE}/schedule${query}`, { headers: { cookie } });
 
     expect(res.status).toBe(200);
 
     return res.text();
+}
+
+/** The week the SERVER decided to draw, read off the stepper's own label. */
+function renderedWeek(html: string): number {
+    const match = html.match(/weeknav_number[^>]*>\s*Week\s*(\d+)/);
+
+    expect(match, 'no current week in the rendered page').not.toBeNull();
+
+    return Number(match![1]);
+}
+
+function renderedTotalWeeks(html: string): number {
+    const match = html.match(/weeknav_total[^>]*>\s*of\s*(\d+)/);
+
+    expect(match, 'no week total in the rendered page').not.toBeNull();
+
+    return Number(match![1]);
 }
 
 /** The `<button …>` open tag carrying this aria-label, attributes included. */
@@ -103,6 +120,47 @@ describe('/schedule first render', () => {
         // The assertion that matters: 1 is what a null term falls back to, and
         // it is what made the stepper render itself disabled.
         expect(totalWeeks).toBeGreaterThan(1);
+    });
+
+    /**
+     * THE URL IS NOW THE VIEW'S STATE, and therefore untrusted input rendered on
+     * the server.
+     *
+     * The week, term and filters moved out of plain `ref`s and into the query
+     * string so a view is shareable and survives a round trip to the proposals
+     * list. That puts them in the same category as `totalWeeks` above — read
+     * before first paint, on the server — so the same trap applies: whatever the
+     * server writes is what the reader gets, and a week the term does not contain
+     * renders an empty grid indistinguishable from a term with nothing in it.
+     *
+     * These read the CONTENT of the stepper's label rather than asking whether it
+     * exists, for the reason this whole suite exists.
+     */
+    describe('week from the URL', () => {
+        it('renders the week named in the query, not week 1', async () => {
+            const html = await renderSchedule('?week=3');
+
+            expect(renderedWeek(html)).toBe(3);
+        });
+
+        it('clamps a week past the end of the term to the last one', async () => {
+            const html = await renderSchedule('?week=999');
+            const total = renderedTotalWeeks(html);
+
+            // Not 999, and not silently 1 either: the last week the term has.
+            expect(renderedWeek(html)).toBe(total);
+        });
+
+        it.each(['?week=0', '?week=-4', '?week=abc', '?week='])(
+            'falls back to week 1 for %s',
+            async (query) => {
+                expect(renderedWeek(await renderSchedule(query))).toBe(1);
+            },
+        );
+
+        it('renders week 1 with no query at all', async () => {
+            expect(renderedWeek(await renderSchedule())).toBe(1);
+        });
     });
 
     it('does NOT render the next-week button as disabled', async () => {

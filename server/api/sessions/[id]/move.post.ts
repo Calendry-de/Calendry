@@ -16,6 +16,56 @@ const bodySchema = z.object({
     reason: z.string().nullish(),
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Sessions'],
+        summary: 'Move a session',
+        description: 'Re-places a Session: term, week, timeslot and/or rooms (permission session.move). Warn-and-allow: a move that breaks a hard constraint is carried out anyway and the violations are returned; only a target outside the TimeGrid (a placement resolving to no slot at all) is refused with 409. Emits a MOVE audit event carrying both the old and the new placement.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        description: 'All fields optional; omitted fields keep their current value.',
+                        properties: {
+                            termId: { type: 'string' },
+                            termWeek: { type: 'integer', minimum: 1 },
+                            dayOfWeek: { type: 'integer', minimum: 1, maximum: 7 },
+                            blockIndex: { type: 'integer', minimum: 0 },
+                            durationBlocks: { type: 'integer', minimum: 1 },
+                            roomIds: { type: 'array', items: { type: 'string' }, description: 'Replaces the full room set when present.' },
+                            reason: { type: 'string', nullable: true },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'Moved.',
+                content: {
+                    'application/json': {
+                        schema: {
+                            type: 'object',
+                            properties: {
+                                session: { type: 'object', description: 'The updated Session row.' },
+                                event: { type: 'object', description: 'The appended audit event (event-sourced history).' },
+                                violations: { type: 'array', items: { type: 'object' }, description: 'Constraint violations now recorded against the Session. Warn-and-allow: they never block the edit.' },
+                            },
+                        },
+                    },
+                },
+            },
+            404: { description: 'No such Session in this tenant.' },
+            409: { description: 'The target day/block/duration is not a slot in the TimeGrid.' },
+        },
+    },
+});
+
 /**
  * Re-place a Session.
  *
