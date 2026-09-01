@@ -33,21 +33,68 @@
             The solver skips {{ unknownTypeRows.length === 1 ? 'it' : 'them' }} too.
         </p>
 
-        <section
-            v-for="group in groups"
-            :key="group.severity"
-            class="cgrid_group"
+        <!--
+            SEVERITY IS NOW A FILTER, NOT THE GROUPING.
+
+            Grouping by category (what a rule is ABOUT — days, rooms, exams…) means
+            a section can hold both hard and soft rules, so each row carries its own
+            severity badge (`ManageConstraintRow`) and this bar narrows which
+            severities show, across every category at once — never fewer than one,
+            since there is no other way back to the rest of the list from here.
+        -->
+        <div
+            aria-label="Filter by severity"
+            class="cgrid_filters"
+            role="group"
         >
-            <header class="cgrid_head">
-                <h2>
-                    <span
-                        class="cgrid_sev"
-                        :class="`cgrid_sev--${group.severity.toLowerCase()}`"
-                    >{{ group.severity }}</span>
-                    {{ group.title }}
-                </h2>
-                <p>{{ group.blurb }}</p>
-            </header>
+            <span class="cgrid_filters-label">Show</span>
+            <button
+                :aria-pressed="severityFilter.has('HARD')"
+                class="cgrid_filter cgrid_filter--hard"
+                :class="{ 'cgrid_filter--active': severityFilter.has('HARD') }"
+                type="button"
+                @click="toggleSeverity('HARD')"
+            >Hard rules</button>
+            <button
+                :aria-pressed="severityFilter.has('SOFT')"
+                class="cgrid_filter cgrid_filter--soft"
+                :class="{ 'cgrid_filter--active': severityFilter.has('SOFT') }"
+                type="button"
+                @click="toggleSeverity('SOFT')"
+            >Soft rules</button>
+        </div>
+
+        <p
+            v-if="!categoryGroups.length"
+            class="cgrid_empty"
+        >No rules match the current filter.</p>
+
+        <!--
+            ONE `<details>` PER CATEGORY, native rather than a hand-rolled
+            disclosure: it is keyboard- and screen-reader-operable for free, and
+            `open` needs no state here for the same reason `open` on a row is local
+            to that row — nothing outside a section acts on whether it is expanded.
+        -->
+        <details
+            v-for="group in categoryGroups"
+            :key="group.category"
+            class="cgrid_group"
+            open
+        >
+            <summary class="cgrid_head">
+                <Icon
+                    aria-hidden="true"
+                    class="cgrid_chevron"
+                    name="material-symbols:chevron-right"
+                />
+                <span class="cgrid_head-text">
+                    <h2>
+                        {{ group.label }}
+                        <span class="cgrid_count">{{ group.entries.length }}</span>
+                    </h2>
+                    <p>{{ group.blurb }}</p>
+                </span>
+            </summary>
 
             <ul class="cgrid_rows">
                 <ManageConstraintRow
@@ -110,7 +157,7 @@
                     />
                 </ul>
             </template>
-        </section>
+        </details>
 
         <!--
             ADDITIONAL RULES — every non-default instance, in one place.
@@ -120,15 +167,28 @@
             both places would put the same exception on screen twice and leave
             no single answer to "what extra rules does this tenant have?".
         -->
-        <section class="cgrid_group">
-            <header class="cgrid_head">
-                <h2>Additional rules</h2>
-                <p>
-                    Extra instances of a rule, each narrowed to particular session kinds — a
-                    different weight for seminars than for lectures, say. The tenant-wide
-                    version above still applies everywhere these do not.
-                </p>
-            </header>
+        <details
+            class="cgrid_group"
+            open
+        >
+            <summary class="cgrid_head">
+                <Icon
+                    aria-hidden="true"
+                    class="cgrid_chevron"
+                    name="material-symbols:chevron-right"
+                />
+                <span class="cgrid_head-text">
+                    <h2>
+                        Additional rules
+                        <span class="cgrid_count">{{ variants.length }}</span>
+                    </h2>
+                    <p>
+                        Extra instances of a rule, each narrowed to particular session kinds — a
+                        different weight for seminars than for lectures, say. The tenant-wide
+                        version above still applies everywhere these do not.
+                    </p>
+                </span>
+            </summary>
 
             <ul
                 v-if="variants.length"
@@ -185,6 +245,13 @@
             </ul>
 
             <p
+                v-else-if="allVariantsCount"
+                class="cgrid_empty"
+            >
+                {{ allVariantsCount }} exist, but none match the current severity filter.
+            </p>
+
+            <p
                 v-else
                 class="cgrid_empty"
             >
@@ -197,7 +264,7 @@
                 to="/manage/constraints/new"
                 type="secondary"
             >Add a rule</CommonButton>
-        </section>
+        </details>
 
         <p
             v-if="error"
@@ -208,13 +275,19 @@
 </template>
 
 <script setup lang="ts">
-import type { ConstraintTypeDef } from '#shared/constraintTypes';
+import type { ConstraintCategory, ConstraintTypeDef } from '#shared/constraintTypes';
 import type { ManageEntity } from '~/utils/manageRegistry';
 import type { useEntityList } from '~/composables/entityList';
 import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintVariantGroup from '~/components/manage/ManageConstraintVariantGroup.vue';
-import { CONSTRAINT_TYPES, defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
+import {
+    CONSTRAINT_CATEGORIES,
+    CONSTRAINT_CATEGORY_ORDER,
+    CONSTRAINT_TYPES,
+    defaultConstraintTypes,
+    findConstraintType,
+} from '#shared/constraintTypes';
 import { isConstraintTypeSuggested } from '#shared/tenantMode';
 import { groupConstraintVariants } from '~/utils/constraintGrouping';
 
@@ -231,8 +304,12 @@ import { groupConstraintVariants } from '~/utils/constraintGrouping';
  * whether or not the tenant has one, and a missing one is reported LOUDLY. That
  * omission is what hid `no_double_booking_person`.
  *
- * HARD AND SOFT ARE SEPARATED because they are not comparable — interleaving
- * them invites reading the weight column as a severity ranking.
+ * GROUPED BY CATEGORY (`ConstraintTypeDef.category`) rather than severity: a
+ * flat list of forty-plus switches is what made `no_double_booking_person`
+ * easy to miss, and severity alone does not answer "where are the rules about
+ * exams?". Severity stays visible per row and doubles as a filter
+ * (`severityFilter`) instead of the grouping axis, so it can narrow every
+ * category at once without hiding the thing being narrowed.
  */
 const props = defineProps<{
     entity: ManageEntity;
@@ -258,6 +335,27 @@ const tenantMode = useTenantMode();
 const busy = ref(new Set<string>());
 const error = ref<string | null>(null);
 
+/**
+ * Both severities visible by default — the filter narrows, it never starts
+ * narrowed. Never allowed to reach zero: an empty filter would hide every
+ * rule with no control left on screen to widen it back.
+ */
+const severityFilter = ref(new Set<'HARD' | 'SOFT'>(['HARD', 'SOFT']));
+
+function toggleSeverity(severity: 'HARD' | 'SOFT') {
+    const next = new Set(severityFilter.value);
+
+    if (next.has(severity)) {
+        next.delete(severity);
+    } else {
+        next.add(severity);
+    }
+
+    if (next.size) {
+        severityFilter.value = next;
+    }
+}
+
 const rows = computed(() => props.list.rows.value as unknown as ConstraintRow[]);
 
 const defaultByType = computed(() => new Map(
@@ -273,7 +371,7 @@ const defaultByType = computed(() => new Map(
  * dropped here and reported by `unknownTypeRows` instead — the same
  * report-never-omit rule the missing-type alarm follows.
  */
-const variants = computed(() => rows.value
+const allVariants = computed(() => rows.value
     .filter((row) => !row.isDefault)
     .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name))
     .map((row) => {
@@ -282,6 +380,13 @@ const variants = computed(() => rows.value
         return type ? { type, row } : null;
     })
     .filter((entry): entry is { type: ConstraintTypeDef; row: ConstraintRow } => entry !== null));
+
+/** Unfiltered count, so the empty state can say "filtered out" instead of "none exist". */
+const allVariantsCount = computed(() => allVariants.value.length);
+
+/** `allVariants`, narrowed by the same severity filter the categories above use. */
+const variants = computed(() => allVariants.value
+    .filter((entry) => severityFilter.value.has(entry.type.severity ?? entry.row.severity)));
 
 /**
  * Issue #103: variants sharing the exact same type/severity/weight/params/
@@ -363,10 +468,11 @@ interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
  * A deprecated type with NO row stays hidden — show what a tenant HAS, never invite
  * them to adopt what is superseded.
  */
-function entriesFor(severity: 'HARD' | 'SOFT', deprecated: boolean): Entry[] {
+function entriesForCategory(category: ConstraintCategory, deprecated: boolean): Entry[] {
     const entries = CONSTRAINT_TYPES
-        .filter((type) => (type.severity ?? 'HARD') === severity)
+        .filter((type) => type.category === category)
         .filter((type) => Boolean(type.deprecatedBy) === deprecated)
+        .filter((type) => severityFilter.value.has(type.severity ?? 'HARD'))
         .map((type) => {
             const row = defaultByType.value.get(type.key);
 
@@ -394,24 +500,24 @@ function supersededBy(type: ConstraintTypeDef): string {
     return findConstraintType(type.deprecatedBy)?.label ?? type.deprecatedBy ?? 'a newer rule';
 }
 
-const groups = computed(() => [
-    {
-        severity: 'HARD' as const,
-        title: 'Rules a timetable must not break',
-        blurb: 'A breach is a defect. Manual edits are warned rather than blocked, and the solver '
-            + 'treats these as inviolable.',
-        entries: entriesFor('HARD', false),
-        superseded: entriesFor('HARD', true),
-    },
-    {
-        severity: 'SOFT' as const,
-        title: 'Preferences the solver weighs',
-        blurb: 'Weights are relative to each other, not a score out of ten — only the ratio between '
-            + 'enabled rules means anything. Zero evaluates the rule without steering the schedule.',
-        entries: entriesFor('SOFT', false),
-        superseded: entriesFor('SOFT', true),
-    },
-]);
+/**
+ * One collapsible section per category, in `CONSTRAINT_CATEGORY_ORDER`.
+ * A category with nothing to show — every type filtered out by severity, or
+ * (in principle) none defined yet — is dropped rather than rendered empty.
+ */
+const categoryGroups = computed(() => CONSTRAINT_CATEGORY_ORDER
+    .map((category) => {
+        const meta = CONSTRAINT_CATEGORIES[category];
+
+        return {
+            category,
+            label: meta.label,
+            blurb: meta.blurb,
+            entries: entriesForCategory(category, false),
+            superseded: entriesForCategory(category, true),
+        };
+    })
+    .filter((group) => group.entries.length || group.superseded.length));
 
 /**
  * Saves ONE field, immediately, per control.
@@ -512,17 +618,96 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
         }
     }
 
+    &_filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: $space3;
+        align-items: center;
+    }
+
+    &_filters-label {
+        font-size: $fontSizeXs;
+        font-weight: 650;
+        color: $surface7;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    &_filter {
+        cursor: pointer;
+
+        padding: $space2 $space5;
+        border: 1px solid $surface4;
+        border-radius: $radiusXl;
+
+        font: inherit;
+        font-size: $fontSizeSm;
+        font-weight: 600;
+        color: $content7;
+
+        background: $surface0;
+
+        transition: 0.12s;
+
+        &--hard.cgrid_filter--active {
+            border-color: transparent;
+            color: $error700;
+            background: varToRgba('error500', 0.16);
+        }
+
+        &--soft.cgrid_filter--active {
+            border-color: transparent;
+            color: $warning700;
+            background: varToRgba('warning500', 0.2);
+        }
+
+        &:not(.cgrid_filter--active) {
+            @include hover() {
+                &:hover { border-color: $surface6; }
+            }
+        }
+    }
+
+    /*
+     * `<details>` GIVES THE COLLAPSE FOR FREE — keyboard- and screen-reader-
+     * operable with no JS state to own here, matching why a row's own
+     * disclosure (`ManageConstraintRow`) is a plain local ref: nothing outside
+     * one section acts on whether it is expanded.
+     */
     &_group {
         display: flex;
         flex-direction: column;
-        gap: $space6;
+        gap: $space5;
+
+        padding: $space6;
+        border: 1px solid $surface3;
+        border-radius: $radiusLg;
+
+        background: $surface0;
+
+        &[open] > .cgrid_head .cgrid_chevron {
+            transform: rotate(90deg);
+        }
     }
 
     &_head {
+        cursor: pointer;
+
+        display: flex;
+        gap: $space4;
+        align-items: flex-start;
+
+        list-style: none;
+
+        // Chrome/Safari still render a marker outside `list-style` on `<summary>`.
+        &::-webkit-details-marker {
+            display: none;
+        }
+
         h2 {
             display: flex;
             flex-wrap: wrap;
-            gap: $space4;
+            gap: $space3;
             align-items: center;
 
             margin: 0;
@@ -541,23 +726,32 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
         }
     }
 
-    &_sev {
-        padding: var(--space-1) $space4;
+    &_head-text {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &_chevron {
+        flex: none;
+
+        width: 20px;
+        height: 20px;
+        margin-top: 2px;
+
+        color: $surface7;
+
+        transition: transform 0.12s;
+    }
+
+    &_count {
+        padding: 0 $space3;
         border-radius: $radiusSm;
 
         font-size: $fontSizeXs;
-        font-weight: 700;
-        letter-spacing: 0.06em;
+        font-weight: 650;
+        color: $content7;
 
-        &--hard {
-            color: $error700;
-            background: varToRgba('error500', 0.16);
-        }
-
-        &--soft {
-            color: $warning700;
-            background: varToRgba('warning500', 0.2);
-        }
+        background: $surface2;
     }
 
     &_rows {

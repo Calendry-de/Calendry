@@ -48,6 +48,18 @@
                     present (convert.rs) — so the distinction to surface is not
                     "can I turn it off" but "who acts on it".
                 -->
+                <!--
+                    THE SEVERITY BADGE, not just the weight slot below.
+                    Rows used to sit in a section that was ALL hard or ALL soft,
+                    so the section header alone said which; grouping by category
+                    instead means one section can hold both, and the row is now
+                    the only place left that says it.
+                -->
+                <span
+                    class="crow_tag"
+                    :class="`crow_tag--sev-${severity.toLowerCase()}`"
+                >{{ severity === 'HARD' ? 'Hard' : 'Soft' }}</span>
+
                 <span
                     class="crow_tag"
                     :class="`crow_tag--${type.evaluator}`"
@@ -490,6 +502,16 @@ function toggleKind(kindId: string) {
         &--low-relevance {
             color: $content7;
             background: $surface2;
+        }
+
+        &--sev-hard {
+            color: $error700;
+            background: varToRgba('error500', 0.16);
+        }
+
+        &--sev-soft {
+            color: $warning700;
+            background: varToRgba('warning500', 0.2);
         }
     }
 

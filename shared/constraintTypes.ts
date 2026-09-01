@@ -202,6 +202,56 @@ export type WireConstraintField =
     | 'maxConsecutiveOfferingBlocks'
     | 'maxDailySessionCount';
 
+/**
+ * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
+ * shelves — independent of `severity`, which is what a breach MEANS.
+ */
+export type ConstraintCategory =
+    | 'structure'
+    | 'availability'
+    | 'days'
+    | 'rooms'
+    | 'online'
+    | 'exams'
+    | 'workload';
+
+/** Display metadata for each category, keyed for `CONSTRAINT_CATEGORY_ORDER` to walk. */
+export const CONSTRAINT_CATEGORIES: Record<ConstraintCategory, { label: string; blurb: string }> = {
+    structure: {
+        label: 'Placement & structure',
+        blurb: 'What makes a timetable valid at all — no overlaps, nothing left unplaced.',
+    },
+    availability: {
+        label: 'Availability & preferences',
+        blurb: 'Honouring what a person, group or slot is configured to allow or want.',
+    },
+    days: {
+        label: 'Days & patterns',
+        blurb: 'How sessions distribute across a day or week — spread, compactness, repeating patterns.',
+    },
+    rooms: {
+        label: 'Rooms',
+        blurb: 'Which room a session lands in, and how consistently.',
+    },
+    online: {
+        label: 'Online & on-site mix',
+        blurb: 'Balancing or separating online and in-person sessions.',
+    },
+    exams: {
+        label: 'Exams',
+        blurb: 'Spacing and placement rules specific to exam periods.',
+    },
+    workload: {
+        label: 'Teaching load',
+        blurb: 'How much, and how consistently, a lecturer teaches.',
+    },
+};
+
+/** Fixed display order — not alphabetical, structure-first-to-niche. */
+export const CONSTRAINT_CATEGORY_ORDER: ConstraintCategory[] = [
+    'structure', 'availability', 'days', 'rooms', 'online', 'exams', 'workload',
+];
+
 export interface ConstraintTypeDef {
     key: string;
     /**
@@ -235,6 +285,14 @@ export interface ConstraintTypeDef {
      * `RESOURCES.constraints.weight`.
      */
     severity: 'HARD' | 'SOFT' | null;
+    /**
+     * Which shelf this type sits on in the manage UI — orthogonal to `severity`.
+     * Severity says whether a breach is a defect or a preference; category says
+     * what the rule is ABOUT (rooms, days, exams, …), so the grid can offer both
+     * axes as independent filters instead of one flat list of thirteen-plus
+     * switches.
+     */
+    category: ConstraintCategory;
     /**
      * Derive `applies_to_kinds` from the tenant's Session kinds CLASSIFIED this
      * way, instead of from the rule's own `ConstraintScope` rows.
@@ -329,6 +387,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Structural, evaluated here -----------------------------------------
     {
         key: 'no_double_booking_room',
+        category: 'structure',
         wireField: 'roomDoubleBooking',
         label: 'No double-booked rooms',
         description: 'A room cannot host two sessions that overlap in the same week.',
@@ -338,6 +397,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'no_double_booking_lecturer',
+        category: 'structure',
         wireField: 'lecturerDoubleBooking',
         label: 'No double-booked people',
         description: 'Nobody can be assigned to two sessions that overlap.',
@@ -347,6 +407,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'no_double_booking_group',
+        category: 'structure',
         wireField: 'groupDoubleBooking',
         label: 'No double-booked groups',
         description:
@@ -359,6 +420,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'no_double_booking_person',
+        category: 'structure',
         wireField: 'personDoubleBooking',
         label: 'No double-booked attendees',
         description:
@@ -373,6 +435,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Structural, evaluated here, PER SESSION (no counterpart) ----------
     {
         key: 'no_session_spanning_break',
+        category: 'structure',
         label: 'Report sessions spanning a break',
         description:
             'A session that starts before a named break and ends after it is drawn '
@@ -402,10 +465,11 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'no_unplaced_session',
+        category: 'structure',
         label: 'Every session must be placed',
         description:
             'A Session an Offering still owes must sit somewhere on the grid. Flags one '
-            + 'cancelled to the spare bank (issue #22) that has not been re-placed or '
+            + 'cancelled to the spare bank that has not been re-placed or '
             + 'removed — a hole in the timetable, not a preference.',
         evaluator: 'app',
         /*
@@ -430,6 +494,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Structural, evaluated here, RELATION-BASED (ADR-0028) --------------
     {
         key: 'different_time',
+        category: 'structure',
         label: 'Different time',
         description:
             'Named offerings must never be scheduled at overlapping times, even '
@@ -451,6 +516,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Hard, solver-owned --------------------------------------------------
     {
         key: 'exact_frequency_per_offering',
+        category: 'structure',
         defaultEnabled: true,
         wireField: 'exactFrequency',
         label: 'Exact session count per offering',
@@ -461,6 +527,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'lecturer_veto',
+        category: 'availability',
         defaultEnabled: true,
         wireField: 'lecturerVeto',
         label: 'Lecturer unavailability',
@@ -471,6 +538,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'group_veto',
+        category: 'availability',
         defaultEnabled: true,
         wireField: 'groupVeto',
         label: 'Honour group availability windows',
@@ -495,6 +563,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'online_onsite_same_day_exclusion',
+        category: 'online',
         defaultEnabled: true,
         wireField: 'onlineOnsiteSameDay',
         /*
@@ -524,6 +593,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'max_online_ratio_per_group',
+        category: 'online',
         defaultEnabled: true,
         wireField: 'maxOnlineShare',
         label: 'Cap online share per group',
@@ -556,6 +626,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     // ---- Soft, solver-owned --------------------------------------------------
     {
         key: 'minimize_first_block',
+        category: 'days',
         gridRelative: true,
         wireField: 'minimizeFirstBlock',
         label: 'Avoid the first block',
@@ -572,6 +643,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_last_block',
+        category: 'days',
         wireField: 'minimizeLastBlock',
         label: 'Avoid the last block',
         description: 'Prefer not to schedule in the latest block of the day.',
@@ -583,6 +655,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_block_usage',
+        category: 'days',
         defaultEnabled: true,
         gridRelative: true,
         wireField: 'minimizeBlockUsage',
@@ -626,6 +699,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_specifc_day',
+        category: 'days',
         defaultEnabled: true,
         wireField: 'minimizeDayUsage',
         label: 'Avoid particular days',
@@ -650,6 +724,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_high_ranking_rooms',
+        category: 'rooms',
         defaultEnabled: true,
         wireField: 'minimizeRoomRank',
         /*
@@ -697,6 +772,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_exam_week_sessions',
+        category: 'exams',
         defaultEnabled: true,
         wireField: 'minimizeExamWeek',
         /*
@@ -739,6 +815,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'compactness',
+        category: 'days',
         defaultEnabled: true,
         gridRelative: true,
         wireField: 'compactness',
@@ -773,6 +850,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'minimize_online_sessions',
+        category: 'online',
         defaultEnabled: true,
         wireField: 'minimizeOnline',
         label: 'Prefer on-site',
@@ -784,6 +862,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'person_preference_fit',
+        category: 'availability',
         defaultEnabled: true,
         /*
          * CROSSES THE WIRE, and this line had to land in the same change as the
@@ -826,6 +905,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     },
     {
         key: 'group_size_fits_room',
+        category: 'rooms',
         defaultEnabled: true,
         wireField: 'groupSizeFitsRoom',
         label: 'Rooms must fit the groups actually attending',
@@ -850,6 +930,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'room_consistency',
+        category: 'rooms',
         defaultEnabled: true,
         wireField: 'roomConsistency',
         label: 'Keep an offering in the same room',
@@ -875,6 +956,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_weekday_imbalance',
+        category: 'days',
         defaultEnabled: true,
         wireField: 'minimizeWeekdayImbalance',
         label: 'Spread a group\u2019s week evenly',
@@ -900,6 +982,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_concurrent_online_sessions',
+        category: 'online',
         defaultEnabled: true,
         wireField: 'maxConcurrentOnlineSessions',
         label: 'Cap online sessions running at once',
@@ -932,6 +1015,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'room_turnaround_buffer',
+        category: 'rooms',
         gridRelative: true,
         wireField: 'roomTurnaroundBuffer',
         label: 'Leave a gap between bookings of one room',
@@ -964,6 +1048,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_room_churn',
+        category: 'rooms',
         wireField: 'minimizeRoomChurn',
         label: 'Give a group a home room',
         description:
@@ -996,6 +1081,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_capacity_waste',
+        category: 'rooms',
         defaultEnabled: true,
         wireField: 'minimizeCapacityWaste',
         label: 'Reward a good room-size fit',
@@ -1031,6 +1117,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_weekly_teaching_load',
+        category: 'workload',
         defaultEnabled: true,
         gridRelative: true,
         wireField: 'maxWeeklyTeachingLoad',
@@ -1079,6 +1166,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_consecutive_blocks',
+        category: 'days',
         gridRelative: true,
         wireField: 'maxConsecutiveBlocks',
         label: 'Cap teaching without a break',
@@ -1122,6 +1210,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_daily_span',
+        category: 'days',
         gridRelative: true,
         wireField: 'maxDailySpan',
         label: 'Cap how long a day runs',
@@ -1170,6 +1259,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_location_change',
+        category: 'rooms',
         defaultEnabled: true,
         wireField: 'minimizeLocationChange',
         label: 'Keep a day on one site',
@@ -1219,6 +1309,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_same_day',
+        category: 'exams',
         defaultEnabled: true,
         appliesToKindType: 'EXAM',
         wireField: 'examSpacingSameDay',
@@ -1244,6 +1335,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'exam_spacing_window',
+        category: 'exams',
         defaultEnabled: true,
         appliesToKindType: 'EXAM',
         wireField: 'examSpacingWindow',
@@ -1279,6 +1371,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'protected_block',
+        category: 'availability',
         gridRelative: true,
         wireField: 'protectedBlock',
         label: 'Reserve a slot institution-wide',
@@ -1323,6 +1416,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'distributed_pattern_adherence',
+        category: 'days',
         defaultEnabled: true,
         wireField: 'distributedPatternAdherence',
         label: 'Hold a weekly slot for spread-out courses',
@@ -1352,6 +1446,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'block_pattern_adherence',
+        category: 'days',
         defaultEnabled: true,
         wireField: 'blockPatternAdherence',
         label: 'Keep intensive courses in one window',
@@ -1377,6 +1472,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'lecturer_consistency',
+        category: 'workload',
         defaultEnabled: true,
         wireField: 'lecturerConsistency',
         label: 'Keep an offering’s lecturer stable',
@@ -1400,6 +1496,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'minimize_offering_day_split',
+        category: 'days',
         wireField: 'minimizeOfferingDaySplit',
         label: 'Keep an offering’s day together',
         description:
@@ -1419,6 +1516,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_offering_sessions_per_day',
+        category: 'days',
         defaultEnabled: true,
         wireField: 'maxOfferingSessionsPerDay',
         label: 'Cap an offering’s sessions per day',
@@ -1447,6 +1545,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_consecutive_offering_blocks',
+        category: 'days',
         defaultEnabled: true,
         gridRelative: true,
         wireField: 'maxConsecutiveOfferingBlocks',
@@ -1476,6 +1575,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
 
     {
         key: 'max_daily_session_count',
+        category: 'days',
         wireField: 'maxDailySessionCount',
         label: 'Cap sessions per day',
         description:
