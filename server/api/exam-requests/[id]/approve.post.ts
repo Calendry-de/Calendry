@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
-import { assertPlacementFits, assertTeachingComplete, materializeExam } from '../../../utils/examRequests';
+import { assertExamRoomCapacity, assertPlacementFits, assertTeachingComplete, materializeExam } from '../../../utils/examRequests';
 
 const bodySchema = z.object({ note: z.string().max(2000).nullish() });
 
@@ -75,6 +75,13 @@ export default defineEventHandler(async (event) => {
         // being incomplete does not make the exam any less approved.
         const teachingComplete = await assertTeachingComplete(tx, identity.tenantId, request.offeringId);
 
-        return { request: decided, sessionId, teachingComplete };
+        // Same convention: a preferred room too small for the expected exam
+        // sitting is reported, not refused — `roomId` was only ever a
+        // preference, and the reviewer already chose to grant the request.
+        const examCapacity = await assertExamRoomCapacity(tx, identity.tenantId, request.offeringId, request.roomId);
+
+        return {
+            request: decided, sessionId, teachingComplete, examCapacity,
+        };
     });
 });

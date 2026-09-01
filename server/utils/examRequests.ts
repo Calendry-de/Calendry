@@ -7,6 +7,7 @@ import { fitsGrid } from './gridBounds';
 import { WEEK_KIND_NAME, classifyWeeks, weekCountOf } from '../../shared/academicCalendar';
 import type { WeekKindName } from '../../shared/academicCalendar';
 import { isPlacedSession } from '../../shared/sessionPlacement';
+import { deriveCapacity } from '../../shared/groupCapacity';
 
 /**
  * The rules behind a lecturer's exam request, in one place because four routes
@@ -203,6 +204,93 @@ export async function assertTeachingComplete(
         complete: placedCount >= offering.frequency,
         placedCount,
         requiredCount: offering.frequency,
+    };
+}
+
+/** Result of {@link assertExamRoomCapacity} — a room's exam capacity checked against the expected sitting size. */
+export interface ExamCapacityCheck {
+    /** False when there is no preferred room, or nothing to compare it against — nothing was actually checked. */
+    checked: boolean;
+    /** `room.examCapacity ?? room.capacity`. Null when `checked` is false. */
+    roomCapacity: number | null;
+    /** `Offering.requiredCapacity` if set, else `deriveCapacity()` over the module's attached Groups. Null when underivable. */
+    requiredCapacity: number | null;
+    /** True whenever nothing was checked, or the room capacity meets the requirement. */
+    sufficient: boolean;
+}
+
+/**
+ * Is the request's preferred room big enough for an exam sitting of this
+ * module?
+ *
+ * EXAM CAPACITY, NOT TEACHING CAPACITY — `Room.examCapacity` exists because
+ * exam spacing/invigilation reduces usable seats below a room's normal
+ * teaching capacity; `null` there falls back to `Room.capacity`, same as
+ * `Offering.requiredCapacity` falling back to a derived number.
+ *
+ * REUSES `deriveCapacity()`, the same function `assembleSolverInput` already
+ * uses for ordinary room-capacity checks: an explicit `Offering.requiredCapacity`
+ * wins, otherwise the number is derived from the attached Groups' membership
+ * closure. Two independent notions of "how many people" would drift.
+ *
+ * WARN, DON'T BLOCK — mirrors `materializeExam`'s own room-clash comment
+ * ("an approved exam that double-books a room is carried out and the clash is
+ * reported"). A too-small room is surfaced on the approval response, not
+ * refused: the reviewer already chose to grant the request, and the room was
+ * only ever a PREFERENCE (see `ExamRequest.roomId`'s own comment).
+ *
+ * PURE READ — safe to call repeatedly.
+ */
+export async function assertExamRoomCapacity(
+    tx: Tx,
+    tenantId: string,
+    offeringId: string,
+    roomId: string | null,
+): Promise<ExamCapacityCheck> {
+    if (!roomId) {
+        return { checked: false, roomCapacity: null, requiredCapacity: null, sufficient: true };
+    }
+
+    const room = await tx.room.findFirst({
+        where: { id: roomId, tenantId },
+        select: { capacity: true, examCapacity: true },
+    });
+
+    if (!room) {
+        return { checked: false, roomCapacity: null, requiredCapacity: null, sufficient: true };
+    }
+
+    const roomCapacity = room.examCapacity ?? room.capacity;
+
+    const offering = await tx.offering.findFirst({
+        where: { id: offeringId, tenantId },
+        select: { requiredCapacity: true, groups: { select: { groupId: true } } },
+    });
+
+    if (!offering) {
+        return { checked: false, roomCapacity, requiredCapacity: null, sufficient: true };
+    }
+
+    let requiredCapacity = offering.requiredCapacity;
+
+    // NULL means "derive it", exactly as it does for the solver's own
+    // room-capacity check — never treated as "no requirement".
+    if (requiredCapacity === null) {
+        const groupIds = offering.groups.map((link) => link.groupId);
+
+        const [groups, memberships] = await Promise.all([
+            tx.group.findMany({ where: { tenantId }, select: { id: true, parentGroupId: true, expectedSize: true } }),
+            tx.membership.findMany({ where: { tenantId }, select: { groupId: true, personId: true } }),
+        ]);
+
+        requiredCapacity = deriveCapacity(groupIds, groups, memberships).capacity;
+    }
+
+    return {
+        checked: requiredCapacity !== null,
+        roomCapacity,
+        requiredCapacity,
+        sufficient: requiredCapacity === null || roomCapacity >= requiredCapacity,
     };
 }
 

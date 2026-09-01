@@ -829,6 +829,13 @@ model Room {
   code     String
   name     String
   capacity Int     @default(0)
+
+  /// Separate, optional capacity for EXAM sittings — spacing and invigilation
+  /// reduce usable seats below normal teaching capacity. NULL falls back to
+  /// `capacity`, same "NULL is a meaningful fallback" pattern as
+  /// `Offering.color`/`Offering.requiredCapacity` above.
+  examCapacity Int? @map("exam_capacity")
+
   location String?
 
   /// Desirability. Soft constraints minimize use of high-ranking rooms.

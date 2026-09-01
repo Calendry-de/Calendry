@@ -206,12 +206,22 @@ async function decide(id: string, action: 'approve' | 'reject') {
     try {
         const result = await request<{
             teachingComplete?: { complete: boolean; placedCount: number; requiredCount: number };
+            examCapacity?: { checked: boolean; roomCapacity: number | null; requiredCapacity: number | null; sufficient: boolean };
         }>(`/api/exam-requests/${id}/${action}`, { method: 'POST', body: {} });
 
         if (action === 'approve' && result.teachingComplete && !result.teachingComplete.complete) {
             teachingWarning.value = `Approved, but this module has only ${result.teachingComplete.placedCount} of its `
                 + `${result.teachingComplete.requiredCount} sessions placed — its teaching plan is not fully `
                 + 'scheduled yet.';
+        }
+
+        // A too-small preferred room, same warn-and-allow shape as a room
+        // clash: reported here, never a reason approval was refused.
+        if (action === 'approve' && result.examCapacity?.checked && !result.examCapacity.sufficient) {
+            const roomWarning = `The preferred room seats ${result.examCapacity.roomCapacity} for an exam, `
+                + `but this sitting is expected to need ${result.examCapacity.requiredCapacity}.`;
+
+            teachingWarning.value = teachingWarning.value ? `${teachingWarning.value} ${roomWarning}` : roomWarning;
         }
 
         await refresh();

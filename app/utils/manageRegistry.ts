@@ -954,6 +954,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             { key: 'code', label: 'Code', format: 'code' },
             { key: 'name', label: 'Name' },
             { key: 'capacity', label: 'Capacity', format: 'number' },
+            { key: 'examCapacity', label: 'Exam capacity', format: 'number', secondary: true },
             { key: 'location', label: 'Location', secondary: true },
             { key: 'isActive', label: 'Active', format: 'boolean' },
         ],
@@ -969,6 +970,17 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                  * without a capacity gets it, and the reading has to be the one
                  * that keeps such a room usable. */
                 help: 'Seats. Leave it 0 for no limit — an online room, or one nobody has measured.',
+            },
+            {
+                key: 'examCapacity',
+                label: 'Exam capacity',
+                type: 'number',
+                min: 0,
+                /* Nullable, unlike `capacity`: unset is a real, distinct state
+                 * ("this room has no separate exam limit"), not "zero seats". */
+                help: 'Seats available for an exam sitting, if fewer than the normal capacity — '
+                    + 'exam spacing and invigilation often use more room per person. '
+                    + "Leave unset to fall back to this room's normal capacity.",
             },
             { key: 'location', label: 'Location', type: 'text' },
             {
