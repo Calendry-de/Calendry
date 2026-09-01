@@ -319,20 +319,34 @@ const apiTokenResolver: TenantResolver = async (event) => {
 };
 
 /**
- * Staff-cookie resolver — issue #76. Tried FIRST, ahead of every tenant-scoped
- * resolver, unlike screen/token which are tried only after a tenant session is
- * ruled out.
+ * Staff-cookie resolver — issue #76. Tried only for `/api/staff/*` and
+ * `/api/staff-auth/*` (see `isStaffPath` below), never for anything else.
  *
- * ORDER IS DELIBERATE BUT, UNLIKE THE SCREEN RESOLVER'S, NOT A PRIVILEGE
- * CONCERN. A `StaffIdentity` cannot satisfy a single tenant permission check
- * (see its own comment) and is refused outright by every `/api/*` route that
- * is not under `server/api/staff/*` (`requireStaffIdentity`) or
- * `server/api/staff-auth/*` (public) — `withRequestTenant()` refuses
- * `kind === 'staff'` before it ever opens a transaction. So a request that
- * somehow carried BOTH a valid staff cookie and a valid tenant session cookie
- * cannot use staff-first ordering to gain tenant access; it can only ever be
- * resolved as exactly one principal, unambiguously, which is the actual
- * property this ordering buys — not a security boundary, a determinism one.
+ * WAS TRIED FIRST FOR EVERY `/api/*` ROUTE, UNCONDITIONALLY, until the bug
+ * this comment now documents: a browser carrying BOTH a valid staff cookie
+ * and a valid tenant session cookie — a Calendry staff member who is ALSO a
+ * signed-in tenant user, in the same browser — resolved as `staff` on every
+ * request, because `??` short-circuits on the first successful resolver and
+ * `sessionCookieResolver` was never even reached. `withRequestTenant()` (see
+ * its own comment) correctly refuses `kind === 'staff'`, so the visible
+ * symptom was every tenant-scoped route 403ing with "A staff session cannot
+ * access tenant-scoped routes" — for a request whose tenant cookie was
+ * entirely valid. `GET /api/auth/session` reads `SESSION_COOKIE` directly
+ * rather than going through this resolver, so the client-side route guard
+ * (`auth.global.ts`) never caught this: the page loaded, then every API call
+ * behind it failed.
+ *
+ * A `StaffIdentity` cannot satisfy a single tenant permission check (see its
+ * own comment) and is refused outright by every `/api/*` route that is not
+ * under `server/api/staff/*` (`requireStaffIdentity`) or
+ * `server/api/staff-auth/*` (public) — so the staff cookie was NEVER capable
+ * of doing anything on a non-staff route besides displacing a valid tenant
+ * identity that would otherwise have resolved. Restricting it to staff paths
+ * removes that displacement entirely rather than trading it for a different
+ * ordering: a dual-cookie browser now resolves as `staff` on staff routes and
+ * as its tenant identity everywhere else, which is what both cookies actually
+ * describe — exactly one principal per request, unambiguously, decided by
+ * the path rather than by which resolver happened to run first.
  */
 const staffCookieResolver: TenantResolver = async (event) => {
     const token = getCookie(event, STAFF_SESSION_COOKIE);
@@ -401,12 +415,19 @@ export const icsLinkResolver: TenantResolver = async (event) => {
     };
 };
 
+/** Matches `server/api/staff/*` and `server/api/staff-auth/*` — see `staffCookieResolver`'s own comment. */
+function isStaffPath(event: H3Event): boolean {
+    const path = (event.path ?? '').split('?')[0] ?? '';
+
+    return path.startsWith('/api/staff/') || path.startsWith('/api/staff-auth/');
+}
+
 /**
  * The single swap point for the routes THIS middleware covers.
  * `icsLinkResolver` is intentionally excluded — see its own comment.
  */
 const activeResolver: TenantResolver = async (event) => (
-    await staffCookieResolver(event)
+    (isStaffPath(event) ? await staffCookieResolver(event) : null)
         ?? await sessionCookieResolver(event)
         ?? await apiTokenResolver(event)
         ?? screenKeyResolver(event)

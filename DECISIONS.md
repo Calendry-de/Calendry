@@ -2123,6 +2123,38 @@ everywhere permission checks, RLS context and audit attribution read it, which
 issue #76 did not need to answer to ship login, tenant creation and the tenant
 list.
 
+**A dual-cookie browser could lock itself out of the tenant app entirely —
+found live, reported as "the frontend says I can't access this even though my
+normal session is valid."** `activeResolver` (`tenantResolver.ts`) tried
+`staffCookieResolver` FIRST, unconditionally, for every `/api/*` request. A
+browser that is both a Calendry staff member AND a signed-in tenant user (the
+obvious case: staff testing the product as a tenant admin in the same
+session) carries both cookies at once. `??` short-circuits on the first
+resolver to succeed, so the valid staff cookie always won and
+`sessionCookieResolver` was never reached — every tenant-scoped route then
+403'd with "A staff session cannot access tenant-scoped routes"
+(`withRequestTenant`'s own guard), for a request whose tenant session was
+entirely valid. The client-side route guard never caught this because
+`GET /api/auth/session` reads `SESSION_COOKIE` directly rather than going
+through `activeResolver` — so the page loaded normally and every API call
+behind it then failed, the exact "no data vs. fetch failed" shape this
+project's own CLAUDE.md names as a recurring trap, just one layer further down
+than usual.
+
+The original ordering comment argued this was safe because a `StaffIdentity`
+can never satisfy a tenant permission check, which is true and remains true —
+but "safe" and "does not lock out a legitimate session" are different
+properties, and the fix targets the second one specifically. `isStaffPath()`
+now gates which resolver runs FIRST by the request's OWN path rather than by
+resolver order: `staffCookieResolver` only runs for `/api/staff/*` and
+`/api/staff-auth/*`, so a dual-cookie browser resolves as `staff` there and as
+its tenant identity everywhere else — exactly what both cookies actually
+describe, and "exactly one principal per request" now holds per-path rather
+than by accident of which resolver happened to be listed first.
+`tests/staff-session-scope.test.ts` pins both directions (cookie order
+reversed on the staff-route case, to rule out a fix that merely reordered the
+same race).
+
 ---
 
 # Staff tenant creation: SECURITY DEFINER instead of owner-Prisma (issue #105)

@@ -17,8 +17,33 @@ const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * every one of this suite's test files needing to know CSRF exists, or
  * `login()`'s return shape (relied on elsewhere, e.g. to read the raw session
  * token back out) having to change to carry a second cookie.
+ *
+ * KEYED BY WHICHEVER SESSION COOKIE VALUE is present — a tenant
+ * `calendry_session` or a staff `calendry_staff_session` — since either can
+ * be the one `cookie` carries. Missing this for the staff plane reproduces
+ * issue #113 exactly, one layer down: `POST /api/staff/federations` (issue
+ * #64) 403'd with "Missing or invalid CSRF token." for every staff-session
+ * test call, because `cookieValue(cookie, 'calendry_session')` found nothing
+ * to look up and silently skipped attaching the pairing — a state-changing
+ * call the CSRF middleware's own EXEMPT_PATHS never covers, since a staff
+ * session (unlike login) already exists by the time it is made.
  */
+const SESSION_COOKIE_NAMES = ['calendry_session', 'calendry_staff_session'];
+
 const csrfBySession = new Map<string, string>();
+
+/** The first of `SESSION_COOKIE_NAMES` present in `raw`, or `undefined`. */
+function anySessionCookieValue(raw: string): string | undefined {
+    for (const name of SESSION_COOKIE_NAMES) {
+        const value = cookieValue(raw, name);
+
+        if (value) {
+            return value;
+        }
+    }
+
+    return undefined;
+}
 
 /** Reads one cookie's value out of a `name=value[; ...]` or comma-joined Set-Cookie string. */
 function cookieValue(raw: string, name: string): string | null {
@@ -55,7 +80,7 @@ export async function api<T = unknown>(
         // rejection path (missing/wrong token) can still set its own header
         // explicitly — that always wins.
         if (STATE_CHANGING_METHODS.has(method) && !hasExplicitCsrfHeader) {
-            const session = cookieValue(cookie, 'calendry_session');
+            const session = anySessionCookieValue(cookie);
             const csrfToken = session ? csrfBySession.get(session) : undefined;
 
             if (csrfToken) {
@@ -88,7 +113,7 @@ export async function api<T = unknown>(
 
     // Learn the session<->CSRF pairing whenever a response sets both at once.
     const setCookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [];
-    const sessionFromResponse = setCookies.map((c) => cookieValue(c, 'calendry_session')).find(Boolean);
+    const sessionFromResponse = setCookies.map(anySessionCookieValue).find(Boolean);
     const csrfFromResponse = setCookies.map((c) => cookieValue(c, CSRF_COOKIE)).find(Boolean);
 
     if (sessionFromResponse && csrfFromResponse) {
