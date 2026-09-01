@@ -1,5 +1,6 @@
 import { STAFF_SESSION_COOKIE } from '../../utils/auth';
 import { resolveStaffSessionToken, revokeStaffSession } from '../../utils/authDb';
+import { writeAuditLog } from '../../utils/auditLog';
 
 defineRouteMeta({
     openAPI: {
@@ -12,7 +13,13 @@ defineRouteMeta({
     },
 });
 
-/** End the current staff session — issue #76. Mirrors /api/auth/logout.post.ts. */
+/**
+ * End the current staff session — issue #76. Mirrors /api/auth/logout.post.ts.
+ *
+ * Audited (issue #106) only when there was an actual session to revoke — an
+ * idempotent logout with no cookie/session names no actor and would be a
+ * meaningless row.
+ */
 export default defineEventHandler(async (event) => {
     const token = getCookie(event, STAFF_SESSION_COOKIE);
 
@@ -21,6 +28,14 @@ export default defineEventHandler(async (event) => {
 
         if (session) {
             await revokeStaffSession(session.session_id);
+
+            await writeAuditLog({
+                action: 'staff_logout',
+                outcome: 'SUCCESS',
+                actorAccountId: session.staff_account_id,
+                actorLabel: session.email,
+                tenantId: null,
+            });
         }
     }
 

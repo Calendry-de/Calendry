@@ -5,6 +5,7 @@ import {
 import {
     checkRateLimit, createStaffSession, findStaffAccountByEmail, resetRateLimit, touchStaffAccountLogin,
 } from '../../utils/authDb';
+import { writeAuditLog } from '../../utils/auditLog';
 import { verifyTurnstileToken } from '../../utils/turnstile';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '../../../shared/turnstile';
 
@@ -75,6 +76,11 @@ defineRouteMeta({
  * Same care as `/api/auth/login` against account-existence timing: the dummy
  * `verifyPassword` call runs the same scrypt work whether or not the email
  * matches a real StaffAccount.
+ *
+ * Audited (issue #106, `writeAuditLog` from issue #78, only ever wired into
+ * the tenant plane until now): every failure branch past the dummy-verify
+ * call, not just "wrong password", plus success. `tenantId` is always `null`
+ * — a staff session has no tenant, ever.
  */
 export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
@@ -107,6 +113,21 @@ export default defineEventHandler(async (event) => {
         : await verifyPassword(body.password, 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA');
 
     if (!account || !account.isActive || !passwordOk) {
+        // Past the dummy-verify branch, whether or not a StaffAccount exists —
+        // same care /api/auth/login.post.ts takes (issue #78): `actorAccountId`
+        // (here: the StaffAccount id) is populated when one does, even though
+        // the guess was wrong or the account is deactivated. `tenantId` is
+        // always null — a staff login predates any tenant, always.
+        await writeAuditLog({
+            action: 'staff_login.failure',
+            outcome: 'FAILURE',
+            actorAccountId: account?.id ?? null,
+            actorLabel: body.email,
+            tenantId: null,
+            target: body.email,
+            detail: { reason: !account ? 'no_such_staff_account' : !account.isActive ? 'staff_account_inactive' : 'wrong_password' },
+        });
+
         throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
 
@@ -130,6 +151,15 @@ export default defineEventHandler(async (event) => {
         secure: process.env.NODE_ENV === 'production',
         path: '/',
         maxAge: Math.floor(STAFF_SESSION_TTL_MS / 1000),
+    });
+
+    await writeAuditLog({
+        action: 'staff_login.success',
+        outcome: 'SUCCESS',
+        actorAccountId: account.id,
+        actorLabel: account.email,
+        tenantId: null,
+        target: body.email,
     });
 
     return {
