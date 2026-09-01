@@ -1,8 +1,7 @@
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { requireStaffIdentity } from '../../../utils/tenantDb';
-import { getOwnerPrisma } from '../../../utils/ownerPrisma';
-import { UnknownFederationError, provisionTenantCore } from '../../../utils/provisionTenant';
+import { UnknownFederationError } from '../../../utils/provisionTenant';
+import { provisionTenantViaFunction, rawPostgresErrorCode } from '../../../utils/staffCreateTenant';
 
 const bodySchema = z.object({
     slug: z.string().min(1),
@@ -17,7 +16,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Staff'],
         summary: 'Calendry staff: create a tenant',
-        description: 'Wraps the exact core transaction `bun run provision:tenant` uses (server/utils/provisionTenant.ts, issue #76) so this UI and the CLI cannot describe two different "what a new tenant looks like"s. Requires a staff session; runs through the OWNER database connection, the only one the RLS write policy on `tenant` permits to insert a row that does not exist yet.',
+        description: 'Creates the same tenant shape `bun run provision:tenant` does (server/utils/provisionTenant.ts, issue #76), via a separate SQL-side implementation kept in agreement by hand: `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER function callable through the ordinary runtime role (issue #105). Requires a staff session. Unlike the CLI, this route holds no standing database-owner connection — the function itself is the only place any of this runs with elevated privilege, the same technique `session_identity()`/`screen_identity()` use for the pre-tenant auth plane.',
         requestBody: {
             required: true,
             content: {
@@ -52,10 +51,15 @@ defineRouteMeta({
  * action (support-code redemption, the "staff assumes a tenant role" flow,
  * is explicitly a SEPARATE, dependent card — not built here).
  *
- * Calls the SAME `provisionTenantCore` the CLI calls, inside a transaction on
- * the OWNER connection (`getOwnerPrisma()`) — never `withRequestTenant()`,
- * which cannot apply here: there is no tenant yet to open an RLS context for,
- * and the caller (`requireStaffIdentity`) has none either.
+ * Calls `calendry_internal.staff_create_tenant()` (issue #105) through the
+ * ORDINARY runtime connection (`provisionTenantViaFunction`,
+ * `server/utils/staffCreateTenant.ts`) — never `getOwnerPrisma()`, which this
+ * route no longer imports, and never `withRequestTenant()`, which cannot
+ * apply here: there is no tenant yet to open an RLS context for, and the
+ * caller (`requireStaffIdentity`) has none either. The SECURITY DEFINER
+ * function is the one place any of this runs with elevated privilege; see
+ * its migration's header for why that is narrower than a standing owner
+ * connection.
  */
 export default defineEventHandler(async (event) => {
     requireStaffIdentity(event);
@@ -63,7 +67,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
 
     try {
-        const result = await getOwnerPrisma().$transaction((tx) => provisionTenantCore(tx, body));
+        const result = await provisionTenantViaFunction(body);
 
         return result;
     } catch (error) {
@@ -72,10 +76,13 @@ export default defineEventHandler(async (event) => {
         }
 
         // A tenant with this slug already exists — creates, never updates.
-        // Matches the CLI's own message-substring check for the identical
-        // Prisma error, but keyed on the error code here since a fresh HTTP
-        // caller has no console to read prose from.
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // `rawPostgresErrorCode()` reads the SQLSTATE the function's INSERT
+        // raised (23505, unique_violation) back out of the raw-query error —
+        // see that helper's own comment for why `error.code` alone (Prisma's
+        // own P2010 "raw query failed") is not specific enough here, unlike
+        // the ordinary `Prisma.PrismaClientKnownRequestError` + 'P2002' check
+        // this replaced, which only applied to Prisma-generated queries.
+        if (rawPostgresErrorCode(error) === '23505') {
             throw createError({
                 statusCode: 409,
                 statusMessage: `A tenant with slug '${body.slug}' already exists.`,

@@ -174,11 +174,18 @@ in DECISIONS.md, the way the fourth was.
    `StaffIdentity` does not extend the common identity shape and cannot even be
    passed to `withTenant()` (a compile error, not a runtime check).
    `actorPersonId` is always `null`, so it can never satisfy a permission
-   check, same as a screen. `server/api/staff/*` (`requireStaffIdentity`) reads
-   and writes across every tenant through the OWNER database connection —
-   never `withRequestTenant`/RLS, which structurally cannot express "no
-   tenant, and that's fine." § "Staff principal — the fourth tenant-isolation
-   exception".
+   check, same as a screen. `server/api/staff/*` (`requireStaffIdentity`)
+   reads and writes across every tenant — never `withRequestTenant`/RLS,
+   which structurally cannot express "no tenant, and that's fine." As of
+   issue #105, the CREATE route no longer does this through a standing OWNER
+   connection: `POST /api/staff/tenants` calls
+   `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER function
+   reachable through the ORDINARY `calendry_app` role, the same technique
+   `session_identity()`/`screen_identity()` use. `GET /api/staff/tenants`
+   (listing every tenant) still reads through the OWNER connection
+   (`getOwnerPrisma()`) — a plain cross-tenant read, not a write, and outside
+   #105's scope. § "Staff principal — the fourth tenant-isolation exception",
+   § "Staff tenant creation: SECURITY DEFINER instead of owner-Prisma".
 
 ## The traps that keep recurring
 
@@ -396,7 +403,7 @@ The rest are area-specific: read the section before working in that area.
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
 | Schedule toolbar | Height is invariant; the solver's tall states are anchored panels. `.bar_select` is capped. | § "The schedule toolbar" |
 | Screens | A lobby display is a DEVICE credential, not a fourth RLS exception: resolved by secret alone through `screen_identity()`, then ordinary `withTenant()`. Key hashed, shown once, generated in the browser. Empty room scope = every room. | § "Screens" |
-| Staff | `StaffIdentity` IS the fourth RLS exception, unlike screens: no tenant at all, ever. `server/api/staff/*` (`requireStaffIdentity`) reads/writes through the OWNER connection, never `withRequestTenant`. `provisionTenantCore()` is the one tenant-creation implementation the CLI and this route both call. | § "Staff principal — the fourth tenant-isolation exception" |
+| Staff | `StaffIdentity` IS the fourth RLS exception, unlike screens: no tenant at all, ever. `requireStaffIdentity` gates `server/api/staff/*`, never `withRequestTenant`. Tenant CREATE goes through `calendry_internal.staff_create_tenant()` (SECURITY DEFINER, via ordinary `calendry_app` — issue #105); tenant LIST still reads through the OWNER connection (`getOwnerPrisma()`). `provisionTenantCore()` (owner connection) remains the CLI's only implementation; the route's is a separate SQL-side one kept in agreement by hand. | §§ "Staff principal — the fourth tenant-isolation exception", "Staff tenant creation: SECURITY DEFINER instead of owner-Prisma" |
 
 ## Bootstrap & deploy sequence
 

@@ -11,9 +11,18 @@
  * `scripts/provision-tenant.ts`'s own header comment for the full argument.
  * This module does not open that transaction itself; it only assumes the
  * `tx` it is given already has owner privileges. `scripts/provision-tenant.ts`
- * opens one via `resolveOwnerDatabaseUrl()` directly; `server/api/staff/
- * tenants/index.post.ts` opens one via `getOwnerPrisma()`
- * (`server/utils/ownerPrisma.ts`).
+ * is the only remaining caller, opening one via `resolveOwnerDatabaseUrl()`
+ * directly.
+ *
+ * `POST /api/staff/tenants` no longer calls this (issue #105): that route
+ * went through a standing owner connection (`getOwnerPrisma()`), which this
+ * function's own doc once pointed to, and now instead calls
+ * `calendry_internal.staff_create_tenant()` — a SECURITY DEFINER function
+ * reachable through the ordinary `calendry_app` runtime connection — via
+ * `provisionTenantViaFunction()` (`server/utils/staffCreateTenant.ts`). That
+ * is a SEPARATE, SQL-side implementation of the same tenant shape, not a
+ * wrapper around this one; the two must be kept in agreement by hand, the
+ * same way `schema.prisma` and a migration already have to be.
  */
 import { randomBytes } from 'node:crypto';
 import type { Prisma } from '@prisma/client';

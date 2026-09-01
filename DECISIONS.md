@@ -46,7 +46,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
 | Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
-| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
@@ -2093,19 +2093,18 @@ narrower function precisely because `withRequestTenant`/`heldPermissions` are
 tenant-scoped machinery that structurally cannot express "this caller has no
 tenant, and that's fine, they're allowed here anyway."
 
-**Tenant creation has one implementation, not two.** `provisionTenantCore()`
-(`server/utils/provisionTenant.ts`) is the exact transaction body that used
-to live inline in `scripts/provision-tenant.ts`; both the CLI and
-`POST /api/staff/tenants` call it now. Both callers still open the transaction
-on the OWNER connection themselves (`resolveOwnerDatabaseUrl()`
-/ `getOwnerPrisma()`) — the reason a tenant needs an owner connection at all
-(`tenant`'s RLS write policy is unsatisfiable for a row that does not exist
-yet) is unchanged and is still argued in full in the CLI's own header comment.
-The owner credential still never leaves routes gated specifically for it:
-ordinary tenant Accounts still cannot reach `server/api/staff/*`
-(`requireStaffIdentity`), so this is not the self-service tenant signup the
-CLI's comment explicitly rules out — it is the same restricted door, opened
-for a second, differently-authenticated caller.
+**Tenant creation had one implementation, then grew a second, deliberately.**
+`provisionTenantCore()` (`server/utils/provisionTenant.ts`) is the exact
+transaction body that used to live inline in `scripts/provision-tenant.ts`,
+and originally `POST /api/staff/tenants` called it too, both callers opening
+the transaction on the OWNER connection (`resolveOwnerDatabaseUrl()` /
+`getOwnerPrisma()`). Issue #105 (below, "Staff tenant creation: SECURITY
+DEFINER instead of owner-Prisma") replaced the ROUTE's half with a second,
+SQL-side implementation of the same tenant shape — the CLI's copy is
+unchanged and is still the argument in full for why provisioning needs an
+owner connection AT ALL (`tenant`'s RLS write policy is unsatisfiable for a
+row that does not exist yet). What changed is which connection the HTTP path
+uses to get there.
 
 **Deliberately out of scope for this card: support-code redemption**, where
 staff temporarily assume a tenant role to help a customer. That is a separate,
@@ -2114,6 +2113,110 @@ distinguished from both a `StaffIdentity` and an ordinary `AccountIdentity`
 everywhere permission checks, RLS context and audit attribution read it, which
 issue #76 did not need to answer to ship login, tenant creation and the tenant
 list.
+
+---
+
+# Staff tenant creation: SECURITY DEFINER instead of owner-Prisma (issue #105)
+
+Issue #76 shipped `POST /api/staff/tenants` calling `provisionTenantCore()`
+inside a transaction on `getOwnerPrisma()` — a live, cached `PrismaClient`
+connected as the database OWNER, held by the RUNNING APP. That reintroduced
+exactly the risk `scripts/provision-tenant.ts`'s own header comment argues
+against for the CLI: a compromised web tier holding owner credentials could
+create tenants, drop RLS, or read every institution's data, gated only by
+`requireStaffIdentity()` — application code, not the database. Issue #105
+closed that gap for the CREATE path using the same technique
+`calendry_internal.session_identity()`/`screen_identity()` already use for
+the pre-tenant auth plane: a narrow SECURITY DEFINER function, callable
+through the ORDINARY `calendry_app` runtime role.
+
+**Why a function can do what `calendry_app` could not.** `tenant`'s RLS write
+policy is `id = calendry_internal.current_tenant_id()`, unsatisfiable for a
+row that does not exist yet (unchanged reasoning from issue #76, still argued
+in full in the CLI's header). A SECURITY DEFINER function executes with the
+privileges of its OWNER — verified empirically that the migration role
+(`calendry`) is a superuser (`rolsuper = t`) and so bypasses RLS outright,
+`FORCE ROW LEVEL SECURITY` included, regardless of which role calls the
+function. `calendry_app` gains the ability to run this ONE insert sequence;
+it gains no broader ability to bypass RLS anywhere else, and holds no
+standing owner connection at all.
+
+**What stayed on the app side, and why.** Password hashing. `hashPassword()`
+(`server/utils/auth.ts`) is `scrypt`, chosen for its tunable memory-hardness;
+PL/pgSQL has no scrypt primitive, and `pgcrypto`'s `crypt()` only offers
+bcrypt/md5/des — using it here would mean this ONE creation path hashes
+passwords differently than every other (`scripts/provision-tenant.ts`,
+`POST /api/accounts`), both of which call the same Node-side `hashPassword()`.
+`server/utils/staffCreateTenant.ts` hashes the initial password on the
+ordinary `calendry_app` connection — hashing touches no protected row — and
+passes only the resulting hash into the function. Every actual privileged
+WRITE (the Tenant row, its Roles/AccessRoles, the admin Person, the
+Account/AccountPerson link, the default Constraint rows) happens INSIDE
+`calendry_internal.staff_create_tenant()`, never split across a pre- or
+post-call on a separate connection — the judgement call the issue asked for
+was minimizing what moves into SQL, not avoiding the privileged writes
+themselves, which is the one thing that cannot move out.
+
+**Catalogues stay in TypeScript, not duplicated into SQL.** The permission
+catalogue (`shared/permissions.ts`) and the constraint-type catalogue
+(`shared/constraintTypes.ts`, via `defaultConstraintRow`) are exactly the
+kind of tenant-open-adjacent, code-owned data CLAUDE.md already treats as
+fixed-but-not-schema. Reproducing either as SQL literals inside a migration
+would create a second copy that silently drifts from the one `prisma/seed.ts`
+and the constraint builder read — the same class of bug the permission-moves
+rule in CLAUDE.md already warns about, just introduced a different way. The
+function takes `p_permission_keys text[]` and `p_default_constraints jsonb`
+as plain data; `provisionTenantViaFunction()` resolves them from the SAME
+TypeScript catalogues `provisionTenantCore()` reads, key-renamed to
+snake_case to match the columns `jsonb_to_recordset()` projects them onto.
+The function knows how to INSERT rows shaped like that; it has no opinion on
+which rows those should be.
+
+**IDs.** Every `id` column here is `TEXT NOT NULL` with NO database-side
+default — confirmed against the DDL — because `@default(uuid(7))` in
+`schema.prisma` is implemented in the Prisma CLIENT, not the database. A
+function running as the database owner cannot ask the Prisma client to mint
+one, so `calendry_internal.uuid_v7()` mints an equivalent id itself: the
+well-known "overlay a millisecond timestamp onto a v4 UUID's leading 48 bits,
+fix up the version/variant nibbles" construction, verified byte-for-byte
+against this database's own existing tenant ids
+(`01a0****-****-7***-[89ab]***-************`) before use. Not
+security-sensitive — it touches no protected table — so unlike the
+identity-lookup functions it carries no REVOKE/GRANT pair.
+
+**Error surface: standard SQLSTATEs, not invented ones, matching the
+append-only triggers' existing habit** (`check_violation`,
+`restrict_violation`). A duplicate slug hits `tenant_slug_key` and raises the
+ordinary `unique_violation` (23505) with no explicit RAISE; an unknown
+`federationSlug` raises plpgsql's standard `no_data_found` (P0002). Getting
+either back out to an HTTP status took empirical verification, not
+assumption: `$queryRaw` against this app's `@prisma/adapter-pg` driver
+adapter wraps every database error as `PrismaClientKnownRequestError` with
+`code: 'P2010'` ("raw query failed"), and the ORIGINAL SQLSTATE lives at
+`error.meta.driverAdapterError.cause.originalCode` — NOT `.cause.code`, which
+the adapter only populates for a generic/unrecognized Postgres error and
+OMITS for one it classifies into a named `kind` of its own (a
+unique-constraint violation comes back as `kind: 'UniqueConstraintViolation'`
+with no `.code` field at all, only `.originalCode`). `.originalCode` is the
+only field present in both shapes.
+`rawPostgresErrorCode()` (`server/utils/staffCreateTenant.ts`) is the one
+place that reads this path; getting it wrong silently would have meant a
+duplicate-slug POST returning 500 instead of the 409 the route already
+promised in its OpenAPI description.
+
+**Atomicity needed no explicit transaction.** A single SQL statement
+invoking a function is already atomic — PostgreSQL rolls back everything the
+function did if it raises partway through, the same guarantee
+`getOwnerPrisma().$transaction(...)` gave, without a second connection or an
+explicit `BEGIN`/`COMMIT` the route has to get right. Verified empirically:
+calling the function twice with a slug that succeeds the first time and a
+federation slug that fails the second left the first tenant's rows and
+NOTHING from the second attempt.
+
+**Scope: the CREATE path only.** `GET /api/staff/tenants` (listing every
+tenant) still uses `getOwnerPrisma()` — a plain cross-tenant READ, not a
+privileged write, and outside this issue's title. `server/utils/ownerPrisma.ts`
+stays for that reason; only its import from the CREATE route was removed.
 
 ---
 
