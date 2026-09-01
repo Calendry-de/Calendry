@@ -205,6 +205,18 @@
                             -->{{ row.weekKind === 'EXAM' ? ' (exam week)' : '' }},
                             {{ weekdayName(row.dayOfWeek) }} {{ startLabel(row.blockIndex) }}
                         </span>
+                        <!--
+                            The teaching-plan fact itself, not just a message
+                            shown once when this request was submitted: it can
+                            change (more Sessions get placed) after the fact,
+                            and a pending request's own state is worth seeing
+                            without re-submitting anything.
+                        -->
+                        <span
+                            v-if="!row.teachingComplete.complete"
+                            class="row_meta row_meta--warn"
+                        >teaching plan: {{ row.teachingComplete.placedCount }} of {{ row.teachingComplete.requiredCount }} sessions placed</span>
+
                         <span
                             v-if="row.decisionNote"
                             class="row_meta"
@@ -252,6 +264,8 @@ interface RequestRow {
     kind: { id: string; name: string };
     /** Resolved per Term by the server, so both exam pages agree. */
     weekKind: string;
+    /** Issue #101 — the module's own teaching plan, not this request's placement. */
+    teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
 }
 
 const STATUS_LABEL: Record<RequestRow['status'], string> = {
@@ -600,6 +614,8 @@ async function submit() {
     &_meta {
         font-size: var(--font-size-sm);
         color: $content7;
+
+        &--warn { color: $warning700; }
     }
 
     &_status {

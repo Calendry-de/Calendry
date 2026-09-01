@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { requirePermission } from '../../utils/requirePermission';
-import { classifyTermWeeks } from '../../utils/examRequests';
+import { assertTeachingComplete, classifyTermWeeks } from '../../utils/examRequests';
+import type { TeachingCompleteness } from '../../utils/examRequests';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 const querySchema = z.object({
@@ -45,6 +46,18 @@ export default defineEventHandler(async (event) => {
      */
     const byTerm = new Map<string, { week: number; kind: string }[]>();
 
+    /*
+     * ISSUE #101. `assertTeachingComplete` used to run ONLY inside
+     * `POST .../approve`'s response — a fact shown once, as a side effect of
+     * the very decision it should have informed, then gone. A reviewer
+     * scanning the pending queue saw nothing distinguishing a module whose
+     * teaching plan is fully placed from one that is not, which is the
+     * moment this fact is actually useful. Cached per Offering for the same
+     * reason `byTerm` is cached per Term: a queue is overwhelmingly a handful
+     * of modules asking more than once.
+     */
+    const byOffering = new Map<string, TeachingCompleteness>();
+
     const withWeekKind = [];
 
     for (const row of rows) {
@@ -52,9 +65,14 @@ export default defineEventHandler(async (event) => {
             byTerm.set(row.termId, await classifyTermWeeks(tx, identity.tenantId, row.termId));
         }
 
+        if (!byOffering.has(row.offeringId)) {
+            byOffering.set(row.offeringId, await assertTeachingComplete(tx, identity.tenantId, row.offeringId));
+        }
+
         withWeekKind.push({
             ...row,
             weekKind: byTerm.get(row.termId)?.find((w) => w.week === row.termWeek)?.kind ?? 'UNSPECIFIED',
+            teachingComplete: byOffering.get(row.offeringId) as TeachingCompleteness,
         });
     }
 

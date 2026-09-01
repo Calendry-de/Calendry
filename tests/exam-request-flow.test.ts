@@ -352,3 +352,53 @@ describe('the exam week', () => {
         expect(res.body.rows.some((r) => r.weekKind === 'EXAM')).toBe(true);
     });
 });
+
+describe('the module’s own teaching-plan completeness', () => {
+    /**
+     * `assertTeachingComplete` used to run ONLY inside `POST .../approve`'s
+     * response — a fact shown once, as a side effect of the very decision it
+     * should have informed, then gone. Neither list route carried it at all,
+     * so a reviewer scanning pending requests, or a lecturer checking their
+     * own, saw nothing distinguishing a module whose teaching plan is fully
+     * placed from one that is not.
+     *
+     * `offeringA` (`test-offering-a`, from the shared fixture) has
+     * `frequency: 2` and exactly one placed Session throughout this whole
+     * file — every request against it approves to an EVENT (`offeringId:
+     * null`), never a Session ON the module itself, so this stays 1 of 2
+     * for every test above and below this one.
+     */
+    it('is on every row of the lecturer’s own list', async () => {
+        const created = await request({ dayOfWeek: 1, blockIndex: 1 });
+
+        expect(created.status).toBe(200);
+
+        const mine = await api<{ rows: { id: string; teachingComplete: { complete: boolean; placedCount: number; requiredCount: number } }[] }>(
+            '/api/me/exam-requests',
+            { cookie: adminA },
+        );
+        const row = mine.body.rows.find((r) => r.id === created.body.request.id);
+
+        expect(row?.teachingComplete).toEqual({ complete: false, placedCount: 1, requiredCount: 2 });
+    });
+
+    it('is on every row of the review queue too, cached per Offering', async () => {
+        const created = await request({ dayOfWeek: 1, blockIndex: 2 });
+
+        expect(created.status).toBe(200);
+
+        const queue = await api<{ rows: { id: string; teachingComplete: { complete: boolean; placedCount: number; requiredCount: number } }[] }>(
+            '/api/exam-requests',
+            { cookie: adminA },
+        );
+        const row = queue.body.rows.find((r) => r.id === created.body.request.id);
+
+        expect(row?.teachingComplete).toEqual({ complete: false, placedCount: 1, requiredCount: 2 });
+        // Every OTHER request against the same Offering agrees — this is a
+        // fact about the module, not about the one request that happened to
+        // trigger the lookup.
+        const sameOffering = queue.body.rows.filter((r) => r.id !== row?.id);
+
+        expect(sameOffering.length).toBeGreaterThan(0);
+    });
+});

@@ -1,5 +1,6 @@
 import { requirePermission } from '../../../utils/requirePermission';
-import { classifyTermWeeks } from '../../../utils/examRequests';
+import { assertTeachingComplete, classifyTermWeeks } from '../../../utils/examRequests';
+import type { TeachingCompleteness } from '../../../utils/examRequests';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
@@ -29,6 +30,13 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
      */
     const byTerm = new Map<string, { week: number; kind: string }[]>();
 
+    // ISSUE #101 — see the review queue's own comment (`exam-requests/index.get.ts`):
+    // same fix, same reason. A lecturer asking for an exam should be able to
+    // see, for any of their own pending requests, whether the module's
+    // teaching plan is actually fully placed yet — not only learn it once, as
+    // a side effect of the request they already submitted.
+    const byOffering = new Map<string, TeachingCompleteness>();
+
     const withWeekKind = [];
 
     for (const row of rows) {
@@ -36,9 +44,14 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
             byTerm.set(row.termId, await classifyTermWeeks(tx, identity.tenantId, row.termId));
         }
 
+        if (!byOffering.has(row.offeringId)) {
+            byOffering.set(row.offeringId, await assertTeachingComplete(tx, identity.tenantId, row.offeringId));
+        }
+
         withWeekKind.push({
             ...row,
             weekKind: byTerm.get(row.termId)?.find((w) => w.week === row.termWeek)?.kind ?? 'UNSPECIFIED',
+            teachingComplete: byOffering.get(row.offeringId) as TeachingCompleteness,
         });
     }
 

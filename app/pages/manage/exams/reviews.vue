@@ -16,15 +16,17 @@
         >{{ error }}</p>
 
         <!--
-            WARN, DON'T BLOCK: the approval above already went through. This
-            names the fact that the module's own teaching plan is not fully
-            placed yet, which the decision does not depend on.
+            WARN, DON'T BLOCK: the approval above already went through. The
+            teaching-plan fact itself is now a per-row column (issue #101),
+            visible before deciding; this is what is left needing a one-time
+            message — a preferred room too small for the exam sitting, known
+            only once the approval has actually run the capacity check.
         -->
         <p
-            v-if="teachingWarning"
+            v-if="approveWarning"
             class="note note--warn"
             role="status"
-        >{{ teachingWarning }}</p>
+        >{{ approveWarning }}</p>
 
         <section
             v-for="group in groups"
@@ -71,6 +73,17 @@
                             class="row_meta"
                             :class="{ 'row_meta--warn': row.weekKind !== 'EXAM' }"
                         >{{ row.weekKind === 'EXAM' ? 'inside the exam period' : 'outside the exam period' }}</span>
+
+                        <!--
+                            ISSUE #101, the fact itself rather than a toast: a
+                            module's teaching-plan completeness is state to
+                            check BEFORE deciding, not something learned only
+                            as a side effect of having already approved.
+                        -->
+                        <span
+                            v-if="!row.teachingComplete.complete"
+                            class="row_meta row_meta--warn"
+                        >teaching plan: {{ row.teachingComplete.placedCount }} of {{ row.teachingComplete.requiredCount }} sessions placed</span>
 
                         <span
                             v-if="row.note"
@@ -157,6 +170,8 @@ interface ReviewRow {
     room: { id: string; name: string; code: string } | null;
     /** Resolved per Term by the server, so both exam pages agree. */
     weekKind: string;
+    /** Issue #101 — the module's own teaching plan, not this request's placement. */
+    teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
     requestedBy: Named | null;
     decidedBy: Named | null;
 }
@@ -196,32 +211,25 @@ function personName(person: Named | null): string {
 
 const busy = ref('');
 const error = ref('');
-const teachingWarning = ref('');
+const approveWarning = ref('');
 
 async function decide(id: string, action: 'approve' | 'reject') {
     busy.value = id;
     error.value = '';
-    teachingWarning.value = '';
+    approveWarning.value = '';
 
     try {
         const result = await request<{
-            teachingComplete?: { complete: boolean; placedCount: number; requiredCount: number };
             examCapacity?: { checked: boolean; roomCapacity: number | null; requiredCapacity: number | null; sufficient: boolean };
         }>(`/api/exam-requests/${id}/${action}`, { method: 'POST', body: {} });
 
-        if (action === 'approve' && result.teachingComplete && !result.teachingComplete.complete) {
-            teachingWarning.value = `Approved, but this module has only ${result.teachingComplete.placedCount} of its `
-                + `${result.teachingComplete.requiredCount} sessions placed — its teaching plan is not fully `
-                + 'scheduled yet.';
-        }
-
         // A too-small preferred room, same warn-and-allow shape as a room
-        // clash: reported here, never a reason approval was refused.
+        // clash: reported here, never a reason approval was refused. Unlike
+        // teaching-plan completeness (now a per-row fact, above), this is
+        // only known once the approval has actually run the capacity check.
         if (action === 'approve' && result.examCapacity?.checked && !result.examCapacity.sufficient) {
-            const roomWarning = `The preferred room seats ${result.examCapacity.roomCapacity} for an exam, `
+            approveWarning.value = `The preferred room seats ${result.examCapacity.roomCapacity} for an exam, `
                 + `but this sitting is expected to need ${result.examCapacity.requiredCapacity}.`;
-
-            teachingWarning.value = teachingWarning.value ? `${teachingWarning.value} ${roomWarning}` : roomWarning;
         }
 
         await refresh();
