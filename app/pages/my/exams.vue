@@ -264,34 +264,39 @@ const STATUS_LABEL: Record<RequestRow['status'], string> = {
 // and 401s into an empty page indistinguishable from having asked for nothing.
 const request = useRequestFetch();
 
+interface ExamContext {
+    offerings: { id: string; title: string; code: string | null; termId: string }[];
+    kinds: { id: string; name: string; type: string }[];
+    // Typed as the schedule's own `TimeGrid`, not a local shape: `blockTime()`
+    // takes that interface, and a structurally-similar duplicate here would
+    // drift from it silently the next time the grid gains a field.
+    grids: TimeGrid[];
+    terms: { id: string; name: string; startDate: string; endDate: string }[];
+    periods: { termId: string; kind: string; startDate: string; endDate: string }[];
+}
+
 const { data, refresh } = await useAsyncData('my:exams', async () => {
-    const [mine, offerings, kinds, grids, terms, periods] = await Promise.all([
+    /*
+     * ONE key, TWO endpoints — not five. `/api/me/exam-requests/context`
+     * replaced four generic CRUD reads (`/api/offerings`, `/api/session-kinds`,
+     * `/api/time-grids`, `/api/terms`, `/api/calendar-periods`), each gated on
+     * its own institution-wide `<resource>.read`. A lecturer holding only
+     * `exam.request_own` — this page's actual gate — held none of those, so the
+     * `Promise.all` 403'd on the first of them and the page rendered BLANK
+     * (issue #108). See that route's own comment for the full story.
+     */
+    const [mine, context] = await Promise.all([
         request<{ rows: RequestRow[] }>('/api/me/exam-requests'),
-        request<{ rows: { id: string; title: string; code: string | null; termId: string }[] }>(
-            '/api/offerings?limit=200',
-        ),
-        request<{ rows: { id: string; name: string; type: string }[] }>(
-            '/api/session-kinds?limit=200',
-        ),
-        // Typed as the schedule's own `TimeGrid`, not a local shape: `blockTime()`
-        // takes that interface, and a structurally-similar duplicate here would
-        // drift from it silently the next time the grid gains a field.
-        request<{ rows: TimeGrid[] }>('/api/time-grids?limit=50'),
-        request<{ rows: { id: string; name: string; startDate: string; endDate: string }[] }>(
-            '/api/terms?limit=100',
-        ),
-        request<{ rows: { termId: string; kind: string; startDate: string; endDate: string }[] }>(
-            '/api/calendar-periods?limit=200',
-        ),
+        request<ExamContext>('/api/me/exam-requests/context'),
     ]);
 
     return {
         mine: mine.rows,
-        offerings: offerings.rows,
-        kinds: kinds.rows,
-        grids: grids.rows,
-        terms: terms.rows,
-        periods: periods.rows,
+        offerings: context.offerings,
+        kinds: context.kinds,
+        grids: context.grids,
+        terms: context.terms,
+        periods: context.periods,
     };
 });
 
