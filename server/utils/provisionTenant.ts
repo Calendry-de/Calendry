@@ -28,7 +28,7 @@ import { randomBytes } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { hashPassword } from './auth';
 import { PERMISSIONS } from '../../shared/permissions';
-import { LECTURER_ROLE_KEY } from '../../shared/roles';
+import { LECTURER_ROLE_KEY, PARENT_ROLE_KEY, STUDENT_ROLE_KEY } from '../../shared/roles';
 import { defaultConstraintRow, defaultConstraintTypes } from '../../shared/constraintTypes';
 
 /**
@@ -121,6 +121,29 @@ export async function provisionTenantCore(
             key: LECTURER_ROLE_KEY,
             name: 'Lecturer',
             description: 'Leads a Session. The one universal domain role.',
+            isSystem: true,
+        },
+    });
+
+    // Issue #107. Scheduling vocabulary only, like `lecturer` above — NOT
+    // wired to any permission grant. An AccessRole (e.g. `member`, below)
+    // decides what a Person who IS a Student or Parent may actually DO.
+    await tx.role.create({
+        data: {
+            tenantId: tenant.id,
+            key: STUDENT_ROLE_KEY,
+            name: 'Student',
+            description: 'Attends Sessions. Domain vocabulary, not an authority.',
+            isSystem: true,
+        },
+    });
+
+    await tx.role.create({
+        data: {
+            tenantId: tenant.id,
+            key: PARENT_ROLE_KEY,
+            name: 'Parent',
+            description: "A student's guardian. Domain vocabulary, not an authority.",
             isSystem: true,
         },
     });

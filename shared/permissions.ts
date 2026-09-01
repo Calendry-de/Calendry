@@ -257,6 +257,25 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'offering_plan.apply', category: 'offering_plan', description: 'Apply a curriculum plan to a group, creating its offerings for a term' },
 
     // Administration
+    /**
+     * Issue #107. Gates `/dashboard` itself — the app-chrome home with the
+     * overview cards and the management sidebar — as opposed to `/schedule`,
+     * which needs only `session.read`/`session.read_own`.
+     *
+     * A NEW GATE ON SOMETHING EVERYONE CURRENTLY REACHES UNCONDITIONALLY:
+     * `/dashboard` had no permission check at all before this key existed.
+     * The seeded `student`/`parent` domain Roles (this issue) do NOT imply
+     * holding it — a Person who IS a Student still needs an AccessRole that
+     * holds `dashboard.view` to land there, and the `member` AccessRole
+     * (exactly `session.read_own`) deliberately does not carry it, which is
+     * what routes a `member`-shaped caller to `/schedule` instead. Every
+     * EXISTING tenant's non-`member`-shaped AccessRoles were backfilled this
+     * key in the same change that introduced it — see
+     * `scripts/backfill-dashboard-view.ts` — because minting this permission
+     * without that backfill would otherwise silently lock every existing
+     * lecturer and admin out of the page they use today.
+     */
+    { key: 'dashboard.view', category: 'administration', description: "See the dashboard home (overview cards and the management sidebar), rather than being routed straight to your own schedule" },
     { key: 'access_role.manage', category: 'administration', description: 'Create and edit access roles' },
     { key: 'person_access_role.assign', category: 'administration', description: 'Grant or revoke access roles' },
 

@@ -39,6 +39,7 @@
     "create:account": "bun run scripts/create-account.ts",
     "create:role": "bun run scripts/create-role.ts",
     "backfill:constraints": "bun run scripts/backfill-constraints.ts",
+    "backfill:dashboard-view": "bun run scripts/backfill-dashboard-view.ts",
     "repair:generation-status": "bun run scripts/repair-generation-status.ts"
   },
   "dependencies": {
