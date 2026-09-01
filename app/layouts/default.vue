@@ -14,7 +14,17 @@
                 />
             </NuxtLink>
             <view-menu/>
-            <view-login/>
+            <!--
+                ONE wrapper, not two more grid children: `.header` is a
+                three-track grid (`auto minmax(0, 1fr) auto`) sized for
+                logo/nav/account, load-bearing per this style block's own
+                comment. A fourth direct child would fall into an implicit
+                4th track instead of sharing the account column.
+            -->
+            <div class="header-account">
+                <view-tenant-switcher/>
+                <view-login/>
+            </div>
         </div>
         <div class="app_content">
             <NuxtLoadingIndicator :color="colorsList.primary300"/>
@@ -31,6 +41,7 @@
 import type { VNode } from 'vue';
 import ViewMenu from '~/components/views/ViewMenu.vue';
 import ViewNavDrawer from '~/components/views/ViewNavDrawer.vue';
+import ViewTenantSwitcher from '~/components/views/ViewTenantSwitcher.vue';
 import ViewLogin from '~/components/views/ViewLogin.vue';
 import ViewVersion from '~/components/views/ViewVersion.vue';
 import { colorsList } from '#imports';
@@ -144,6 +155,17 @@ useCalendryLayout();
         display: flex;
         gap: 100px;
         align-items: center;
+    }
+
+    &-account {
+        display: flex;
+        gap: var(--space-5);
+        align-items: center;
+
+        // The one direct child free to shrink: logo and nav both have fixed
+        // min-contents, so this is where a long institution name gets squeezed
+        // first, matching `ViewTenantSwitcher`'s own `max-width` + ellipsis.
+        min-width: 0;
     }
 }
 </style>
