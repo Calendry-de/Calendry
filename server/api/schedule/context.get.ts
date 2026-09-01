@@ -98,36 +98,36 @@ export default defineEventHandler(async (event) => {
          * no sessions at all, and `termId` is resolved against them by the
          * client exactly as it was before.
          */
-        const [terms, timeGrids, tenant] = await Promise.all([
-            tx.term.findMany({
-                where: { tenantId: identity.tenantId },
-                select: { id: true, name: true, startDate: true, endDate: true, timeGridId: true },
-                orderBy: { startDate: 'desc' },
-            }),
-            tx.timeGrid.findMany({
-                where: { tenantId: identity.tenantId },
-                /*
-                 * WITH BREAKS. They change what every block is CALLED, so a grid
-                 * without them renders a timetable that is wrong rather than
-                 * merely sparse — the same reason `RESOURCES['time-grids']`
-                 * includes them.
-                 */
-                include: { breaks: true },
-            }),
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const terms = await tx.term.findMany({
+            where: { tenantId: identity.tenantId },
+            select: { id: true, name: true, startDate: true, endDate: true, timeGridId: true },
+            orderBy: { startDate: 'desc' },
+        });
+        const timeGrids = await tx.timeGrid.findMany({
+            where: { tenantId: identity.tenantId },
             /*
-             * THE ONE PLACE THE CLIENT LEARNS THE TENANT'S ZONE. "Today"/"now"
-             * on the schedule (the Today button, the live now-indicator) must
-             * resolve in `Tenant.timezone`, never the viewer's own — the same
-             * rule `localNow` already enforces server-side for
-             * `computeReferenceSlot`. Fetched alongside terms/timeGrids, not
-             * inside the cached block below: a tenant's timezone changing
-             * must not wait out a stale cache entry.
+             * WITH BREAKS. They change what every block is CALLED, so a grid
+             * without them renders a timetable that is wrong rather than
+             * merely sparse — the same reason `RESOURCES['time-grids']`
+             * includes them.
              */
-            tx.tenant.findUniqueOrThrow({
-                where: { id: identity.tenantId },
-                select: { timezone: true },
-            }),
-        ]);
+            include: { breaks: true },
+        });
+        /*
+         * THE ONE PLACE THE CLIENT LEARNS THE TENANT'S ZONE. "Today"/"now"
+         * on the schedule (the Today button, the live now-indicator) must
+         * resolve in `Tenant.timezone`, never the viewer's own — the same
+         * rule `localNow` already enforces server-side for
+         * `computeReferenceSlot`. Fetched alongside terms/timeGrids, not
+         * inside the cached block below: a tenant's timezone changing
+         * must not wait out a stale cache entry.
+         */
+        const tenant = await tx.tenant.findUniqueOrThrow({
+            where: { id: identity.tenantId },
+            select: { timezone: true },
+        });
 
         /*
          * RESOLVED HERE AND REPORTED BACK, rather than each side defaulting to
@@ -195,33 +195,33 @@ export default defineEventHandler(async (event) => {
              */
             const groupIds = await ancestorGroupIds(tx, referencedGroupIds);
 
-            const [rooms, people, groups] = await Promise.all([
-                roomIds.length
-                    ? tx.room.findMany({
-                        /*
-                         * No tenant predicate: the ids came from Sessions this caller
-                         * may read, and a federation-shared Session names a
-                         * federation-owned Room that `tenantId` would exclude — the
-                         * shared lecture hall would lose its name on the one
-                         * timetable that most needs it. RLS still applies.
-                         */
-                        where: { id: { in: roomIds } },
-                        select: { id: true, code: true, name: true, isVirtual: true },
-                    })
-                    : [],
-                personIds.length
-                    ? tx.person.findMany({
-                        where: { id: { in: personIds } },
-                        select: { id: true, givenName: true, familyName: true },
-                    })
-                    : [],
-                groupIds.length
-                    ? tx.group.findMany({
-                        where: { id: { in: groupIds } },
-                        select: { id: true, name: true, parentGroupId: true },
-                    })
-                    : [],
-            ]);
+            // Sequential — `tx` is one shared connection; concurrent queries on
+            // it trip pg's deprecated overlapping-query warning.
+            const rooms = roomIds.length
+                ? await tx.room.findMany({
+                    /*
+                     * No tenant predicate: the ids came from Sessions this caller
+                     * may read, and a federation-shared Session names a
+                     * federation-owned Room that `tenantId` would exclude — the
+                     * shared lecture hall would lose its name on the one
+                     * timetable that most needs it. RLS still applies.
+                     */
+                    where: { id: { in: roomIds } },
+                    select: { id: true, code: true, name: true, isVirtual: true },
+                })
+                : [];
+            const people = personIds.length
+                ? await tx.person.findMany({
+                    where: { id: { in: personIds } },
+                    select: { id: true, givenName: true, familyName: true },
+                })
+                : [];
+            const groups = groupIds.length
+                ? await tx.group.findMany({
+                    where: { id: { in: groupIds } },
+                    select: { id: true, name: true, parentGroupId: true },
+                })
+                : [];
 
             return {
                 /*

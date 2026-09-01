@@ -32,22 +32,41 @@ export const GENERATION_SELECT = {
 } satisfies Prisma.GenerationSelect;
 
 /**
+ * Terminations this app knows to be reproducible.
+ *
+ * AN ALLOW-LIST, NOT A DENY-LIST, and the difference is the whole point. This
+ * was `reason !== 'time_budget'`, which answers "reproducible" for every string
+ * it has never seen — so when the solver gained `stagnated` (a run that could
+ * not place everything and stopped searching), the app reported it as a clean,
+ * repeatable result without a line of code being wrong about `stagnated`
+ * specifically. A new termination reason must now arrive as UNKNOWN and stay
+ * there until somebody decides what it means.
+ */
+const REPRODUCIBLE_TERMINATIONS = new Set(['converged', 'move_budget']);
+
+/**
  * Reproducibility, stated only when it is actually known.
  *
- * `time_budget` is the one termination that is NOT reproducible: how many moves
- * fit in a second is not a property of the input. `converged` and `move_budget`
- * both are.
+ * `time_budget` is not reproducible: how many moves fit in a second is not a
+ * property of the input. `converged` and `move_budget` both are.
  *
- * NULL means the run predates Stage 6a's `termination_reason` capture, and the
- * honest answer is "unknown" — never "reproducible". Rows are not backfilled,
- * so this case is real and permanent, not transitional.
+ * NULL means the run predates Stage 6a's `termination_reason` capture, OR ends
+ * for a reason this version does not recognise. Both are honestly "unknown" —
+ * never "reproducible". Rows are not backfilled, so the first case is real and
+ * permanent, not transitional.
  */
 export function isReproducible(terminationReason: string | null): boolean | null {
     if (!terminationReason) {
         return null;
     }
 
-    return terminationReason !== 'time_budget';
+    if (REPRODUCIBLE_TERMINATIONS.has(terminationReason)) {
+        return true;
+    }
+
+    // Named, so the one reason we know NOT to be reproducible still answers
+    // false rather than falling into the unknown bucket with everything else.
+    return terminationReason === 'time_budget' ? false : null;
 }
 
 export interface RunSummary {

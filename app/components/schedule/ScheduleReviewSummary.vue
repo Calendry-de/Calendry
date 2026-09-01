@@ -103,6 +103,55 @@
                 </dd>
             </div>
 
+            <!--
+                THE SHORTFALL, ABOVE EVERY OTHER FACT.
+
+                A run that answers fewer placements than it was asked for looks
+                identical to a complete one in every count on this page: the
+                missing Sessions simply appear as deletions, and "11 removed"
+                reads as a decision the solver made. It is not one — it is an
+                answer with holes in it, and the apply now refuses to delete on
+                it. That refusal has to be visible, or the page has quietly
+                corrected something the reviewer would want to know about.
+            -->
+            <div
+                v-if="demandShort"
+                class="rev_fact rev_fact--warn"
+            >
+                <dt>Incomplete answer</dt>
+                <dd>
+                    The solver returned {{ demandShort.returned.toLocaleString() }} of the
+                    {{ demandShort.required.toLocaleString() }} placements this run asked it
+                    for, across {{ demandShort.shortOfferings }}
+                    offering{{ demandShort.shortOfferings === 1 ? '' : 's' }}.
+                    <template v-if="withheld">
+                        {{ withheld }} existing session{{ withheld === 1 ? '' : 's' }}
+                        {{ withheld === 1 ? 'is' : 'are' }} being kept rather than removed —
+                        the run said nothing about {{ withheld === 1 ? 'it' : 'them' }}, which
+                        is not the same as refusing to place {{ withheld === 1 ? 'it' : 'them' }}.
+                    </template>
+                </dd>
+            </div>
+
+            <!--
+                Older runs recorded nothing about what they asked for, so the
+                check above cannot run at all. Said only when it MATTERS — a
+                proposal with no deletions rests on nothing, so warning about it
+                would be noise on every historical proposal in the list.
+            -->
+            <div
+                v-else-if="unverifiedDeletes"
+                class="rev_fact rev_fact--warn"
+            >
+                <dt>Unverified removals</dt>
+                <dd>
+                    This run predates the check that confirms the solver answered in full, so
+                    its {{ plan.deleted }} removal{{ plan.deleted === 1 ? '' : 's' }}
+                    cannot be told apart from placements it simply left out. Re-run the solve to
+                    get a proposal that can be checked.
+                </dd>
+            </div>
+
             <div
                 v-if="plan.placementsUnmapped"
                 class="rev_fact rev_fact--warn"
@@ -167,9 +216,35 @@ const props = defineProps<{
     plan: NonNullable<ReviewPreview['plan']>;
     violations: ReviewPreview['violations'];
     run: ReviewPreview['run'];
+    /** What the run asked for against what it answered. Absent on an older payload. */
+    demand?: ReviewPreview['demand'];
     /** READY, so "they re-run after applying" is a true statement about a future. */
     decidable: boolean;
 }>();
+
+/**
+ * The shortfall, or null when there is nothing to report.
+ *
+ * `shortOfferings > 0` is the test rather than `returned < required`: the
+ * per-Offering count is what the plan actually withholds deletes on, so a
+ * summary that spoke from the totals could claim a shortfall the plan did not
+ * act on — two readings of the same run that disagree in front of the reviewer.
+ */
+const demandShort = computed(() => {
+    const demand = props.demand;
+
+    return demand && demand.verified && demand.shortOfferings > 0 ? demand : null;
+});
+
+const withheld = computed(() => props.plan.deletesWithheld ?? 0);
+
+/**
+ * A run with no ledger that nonetheless proposes removals — the case this check
+ * exists for, arriving from before the check existed. Absent `demand` counts as
+ * unverified: an older payload has no field, and reading that as "verified"
+ * would restore exactly the silent assumption being removed.
+ */
+const unverifiedDeletes = computed(() => !props.demand?.verified && props.plan.deleted > 0);
 
 /**
  * Derived, not written out. This label read "3 structural rules" for the whole

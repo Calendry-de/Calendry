@@ -13,10 +13,9 @@
  * a standing owner connection.
  */
 import type { PrismaClient } from '@prisma/client';
-import { rawPostgresErrorCode } from './staffCreateTenant';
+import { UnknownTenantIdError, rawPostgresErrorCode } from './staffCreateTenant';
 
 export class UnknownFederationIdError extends Error {}
-export class UnknownTenantIdError extends Error {}
 
 interface StaffCreateFederationRow {
     id: string;

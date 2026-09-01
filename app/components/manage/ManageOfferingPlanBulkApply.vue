@@ -10,8 +10,15 @@
         <p class="bulk_help">
             Applies this plan to every group below, for one Term, in a single action —
             the moment a whole term's cohorts move forward together rather than one at a
-            time. Reuse still applies: a group that already has an offering from this
-            plan joins it instead of getting a second one.
+            time. Filter by name and add every match at once, rather than picking groups
+            one by one. Reuse still applies: a group that already has an offering from
+            this plan joins it instead of getting a second one.
+            <template v-if="preSelectedCount">
+                {{ preSelectedCount }} group{{ preSelectedCount === 1 ? '' : 's' }} already
+                {{ preSelectedCount === 1 ? 'names' : 'name' }} this as its curriculum plan and
+                {{ preSelectedCount === 1 ? 'is' : 'are' }} pre-selected below — remove any that
+                don’t belong in this rollout.
+            </template>
         </p>
 
         <p
@@ -45,21 +52,39 @@
             </li>
         </ul>
 
-        <label class="bulk_add">
-            <span class="sr-only">Add a group</span>
-            <select
-                :disabled="busy || !availableGroups.length"
-                :value="''"
-                @change="addGroup($event)"
-            >
-                <option value="">{{ availableGroups.length ? 'Add a group…' : 'Every group is already added' }}</option>
-                <option
-                    v-for="option in availableGroups"
-                    :key="option.id"
-                    :value="String(option.id)"
-                >{{ option.name }}</option>
-            </select>
-        </label>
+        <div class="bulk_pick">
+            <label class="bulk_filter">
+                <span class="sr-only">Filter groups by name</span>
+                <input
+                    v-model="filter"
+                    type="text"
+                    placeholder="Filter groups by name…"
+                    :disabled="busy"
+                >
+            </label>
+
+            <CommonButton
+                :disabled="busy || !filteredAvailableGroups.length"
+                type="secondary"
+                @click="addAllFiltered"
+            >{{ addAllLabel }}</CommonButton>
+
+            <label class="bulk_add">
+                <span class="sr-only">Add one group</span>
+                <select
+                    :disabled="busy || !filteredAvailableGroups.length"
+                    :value="''"
+                    @change="addGroup($event)"
+                >
+                    <option value="">{{ filteredAvailableGroups.length ? 'Or add one…' : 'No matching groups left to add' }}</option>
+                    <option
+                        v-for="option in filteredAvailableGroups"
+                        :key="option.id"
+                        :value="String(option.id)"
+                    >{{ option.name }}</option>
+                </select>
+            </label>
+        </div>
 
         <div class="bulk_controls">
             <label class="bulk_field">
@@ -102,13 +127,24 @@
  * SAME IDEMPOTENCY GUARANTEE, so there is nothing to confirm here either: a
  * group already reached by this plan in this Term is a no-op entry in the
  * result, not a duplicate.
+ *
+ * THREE WAYS INTO THE LIST, cheapest first. `Group.curriculumPlanId` —
+ * an intent set on the Group itself, before it has a single Offering —
+ * pre-selects every Group already naming THIS plan, with nothing to click.
+ * The filter + "add all" covers a Group that never set the field but shares
+ * a name pattern with its cohort ("dIT25 S1", "dWI25 S1", …). The plain
+ * dropdown is the fallback for the odd one out neither of those catches.
+ * `groupIds` is still capped at 100 server-side
+ * (`offering-plan-apply/[id].post.ts`'s zod schema); nothing here pre-empts
+ * that — a plan whose pre-selection plus filter matches more than 100 groups
+ * is refused the same way a 101st manual add would have been.
  */
 const props = defineProps<{
     planId: string;
     readonly?: boolean;
 }>();
 
-interface GroupRow { id: string; name: string }
+interface GroupRow { id: string; name: string; curriculumPlanId: string | null }
 interface TermRow { id: string; name: string }
 interface AppliedResult { groupId: string; offerings: { id: string; title: string; action: string }[] }
 
@@ -130,7 +166,16 @@ const { data: termsData } = await useAsyncData(
 const allGroups = computed(() => groupsData.value ?? []);
 const terms = computed(() => termsData.value ?? []);
 
-const selectedGroupIds = ref<string[]>([]);
+// PRE-SELECTED, not just offered: `Group.curriculumPlanId` is exactly the
+// "we already know who this plan is for" intent this panel exists to act on,
+// so a Group naming this plan starts in the list rather than waiting to be
+// found through the filter. Still just a starting point — every row below
+// has its own remove button, and the manual add/filter still reaches a Group
+// that never set the field.
+const preSelectedCount = allGroups.value.filter((g) => g.curriculumPlanId === props.planId).length;
+const selectedGroupIds = ref<string[]>(
+    allGroups.value.filter((g) => g.curriculumPlanId === props.planId).map((g) => String(g.id)),
+);
 const selectedGroups = computed(() => selectedGroupIds.value
     .map((id) => allGroups.value.find((g) => String(g.id) === id))
     .filter((g): g is GroupRow => Boolean(g)));
@@ -140,6 +185,22 @@ const availableGroups = computed(() => {
 
     return allGroups.value.filter((g) => !taken.has(String(g.id)));
 });
+
+const filter = ref('');
+
+// Case-insensitive substring, matching the manage list's own search
+// convention — a group is a name to a human doing this, not an id.
+const filteredAvailableGroups = computed(() => {
+    const needle = filter.value.trim().toLowerCase();
+
+    return needle
+        ? availableGroups.value.filter((g) => g.name.toLowerCase().includes(needle))
+        : availableGroups.value;
+});
+
+const addAllLabel = computed(() => (filter.value.trim()
+    ? `Add all ${filteredAvailableGroups.value.length} matching`
+    : `Add all ${filteredAvailableGroups.value.length}`));
 
 const termId = ref('');
 const busy = ref(false);
@@ -155,6 +216,21 @@ function addGroup(event: Event) {
     if (value) {
         selectedGroupIds.value = [...selectedGroupIds.value, value];
     }
+}
+
+// The whole point: going from "one dropdown pick per group" to "every group
+// this filter already identifies, in one click" — the manual add above still
+// covers the odd one out the filter didn't catch.
+function addAllFiltered() {
+    if (!filteredAvailableGroups.value.length) {
+        return;
+    }
+
+    selectedGroupIds.value = [
+        ...selectedGroupIds.value,
+        ...filteredAvailableGroups.value.map((g) => String(g.id)),
+    ];
+    filter.value = '';
 }
 
 function removeGroup(id: string) {
@@ -312,6 +388,34 @@ async function apply() {
         color: $content4;
 
         background: $surface0;
+    }
+
+    &_pick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        align-items: center;
+    }
+
+    &_filter {
+        flex: 1 1 200px;
+
+        input {
+            width: 100%;
+            padding: var(--space-3) var(--space-5);
+            border: 1px solid $surface4;
+            border-radius: var(--radius-lg);
+
+            font-family: inherit;
+            font-size: var(--font-size-md);
+            color: $content4;
+
+            background: $surface0;
+        }
+    }
+
+    &_add {
+        flex: 1 1 200px;
     }
 
     &_controls {

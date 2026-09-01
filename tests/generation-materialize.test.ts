@@ -556,6 +556,11 @@ describe('planMaterialization', () => {
             // Nothing collateral: this run has both Offerings in scope, so
             // every move is one the caller asked for.
             movedCollateral: 0,
+            // No demand ledger is passed here, so nothing can be reconciled and
+            // nothing is withheld — this fixture asserts the UNCHANGED
+            // behaviour, which is what the reconciliation must not disturb. The
+            // withholding itself is asserted in its own suite below.
+            deletesWithheld: 0,
             // 2 = the locked in-scope Session + the locked Event; see above.
             skippedLocked: 2, placementsUnmapped: 0,
         });
@@ -889,5 +894,135 @@ describe('DELETE events', () => {
         });
 
         expect(events).toBe(0);
+    });
+});
+
+/**
+ * A SHORT ANSWER MUST NOT AUTHORISE A DELETE (2026-09-01).
+ *
+ * `planMaterialization` reads an in-scope Session's absence from the output as
+ * a refusal to place it, and deletes on that. The inference only holds while
+ * the output is COMPLETE. A live tenant's `converged` run — 45.8M moves, not
+ * budget-bound — was handed 208 in-scope wire Offerings each asking for one
+ * Session, each already carrying one, and returned 197 placements. The eleven
+ * Sessions it dropped from its answer were deleted as orphans, reason
+ * `not_returned_by_solver`, and the next run recreated them and dropped a
+ * DIFFERENT eleven: 127 DELETE events of churn with the Session count flat.
+ *
+ * The demand ledger is what makes a refusal distinguishable from a gap. These
+ * two cases are the whole contract, and they differ ONLY in what the run
+ * recorded asking for — the output and the fixture are identical, so a
+ * regression cannot hide in a difference between them.
+ */
+describe('demand reconciliation withholds deletes on a short answer', () => {
+    /** offeringA's third Session — in scope, unlocked, and absent from `output()`. */
+    const dropped = { sessionId: ids.dropSession, offeringId: ids.offeringA };
+
+    beforeAll(async () => {
+        if (!url) {
+            throw new Error('No owner database URL; run through tests/run-integration.sh');
+        }
+
+        await seed();
+    });
+
+    it('deletes as before when the answer covers everything asked for', async () => {
+        const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            // Exactly what `output()` returns: A twice, B once. Nothing short.
+            demandLedger: [
+                {
+                    wireOfferingId: ids.offeringA, offeringId: ids.offeringA,
+                    requiredSessionCount: 2, existingSessionsSent: 3,
+                },
+                {
+                    wireOfferingId: ids.offeringB, offeringId: ids.offeringB,
+                    requiredSessionCount: 1, existingSessionsSent: 0,
+                },
+            ],
+        }));
+
+        expect(plan.demand).toEqual({
+            verified: true, required: 3, returned: 3, shortOfferings: 0,
+        });
+        expect(plan.deletes.map((d) => d.sessionId)).toEqual([dropped.sessionId]);
+        expect(plan.withheldDeletes).toEqual([]);
+        expect(plan.counts.deleted).toBe(1);
+        expect(plan.counts.deletesWithheld).toBe(0);
+    });
+
+    it('withholds the delete when the run asked for more than it answered', async () => {
+        const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            // The bug's shape: A was asked for THREE and answered TWO, so its
+            // silence about the third Session says nothing at all.
+            demandLedger: [
+                {
+                    wireOfferingId: ids.offeringA, offeringId: ids.offeringA,
+                    requiredSessionCount: 3, existingSessionsSent: 3,
+                },
+                {
+                    wireOfferingId: ids.offeringB, offeringId: ids.offeringB,
+                    requiredSessionCount: 1, existingSessionsSent: 0,
+                },
+            ],
+        }));
+
+        expect(plan.demand).toEqual({
+            verified: true, required: 4, returned: 3, shortOfferings: 1,
+        });
+        expect(plan.deletes).toEqual([]);
+        expect(plan.withheldDeletes.map((d) => d.sessionId)).toEqual([dropped.sessionId]);
+        expect(plan.counts.deleted).toBe(0);
+        expect(plan.counts.deletesWithheld).toBe(1);
+    });
+
+    it('reports a run with no ledger as unverified rather than as complete', async () => {
+        const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            // A run started before the ledger existed. Its deletes still happen
+            // — nothing contradicts them — but the plan must not claim they
+            // were checked, which is the distinction `verified` carries.
+        }));
+
+        expect(plan.demand.verified).toBe(false);
+        expect(plan.counts.deleted).toBe(1);
+        expect(plan.counts.deletesWithheld).toBe(0);
+    });
+
+    it('does not delete the withheld Session when the plan is executed', async () => {
+        await seed();
+
+        const counts = await db.$transaction((tx) => materializeGeneration(tx as never, {
+            tenantId: ids.tenant,
+            termId: ids.term,
+            generationId: ids.generation,
+            output: output(),
+            scopeOfferingIds: [ids.offeringA, ids.offeringB],
+            demandLedger: [{
+                wireOfferingId: ids.offeringA, offeringId: ids.offeringA,
+                requiredSessionCount: 3, existingSessionsSent: 3,
+            }],
+            actorPersonId: null,
+        }));
+
+        expect(counts.deleted).toBe(0);
+        expect(counts.deletesWithheld).toBe(1);
+
+        // The row, and its audit trail: no DELETE event either, because nothing
+        // was removed to write one about.
+        expect(await db.session.findUnique({ where: { id: dropped.sessionId } })).not.toBeNull();
+        expect(await db.sessionEvent.count({
+            where: { tenantId: ids.tenant, type: 'DELETE' },
+        })).toBe(0);
     });
 });

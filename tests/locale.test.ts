@@ -108,13 +108,13 @@ describe('GET /api/auth/session resolves the tiered locale', () => {
 
 describe('GET/PUT /api/me/settings', () => {
     afterEach(async () => {
-        await ownerDb.person.update({ where: { id: PERSON_A }, data: { locale: null } });
+        await ownerDb.person.update({ where: { id: PERSON_A }, data: { locale: null, timezone: null } });
     });
 
     it('round-trips a Person locale', async () => {
         const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
 
-        expect((await api('/api/me/settings', { cookie })).body).toEqual({ locale: null });
+        expect((await api('/api/me/settings', { cookie })).body).toEqual({ locale: null, timezone: null });
 
         const put = await api('/api/me/settings', {
             method: 'PUT', cookie, body: JSON.stringify({ locale: 'de-DE' }),
@@ -122,7 +122,8 @@ describe('GET/PUT /api/me/settings', () => {
 
         expect(put.status).toBe(200);
         expect(put.body.locale).toBe('de-DE');
-        expect((await api('/api/me/settings', { cookie })).body).toEqual({ locale: 'de-DE' });
+        // `timezone` was not sent — the PUT leaves it untouched, still null.
+        expect((await api('/api/me/settings', { cookie })).body).toEqual({ locale: 'de-DE', timezone: null });
     });
 
     it('refuses an unrecognised locale', async () => {
@@ -143,6 +144,39 @@ describe('GET/PUT /api/me/settings', () => {
         });
 
         expect(cleared.body.locale).toBeNull();
+    });
+
+    it('round-trips a Person timezone, independent of locale', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+
+        const put = await api('/api/me/settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ locale: null, timezone: 'Europe/Berlin' }),
+        });
+
+        expect(put.status).toBe(200);
+        expect(put.body).toEqual({ locale: null, timezone: 'Europe/Berlin' });
+
+        const get = await api('/api/me/settings', { cookie });
+
+        expect(get.body).toEqual({ locale: null, timezone: 'Europe/Berlin' });
+    });
+
+    it('leaves timezone untouched when the PUT omits it', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        await api('/api/me/settings', { method: 'PUT', cookie, body: JSON.stringify({ locale: null, timezone: 'Europe/Berlin' }) });
+
+        const put = await api('/api/me/settings', { method: 'PUT', cookie, body: JSON.stringify({ locale: 'de-DE' }) });
+
+        expect(put.body).toEqual({ locale: 'de-DE', timezone: 'Europe/Berlin' });
+    });
+
+    it('refuses an unrecognised timezone', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        const res = await api('/api/me/settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ locale: null, timezone: 'Not/AZone' }),
+        });
+
+        expect(res.status).toBe(400);
     });
 });
 
@@ -172,6 +206,67 @@ describe('PUT /api/display-settings defaultLocale', () => {
         });
 
         expect(res.status).toBe(400);
+    });
+});
+
+describe('PUT /api/display-settings timezone', () => {
+    afterEach(async () => {
+        await ownerDb.tenant.update({ where: { id: TENANT_A }, data: { timezone: 'Europe/Berlin' } });
+        await ownerDb.tenantDisplaySettings.deleteMany({ where: { tenantId: TENANT_A } });
+    });
+
+    it('defaults to the tenant\'s current value (Europe/Berlin, this fixture\'s seed)', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        const get = await api('/api/display-settings', { cookie });
+
+        expect(get.body.timezone).toBe('Europe/Berlin');
+    });
+
+    it('writes `tenant.timezone` directly, not the display-settings singleton', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        const put = await api('/api/display-settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ timezone: 'America/New_York' }),
+        });
+
+        expect(put.status).toBe(200);
+        expect(put.body.timezone).toBe('America/New_York');
+
+        const row = await ownerDb.tenant.findUniqueOrThrow({ where: { id: TENANT_A } });
+
+        expect(row.timezone).toBe('America/New_York');
+
+        // Never touches the display-settings singleton, which this fixture's
+        // seed leaves absent — a write scoped to `tenant` alone must not
+        // create it as a side effect.
+        expect(await ownerDb.tenantDisplaySettings.findUnique({ where: { tenantId: TENANT_A } })).toBeNull();
+    });
+
+    it('leaves the tenant timezone untouched when the PUT omits it', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        const put = await api('/api/display-settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ defaultColor: '#112233' }),
+        });
+
+        expect(put.status).toBe(200);
+        expect(put.body.timezone).toBe('Europe/Berlin');
+    });
+
+    it('refuses an unrecognised timezone', async () => {
+        const { cookie } = await login(ACCOUNTS.adminA, TEST_PASSWORD);
+        const res = await api('/api/display-settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ timezone: 'Not/AZone' }),
+        });
+
+        expect(res.status).toBe(400);
+    });
+
+    it('refuses a caller without tenant.update', async () => {
+        const { cookie } = await login(ACCOUNTS.viewerA, TEST_PASSWORD);
+        const res = await api('/api/display-settings', {
+            method: 'PUT', cookie, body: JSON.stringify({ timezone: 'America/New_York' }),
+        });
+
+        expect(res.status).toBe(403);
     });
 });
 

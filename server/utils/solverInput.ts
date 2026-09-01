@@ -6,7 +6,6 @@ import type {
 import type { Tx } from './tenantDb';
 import { assertClosedUnderParent, conflictClosure, referencedGroupIds } from './solverGroups';
 import {
-    TermEndedError,
     buildAcademicCalendar,
     computeReferenceSlot,
     isoWeekday,
@@ -19,6 +18,7 @@ import { blackedOutWeeks } from '../../shared/academicCalendar';
 import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
+import type { DemandEntry } from './solverDemand';
 import type { SessionKindType } from '../../shared/sessionKindType';
 import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
 import { LECTURER_ROLE_KEY } from '../../shared/roles';
@@ -131,6 +131,13 @@ export interface AssemblyReport {
      */
     offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
     /**
+     * Offerings whose explicit `requiredLecturerCount` exceeds the attached
+     * candidate pool — `offering.lecturers.length`. The wire is never sent the
+     * impossible number: `required` is clamped down to `available` before it
+     * ships, so this is the only place the mismatch is visible at all.
+     */
+    offeringsWithInsufficientLecturers: { id: string; title: string; required: number; available: number }[];
+    /**
      * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO` of
      * the teaching week. Warn-and-allow (TAXONOMY.md §3): an administrator already
      * approved it, but an infeasible term traces back to somebody's calendar more
@@ -225,6 +232,22 @@ export interface AssemblyReport {
         /** Placements the rule could speak about at all, so the ratio is readable. */
         placementsCounted: number;
     };
+    /**
+     * WHAT WAS ASKED, PER WIRE OFFERING — the record the apply reconciles
+     * against.
+     *
+     * Every other field here reports something NARROWED on the way to the wire.
+     * This one reports what was sent in full, and it is here because the apply
+     * needs it later: `planMaterialization()` deletes an in-scope Session the
+     * output does not mention, and that inference is only sound while the
+     * output carries every Offering's full `required_session_count`. A run that
+     * came back short must not be allowed to authorise those deletes, and
+     * nothing downstream can tell short from complete without this.
+     *
+     * Recorded rather than recomputed at apply time: see the module comment on
+     * `solverDemand.ts` for why the Offering as it is NOW is the wrong answer.
+     */
+    demand: DemandEntry[];
     counts: {
         rooms: number;
         persons: number;
@@ -698,69 +721,68 @@ export async function assembleSolverInput(
         grid,
     });
 
-    const [roomRows, personRows, groupRows, offeringRows, sessionRows, constraintRows, lecturerRole] =
-        await Promise.all([
-            tx.room.findMany({
-                /**
-                 * Federation-owned Rooms are included alongside the tenant's own
-                 * (Stage 7b). RLS already narrows `federationId IS NOT NULL` to
-                 * the caller's OWN federation, so this cannot widen past it.
-                 */
-                where: {
-                    isActive: true,
-                    OR: [
-                        { tenantId: options.tenantId },
-                        { tenantId: null, federationId: { not: null } },
-                    ],
-                },
-                include: { roomEquipment: { include: { equipment: true } } },
-            }),
-            tx.person.findMany({
-                where: { tenantId: options.tenantId, isActive: true },
-                include: { personRoles: { include: { role: true } }, memberships: true },
-            }),
-            tx.group.findMany({
-                where: { tenantId: options.tenantId },
-                /*
-                 * The Term-scoped availability window, if the tenant set one.
-                 * Filtered to THIS Term here rather than at use: a window is a
-                 * range of dates inside one Term, and week indices on the wire
-                 * are indices into THAT Term's calendar — the same ambiguity
-                 * `person_unavailability.term_id` exists to remove.
-                 */
-                include: { availability: { where: { termId: options.termId } } },
-            }),
-            tx.offering.findMany({
-                where: { tenantId: options.tenantId, termId: term.id, isActive: true },
-                include: {
-                    kind: true,
-                    groups: true,
-                    lecturers: true,
-                    equipment: { include: { equipment: true } },
-                },
-            }),
-            tx.session.findMany({
-                /**
-                 * Own Sessions plus Federation-shared ones (Stage 7c). A shared
-                 * event occupies a room and a slot the solver must respect; it
-                 * is sent as immovable occupancy, which `toWireSession` enforces
-                 * by forcing isLocked when the Session has no owning tenant.
-                 */
-                where: {
-                    termId: term.id,
-                    OR: [
-                        { tenantId: options.tenantId },
-                        ...(tenant.federationId ? [{ federationId: tenant.federationId }] : []),
-                    ],
-                },
-                include: { kind: true, rooms: true, people: true, groups: true },
-            }),
-            tx.constraint.findMany({
-                where: { tenantId: options.tenantId, isEnabled: true },
-                include: { scopes: true, relationMembers: { orderBy: { position: 'asc' } } },
-            }),
-            tx.role.findFirst({ where: { tenantId: options.tenantId, key: LECTURER_ROLE_KEY }, select: { id: true } }),
-        ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const roomRows = await tx.room.findMany({
+        /**
+         * Federation-owned Rooms are included alongside the tenant's own
+         * (Stage 7b). RLS already narrows `federationId IS NOT NULL` to
+         * the caller's OWN federation, so this cannot widen past it.
+         */
+        where: {
+            isActive: true,
+            OR: [
+                { tenantId: options.tenantId },
+                { tenantId: null, federationId: { not: null } },
+            ],
+        },
+        include: { roomEquipment: { include: { equipment: true } } },
+    });
+    const personRows = await tx.person.findMany({
+        where: { tenantId: options.tenantId, isActive: true },
+        include: { personRoles: { include: { role: true } }, memberships: true },
+    });
+    const groupRows = await tx.group.findMany({
+        where: { tenantId: options.tenantId },
+        /*
+         * The Term-scoped availability window, if the tenant set one.
+         * Filtered to THIS Term here rather than at use: a window is a
+         * range of dates inside one Term, and week indices on the wire
+         * are indices into THAT Term's calendar — the same ambiguity
+         * `person_unavailability.term_id` exists to remove.
+         */
+        include: { availability: { where: { termId: options.termId } } },
+    });
+    const offeringRows = await tx.offering.findMany({
+        where: { tenantId: options.tenantId, termId: term.id, isActive: true },
+        include: {
+            kind: true,
+            groups: true,
+            lecturers: true,
+            equipment: { include: { equipment: true } },
+        },
+    });
+    const sessionRows = await tx.session.findMany({
+        /**
+         * Own Sessions plus Federation-shared ones (Stage 7c). A shared
+         * event occupies a room and a slot the solver must respect; it
+         * is sent as immovable occupancy, which `toWireSession` enforces
+         * by forcing isLocked when the Session has no owning tenant.
+         */
+        where: {
+            termId: term.id,
+            OR: [
+                { tenantId: options.tenantId },
+                ...(tenant.federationId ? [{ federationId: tenant.federationId }] : []),
+            ],
+        },
+        include: { kind: true, rooms: true, people: true, groups: true },
+    });
+    const constraintRows = await tx.constraint.findMany({
+        where: { tenantId: options.tenantId, isEnabled: true },
+        include: { scopes: true, relationMembers: { orderBy: { position: 'asc' } } },
+    });
+    const lecturerRole = await tx.role.findFirst({ where: { tenantId: options.tenantId, key: LECTURER_ROLE_KEY }, select: { id: true } });
 
     /**
      * Federation-owned ROOMS are included: they arrive through the widened RLS
@@ -826,6 +848,13 @@ export async function assembleSolverInput(
         featureQuantities: room.roomEquipment
             .filter((link) => link.quantity !== null)
             .map((link) => ({ feature: link.equipment.key, quantity: link.quantity! })),
+        /*
+         * The app models no specialized-room flag yet — same "not modeled"
+         * treatment as `site` above. `false` is the proto's own documented
+         * no-op: the field is "inert on its own", costing nothing until a
+         * `MinimizeSpecializedRoomUse` constraint exists to read it.
+         */
+        isSpecialized: false,
     }));
 
     /**
@@ -1072,6 +1101,7 @@ export async function assembleSolverInput(
     const offeringsWithPartialEnrolment: {
         id: string; title: string; members: number; expected: number;
     }[] = [];
+    const offeringsWithInsufficientLecturers: AssemblyReport['offeringsWithInsufficientLecturers'] = [];
 
     /**
      * Fetched ONCE for the whole assembly: every Offering's closure is walked
@@ -1218,6 +1248,15 @@ export async function assembleSolverInput(
                 });
             }
 
+            if (offering.requiredLecturerCount !== null && offering.requiredLecturerCount > offering.lecturers.length) {
+                offeringsWithInsufficientLecturers.push({
+                    id: wireId,
+                    title: offering.title,
+                    required: offering.requiredLecturerCount,
+                    available: offering.lecturers.length,
+                });
+            }
+
             return {
             id: wireId,
             tenantId: options.tenantId,
@@ -1228,11 +1267,15 @@ export async function assembleSolverInput(
             requiredSessionCount: Math.max(0, offering.frequency - bankedCount),
             durationBlocks: offering.durationBlocks,
             candidateLecturerIds: offering.lecturers.map((link) => link.personId),
-            // The app has no separate count: OfferingLecturer IS the assignment
-            // ("Who leads it" in the management UI), so the pool equals the
-            // requirement and the solver does not choose. Tracked as a modelling
-            // limit rather than papered over with a guess.
-            requiredLecturerCount: offering.lecturers.length,
+            // NULL (every Offering nobody has touched) derives to one lecturer,
+            // chosen by the solver from the pool — see the column's schema
+            // comment. Clamped to the pool size either way: an explicit count
+            // above it is reported in `offeringsWithInsufficientLecturers`
+            // above rather than sent as a demand nothing can satisfy.
+            requiredLecturerCount: Math.min(
+                offering.requiredLecturerCount ?? Math.min(1, offering.lecturers.length),
+                offering.lecturers.length,
+            ),
             // The SERIES' own group, not the Offering's whole set. This is
             // what makes each series independent — and it is what comes back in
             // `PlacedSession.group_ids`, so materialization gets the one right
@@ -1555,6 +1598,42 @@ export async function assembleSolverInput(
      * session; if genuine pool selection ever lands this becomes a decision
      * variable and this count becomes an upper bound rather than the answer.
      */
+    /**
+     * THE DEMAND LEDGER — one entry per wire Offering, built from the two lists
+     * that are about to be sent rather than from the rows they came from.
+     *
+     * Reading `offerings` and `sessionInputs` here (not `offeringRows` and
+     * `sessionRows`) is the point: the ledger has to say what CROSSED THE WIRE,
+     * including the banked subtraction, the per-group split, and every Session
+     * the filters above omitted. Derived from the source rows it would record a
+     * request the solver never received, and the apply would then reconcile
+     * against a fiction.
+     */
+    const existingSentByWireOffering = new Map<string, number>();
+
+    for (const session of sessionInputs) {
+        if (!session.offeringId) {
+            continue;
+        }
+
+        existingSentByWireOffering.set(
+            session.offeringId,
+            (existingSentByWireOffering.get(session.offeringId) ?? 0) + 1,
+        );
+    }
+
+    const demand: DemandEntry[] = offerings.map((offering) => ({
+        wireOfferingId: offering.id,
+        // Present for every wire id by construction — `realOfferingIdOf` is
+        // written in the same loop that builds `offerings`. Falling back to the
+        // wire id keeps an unsplit id correct rather than dropping the entry,
+        // which would under-report demand: the one direction that silently
+        // authorises a delete.
+        offeringId: realOfferingIdOf.get(offering.id) ?? offering.id,
+        requiredSessionCount: offering.requiredSessionCount,
+        existingSessionsSent: existingSentByWireOffering.get(offering.id) ?? 0,
+    }));
+
     let placementsWithNoSignal = 0;
     let placementsCounted = 0;
 
@@ -1635,6 +1714,7 @@ export async function assembleSolverInput(
             },
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
+            offeringsWithInsufficientLecturers,
             personsWithHeavyVetoLoad,
             offeringsSplitByGroup,
             legacyCombinedSessionsOmitted,
@@ -1655,6 +1735,7 @@ export async function assembleSolverInput(
                 placementsWithNoSignal,
                 placementsCounted,
             },
+            demand,
             counts: {
                 rooms: rooms.length,
                 persons: persons.length,
@@ -1688,5 +1769,3 @@ export function encodeInput(input: SolverInput): Buffer {
 export function hashInput(input: SolverInput): string {
     return createHash('sha256').update(encodeInput(input)).digest('hex');
 }
-
-export { TermEndedError };

@@ -38,7 +38,7 @@ export interface GridBounds {
     activeDays: number[];
 }
 
-export interface Placement {
+export interface GridPlacement {
     dayOfWeek: number;
     blockIndex: number;
     durationBlocks: number;
@@ -56,7 +56,7 @@ export interface Placement {
  * seed emits `% (blocksPerDay - 1)`), so a Session occupying `[b, b + d)` needs
  * `b + d <= blocksPerDay`.
  */
-export function fitsGrid(placement: Placement, grid: GridBounds): boolean {
+export function fitsGrid(placement: GridPlacement, grid: GridBounds): boolean {
     return placement.blockIndex >= 0
         && placement.durationBlocks >= 1
         && placement.blockIndex + placement.durationBlocks <= grid.blocksPerDay

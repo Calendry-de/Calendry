@@ -10,7 +10,7 @@ defineRouteMeta({
         summary: 'Delete one row by id',
         description: 'Generic delete route (permission <resource>.delete). System rows (isSystem) are refused. Entity-specific guards apply, e.g. a Person holding a login cannot be deleted before the login is deleted or reattached.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {

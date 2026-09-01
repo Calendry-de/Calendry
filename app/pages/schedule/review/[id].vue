@@ -373,6 +373,7 @@
                 :plan="preview.plan"
                 :violations="preview.violations"
                 :run="preview.run"
+                :demand="preview.demand"
                 :decidable="isDecidable"
             />
 

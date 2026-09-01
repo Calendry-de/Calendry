@@ -44,16 +44,16 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
-        const [groups, memberships] = await Promise.all([
-            tx.group.findMany({
-                where: { tenantId: identity.tenantId },
-                select: { id: true, parentGroupId: true, expectedSize: true },
-            }),
-            tx.membership.findMany({
-                where: { tenantId: identity.tenantId },
-                select: { groupId: true, personId: true },
-            }),
-        ]);
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const groups = await tx.group.findMany({
+            where: { tenantId: identity.tenantId },
+            select: { id: true, parentGroupId: true, expectedSize: true },
+        });
+        const memberships = await tx.membership.findMany({
+            where: { tenantId: identity.tenantId },
+            select: { groupId: true, personId: true },
+        });
 
         const derived = deriveCapacity(offering.groups.map((link) => link.groupId), groups, memberships);
 

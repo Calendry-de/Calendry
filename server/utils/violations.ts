@@ -185,12 +185,12 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
 
     const involvedIds = [...new Set([...seeds.map((s) => s.id), ...candidates.map((c) => c.id)])];
 
-    const [rooms, people, groups, virtualRooms] = await Promise.all([
-        tx.sessionRoom.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, roomId: true } }),
-        tx.sessionPerson.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, personId: true } }),
-        tx.sessionGroup.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, groupId: true } }),
-        tx.room.findMany({ where: { isVirtual: true }, select: { id: true } }),
-    ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const rooms = await tx.sessionRoom.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, roomId: true } });
+    const people = await tx.sessionPerson.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, personId: true } });
+    const groups = await tx.sessionGroup.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, groupId: true } });
+    const virtualRooms = await tx.room.findMany({ where: { isVirtual: true }, select: { id: true } });
 
     const virtualRoomIds = new Set(virtualRooms.map((room) => room.id));
 

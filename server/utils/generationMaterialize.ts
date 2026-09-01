@@ -5,6 +5,8 @@ import { isPlacedSession } from '../../shared/sessionPlacement';
 import { appendEvent } from './sessionEvents';
 import { fromWireWeek } from './solverSessions';
 import { parseWireOfferingId } from './offeringSplit';
+import { reconcileDemand } from './solverDemand';
+import type { DemandEntry } from './solverDemand';
 
 /**
  * Turning a solver result into real Session rows, split into a PLAN (reads only)
@@ -106,6 +108,18 @@ export interface PlanCounts {
      */
     unchanged: number;
     deleted: number;
+    /**
+     * Deletes this plan REFUSED to make, because the run's own answer for that
+     * Offering came back short of what was asked of it.
+     *
+     * Not a subset of `deleted` — the complement of it. A Session counted here
+     * would have been deleted under the old rule and is being kept instead, so
+     * the number is the damage this reconciliation prevented. It rides in the
+     * APPLY_GENERATION event payload alongside the rest of the counts, because
+     * an apply that kept eleven Sessions the solver did not mention is a fact a
+     * replay needs and a reviewer should be able to find afterwards.
+     */
+    deletesWithheld: number;
     skippedLocked: number;
     /**
      * Placements that cannot be written at all — the Offering is not in this
@@ -119,11 +133,37 @@ export interface PlanCounts {
     placementsUnmapped: number;
 }
 
+/** What the run asked the solver for, against what its answer covered. */
+export interface PlanDemand {
+    /**
+     * FALSE MEANS UNCHECKED, not clean. A run started before the demand ledger
+     * existed recorded nothing about what it asked for, so this plan's deletes
+     * rest on the old assumption that the output is complete. Surfaced rather
+     * than smoothed over: `verified: false` with `deleted > 0` is the one
+     * combination a reviewer should look at twice.
+     */
+    verified: boolean;
+    /** Sessions the run asked the solver to place, across every in-scope series. */
+    required: number;
+    /** Placements it returned for those Offerings. */
+    returned: number;
+    /** Offerings whose answer returned fewer placements than were asked for. */
+    shortOfferings: number;
+}
+
 export interface MaterializationPlan {
     placements: PlannedPlacement[];
     deletes: PlannedDelete[];
+    /**
+     * Deletes withheld because their Offering's answer was short — kept as rows
+     * rather than a count so the review screen can NAME them. "11 sessions kept
+     * because the solver's answer was incomplete" is only actionable if a human
+     * can see which eleven.
+     */
+    withheldDeletes: PlannedDelete[];
     /** Ids of locked Sessions, which are never touched. */
     skippedLocked: string[];
+    demand: PlanDemand;
     counts: PlanCounts;
 }
 
@@ -154,6 +194,15 @@ function samePlacement(a: Placement, b: Placement): boolean {
  * mean the applied schedule contains placements the solver rejected while
  * `frequency` appears satisfied. It is recoverable through the event log.
  *
+ * AND IT IS ONLY SOUND WHILE THE ANSWER IS COMPLETE. "Absent" reads as a refusal
+ * only if the solver returned everything it was asked for; where it returned
+ * FEWER placements for an Offering than the run demanded, its silence about that
+ * Offering's Sessions says nothing at all, exactly as an Event's or a banked
+ * Session's absence does. `demandLedger` is what makes that distinguishable —
+ * without it this function cannot tell a refusal from a dropped answer, and it
+ * deleted eleven live Sessions per run on the strength of that confusion. See
+ * `solverDemand.ts`.
+ *
  * LOCKED SESSIONS ARE NEVER TOUCHED — they were sent as immovable fixtures, so the
  * answer was computed on the assumption they would not move.
  */
@@ -163,12 +212,20 @@ export async function planMaterialization(tx: Tx, options: {
     output: SolverOutput;
     /** Offerings the run was allowed to place. Anything else is out of scope. */
     scopeOfferingIds: string[];
+    /**
+     * What the run put on the wire, from `solver_run.meta.report.demand`. NULL
+     * for a run started before the ledger existed — see `PlanDemand.verified`.
+     */
+    demandLedger?: DemandEntry[] | null;
     /** Set when the tenant belongs to a Federation, so shared Sessions are seen. */
     federationId?: string | null;
 }): Promise<MaterializationPlan> {
-    const { tenantId, federationId = null, termId, output, scopeOfferingIds } = options;
+    const {
+        tenantId, federationId = null, termId, output, scopeOfferingIds, demandLedger = null,
+    } = options;
 
     const inScope = new Set(scopeOfferingIds);
+    const demand = reconcileDemand(demandLedger, output);
 
     /**
      * TWO SETS: `visible` is everything this tenant can see, including
@@ -321,8 +378,13 @@ export async function planMaterialization(tx: Tx, options: {
      * Everything in scope that the solver did not return. Locked Sessions and
      * Sessions of out-of-scope Offerings are excluded — the solver was never
      * asked about those and its silence says nothing.
+     *
+     * SELECTED FIRST, PARTITIONED SECOND. Every candidate is collected here and
+     * split into deletes and withheld deletes below, so both lists come from
+     * one filter: a second predicate for "would have been deleted" is exactly
+     * the pair of conditions that agree today and drift apart later.
      */
-    const deletes: PlannedDelete[] = existing
+    const unreturned = existing
         .filter((s) => {
             /**
              * An EVENT is never deleted by an apply. Stated as its own clause
@@ -372,10 +434,26 @@ export async function planMaterialization(tx: Tx, options: {
             },
         }));
 
+    /**
+     * THE SPLIT. An unreturned Session whose Offering came back short is kept,
+     * not deleted — `demand.short` is empty whenever the answer was complete or
+     * could not be checked, so this is a no-op on every well-formed run and
+     * `deletes` is exactly what it always was.
+     */
+    const deletes = unreturned.filter((d) => !d.offeringId || !demand.short.has(d.offeringId));
+    const withheldDeletes = unreturned.filter((d) => d.offeringId && demand.short.has(d.offeringId));
+
     return {
         placements,
         deletes,
+        withheldDeletes,
         skippedLocked,
+        demand: {
+            verified: demand.known,
+            required: demand.totalRequired,
+            returned: demand.totalReturned,
+            shortOfferings: demand.short.size,
+        },
         counts: {
             created: placements.filter((p) => p.action === 'create').length,
             moved: placements.filter((p) => p.action === 'move').length,
@@ -386,6 +464,7 @@ export async function planMaterialization(tx: Tx, options: {
                 .filter((p) => p.action === 'move' && !inScope.has(p.offeringId)).length,
             unchanged: placements.filter((p) => p.action === 'unchanged').length,
             deleted: deletes.length,
+            deletesWithheld: withheldDeletes.length,
             skippedLocked: skippedLocked.length,
             placementsUnmapped,
         },
@@ -498,10 +577,10 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
         await tx.sessionRoom.deleteMany({ where: { sessionId } });
 
         if (planned.attendeesAreAuthoritative) {
-            await Promise.all([
-                tx.sessionPerson.deleteMany({ where: { sessionId } }),
-                tx.sessionGroup.deleteMany({ where: { sessionId } }),
-            ]);
+            // Sequential — `tx` is one shared connection; concurrent queries on
+            // it trip pg's deprecated overlapping-query warning.
+            await tx.sessionPerson.deleteMany({ where: { sessionId } });
+            await tx.sessionGroup.deleteMany({ where: { sessionId } });
         }
 
         // EVERY Room, not just the primary. `session_room` is a join table and
@@ -583,14 +662,19 @@ export async function materializeGeneration(tx: Tx, options: {
     generationId: string;
     output: SolverOutput;
     scopeOfferingIds: string[];
+    /** The run's demand ledger, so deletes can be reconciled. See `PlanDemand`. */
+    demandLedger?: DemandEntry[] | null;
     federationId?: string | null;
     /** Attribution for the DELETE events this may emit. */
     actorPersonId: string | null;
 }): Promise<MaterializeCounts> {
-    const { tenantId, federationId = null, termId, generationId, output, scopeOfferingIds, actorPersonId } = options;
+    const {
+        tenantId, federationId = null, termId, generationId, output, scopeOfferingIds,
+        demandLedger = null, actorPersonId,
+    } = options;
 
     const plan = await planMaterialization(tx, {
-        tenantId, federationId, termId, output, scopeOfferingIds,
+        tenantId, federationId, termId, output, scopeOfferingIds, demandLedger,
     });
 
     return executePlan(tx, plan, {

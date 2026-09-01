@@ -96,17 +96,17 @@ export default defineEventHandler(async (event) => {
         };
 
         return mapDbErrors(async () => {
-            const [people, total] = await Promise.all([
-                tx.person.findMany({
-                    where,
-                    select,
-                    orderBy: { familyName: 'asc' },
-                    ...(paging.limit === undefined
-                        ? {}
-                        : { take: paging.limit, skip: paging.offset ?? 0 }),
-                }),
-                paging.limit === undefined ? Promise.resolve(0) : tx.person.count({ where }),
-            ]);
+            // Sequential — `tx` is one shared connection; concurrent queries on
+            // it trip pg's deprecated overlapping-query warning.
+            const people = await tx.person.findMany({
+                where,
+                select,
+                orderBy: { familyName: 'asc' },
+                ...(paging.limit === undefined
+                    ? {}
+                    : { take: paging.limit, skip: paging.offset ?? 0 }),
+            });
+            const total = paging.limit === undefined ? 0 : await tx.person.count({ where });
 
             const counts = await tenantCounts(
                 tx,

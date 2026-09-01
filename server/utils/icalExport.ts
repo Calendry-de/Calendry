@@ -1,4 +1,4 @@
-import { addDays, isoDate, mondayOf, weekIndexOf } from '../../shared/academicCalendar';
+import { addDays, mondayOf, weekIndexOf } from '../../shared/academicCalendar';
 import { blockSpan } from '../../shared/timeGrid';
 import type { BlockGrid } from '../../shared/timeGrid';
 import { zonedTimeToUtc } from '../../shared/timezone';
@@ -114,5 +114,3 @@ export function weekRangeOf(termStartDate: Date, from: Date, to: Date): { first:
         last: weekIndexOf(termStartDate, to) + 1,
     };
 }
-
-export { isoDate };

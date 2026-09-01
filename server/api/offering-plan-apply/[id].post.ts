@@ -13,6 +13,39 @@ const bodySchema = z.object({
     message: 'Provide exactly one of groupId or groupIds.',
 });
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Curriculum plans'],
+        summary: 'Apply a curriculum plan to one or more Groups, for one Term',
+        description: 'Gives the Group(s) every Offering in the plan for the given Term — creating whichever ones do not exist yet and attaching each Group to whichever already do (reuse is keyed on term + createdFromTemplateId, not on the plan, so two Groups taking the same subject in the same Term share one Offering). Idempotent: re-applying the same plan to a Group that already has it changes nothing. Provide exactly one of groupId (single-Group shape, responds { offerings }) or groupIds (bulk shape, responds { results: [...] }). All-or-nothing across every check, for every Group named, before writing anything.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Curriculum plan id.' },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: {
+                        type: 'object',
+                        required: ['termId'],
+                        properties: {
+                            termId: { type: 'string' },
+                            groupId: { type: 'string', description: 'Single-Group shape. Exactly one of groupId/groupIds.' },
+                            groupIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 100, description: 'Bulk shape. Exactly one of groupId/groupIds.' },
+                        },
+                    },
+                },
+            },
+        },
+        responses: {
+            200: { description: 'groupId sent: { offerings: [...] }. groupIds sent: { results: [{ groupId, offerings }] }.' },
+            403: { description: 'Caller lacks offering_plan.apply.' },
+            404: { description: 'Plan, Term, or one or more Groups not found in this tenant.' },
+            422: { description: 'The plan has no items yet, or one or more of its templates is missing a kind or a title.' },
+        },
+    },
+});
+
 /**
  * Gives one or more Groups every Offering in a curriculum plan, for one Term
  * — creating whichever ones do not exist yet and ATTACHING each Group to

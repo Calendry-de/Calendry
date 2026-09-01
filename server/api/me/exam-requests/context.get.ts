@@ -46,38 +46,38 @@ defineRouteMeta({
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     await requirePermission(event, tx, 'exam.request_own');
 
-    const [offerings, kinds, grids, terms, periods] = await Promise.all([
-        identity.actorPersonId
-            ? tx.offering.findMany({
-                where: {
-                    tenantId: identity.tenantId,
-                    lecturers: { some: { personId: identity.actorPersonId } },
-                },
-                select: { id: true, title: true, code: true, termId: true },
-                orderBy: { title: 'asc' },
-            })
-            : Promise.resolve([]),
-        tx.sessionKind.findMany({
-            where: { tenantId: identity.tenantId },
-            select: { id: true, name: true, type: true },
-            orderBy: { name: 'asc' },
-        }),
-        tx.timeGrid.findMany({
-            where: { tenantId: identity.tenantId },
-            include: { breaks: true },
-            orderBy: { name: 'asc' },
-        }),
-        tx.term.findMany({
-            where: { tenantId: identity.tenantId },
-            select: { id: true, name: true, startDate: true, endDate: true },
-            orderBy: { startDate: 'asc' },
-        }),
-        tx.calendarPeriod.findMany({
-            where: { tenantId: identity.tenantId },
-            select: { termId: true, kind: true, startDate: true, endDate: true },
-            orderBy: { startDate: 'asc' },
-        }),
-    ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const offerings = identity.actorPersonId
+        ? await tx.offering.findMany({
+            where: {
+                tenantId: identity.tenantId,
+                lecturers: { some: { personId: identity.actorPersonId } },
+            },
+            select: { id: true, title: true, code: true, termId: true },
+            orderBy: { title: 'asc' },
+        })
+        : [];
+    const kinds = await tx.sessionKind.findMany({
+        where: { tenantId: identity.tenantId },
+        select: { id: true, name: true, type: true },
+        orderBy: { name: 'asc' },
+    });
+    const grids = await tx.timeGrid.findMany({
+        where: { tenantId: identity.tenantId },
+        include: { breaks: true },
+        orderBy: { name: 'asc' },
+    });
+    const terms = await tx.term.findMany({
+        where: { tenantId: identity.tenantId },
+        select: { id: true, name: true, startDate: true, endDate: true },
+        orderBy: { startDate: 'asc' },
+    });
+    const periods = await tx.calendarPeriod.findMany({
+        where: { tenantId: identity.tenantId },
+        select: { termId: true, kind: true, startDate: true, endDate: true },
+        orderBy: { startDate: 'asc' },
+    });
 
     return { offerings, kinds, grids, terms, periods };
 }));

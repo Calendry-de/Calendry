@@ -2,6 +2,22 @@ import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 import { deriveGroupPlanApplications } from '../../utils/offeringPlans';
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Curriculum plans'],
+        summary: 'One Group\'s current curriculum-plan phase(s), with its advance target',
+        description: 'The per-Group form of GET /api/group-plan-applications — issue #100\'s "how do we know which phase a group is in" answer, fully derived (never stored) from Offering.createdFromTemplateId. A Group with no Offering seeded from any plan template yet gets an empty array, not a 404.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Group id.' },
+        ],
+        responses: {
+            200: { description: 'One entry per curriculum plan this Group already has offerings from.' },
+            403: { description: 'Caller lacks offering_plan.apply.' },
+            404: { description: 'Group not found in this tenant.' },
+        },
+    },
+});
+
 /**
  * Every curriculum plan this Group already has offerings from, with the
  * "advance" target for each — the ONE query that answers both "what does

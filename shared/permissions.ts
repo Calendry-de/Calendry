@@ -347,6 +347,36 @@ const EXPLICIT_PERMISSIONS = [
      */
     { key: 'ics_link.generate_own', category: 'ics_link', description: 'Create a calendar-subscription link for your own schedule' },
     { key: 'ics_link.generate', category: 'ics_link', description: 'Create a calendar-subscription link for your own schedule or for specific Groups' },
+
+    /**
+     * GDPR data-access tooling (issue #84). SEPARATE FROM `person.read`
+     * deliberately, the same reasoning `solver.snapshot.read` gives for
+     * standing apart from `solver.trigger`: a full export reaches well past
+     * what `person.read` implies — sessions, memberships, preferences,
+     * exam requests, API tokens, and this Person's own audit trail — so
+     * holding "may see this person's record in a list" must not silently
+     * also mean "may download everything about them". `GET /api/me/export`
+     * needs no permission at all (self-service, same family as the rest of
+     * `/api/me/*`); this key gates exporting somebody ELSE's data, from
+     * `GET /api/person-export/:id` — a SIBLING of `persons`, not nested
+     * under it: `persons` is a live `CRUD_RESOURCES` key served by the
+     * generic `/api/[resource]` route, and a literal `server/api/persons/`
+     * directory shadows that dynamic route for the whole `/api/persons/*`
+     * subtree in Nitro's file-based router.
+     */
+    { key: 'person.export', category: 'person', description: "Export a Person's full data — a GDPR access request on someone else's record" },
+    /**
+     * The tenant-wide half of issue #84: everything this institution owns,
+     * in one bundle — for a departing tenant taking their data with them,
+     * or an administrator answering a Right to Access request that spans
+     * more than one Person. Self-service, unlike erasure: an institution
+     * may always take a copy of its own data. Erasure of a whole tenant has
+     * no matching permission — CLAUDE.md is explicit that tenant lifecycle
+     * (create/delete) is staff-only, never a tenant permission, so that
+     * half lives at `DELETE /api/staff/tenants/:id` behind
+     * `requireStaffIdentity` instead.
+     */
+    { key: 'tenant.export', category: 'tenant', description: "Export this institution's entire dataset" },
 ] as const satisfies readonly PermissionShape[];
 
 /**

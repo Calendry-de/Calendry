@@ -73,15 +73,17 @@ async function overlappingSessionIds(tx: Tx, options: SlotOptions): Promise<stri
 async function busyPersonIds(tx: Tx, options: SlotOptions): Promise<Set<string>> {
     const overlappingIds = await overlappingSessionIds(tx, options);
 
-    const [attachedHere, busyElsewhere, coveringElsewhere] = await Promise.all([
-        tx.sessionPerson.findMany({ where: { sessionId: options.session.id }, select: { personId: true } }),
-        overlappingIds.length
-            ? tx.sessionPerson.findMany({ where: { sessionId: { in: overlappingIds } }, select: { personId: true } })
-            : Promise.resolve([]),
-        overlappingIds.length
-            ? tx.sessionSubstitution.findMany({ where: { sessionId: { in: overlappingIds } }, select: { coveringPersonId: true } })
-            : Promise.resolve([]),
-    ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const attachedHere = await tx.sessionPerson.findMany({
+        where: { sessionId: options.session.id }, select: { personId: true },
+    });
+    const busyElsewhere = overlappingIds.length
+        ? await tx.sessionPerson.findMany({ where: { sessionId: { in: overlappingIds } }, select: { personId: true } })
+        : [];
+    const coveringElsewhere = overlappingIds.length
+        ? await tx.sessionSubstitution.findMany({ where: { sessionId: { in: overlappingIds } }, select: { coveringPersonId: true } })
+        : [];
 
     return new Set([
         ...attachedHere.map((p) => p.personId),
@@ -131,15 +133,15 @@ export async function freeSubstituteCandidates(tx: Tx, options: SlotOptions & {
             : {}),
     };
 
-    const [rows, total] = await Promise.all([
-        tx.person.findMany({
-            where,
-            select: { id: true, givenName: true, familyName: true, email: true },
-            orderBy: [{ familyName: 'asc' }, { givenName: 'asc' }],
-            take: options.limit ?? 20,
-        }),
-        tx.person.count({ where }),
-    ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const rows = await tx.person.findMany({
+        where,
+        select: { id: true, givenName: true, familyName: true, email: true },
+        orderBy: [{ familyName: 'asc' }, { givenName: 'asc' }],
+        take: options.limit ?? 20,
+    });
+    const total = await tx.person.count({ where });
 
     return { rows, total };
 }

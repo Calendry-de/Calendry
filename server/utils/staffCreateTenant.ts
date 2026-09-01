@@ -73,6 +73,16 @@ function constraintsParam(): string {
 }
 
 /**
+ * Shared across every staff route that resolves a tenant id against a
+ * SECURITY DEFINER function's P0002 (`staffEraseTenant.ts`,
+ * `staffFederation.ts`) — one class, not two independently declared copies
+ * with the same name and body, which is exactly the kind of drift-by-name
+ * collision Nitro's auto-import warns about when two files export the same
+ * symbol.
+ */
+export class UnknownTenantIdError extends Error {}
+
+/**
  * Reads the original PostgreSQL error code off a raw-query failure.
  *
  * `$queryRaw`/`$executeRaw` against the `@prisma/adapter-pg` driver adapter

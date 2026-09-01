@@ -27,28 +27,29 @@ export default defineEventHandler(async (event) => {
             ...(query.termId ? { termId: query.termId } : {}),
         };
 
-        const [rows, active] = await Promise.all([
-            tx.solverRun.findMany({
-                where,
-                orderBy: { createdAt: 'desc' },
-                take: query.limit ?? 20,
-            }),
-            // Surfaced separately because it is the thing a caller acts on: it
-            // is what a start attempt would collide with, and the only run worth
-            // cancelling. Finding it by scanning the list would mean every
-            // caller reimplementing the index's definition of "active".
-            tx.solverRun.findMany({
-                where: { ...where, status: { in: ACTIVE_RUN_STATUSES } },
-                /*
-                 * `scope` travels so a caller can say WHAT it collided with. A
-                 * 409 that adopts the winner otherwise reports "a run was
-                 * already in progress" whatever the user clicked, which is
-                 * wrong in the one case that matters: asking for a repair and
-                 * silently joining somebody's full rebuild.
-                 */
-                select: { id: true, termId: true, status: true, createdAt: true, scope: true },
-            }),
-        ]);
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const rows = await tx.solverRun.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: query.limit ?? 20,
+        });
+
+        // Surfaced separately because it is the thing a caller acts on: it
+        // is what a start attempt would collide with, and the only run worth
+        // cancelling. Finding it by scanning the list would mean every
+        // caller reimplementing the index's definition of "active".
+        const active = await tx.solverRun.findMany({
+            where: { ...where, status: { in: ACTIVE_RUN_STATUSES } },
+            /*
+             * `scope` travels so a caller can say WHAT it collided with. A
+             * 409 that adopts the winner otherwise reports "a run was
+             * already in progress" whatever the user clicked, which is
+             * wrong in the one case that matters: asking for a repair and
+             * silently joining somebody's full rebuild.
+             */
+            select: { id: true, termId: true, status: true, createdAt: true, scope: true },
+        });
 
         return {
             runs: rows.map(serializeRun),

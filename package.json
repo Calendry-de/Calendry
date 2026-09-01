@@ -44,7 +44,7 @@
     "repair:generation-status": "bun run scripts/repair-generation-status.ts"
   },
   "dependencies": {
-    "@calendry-de/calendry-proto": "^0.15.1",
+    "@calendry-de/calendry-proto": "^0.16.1",
     "@grpc/grpc-js": "^1.14.4",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/icon": "^2.5.1",
@@ -55,6 +55,7 @@
     "@prisma/client": "^7.10.0",
     "animejs": "^4.5.0",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "ioredis": "^5.11.1",
     "markdown-it": "^14.3.1",
     "nuxt": "^4.5.2",

@@ -21,7 +21,7 @@
                     those applies.
                 </p>
 
-                <label class="panel_locale">
+                <label class="panel_field">
                     <span>Your locale</span>
                     <input
                         v-model="localeInput"
@@ -35,6 +35,31 @@
                     class="note note--error"
                     role="alert"
                 >{{ localeError }}</p>
+            </section>
+
+            <section class="panel_group">
+                <h2>Timezone</h2>
+                <p class="panel_hint">
+                    Display and export only — an IANA zone name (e.g. <code>Europe/Berlin</code>,
+                    <code>America/New_York</code>). It never changes where a session is drawn on the
+                    grid or how "today" is decided; the institution's own timezone governs all of
+                    that. Leave empty to leave it unset.
+                </p>
+
+                <label class="panel_field">
+                    <span>Your timezone</span>
+                    <input
+                        v-model="timezoneInput"
+                        placeholder="e.g. Europe/Berlin — leave empty to leave unset"
+                        type="text"
+                    >
+                </label>
+
+                <p
+                    v-if="timezoneError"
+                    class="note note--error"
+                    role="alert"
+                >{{ timezoneError }}</p>
             </section>
 
             <div class="panel_actions">
@@ -58,26 +83,31 @@
         </form>
 
         <ApiTokensPanel/>
+        <DataExportPanel/>
     </CommonPage>
 </template>
 
 <script setup lang="ts">
 import ApiTokensPanel from '~/components/my/ApiTokensPanel.vue';
+import DataExportPanel from '~/components/my/DataExportPanel.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonPage from '~/components/common/CommonPage.vue';
 import { isUsableLocale } from '#shared/locale';
+import { isUsableTimeZone } from '#shared/timezone';
 
 /**
- * A signed-in Person's own display preferences (issue #17) — today, just
- * `locale`. No permission gate beyond being signed in (the global auth
- * middleware already requires that for every non-anonymous route): this is
- * self-service over the caller's own row, nobody else's.
+ * A signed-in Person's own display preferences (issue #17's `locale`,
+ * `timezone` added alongside it). No permission gate beyond being signed in
+ * (the global auth middleware already requires that for every non-anonymous
+ * route): this is self-service over the caller's own row, nobody else's.
  */
 useHead({ title: 'My account' });
 
 const request = useRequestFetch();
 
-const settings = useAsyncData('me:settings', () => request<{ locale: string | null }>('/api/me/settings'));
+interface MeSettings { locale: string | null; timezone: string | null }
+
+const settings = useAsyncData('me:settings', () => request<MeSettings>('/api/me/settings'));
 
 await settings;
 
@@ -89,7 +119,12 @@ const storedLocale = computed(() => settings.data.value?.locale ?? null);
 const localeInput = ref(storedLocale.value ?? '');
 const localeError = ref('');
 
-const dirty = computed(() => localeInput.value !== (storedLocale.value ?? ''));
+const storedTimezone = computed(() => settings.data.value?.timezone ?? null);
+const timezoneInput = ref(storedTimezone.value ?? '');
+const timezoneError = ref('');
+
+const dirty = computed(() => localeInput.value !== (storedLocale.value ?? '')
+    || timezoneInput.value !== (storedTimezone.value ?? ''));
 
 const saving = ref(false);
 const saved = ref(false);
@@ -100,18 +135,30 @@ async function save() {
     saved.value = false;
     saveError.value = '';
     localeError.value = '';
+    timezoneError.value = '';
 
-    const trimmed = localeInput.value.trim();
+    const trimmedLocale = localeInput.value.trim();
+    const trimmedTimezone = timezoneInput.value.trim();
 
-    if (trimmed && !isUsableLocale(trimmed)) {
+    if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
         localeError.value = 'Not a recognised locale — try a tag like "de-DE" or "en-GB".';
         saving.value = false;
 
         return;
     }
 
+    if (trimmedTimezone && !isUsableTimeZone(trimmedTimezone)) {
+        timezoneError.value = 'Not a recognised timezone — try a zone name like "Europe/Berlin".';
+        saving.value = false;
+
+        return;
+    }
+
     try {
-        await request('/api/me/settings', { method: 'PUT', body: { locale: trimmed || null } });
+        await request('/api/me/settings', {
+            method: 'PUT',
+            body: { locale: trimmedLocale || null, timezone: trimmedTimezone || null },
+        });
         await settings.refresh();
         saved.value = true;
     }
@@ -176,7 +223,7 @@ async function save() {
         }
     }
 
-    &_locale {
+    &_field {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);

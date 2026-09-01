@@ -4,6 +4,7 @@ import { mapDbErrors } from '../../../utils/dbErrors';
 import { materializeGeneration } from '../../../utils/generationMaterialize';
 import { appendEvent } from '../../../utils/sessionEvents';
 import { requirePermission } from '../../../utils/requirePermission';
+import { demandLedgerFrom } from '../../../utils/solverDemand';
 import { withRequestTenant } from '../../../utils/tenantDb';
 import { refreshViolations } from '../../../utils/violations';
 
@@ -125,7 +126,7 @@ export default defineEventHandler(async (event) => {
              */
             const run = await tx.solverRun.findFirst({
                 where: { tenantId: identity.tenantId, generationId: generation.id },
-                select: { id: true, termId: true, result: true, scope: true },
+                select: { id: true, termId: true, result: true, scope: true, meta: true },
             });
 
             let materialized = null;
@@ -140,6 +141,15 @@ export default defineEventHandler(async (event) => {
                     generationId: generation.id,
                     output: SolverOutput.fromJSON(run.result),
                     scopeOfferingIds: scope.offeringIds ?? [],
+                    /**
+                     * What this run ASKED the solver for. Without it an apply
+                     * cannot tell "the solver refused to place this Session"
+                     * from "the solver's answer was short and never mentioned
+                     * it", and deletes the Session either way — which is how
+                     * eleven live placements per run went missing. Null for a
+                     * run started before the ledger existed; see `PlanDemand`.
+                     */
+                    demandLedger: demandLedgerFrom(run.meta),
                     actorPersonId: identity.actorPersonId,
                 }));
             }

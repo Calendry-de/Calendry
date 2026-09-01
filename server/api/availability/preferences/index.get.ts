@@ -19,39 +19,39 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     await requireAnyPermission(event, tx, ['availability.manage_any', 'availability.read_any']);
 
-    const [people, limits, roomFeatureOptions] = await Promise.all([
-        tx.person.findMany({
-            where: { tenantId: identity.tenantId, isActive: true },
-            orderBy: [{ familyName: 'asc' }, { givenName: 'asc' }],
-            take: 500,
-            select: {
-                id: true,
-                givenName: true,
-                familyName: true,
-                preference: {
-                    select: {
-                        preferredDays: true,
-                        preferredBlocks: true,
-                        weightMultiplier: true,
-                        roomFeatures: { select: { equipmentId: true } },
-                    },
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const people = await tx.person.findMany({
+        where: { tenantId: identity.tenantId, isActive: true },
+        orderBy: [{ familyName: 'asc' }, { givenName: 'asc' }],
+        take: 500,
+        select: {
+            id: true,
+            givenName: true,
+            familyName: true,
+            preference: {
+                select: {
+                    preferredDays: true,
+                    preferredBlocks: true,
+                    weightMultiplier: true,
+                    roomFeatures: { select: { equipmentId: true } },
                 },
-                personRoles: { select: { role: { select: { key: true, name: true } } } },
             },
-        }),
-        tenantGridLimits(tx, identity.tenantId),
-        /*
-         * Travels with the page, not fetched from `/api/equipment`. This route's
-         * gate is `availability.manage_any`/`read_any`, which does not imply
-         * `equipment.read` — and one 403 inside a reference fetch blanks the
-         * whole screen with no error, the least diagnosable failure a UI has.
-         */
-        tx.equipment.findMany({
-            orderBy: { name: 'asc' },
-            take: 200,
-            select: { id: true, key: true, name: true },
-        }),
-    ]);
+            personRoles: { select: { role: { select: { key: true, name: true } } } },
+        },
+    });
+    const limits = await tenantGridLimits(tx, identity.tenantId);
+    /*
+     * Travels with the page, not fetched from `/api/equipment`. This route's
+     * gate is `availability.manage_any`/`read_any`, which does not imply
+     * `equipment.read` — and one 403 inside a reference fetch blanks the
+     * whole screen with no error, the least diagnosable failure a UI has.
+     */
+    const roomFeatureOptions = await tx.equipment.findMany({
+        orderBy: { name: 'asc' },
+        take: 200,
+        select: { id: true, key: true, name: true },
+    });
 
     return {
         grid: limits.defaultGrid,

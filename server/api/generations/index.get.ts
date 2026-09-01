@@ -57,10 +57,13 @@ export default defineEventHandler(async (event) => {
             take: query.limit ?? 25,
         });
 
-        const withRuns = await Promise.all(generations.map(async (generation) => ({
-            ...generation,
-            run: await runSummaryFor(tx, identity.tenantId, generation.id),
-        })));
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const withRuns: Array<typeof generations[number] & { run: Awaited<ReturnType<typeof runSummaryFor>> }> = [];
+
+        for (const generation of generations) {
+            withRuns.push({ ...generation, run: await runSummaryFor(tx, identity.tenantId, generation.id) });
+        }
 
         /*
          * The term filter is in the query above now that a Generation carries

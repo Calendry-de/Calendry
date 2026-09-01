@@ -692,7 +692,7 @@ async function remove(row: VetoRow) {
 <style scoped lang="scss">
 /*
  * Prose is capped at 68ch — the measure this repo already uses
- * (`ManageConstraintGrid`, `LandingRoadmapList`, `LandingPrincipleList`).
+ * (`ManageConstraintGrid`, `LandingBuiltClusters`, `LandingPrincipleList`).
  * Uncapped, `.intro` measured 1278px at 1440px, about 205 characters per line
  * against a 45–75 target, because nothing in the section bounded anything.
  */

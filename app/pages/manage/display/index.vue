@@ -171,6 +171,33 @@
                 >{{ localeError }}</p>
             </section>
 
+            <section class="panel_group">
+                <h2>Timezone</h2>
+                <p class="panel_hint">
+                    An IANA zone name (e.g. <code>Europe/Berlin</code>) — the wall clock every
+                    Session, TimeGrid and "today" is resolved against, never a person's own
+                    device. A person's own timezone under
+                    <NuxtLink to="/my/account">My account</NuxtLink> is display/export only and
+                    never changes any of that.
+                </p>
+
+                <label class="panel_locale">
+                    <span>Institution timezone</span>
+                    <input
+                        v-model="timezoneInput"
+                        :disabled="!canEdit"
+                        placeholder="e.g. Europe/Berlin"
+                        type="text"
+                    >
+                </label>
+
+                <p
+                    v-if="timezoneError"
+                    class="note note--error"
+                    role="alert"
+                >{{ timezoneError }}</p>
+            </section>
+
             <!--
                 A live preview, because every control on this page is about how
                 something LOOKS and nothing else on the page shows it. Reading a
@@ -235,6 +262,7 @@ import ManageColorField from '~/components/manage/ManageColorField.vue';
 import { COLOR_SOURCES, DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { ColorSource, DisplaySettings } from '#shared/sessionColor';
 import { isUsableLocale } from '#shared/locale';
+import { isUsableTimeZone } from '#shared/timezone';
 import { DEFAULT_TENANT_MODE, TENANT_MODES } from '#shared/tenantMode';
 import type { TenantMode } from '#shared/tenantMode';
 import { useHasPermission, useSession } from '~/composables/session';
@@ -302,7 +330,7 @@ const request = useRequestFetch();
 
 const settings = useAsyncData(
     'display-settings',
-    () => request<DisplaySettings & { defaultLocale: string | null; mode: TenantMode; configured: boolean }>('/api/display-settings'),
+    () => request<DisplaySettings & { defaultLocale: string | null; mode: TenantMode; timezone: string; configured: boolean }>('/api/display-settings'),
 );
 
 await settings;
@@ -320,17 +348,23 @@ const form = reactive({
     defaultColor: settings.data.value?.defaultColor ?? null,
     defaultLocale: settings.data.value?.defaultLocale ?? null as string | null,
     mode: settings.data.value?.mode ?? DEFAULT_TENANT_MODE,
+    timezone: settings.data.value?.timezone ?? 'UTC',
 });
 
-// A separate text ref rather than binding `form.defaultLocale` directly:
-// an in-progress keystroke ("d", "de", "de-") is invalid `Intl` input and
-// must not flip `dirty`/fail validation on every character — only the
-// commit into `form.defaultLocale` (on save) is validated.
+// A separate text ref rather than binding `form.defaultLocale`/`form.timezone`
+// directly: an in-progress keystroke ("d", "de", "de-") is invalid `Intl`
+// input and must not flip `dirty`/fail validation on every character — only
+// the commit into `form` (on save) is validated.
 const localeInput = ref(form.defaultLocale ?? '');
 const localeError = ref('');
 
+const timezoneInput = ref(form.timezone);
+const timezoneError = ref('');
+
 const initial = JSON.stringify(form);
-const dirty = computed(() => JSON.stringify(form) !== initial || localeInput.value !== (form.defaultLocale ?? ''));
+const dirty = computed(() => JSON.stringify(form) !== initial
+    || localeInput.value !== (form.defaultLocale ?? '')
+    || timezoneInput.value !== form.timezone);
 
 /**
  * Enabled sources first, in their stated order, then the disabled ones. Both
@@ -403,6 +437,7 @@ async function save() {
     saved.value = false;
     saveError.value = '';
     localeError.value = '';
+    timezoneError.value = '';
 
     const trimmedLocale = localeInput.value.trim();
 
@@ -413,7 +448,17 @@ async function save() {
         return;
     }
 
+    const trimmedTimezone = timezoneInput.value.trim();
+
+    if (!isUsableTimeZone(trimmedTimezone)) {
+        timezoneError.value = 'Not a recognised timezone — try a zone name like "Europe/Berlin".';
+        saving.value = false;
+
+        return;
+    }
+
     form.defaultLocale = trimmedLocale || null;
+    form.timezone = trimmedTimezone;
 
     try {
         await request('/api/display-settings', { method: 'PUT', body: { ...form } });

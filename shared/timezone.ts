@@ -70,3 +70,23 @@ export function zonedTimeToUtc(parts: ZonedDateParts, timeZone: string): Date {
 
     return new Date(guess - (asIfGuessWereLocal - guess));
 }
+
+/**
+ * Whether `value` is an IANA zone name `Intl` recognises — the same
+ * try/construct check `isUsableLocale` (`shared/locale.ts`) does for a BCP-47
+ * tag, so a saved-but-unusable timezone fails the same way a saved-but-
+ * unusable locale does: at the write boundary, not silently at read time.
+ */
+export function isUsableTimeZone(value: string | null | undefined): value is string {
+    if (!value) {
+        return false;
+    }
+
+    try {
+        new Intl.DateTimeFormat(undefined, { timeZone: value });
+
+        return true;
+    } catch {
+        return false;
+    }
+}

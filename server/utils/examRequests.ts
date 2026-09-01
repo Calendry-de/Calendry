@@ -278,10 +278,10 @@ export async function assertExamRoomCapacity(
     if (requiredCapacity === null) {
         const groupIds = offering.groups.map((link) => link.groupId);
 
-        const [groups, memberships] = await Promise.all([
-            tx.group.findMany({ where: { tenantId }, select: { id: true, parentGroupId: true, expectedSize: true } }),
-            tx.membership.findMany({ where: { tenantId }, select: { groupId: true, personId: true } }),
-        ]);
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const groups = await tx.group.findMany({ where: { tenantId }, select: { id: true, parentGroupId: true, expectedSize: true } });
+        const memberships = await tx.membership.findMany({ where: { tenantId }, select: { groupId: true, personId: true } });
 
         requiredCapacity = deriveCapacity(groupIds, groups, memberships).capacity;
     }

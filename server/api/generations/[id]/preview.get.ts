@@ -3,9 +3,10 @@ import { SolverOutput } from '@calendry-de/calendry-proto';
 import {
     planMaterialization, summarizePlanByWeek, summarizeProposedViolations,
 } from '../../../utils/generationMaterialize';
-import type { MaterializationPlan } from '../../../utils/generationMaterialize';
+import type { MaterializationPlan, PlannedDelete } from '../../../utils/generationMaterialize';
 import { GENERATION_SELECT, runSummaryFor } from '../../../utils/generationRead';
 import { requirePermission } from '../../../utils/requirePermission';
+import { demandLedgerFrom } from '../../../utils/solverDemand';
 import { withRequestTenant } from '../../../utils/tenantDb';
 import type { Tx } from '../../../utils/tenantDb';
 
@@ -56,7 +57,7 @@ export default defineEventHandler(async (event) => {
             const stored = run
                 ? await tx.solverRun.findFirst({
                     where: { tenantId: identity.tenantId, generationId: generation.id },
-                    select: { termId: true, result: true, scope: true },
+                    select: { termId: true, result: true, scope: true, meta: true },
                 })
                 : null;
 
@@ -73,6 +74,15 @@ export default defineEventHandler(async (event) => {
                     run,
                     plan: emptyCounts(),
                     deletedByOffering: [],
+                    /*
+                     * A manual baseline asked the solver for nothing, so
+                     * `verified` is true and vacuous rather than "unchecked":
+                     * there is no run whose answer could be short. The
+                     * unchecked case is a SOLVER run with no ledger, which
+                     * only reaches the branch below.
+                     */
+                    demand: { verified: true, required: 0, returned: 0, shortOfferings: 0 },
+                    withheldByOffering: [],
                     changesByOffering: { rows: [], untouchedOfferings: 0 },
                     violations: {
                         current: await summarizeCurrentViolations(tx, identity.tenantId, stored?.termId),
@@ -94,6 +104,11 @@ export default defineEventHandler(async (event) => {
                 termId: stored.termId,
                 output,
                 scopeOfferingIds: scope.offeringIds ?? [],
+                // The same evidence the apply reconciles against, read the same
+                // way — this route's whole contract is that its numbers ARE the
+                // apply's decision, so a preview computed without the ledger
+                // would show deletes the apply then refuses to make.
+                demandLedger: demandLedgerFrom(stored.meta),
             });
 
             return {
@@ -103,7 +118,24 @@ export default defineEventHandler(async (event) => {
                 // The destructive change gets a name, not just a number: a
                 // deletion means the solver REFUSED to place that Session, and
                 // "8 deleted" is not something a human can act on.
-                deletedByOffering: await deletedByOffering(tx, identity.tenantId, plan),
+                deletedByOffering: await deletesByOffering(tx, identity.tenantId, plan.deletes),
+                /**
+                 * WHAT THE RUN ASKED FOR AGAINST WHAT IT ANSWERED, and the
+                 * Sessions this plan is keeping because the two disagree.
+                 *
+                 * The review screen leads with change counts, and a shortfall is
+                 * invisible in them: a run that returned 197 of 208 requested
+                 * placements produces a proposal that looks complete and simply
+                 * deletes eleven Sessions nobody decided to remove. That is now
+                 * refused (see `PlanDemand`), which makes it a fact the reviewer
+                 * has to be told rather than a silent correction.
+                 */
+                demand: plan.demand,
+                withheldByOffering: await deletesByOffering(
+                    tx,
+                    identity.tenantId,
+                    plan.withheldDeletes,
+                ),
                 /**
                  * THE CHANGE LIST, and the reason it lives on the server.
                  *
@@ -160,7 +192,7 @@ export default defineEventHandler(async (event) => {
 function emptyCounts() {
     return {
         created: 0, moved: 0, movedCollateral: 0, unchanged: 0, deleted: 0,
-        skippedLocked: 0, placementsUnmapped: 0,
+        deletesWithheld: 0, skippedLocked: 0, placementsUnmapped: 0,
     };
 }
 
@@ -348,14 +380,23 @@ async function changesByOffering(
     };
 }
 
-async function deletedByOffering(tx: Tx, tenantId: string, plan: MaterializationPlan) {
-    if (!plan.deletes.length) {
+/**
+ * Names for a list of planned deletes, most-affected Offering first.
+ *
+ * TAKES THE LIST, NOT THE PLAN, because there are now two lists with the same
+ * shape and the same need for names: the deletes the apply WILL make, and the
+ * ones it withheld because the run's answer came back short. Passing the plan
+ * meant hardcoding `plan.deletes` here, and the withheld list would have got a
+ * near-identical second copy of this function to drift from it.
+ */
+async function deletesByOffering(tx: Tx, tenantId: string, rows: PlannedDelete[]) {
+    if (!rows.length) {
         return [];
     }
 
     const counts = new Map<string, number>();
 
-    for (const del of plan.deletes) {
+    for (const del of rows) {
         // Unreachable by construction — the delete partition excludes Events
         // explicitly — but skipped rather than coerced, so that if it ever DID
         // happen this would under-report by one rather than invent an Offering

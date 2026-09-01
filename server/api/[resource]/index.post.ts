@@ -10,7 +10,7 @@ defineRouteMeta({
         summary: 'Create a row of a core entity',
         description: 'Generic create route (permission <resource>.create; access-roles requires access_role.manage instead). The body is the per-resource create schema, matched by the resource path segment (see the oneOf variants); tenant ownership always comes from the session, never from the body. Creating a row that claims an exclusive flag (e.g. a default) demotes the incumbent in the same transaction.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
         ],
         requestBody: {
             required: true,
@@ -89,6 +89,11 @@ defineRouteMeta({
                                         type: 'integer',
                                         minimum: 0,
                                         nullable: true,
+                                    },
+                                    curriculumPlanId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering — an administrative hint, never derived from or resolved against its actual offerings.',
                                     },
                                 },
                             },
@@ -204,6 +209,94 @@ defineRouteMeta({
                                     notes: {
                                         type: 'string',
                                         nullable: true,
+                                    },
+                                },
+                            },
+                            {
+                                title: 'offering-templates',
+                                type: 'object',
+                                description: 'A reusable Offering shape (issue #8); every field is optional except `name` — a template states only the part of the shape it wants to fix. Never federation-ownable.',
+                                required: ['name'],
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                    },
+                                    title: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    kindId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'A session kind of this tenant.',
+                                    },
+                                    code: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    color: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    frequency: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        nullable: true,
+                                    },
+                                    durationBlocks: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        nullable: true,
+                                    },
+                                    schedulingPattern: {
+                                        type: 'string',
+                                        enum: ['DISTRIBUTED', 'BLOCK'],
+                                        nullable: true,
+                                        description: 'Empty string is treated as null (unclassified).',
+                                    },
+                                    requiredRoleId: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    requiredCapacity: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        nullable: true,
+                                    },
+                                    requiredRoomCount: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        maximum: 4,
+                                        nullable: true,
+                                        description: 'Hard-capped at 4; above it the solver refuses the whole input.',
+                                    },
+                                    allowOnline: {
+                                        type: 'boolean',
+                                        nullable: true,
+                                    },
+                                    notes: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                            },
+                            {
+                                title: 'offering-plans',
+                                type: 'object',
+                                description: 'A reusable, ordered bundle of offering-templates; item membership/order and the apply action are separate resources (`offering-plan-items`, `offering-plan-apply`), not nested under this one.',
+                                required: ['name'],
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    nextPlanId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'Chains plans into a sequence; null if this is the last (or only) plan.',
                                     },
                                 },
                             },

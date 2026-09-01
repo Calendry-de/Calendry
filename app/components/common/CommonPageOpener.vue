@@ -377,6 +377,26 @@ $accent: $primary400Orig; // one step up from the brand, which is what a ramp is
     to { opacity: 0; }
 }
 
+/*
+ * `transform: none` AT THE END, AND IT MUST NOT BE `scale(1)`.
+ *
+ * This animation is `fill-mode: both`, so whatever the 100% keyframe says is
+ * what the element keeps once the animation is over. `scale(1)` looks like "no
+ * transform" and is not: it computes to `matrix(1, 0, 0, 1, 0, 0)`, and ANY
+ * computed transform other than `none` makes the element a containing block for
+ * `position: fixed` descendants.
+ *
+ * The whole page is a descendant. The landing page's floating navigation bar is
+ * `position: fixed`, and inside a transformed ancestor `fixed` silently behaves
+ * like `absolute`: on a first visit the bar anchored itself to the top of the
+ * DOCUMENT and scrolled away, while every returning visit (no `--playing` class,
+ * no transform) worked correctly. That is the worst shape a bug can have, since
+ * the people who see it are exactly the ones the page is written for.
+ *
+ * Interpolating toward `none` is well defined: it is treated as the identity
+ * matrix for the tween and resolves to a computed value of `none` at 100%, so
+ * the visual result is unchanged and the containing block disappears with it.
+ */
 @keyframes opener-reveal {
     0% {
         transform: scale(1.03);
@@ -384,7 +404,7 @@ $accent: $primary400Orig; // one step up from the brand, which is what a ramp is
     }
 
     100% {
-        transform: scale(1);
+        transform: none;
         opacity: 1;
     }
 }

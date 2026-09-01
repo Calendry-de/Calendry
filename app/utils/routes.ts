@@ -32,6 +32,16 @@ export function resolveHomeRoute(permissions: readonly string[]): string {
 export const LANDING_ROUTE = '/';
 
 /**
+ * The public pricing page, reachable from the landing bar.
+ *
+ * Anonymous for exactly the reason `/` is: somebody deciding whether to start a
+ * conversation has no account yet, and bouncing them to a login form is the end
+ * of the conversation. Like `/`, it reads no session and calls no API, so a
+ * signed-in visitor is not bounced off it either.
+ */
+export const PRICING_ROUTE = '/pricing';
+
+/**
  * The lobby-display board. Authenticates with a device KEY in its own query
  * string, never a session cookie — so it is anonymous to the route guard and
  * gated by its data route instead.
@@ -47,6 +57,8 @@ export const SCREEN_ROUTE = '/screen';
  */
 export const STAFF_LOGIN_ROUTE = '/staff/login';
 export const STAFF_ROUTE = '/staff';
+/** Clears a forced or expired StaffAccount password (issue #106's other half). */
+export const STAFF_CHANGE_PASSWORD_ROUTE = '/staff/change-password';
 
 /**
  * Whether a `?redirect=` value is safe to navigate to — ONE definition, used by

@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { COLOR_SOURCES } from '../../../shared/sessionColor';
+import { COLOR_SOURCES, DISPLAY_DEFAULTS } from '../../../shared/sessionColor';
 import { isUsableLocale } from '../../../shared/locale';
-import { TENANT_MODES } from '../../../shared/tenantMode';
+import { isUsableTimeZone } from '../../../shared/timezone';
+import { DEFAULT_TENANT_MODE, TENANT_MODES } from '../../../shared/tenantMode';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requirePermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -61,6 +62,16 @@ const schema = z.object({
      * could mean that `UNIVERSITY` does not already say.
      */
     mode: z.enum(TENANT_MODES).optional(),
+    /**
+     * `Tenant.timezone`, not `tenant_display_settings` — a required column
+     * with no "unset" state (grid resolution, constraint evaluation and
+     * "same day" logic all run in it, TAXONOMY.md §8), so no `null` here
+     * either, same reasoning as `mode`. Written separately below since it
+     * lives on a different row than the rest of this schema.
+     */
+    timezone: z.string()
+        .refine(isUsableTimeZone, 'Not a recognised timezone.')
+        .optional(),
 });
 
 export default defineEventHandler(async (event) => {
@@ -75,12 +86,39 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requirePermission(event, tx, 'tenant.update');
 
+        // Split out before the upsert below — `timezone` is not a column on
+        // `tenant_display_settings` and `tx.tenantDisplaySettings.upsert`
+        // would reject an unknown field.
+        const { timezone, ...displayInput } = input;
+        const changesDisplaySettings = Object.keys(displayInput).length > 0;
+
         return mapDbErrors(async () => {
-            const row = await tx.tenantDisplaySettings.upsert({
-                where: { tenantId: identity.tenantId },
-                create: { tenantId: identity.tenantId, ...input },
-                update: input,
-            });
+            /*
+             * SKIPPED, not upserted with an empty patch, when the request only
+             * touches `timezone`: an unconditional upsert here would CREATE the
+             * singleton — stamping every other field with its default — for a
+             * caller who asked to change none of them. The GET route's own
+             * "absent row means defaults" contract (index.get.ts) would then be
+             * lying about this tenant, which never actually saved a display
+             * preference.
+             */
+            const row = changesDisplaySettings
+                ? await tx.tenantDisplaySettings.upsert({
+                    where: { tenantId: identity.tenantId },
+                    create: { tenantId: identity.tenantId, ...displayInput },
+                    update: displayInput,
+                })
+                : await tx.tenantDisplaySettings.findUnique({ where: { tenantId: identity.tenantId } });
+
+            const tenant = timezone === undefined
+                ? await tx.tenant.findUniqueOrThrow({ where: { id: identity.tenantId }, select: { timezone: true } })
+                : await tx.tenant.update({ where: { id: identity.tenantId }, data: { timezone }, select: { timezone: true } });
+
+            if (!row) {
+                return {
+                    ...DISPLAY_DEFAULTS, defaultLocale: null, mode: DEFAULT_TENANT_MODE, timezone: tenant.timezone, configured: false,
+                };
+            }
 
             return {
                 highlightOnline: row.highlightOnline,
@@ -89,6 +127,7 @@ export default defineEventHandler(async (event) => {
                 defaultColor: row.defaultColor,
                 defaultLocale: row.defaultLocale,
                 mode: row.mode,
+                timezone: tenant.timezone,
                 configured: true,
             };
         });

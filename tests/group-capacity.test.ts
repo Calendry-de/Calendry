@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-    ENROLMENT_COMPLETE_RATIO, type CapacityGroup, type CapacityMembership, deriveCapacity,
+    ENROLMENT_COMPLETE_RATIO, type CapacityGroup, type CapacityMembership, deriveCapacity, estimatedGroupSizes,
 } from '../shared/groupCapacity';
 
 /**
@@ -55,6 +55,39 @@ describe('with no real membership, it falls back to estimates', () => {
         expect(deriveCapacity(['noestimate'], TREE, [])).toMatchObject({
             capacity: 25, basis: 'expected_size',
         });
+    });
+});
+
+describe('estimatedGroupSizes', () => {
+    it('reports every group\'s own estimate where it has one', () => {
+        const sizes = estimatedGroupSizes(TREE);
+
+        expect(sizes.get('itsec')).toBe(48);
+        expect(sizes.get('dit-s1')).toBe(24);
+    });
+
+    it('sums nested groups for one with no estimate of its own', () => {
+        expect(estimatedGroupSizes(TREE).get('noestimate')).toBe(25);
+    });
+
+    it('is NULL, not 0, where neither a group nor anything beneath it has a number', () => {
+        const bare: CapacityGroup[] = [
+            { id: 'root', parentGroupId: null, expectedSize: null },
+            { id: 'child', parentGroupId: 'root', expectedSize: null },
+        ];
+
+        expect(estimatedGroupSizes(bare).get('root')).toBeNull();
+    });
+
+    it('sums through more than one level of nesting', () => {
+        const grand: CapacityGroup[] = [
+            { id: 'root', parentGroupId: null, expectedSize: null },
+            { id: 'mid', parentGroupId: 'root', expectedSize: null },
+            { id: 'leaf-a', parentGroupId: 'mid', expectedSize: 10 },
+            { id: 'leaf-b', parentGroupId: 'mid', expectedSize: 15 },
+        ];
+
+        expect(estimatedGroupSizes(grand).get('root')).toBe(25);
     });
 });
 

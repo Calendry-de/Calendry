@@ -106,7 +106,7 @@
                 <span>
                     A draft should have opened in your email app, addressed to
                     {{ CONTACT_EMAIL }}. If nothing happened, your browser has no mail app
-                    configured — write to us directly instead.
+                    configured. Write to us directly instead.
                 </span>
             </p>
         </form>
@@ -114,7 +114,7 @@
         <aside class="contact_aside">
             <h3 class="contact_asideTitle">Why this is an email and not a sign-up form</h3>
             <p class="contact_asideBody">
-                There is no self-service sign-up, and Calendry cannot send mail yet — notification
+                There is no self-service sign-up, and Calendry cannot send mail yet: notification
                 delivery is on the list above, not behind us. A form that showed you a tick and
                 filed your message nowhere would be worse than saying so, so this button composes
                 a message in your own email app and you send it from your own account.

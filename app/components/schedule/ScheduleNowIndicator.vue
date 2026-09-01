@@ -82,20 +82,33 @@ const position = computed<Position | null>(() => {
     }
 
     const minutes = nowLocal.value.minutes;
-    const firstBlockStart = blockSpan(props.grid, 0, dayOfWeek).start;
+
+    /*
+     * UNIVERSAL boundaries (`dayOfWeek: null`), not today's own — matching
+     * `useGridGeometry`'s `rows`, built the same way (gridGeometry.ts). A
+     * day-specific `TimeGridBreak` can push TODAY's own blocks later than
+     * the universal template's last row, and this component draws no row
+     * of its own to place a line into past that point: checking "now"
+     * against today's real (shifted) boundaries let `blockAtMinute` return
+     * an in-range index — and therefore a "line" CSS row — for a time the
+     * drawn grid has no row for at all, which is what let the line keep
+     * rendering (clamped to the last row by the `Math.max(0, …)` below)
+     * long after the grid's last drawn block had ended.
+     */
+    const firstBlockStart = blockSpan(props.grid, 0, null).start;
 
     if (minutes < firstBlockStart) {
         return null; // Before the grid opens for the day.
     }
 
-    const blockIndex = blockAtMinute(props.grid, minutes, dayOfWeek);
+    const blockIndex = blockAtMinute(props.grid, minutes, null);
 
     if (blockIndex >= props.grid.blocksPerDay) {
-        return null; // Past the grid's last block.
+        return null; // Past the grid's last drawn block.
     }
 
     const gridColumn = String(columnIndex + 2); // Column 1 is the time gutter.
-    const span = blockSpan(props.grid, blockIndex, dayOfWeek);
+    const span = blockSpan(props.grid, blockIndex, null);
 
     if (minutes < span.end) {
         // Inside the block's own teaching time — the exact case

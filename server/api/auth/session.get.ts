@@ -91,14 +91,14 @@ export default defineEventHandler(async (event) => {
             sessionId: session.session_id,
         },
         async (tx) => {
-            const [perms, person, display] = await Promise.all([
-                loadPermissions(tx, session.person_id as string),
-                tx.person.findUnique({ where: { id: session.person_id as string }, select: { locale: true } }),
-                tx.tenantDisplaySettings.findUnique({
-                    where: { tenantId: session.tenant_id as string },
-                    select: { defaultLocale: true, mode: true },
-                }),
-            ]);
+            // Sequential — `tx` is one shared connection; concurrent queries on
+            // it trip pg's deprecated overlapping-query warning.
+            const perms = await loadPermissions(tx, session.person_id as string);
+            const person = await tx.person.findUnique({ where: { id: session.person_id as string }, select: { locale: true } });
+            const display = await tx.tenantDisplaySettings.findUnique({
+                where: { tenantId: session.tenant_id as string },
+                select: { defaultLocale: true, mode: true },
+            });
 
             return {
                 permissions: perms,

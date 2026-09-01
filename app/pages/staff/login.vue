@@ -6,7 +6,15 @@
             class="staff_login_form"
             @submit.prevent="submit"
         >
-            <p class="staff_login_lead">
+            <p
+                v-if="justChanged"
+                class="staff_login_changed"
+                role="status"
+            >Password changed. Sign in with your new password.</p>
+            <p
+                v-else
+                class="staff_login_lead"
+            >
                 Internal sign-in. This is a separate credential from a tenant
                 account.
             </p>
@@ -61,7 +69,7 @@
 import CommonBox from '~/components/common/CommonBox.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonInputText from '~/components/common/CommonInputText.vue';
-import { STAFF_ROUTE, isInternalPath } from '~/utils/routes';
+import { STAFF_CHANGE_PASSWORD_ROUTE, STAFF_ROUTE, isInternalPath } from '~/utils/routes';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
 
 /**
@@ -108,6 +116,9 @@ const email = ref('');
 const password = ref('');
 const error = ref('');
 const busy = ref(false);
+
+/** Arrived here straight back from a successful `staff/change-password`. */
+const justChanged = computed(() => route.query.changed === '1');
 
 /*
  * CAPTCHA (issue #106) — a local counter, not server state, same reasoning as
@@ -206,11 +217,11 @@ async function submit() {
 
         // Credentials were correct, but the password is forced-reset or
         // expired (issue #106): no session was issued, so navigating to
-        // STAFF_ROUTE would only bounce right back here. There is no staff
-        // change-password page yet — this names the situation rather than
-        // silently pretending the sign-in succeeded.
+        // STAFF_ROUTE would only bounce right back here. Sent to
+        // STAFF_CHANGE_PASSWORD_ROUTE to clear it instead — mirrors
+        // login.vue's own requiresPasswordChange branch exactly.
         if (result.requiresPasswordChange) {
-            error.value = 'This password must be changed before signing in. Contact an administrator.';
+            await navigateTo(`${STAFF_CHANGE_PASSWORD_ROUTE}?forced=1&email=${encodeURIComponent(email.value)}`);
 
             return;
         }
@@ -257,6 +268,12 @@ async function submit() {
         margin: 0 0 4px;
         color: $content6;
         font-size: var(--font-size-sm);
+    }
+
+    &_changed {
+        margin: 0 0 4px;
+        font-size: var(--font-size-sm);
+        color: $success300;
     }
 
     &_error {

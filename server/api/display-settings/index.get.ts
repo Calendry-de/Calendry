@@ -33,12 +33,26 @@ import { withRequestTenant } from '../../utils/tenantDb';
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     await requireAnyPermission(event, tx, ['tenant.read', 'session.read']);
 
+    /*
+     * `Tenant.timezone` — NOT the `tenant_display_settings` singleton, and
+     * always present (it is a required column, `@default("UTC")` at
+     * provisioning): there is no "absent row" state to fall back from, so
+     * this reads the `tenant` row directly rather than through the same
+     * "absent means defaults" branch below.
+     */
+    const tenant = await tx.tenant.findUniqueOrThrow({
+        where: { id: identity.tenantId },
+        select: { timezone: true },
+    });
+
     const row = await tx.tenantDisplaySettings.findUnique({
         where: { tenantId: identity.tenantId },
     });
 
     if (!row) {
-        return { ...DISPLAY_DEFAULTS, defaultLocale: null, mode: DEFAULT_TENANT_MODE, configured: false };
+        return {
+            ...DISPLAY_DEFAULTS, defaultLocale: null, mode: DEFAULT_TENANT_MODE, timezone: tenant.timezone, configured: false,
+        };
     }
 
     return {
@@ -55,6 +69,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         // bias that happens to share this singleton rather than open a
         // second "absent row means defaults" mechanism.
         mode: row.mode,
+        timezone: tenant.timezone,
         configured: true,
     };
 }));

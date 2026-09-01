@@ -734,12 +734,31 @@ model Group {
   /// Membership is the source of truth.
   expectedSize Int? @map("expected_size")
 
+  /// The curriculum plan this Group is INTENDED to follow — an administrative
+  /// hint, set once (typically at creation), before this Group has a single
+  /// Offering yet.
+  ///
+  /// NEVER READ TO ANSWER "what plan is this Group currently on" — that
+  /// question is `deriveGroupPlanApplications()`, computed fresh from
+  /// `Offering.createdFromTemplateId` on the Offerings this Group already has
+  /// (see that function's own comment on why nothing is stored for it). This
+  /// field answers a different, earlier question — "which plan should this
+  /// Group's offerings come from, once someone applies one" — which has no
+  /// derivable answer before that first apply, and is the intent
+  /// `ManageOfferingPlanBulkApply` pre-selects a Group by.
+  ///
+  /// SET NULL on delete, matching `Offering.createdFromTemplateId`: deleting a
+  /// plan must not cascade into every Group that once intended to follow it,
+  /// only clear the now-meaningless hint.
+  curriculumPlanId String? @map("curriculum_plan_id")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parentGroup Group?  @relation("GroupHierarchy", fields: [parentGroupId], references: [id], onDelete: Restrict)
-  children    Group[] @relation("GroupHierarchy")
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parentGroup    Group?        @relation("GroupHierarchy", fields: [parentGroupId], references: [id], onDelete: Restrict)
+  children       Group[]       @relation("GroupHierarchy")
+  curriculumPlan OfferingPlan? @relation(fields: [curriculumPlanId], references: [id], onDelete: SetNull)
 
   /// When `sources` were last copied into `memberships`. NULL means never —
   /// which is a different fact from "generated and unchanged since", and the
@@ -768,6 +787,7 @@ model Group {
 
   @@index([tenantId])
   @@index([parentGroupId])
+  @@index([curriculumPlanId])
   @@map("group")
 }
 
@@ -1306,6 +1326,24 @@ model Offering {
   /// explicit value still wins; only NULL derives.
   requiredCapacity Int? @map("required_capacity")
 
+  /// How many of the attached `OfferingLecturer`s ONE Session needs, chosen
+  /// by the solver from that pool rather than all of them together.
+  ///
+  /// NULL derives to `min(1, pool size)` at assembly time
+  /// (`assembleSolverInput`) — one lecturer's-worth of attendance is what an
+  /// unedited Offering has always meant, and a NULL row (every row today)
+  /// applies that reading retroactively rather than freezing whatever the
+  /// pool happened to contain. An explicit value is a deliberate co-teaching
+  /// requirement.
+  ///
+  /// NOT bounded by a CHECK against `offering_lecturer`'s row count: that
+  /// table is written through a separate request (the generic `relations`
+  /// picker, not `childKeys`), so no single transaction ever holds both
+  /// counts at once. `assembleSolverInput` clamps to the pool size and
+  /// reports the mismatch instead — the wire is never sent an impossible
+  /// demand, but nothing here refuses the save.
+  requiredLecturerCount Int? @map("required_lecturer_count")
+
   /// How many Rooms ONE Session of this Offering must occupy simultaneously.
   ///
   /// NOT NULLABLE, unlike its neighbours here: `requiredCapacity`'s NULL means
@@ -1599,6 +1637,11 @@ model OfferingPlan {
   /// application code (a plan doesn't need to know who points at it), kept
   /// only because Prisma requires the relation's other side to exist.
   precededBy OfferingPlan[] @relation("PlanSuccession")
+
+  /// Groups that intend to follow this plan (`Group.curriculumPlanId`) but
+  /// have not necessarily had it applied yet — read by the bulk-apply picker
+  /// to pre-select candidates, never to answer "who is on this plan now".
+  intendedByGroups Group[]
 
   @@index([tenantId])
   @@index([nextPlanId])

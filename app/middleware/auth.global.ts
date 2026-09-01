@@ -1,7 +1,8 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
 import { useStore } from '~/store';
 import {
-    HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, isInternalPath, resolveHomeRoute,
+    HOME_ROUTE, LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, STAFF_CHANGE_PASSWORD_ROUTE, STAFF_LOGIN_ROUTE,
+    STAFF_ROUTE, isInternalPath, resolveHomeRoute,
 } from '~/utils/routes';
 
 /**
@@ -35,15 +36,17 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  * route enforces the key; this list only keeps the client-side guard from
  * intercepting a page that answers to a different credential.
  *
- * `/staff` and `/staff/login` (issue #76) are the third reason: a Calendry
- * STAFF session is a completely separate credential
- * (`STAFF_SESSION_COOKIE`/`StaffIdentity`, never a tenant Account session), so
- * this guard — which only ever fetches and checks the TENANT session — must
- * neither block a staff visitor for lacking one nor bounce a tenant-signed-in
- * visitor away from staff pages. Each staff page checks for its own staff
- * session itself.
+ * `/staff`, `/staff/login` and `/staff/change-password` (issue #76, #106) are
+ * the third reason: a Calendry STAFF session is a completely separate
+ * credential (`STAFF_SESSION_COOKIE`/`StaffIdentity`, never a tenant Account
+ * session), so this guard — which only ever fetches and checks the TENANT
+ * session — must neither block a staff visitor for lacking one nor bounce a
+ * tenant-signed-in visitor away from staff pages. Each staff page checks for
+ * its own staff session itself.
  */
-const ANONYMOUS_ROUTES = [LANDING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE];
+const ANONYMOUS_ROUTES = [
+    LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, STAFF_CHANGE_PASSWORD_ROUTE,
+];
 
 export default defineNuxtRouteMiddleware(async (to) => {
     // Before anything else, and before any session fetch: this page renders the

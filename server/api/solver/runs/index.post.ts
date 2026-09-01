@@ -11,7 +11,8 @@ import {
     startRun,
     toWireU64,
 } from '../../../utils/solverClient';
-import { TermEndedError, assembleSolverInput, encodeInput } from '../../../utils/solverInput';
+import { assembleSolverInput, encodeInput } from '../../../utils/solverInput';
+import { TermEndedError } from '../../../utils/solverCalendar';
 import { hashScope, resolveScope, toWireScope } from '../../../utils/solverScope';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '../../../../shared/solverBudget';
 import { SOLVER_MODES } from '../../../../shared/solverMode';

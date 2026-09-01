@@ -91,6 +91,14 @@ export function toWireScope(scope: StoredScope): SolveScope {
          * a preference resolveScope() was never asked for.
          */
         minimizeInscopeMovementWeight: 0,
+        /*
+         * Same treatment as `minimizeInscopeMovementWeight` above —
+         * `StoredScope` has nothing to carry per-entity overrides yet, and
+         * empty is the proto's own documented no-op default ("Empty (the
+         * default) leaves both [weights] behaving exactly as they did before
+         * this field existed").
+         */
+        movementOverrides: [],
     };
 }
 

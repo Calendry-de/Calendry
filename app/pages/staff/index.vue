@@ -29,38 +29,95 @@
                         <th>Timezone</th>
                         <th>Federation</th>
                         <th>Created</th>
+                        <th>Erase</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr
+                    <template
                         v-for="tenant in tenants"
                         :key="tenant.id"
                     >
-                        <td>{{ tenant.slug }}</td>
-                        <td>{{ tenant.name }}</td>
-                        <td>{{ tenant.timezone }}</td>
-                        <td>
-                            <select
-                                :disabled="assigningTenantId === tenant.id"
-                                :value="tenant.federation?.id ?? ''"
-                                @change="setTenantFederation(tenant, ($event.target as HTMLSelectElement).value || null)"
+                        <tr>
+                            <td>{{ tenant.slug }}</td>
+                            <td>{{ tenant.name }}</td>
+                            <td>{{ tenant.timezone }}</td>
+                            <td>
+                                <select
+                                    :disabled="assigningTenantId === tenant.id"
+                                    :value="tenant.federation?.id ?? ''"
+                                    @change="setTenantFederation(tenant, ($event.target as HTMLSelectElement).value || null)"
+                                >
+                                    <option
+                                        :selected="!tenant.federation"
+                                        value=""
+                                    >— none —</option>
+                                    <option
+                                        v-for="federation in federations"
+                                        :key="federation.id"
+                                        :selected="federation.id === tenant.federation?.id"
+                                        :value="federation.id"
+                                    >{{ federation.name }}</option>
+                                </select>
+                            </td>
+                            <td>{{ new Date(tenant.createdAt).toLocaleDateString() }}</td>
+                            <td>
+                                <CommonButton
+                                    v-if="erasingTenantId !== tenant.id"
+                                    size="S"
+                                    type="destructive"
+                                    @click="startErase(tenant.id)"
+                                >Erase…</CommonButton>
+                            </td>
+                        </tr>
+
+                        <!--
+                            Issue #84 — GDPR erasure. IMMEDIATE and
+                            IRREVERSIBLE, so the confirmation is not a modal
+                            that could be dismissed on reflex: the operator
+                            must type the tenant's own slug back before the
+                            button that actually erases becomes clickable.
+                        -->
+                        <tr v-if="erasingTenantId === tenant.id">
+                            <td
+                                class="staff_erase"
+                                colspan="6"
                             >
-                                <option
-                                    :selected="!tenant.federation"
-                                    value=""
-                                >— none —</option>
-                                <option
-                                    v-for="federation in federations"
-                                    :key="federation.id"
-                                    :selected="federation.id === tenant.federation?.id"
-                                    :value="federation.id"
-                                >{{ federation.name }}</option>
-                            </select>
-                        </td>
-                        <td>{{ new Date(tenant.createdAt).toLocaleDateString() }}</td>
-                    </tr>
+                                <p class="staff_erase_warning" role="alert">
+                                    This deletes every Person, login, Group, Room, Offering,
+                                    Session, Constraint and audit trail entry '{{ tenant.slug }}'
+                                    owns, immediately and permanently. Type the slug to confirm.
+                                </p>
+
+                                <div class="staff_erase_row">
+                                    <CommonInputText
+                                        v-model="eraseConfirmInput"
+                                        :disabled="erasing"
+                                        :placeholder="tenant.slug"
+                                    >Confirm slug</CommonInputText>
+
+                                    <CommonButton
+                                        :disabled="erasing || eraseConfirmInput !== tenant.slug"
+                                        type="destructive"
+                                        @click="confirmErase(tenant)"
+                                    >{{ erasing ? 'Erasing…' : `Erase '${tenant.slug}' permanently` }}</CommonButton>
+
+                                    <CommonButton
+                                        :disabled="erasing"
+                                        type="secondary"
+                                        @click="cancelErase"
+                                    >Cancel</CommonButton>
+                                </div>
+
+                                <p
+                                    v-if="eraseError"
+                                    class="staff_note staff_note--error"
+                                    role="alert"
+                                >{{ eraseError }}</p>
+                            </td>
+                        </tr>
+                    </template>
                     <tr v-if="tenants.length === 0">
-                        <td colspan="5">No tenants yet.</td>
+                        <td colspan="6">No tenants yet.</td>
                     </tr>
                 </tbody>
             </table>
@@ -70,6 +127,12 @@
                 class="staff_note staff_note--error"
                 role="alert"
             >{{ federationAssignError }}</p>
+
+            <p
+                v-if="eraseSuccess"
+                class="staff_note staff_note--success"
+                role="status"
+            >{{ eraseSuccess }}</p>
         </section>
 
         <section class="staff_section">
@@ -431,6 +494,58 @@ async function createFederation() {
 const assigningTenantId = ref('');
 const federationAssignError = ref('');
 
+// --- erasure (issue #84) ---------------------------------------------------
+
+const erasingTenantId = ref('');
+const eraseConfirmInput = ref('');
+const erasing = ref(false);
+const eraseError = ref('');
+const eraseSuccess = ref('');
+
+function startErase(tenantId: string) {
+    erasingTenantId.value = tenantId;
+    eraseConfirmInput.value = '';
+    eraseError.value = '';
+    eraseSuccess.value = '';
+}
+
+function cancelErase() {
+    erasingTenantId.value = '';
+    eraseConfirmInput.value = '';
+    eraseError.value = '';
+}
+
+interface EraseTenantResult { personCount: number; accountsErased: number }
+
+async function confirmErase(tenant: StaffTenant) {
+    if (erasing.value || eraseConfirmInput.value !== tenant.slug) {
+        return;
+    }
+
+    erasing.value = true;
+    eraseError.value = '';
+
+    try {
+        const result = await $fetch<EraseTenantResult>(`/api/staff/tenants/${tenant.id}`, {
+            method: 'DELETE',
+            body: { confirmSlug: eraseConfirmInput.value },
+        });
+
+        eraseSuccess.value = `Erased '${tenant.slug}' — ${result.personCount} `
+            + `${result.personCount === 1 ? 'person' : 'people'} and ${result.accountsErased} `
+            + `now-ownerless login${result.accountsErased === 1 ? '' : 's'} removed.`;
+
+        cancelErase();
+        await refresh();
+    } catch (caught) {
+        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+
+        eraseError.value = statusMessage ?? `Could not erase '${tenant.slug}'.`;
+    } finally {
+        erasing.value = false;
+    }
+}
+
 /** Attach (`federationId` set) or detach (`null`) one Tenant's Federation, from the select in the Tenants table. */
 async function setTenantFederation(tenant: StaffTenant, federationId: string | null) {
     assigningTenantId.value = tenant.id;
@@ -506,6 +621,25 @@ async function setTenantFederation(tenant: StaffTenant, federationId: string | n
 
         &--success {
             color: $success300;
+        }
+    }
+
+    &_erase {
+        padding: 16px;
+        background: varToRgba('error500', 0.08);
+
+        &_warning {
+            margin: 0 0 12px;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: $error400;
+        }
+
+        &_row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
         }
     }
 }

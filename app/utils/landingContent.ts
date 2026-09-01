@@ -43,7 +43,23 @@ export interface LandingFeature {
     id: string;
     title: string;
     body: string;
+    /**
+     * Which timetable script runs beside this paragraph, on the sections that
+     * pair the two. Optional because `PRINCIPLES` and `TECHNICAL_NOTES` reuse
+     * this shape and are set as plain prose.
+     */
+    figure?: TimetableVariant;
 }
+
+/**
+ * The four things a small timetable can act out beside a paragraph.
+ *
+ * Named for what the schedule DOES rather than for the section it appears in,
+ * because the figure is the claim being demonstrated: assembling a week, moving
+ * a session and recording the clash, receiving a whole proposal, and reducing
+ * the field to one person's sessions.
+ */
+export type TimetableVariant = 'model' | 'editing' | 'solver' | 'people';
 
 /** One line of the built/next checklist. */
 export interface LandingRoadmapItem {
@@ -51,9 +67,38 @@ export interface LandingRoadmapItem {
     /** `done` is shipped and working; `next` is not built. There is no third state. */
     state: 'done' | 'next';
     title: string;
-    /** The honest detail — what "done" covers, or what is undecided about "next". */
+    /** The honest detail: what "done" covers, or what is undecided about "next". */
     note: string;
+    /**
+     * Which cluster of `BUILT_CLUSTERS` this row belongs under. Present on every
+     * `done` row and on none of the `next` ones, because only the built list is
+     * long enough to need grouping.
+     *
+     * NOT a taxonomy and not a feature category: purely a reading aid, so that
+     * fourteen rows arrive as four answerable questions instead of one wall. A
+     * new row picks the cluster a reader would look under, and `BUILT_CLUSTERS`
+     * is the whole list of choices.
+     */
+    cluster?: BuiltCluster;
 }
+
+/**
+ * The four questions the built list answers, in reading order.
+ *
+ * ORDER IS THE SAME EDITORIAL ARGUMENT the flat list already made: what a
+ * timetabling officer touches daily comes first, what an evaluator asks about
+ * last comes last. Grouping did not reorder the claims, it only put a heading
+ * every three or four rows so the spine of the page can be scanned rather than
+ * only read.
+ */
+export const BUILT_CLUSTERS = [
+    'Running a term',
+    'Asking for a timetable',
+    'Who can reach what',
+    'More than one institution',
+] as const;
+
+export type BuiltCluster = typeof BUILT_CLUSTERS[number];
 
 /**
  * WHAT IT DOES — deliberately non-technical.
@@ -66,6 +111,7 @@ export interface LandingRoadmapItem {
 export const FEATURES: LandingFeature[] = [
     {
         id: 'model',
+        figure: 'model',
         title: 'One place for what a timetable is made of',
         body: 'Rooms, classes and cohorts, staff and students, courses, terms, and your own daily '
             + 'block structure. Your vocabulary stays yours: role names, session types and room '
@@ -75,14 +121,16 @@ export const FEATURES: LandingFeature[] = [
     },
     {
         id: 'editing',
+        figure: 'editing',
         title: 'Change a schedule without breaking it quietly',
         body: 'Move a session, swap two, or lock one so nothing may touch it. If a change clashes '
-            + 'with something — a double-booked room, a class in two places at once — Calendry '
+            + 'with something (a double-booked room, a class in two places at once), Calendry '
             + 'lets you make it and records the clash as state you can look up afterwards. It '
             + 'does not block you, and it does not forget.',
     },
     {
         id: 'solver',
+        figure: 'solver',
         title: 'Ask for a timetable, then judge it',
         body: 'Start a run and watch it work; cancel it if you change your mind. When it finishes '
             + 'you get a proposal shown against the schedule you already have, with what it would '
@@ -90,6 +138,7 @@ export const FEATURES: LandingFeature[] = [
     },
     {
         id: 'people',
+        figure: 'people',
         title: 'Everyone sees their own slice',
         body: 'You compose the permission roles for your institution, so who can read the '
             + 'schedule, who can move a session and who can run the solver are separate '
@@ -120,6 +169,7 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'schedule',
         state: 'done',
+        cluster: 'Running a term',
         title: 'Schedule view and editor',
         note: 'Week grid on a desktop, day agenda on a phone. Move, swap and lock, with clashes '
             + 'recorded rather than refused, and every edit appended to a log with an actor. A '
@@ -128,39 +178,45 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'manage',
         state: 'done',
+        cluster: 'Running a term',
         title: 'Management screens for the core entities',
         note: 'Rooms, groups, people, courses, terms, the daily block grid and its breaks, plus a '
             + 'Ctrl+K palette that jumps to any of them. A course can state that one session '
-            + 'needs several rooms at once — a cohort too large for any single hall — and the '
+            + 'needs several rooms at once, for a cohort too large for any single hall, and the '
             + 'scheduler places the combination. A class can be assembled from other classes, '
             + 'for a track two cohorts take together.',
     },
     {
         id: 'calendar',
         state: 'done',
+        cluster: 'Running a term',
         title: 'Academic calendar periods',
         note: 'Holidays, breaks and exam weeks, with a preview of exactly which weeks change '
-            + 'classification before you save — because two dates do not obviously imply four '
+            + 'classification before you save. Two dates do not obviously imply four '
             + 'exam weeks, and sometimes they do.',
     },
     {
         id: 'events',
         state: 'done',
+        cluster: 'Running a term',
         title: 'One-off events alongside recurring courses',
-        note: 'Create a session that belongs to no course — an open day, a guest lecture — with '
+        note: 'Create a session that belongs to no course, such as an open day or a guest '
+            + 'lecture, with '
             + 'its own room, groups and people.',
     },
     {
         id: 'ical-export',
         state: 'done',
+        cluster: 'Who can reach what',
         title: 'Download your schedule as a calendar file',
         note: 'An .ics of your own sessions for a term, opened in whatever calendar app you '
-            + 'already use — real UTC times, converted from the institution’s own clock rather '
+            + 'already use. Real UTC times, converted from the institution’s own clock rather '
             + 'than sent as its wall-clock hours.',
     },
     {
         id: 'person-search',
         state: 'done',
+        cluster: 'Running a term',
         title: 'Finding a person by name',
         note: 'Assigning people searches the institution as you type rather than listing it. '
             + 'The people already assigned stay on screen while you look for the next one.',
@@ -168,6 +224,7 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'exams',
         state: 'done',
+        cluster: 'Who can reach what',
         title: 'A lecturer asks for an exam; staff decide',
         note: 'Request an exam on a module you lead, and see where the request got to. '
             + 'It reaches no timetable until somebody approves it, because an exam is a room '
@@ -176,6 +233,7 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'availability',
         state: 'done',
+        cluster: 'Who can reach what',
         title: 'Self-service availability',
         note: 'A lecturer declares when they cannot teach, and which days, times and kinds of '
             + 'room they would rather have; staff approve or reject each declaration. Reaching '
@@ -184,26 +242,29 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'solver-integration',
         state: 'done',
+        cluster: 'Asking for a timetable',
         title: 'Solver integration, end to end',
         note: 'Start a run, keep the result even if the solver restarts, review the proposal '
             + 'against the current schedule, then apply or discard it. A run that succeeds with '
-            + 'rules still broken is still offered — with the breaches listed — rather than '
+            + 'rules still broken is still offered, with the breaches listed, rather than '
             + 'thrown away. A clash made by hand can be repaired without rebuilding the term: '
             + 'the repair moves as little as it can, and still produces a proposal to review.',
     },
     {
         id: 'constraints',
         state: 'done',
+        cluster: 'Asking for a timetable',
         title: 'Rules each institution configures for itself',
         note: 'Thirty rule types, switched on and weighted per institution: double-booking, '
             + 'session counts, unavailability, online share, room rank and exam periods, plus '
-            + 'the shape of a day — idle gaps, teaching without a break, how long it runs, and '
+            + 'the shape of a day: idle gaps, teaching without a break, how long it runs, and '
             + 'whether it crosses buildings. Rooms can be reserved institution-wide, sized to '
             + 'the group actually attending, and kept consistent for a class across the week.',
     },
     {
         id: 'federation',
         state: 'done',
+        cluster: 'More than one institution',
         title: 'Shared rooms across a federation',
         note: 'Institutions in a consortium can share a lecture hall and see each other\'s '
             + 'occupancy of it, without seeing each other\'s schedules.',
@@ -211,14 +272,16 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'determinism',
         state: 'done',
+        cluster: 'Asking for a timetable',
         title: 'Reproducible runs',
-        note: 'The same inputs and the same seed produce a byte-identical timetable — as long as '
+        note: 'The same inputs and the same seed produce a byte-identical timetable, as long as '
             + 'the run ended on its move budget rather than on a clock, which the run itself '
             + 'reports.',
     },
     {
         id: 'auth',
         state: 'done',
+        cluster: 'Who can reach what',
         title: 'Sign-in and per-institution permission roles',
         note: 'One account can act in several institutions and picks which at sign-in. Roles are '
             + 'composed from a fixed catalogue of permissions, per institution, in the UI.',
@@ -226,6 +289,7 @@ export const BUILT: LandingRoadmapItem[] = [
     {
         id: 'tenancy',
         state: 'done',
+        cluster: 'More than one institution',
         title: 'Multi-tenant data model and API',
         note: 'Institutions are isolated in the database itself, not only in application code. A '
             + 'query issued without institution context returns nothing rather than everything.',
@@ -245,15 +309,15 @@ export const NEXT: LandingRoadmapItem[] = [
         id: 'import',
         state: 'next',
         title: 'Import from CSV and Excel',
-        note: 'For institutions arriving with years of spreadsheets. How the column mapping works '
-            + '— guided, or a fixed template — is not decided yet.',
+        note: 'For institutions arriving with years of spreadsheets. Whether the column mapping '
+            + 'is guided or a fixed template is not decided yet.',
     },
     {
         id: 'export',
         state: 'next',
         title: 'A live calendar subscription, not just a download',
         note: 'The one-off .ics download is built. A stable URL your calendar app polls on its '
-            + 'own is a different, harder question — a feed link is itself a credential, and it '
+            + 'own is a different, harder question. A feed link is itself a credential, and it '
             + 'needs the same answer as letting a student view a schedule with no account.',
     },
     {
@@ -267,8 +331,8 @@ export const NEXT: LandingRoadmapItem[] = [
         id: 'event-edit',
         state: 'next',
         title: 'Editing a one-off event after creating it',
-        note: 'Its time can be moved, but its room, groups and people cannot be changed — '
-            + 'correcting a mistake means deleting and recreating it.',
+        note: 'Its time can be moved, but its room, groups and people cannot be changed. '
+            + 'Correcting a mistake means deleting and recreating it.',
     },
     {
         id: 'candidates',
@@ -297,7 +361,7 @@ export const PRINCIPLES: LandingFeature[] = [
         title: 'Warn, never block',
         body: 'A person editing a timetable usually knows something the rules do not. So an edit '
             + 'that breaks a hard rule is permitted, and the breach becomes queryable state '
-            + 'attached to the schedule — findable next week, not a toast you dismissed.',
+            + 'attached to the schedule. Findable next week, not a toast you dismissed.',
     },
     {
         id: 'groups',
@@ -319,7 +383,7 @@ export const PRINCIPLES: LandingFeature[] = [
         title: 'Nothing about time is hardcoded',
         body: 'Days per week, blocks per day, block length and the uneven breaks between blocks '
             + 'come from each institution\'s own grid. There is no assumed Monday-to-Friday and '
-            + 'no fallback shape anywhere — an institution without a grid gets an empty state, '
+            + 'no fallback shape anywhere. An institution without a grid gets an empty state, '
             + 'not a guess.',
     },
     {
@@ -327,7 +391,7 @@ export const PRINCIPLES: LandingFeature[] = [
         title: 'Every edit is an event',
         body: 'Creates, moves, swaps, deletes and locks are appended to a log, on top of the '
             + 'generation they started from, with the person who did it. Reading that history '
-            + 'back has no screen yet — the log is being kept properly before there is anything '
+            + 'back has no screen yet. The log is being kept properly before there is anything '
             + 'to show it in.',
     },
 ];

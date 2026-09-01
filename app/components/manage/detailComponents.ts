@@ -7,6 +7,7 @@ import ManageConstraintGrid from '~/components/manage/ManageConstraintGrid.vue';
 import ManageGroupForm from '~/components/manage/ManageGroupForm.vue';
 import ManageGroupTree from '~/components/manage/ManageGroupTree.vue';
 import ManageOfferingPlanForm from '~/components/manage/ManageOfferingPlanForm.vue';
+import ManagePersonForm from '~/components/manage/ManagePersonForm.vue';
 import ManageScreenForm from '~/components/manage/ManageScreenForm.vue';
 import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
 
@@ -63,6 +64,14 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
      *                  not sit under a Save button that does not cover them.
      */
     AccountForm: ManageAccountForm,
+    /**
+     * PersonForm       every registry field is plain — nothing custom for the
+     *                  generic scaffold to lose. Bespoke purely to add issue
+     *                  #84's GDPR export action outside the form, the same
+     *                  "explicit verb, not a field" reasoning `AccountForm`
+     *                  gives for its credential ops.
+     */
+    PersonForm: ManagePersonForm,
 };
 
 export const LIST_COMPONENTS: Record<string, Component> = {

@@ -48,7 +48,7 @@ defineRouteMeta({
         summary: 'List rows of a core entity',
         description: 'Generic list route for the core entities (permission <resource>.read). THE RESPONSE SHAPE SWITCHES ON limit: without it the body is a bare array of rows; with it the body is { rows, total }. Each resource additionally accepts its own equality filters (e.g. offerings takes termId, persons takes isActive and email); an unsupported parameter is a 400, never silently ignored. Federation-ownable resources (rooms, equipment, offerings) also surface rows shared into the federation.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200 }, description: 'Presence switches the response shape to { rows, total }.' },
             { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
             { name: 'q', in: 'query', schema: { type: 'string' }, description: 'Case-insensitive text search over the resource declared search fields. 400 on a resource without any.' },
@@ -169,16 +169,16 @@ export default defineEventHandler(async (event) => {
                 return delegate(tx, config.model).findMany({ where, orderBy: config.orderBy, include: config.include });
             }
 
-            const [rows, total] = await Promise.all([
-                delegate(tx, config.model).findMany({
-                    include: config.include,
-                    where,
-                    orderBy: config.orderBy,
-                    take: paging.limit,
-                    skip: paging.offset ?? 0,
-                }),
-                delegate(tx, config.model).count({ where }),
-            ]);
+            // Sequential — `tx` is one shared connection; concurrent queries on
+            // it trip pg's deprecated overlapping-query warning.
+            const rows = await delegate(tx, config.model).findMany({
+                include: config.include,
+                where,
+                orderBy: config.orderBy,
+                take: paging.limit,
+                skip: paging.offset ?? 0,
+            });
+            const total = await delegate(tx, config.model).count({ where });
 
             return { rows, total };
         });

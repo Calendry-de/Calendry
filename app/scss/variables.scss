@@ -117,6 +117,74 @@ $landingBarCollapseAt: 640px;
     }
 }
 
+/*
+ * HOW MUCH ROOM THE FLOATING BAR NEEDS BELOW IT, as ONE number.
+ *
+ * `LandingTopBar` is `position: fixed`, so it reserves no flow and everything
+ * underneath is responsible for clearing it. Measured at the desktop width:
+ *
+ *   12px wrapper padding + 55.6px capsule = 67.6px to the capsule's lower edge
+ *
+ * 96 rather than 68, because clearing the bar by zero is not clearing it: a
+ * heading whose cap-line touches the capsule reads as collided even when it is
+ * technically below. The remaining ~28px is the gap.
+ *
+ * THIS EXISTS BECAUSE IT WAS THREE SEPARATE GUESSES. The hero, the anchor
+ * scroll-margin and the sticky aside heading each picked their own value, and
+ * the aside picked 48px: half the bar's height, so the section heading in
+ * "Decisions worth defending" slid underneath the capsule and lost its last word
+ * on every scroll. Anything that has to sit clear of the bar takes this token,
+ * and re-measuring the bar is then a one-line change rather than a hunt.
+ */
+$landingBarClearance: 96px;
+
+/*
+ * THE LANDING SURFACE'S ONE SCROLL GESTURE. Content rises a few pixels and
+ * fades in as it enters the viewport, so a long page arrives a section at a
+ * time instead of all at once above a scrollbar that says there is more.
+ *
+ * Only `opacity` and `transform`, the two properties that never touch layout,
+ * so it composites. `$shift` is per-caller because a wide bento cell reads
+ * right with more travel than a compact list row.
+ *
+ * TWO GATES, AND THE UNGATED STATE IS THE FINISHED ONE. Nothing here sets an
+ * initial hidden state outside the animation, so a browser that fails either
+ * gate renders the composed page rather than an empty column. That is the same
+ * rule `LandingHeroGrid` follows, and it is why the reveal is safe to put on
+ * content a reader must actually be able to read.
+ *
+ * Keyframes live in tokens-root.scss; see the note there for why they are not
+ * in this mixin.
+ */
+@mixin landingReveal($shift: 12px) {
+    @media (prefers-reduced-motion: no-preference) {
+        @supports (animation-timeline: view()) {
+            --reveal-shift: #{$shift};
+
+            animation: landingReveal 1ms linear both;
+            animation-timeline: view();
+
+            // Finishes well before the element reaches the middle of the screen:
+            // a reveal still running under the reader's eye is a distraction, not
+            // an entrance.
+            animation-range: entry 5% cover 20%;
+        }
+    }
+
+    /*
+     * PRINT HAS NO SCROLLPORT, so a view() timeline has nothing to resolve
+     * against and the element can print at its 0%-opacity start state. Everything
+     * below the first page would come out blank. This is not hypothetical for
+     * this page in particular: it is the page somebody prints to PDF for a
+     * procurement pack.
+     */
+    @media print {
+        transform: none;
+        opacity: 1;
+        animation: none;
+    }
+}
+
 @mixin mobileSafariOnly() {
     @include mobileOnly() {
         @supports (-webkit-hyphens:none) {

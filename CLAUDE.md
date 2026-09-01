@@ -105,10 +105,11 @@ values. **Never hardcode an open value into logic** — never assume a Role call
   `db-drop` (`db push --force-reset`) is the same hazard, kept only as an
   explicit escape hatch — never to rebuild a working database.
   § "Database & migrations".
-- **The history is ONE squashed migration** (`20260812000000_init`), assembled
-  pre-1.0 by CONCATENATING the 32 that built it — never regenerated, for the
-  reason above. Squashing again is fine and follows the same method; a test
-  asserting a statement exists must read the migrations DIRECTORY
+- **The history is ONE squashed migration** (`20260902010000_init`), assembled
+  pre-1.0 by CONCATENATING everything that built it, twice over so far (most
+  recently 16 migrations back into one) — never regenerated, for the reason
+  above. Squashing again is fine and follows the same method; a test asserting
+  a statement exists must read the migrations DIRECTORY
   (`tests/helpers/migrations.ts`), never a path, and must scope its match to the
   statement it means: over the whole DDL, `is_enabled` matches a column
   declaration and every migration's own prose matches its comments.
@@ -285,6 +286,16 @@ Each of these has bitten more than once, in a different disguise each time.
 - **The landing page's claims live in `app/utils/landingContent.ts`** and
   `tests/landing-page.test.ts` asserts the page renders exactly them. The contact
   CTA is `mailto:`, not a POST: persisting it would be a fourth RLS exception.
+- **A field added to (or removed from) an API route's request or response
+  shape is added to (or removed from) that route's `defineRouteMeta` OpenAPI
+  schema, in the same change — never a follow-up.** For the generic CRUD
+  family (`server/api/[resource]/*.ts`), that means the resource's `oneOf`
+  variant in `index.post.ts` (create) and `[id].patch.ts` (update); a bespoke
+  route (e.g. `offering-plan-apply/[id].post.ts`) documents itself the same
+  way, inline. **`defineRouteMeta`'s argument must be a pure object literal**
+  — no variables, spreads, or function calls — Nitro silently drops anything
+  computed rather than erroring, so a schema built that way looks correct in
+  the diff and is simply absent from the generated docs.
 
 ### Components and styling
 
@@ -362,6 +373,23 @@ solver has no way to detect.
   a proto bump then compiles clean and throws `"<field> is not iterable"` from
   `encode()` at runtime. v0.10.0 did exactly this twice (`Room.feature_quantities`,
   `Session.room_ids`). Construct checked, and let typecheck name the new field.
+- **A Session's absence from the output authorises a DELETE only when the run's
+  answer covered its Offering's demand.** `assembleSolverInput` records a
+  `demand` ledger (what each wire Offering was asked for, and what existing
+  Sessions were sent for it) in `solver_run.meta.report`;
+  `planMaterialization` reconciles it and moves the unreturned Sessions of any
+  Offering that came back SHORT into `withheldDeletes` instead of deleting
+  them. Never delete on silence alone: a `converged` run returned 197 of 208
+  requested placements and the apply destroyed the 11 live Sessions it had
+  simply omitted, run after run, each time a different 11. The ledger is
+  RECORDED, never recomputed from `Offering.frequency` at apply time — the
+  Offering as it is now is a different question. § "The demand ledger".
+- **A termination reason this version does not recognise is UNKNOWN, never
+  fine.** `isReproducible()` is an allow-list and `terminationSentence()` names
+  an unrecognised reason rather than explaining it away; `stagnated` (the
+  solver gave up before placing everything) must never read as `converged` or
+  as a run predating termination capture. A deny-list of one is an allow-list
+  of everything.
 - **Warn-and-allow parity**: a `SUCCEEDED` run with residual hard violations is
   still an applicable Generation — not discarded, not auto-applied, and
   `GenerationStatus.INFEASIBLE` is consequently unused for solver output.
@@ -382,6 +410,16 @@ solver has no way to detect.
   a per-role normalisation rule first, because a Session's attendee set is the
   whole descendant closure. Solver ADR-0026; §§ "Per-person preferences",
   "`PersonPreferenceFit.roles`".
+- **A lecturer candidate pool is not a co-teaching roster.**
+  `Offering.requiredLecturerCount` decouples "who CAN lead it"
+  (`OfferingLecturer`, the pool sent as `candidateLecturerIds`) from how many
+  of them one Session actually needs. NULL derives to `min(1, pool size)` —
+  attaching several eligible lecturers means the solver picks one, never that
+  all of them are forced onto every Session together. Not bounded by a DB
+  CHECK: the pool is a separate table saved by a separate request, so
+  `assembleSolverInput` clamps to the pool size and reports a mismatch rather
+  than refusing the save. § "Lecturer candidate pools: `requiredLecturerCount`
+  decouples eligibility from assignment".
 - **Tracked wire-format gaps** (on the board) each report rather than
   narrow silently — do not "fix" one by picking a value: the solver's unbounded
   run registry, violations naming solver-invented Sessions with no join key.

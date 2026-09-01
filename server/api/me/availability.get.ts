@@ -29,47 +29,47 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
     }
 
-    const [rows, preference, limits, terms, roomFeatureOptions] = await Promise.all([
-        tx.personUnavailability.findMany({
-            where: { personId },
-            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-            select: {
-                id: true,
-                days: true,
-                blocks: true,
-                weeks: true,
-                reason: true,
-                status: true,
-                decisionNote: true,
-                decidedAt: true,
-                createdAt: true,
-                termId: true,
-                term: { select: { name: true } },
-            },
-        }),
-        tx.personPreference.findUnique({
-            where: { personId },
-            select: {
-                preferredDays: true,
-                preferredBlocks: true,
-                roomFeatures: { select: { equipmentId: true } },
-            },
-        }),
-        tenantGridLimits(tx, identity.tenantId),
-        tenantTerms(tx, identity.tenantId),
-        /*
-         * The room-type vocabulary this person can choose from — sent WITH the
-         * page rather than fetched from `/api/equipment`, which requires
-         * `equipment.read`. This page's own gate is `availability.manage_own`,
-         * and a page must not depend on a permission its gate does not imply:
-         * one 403 inside the reference fetch renders the whole form empty.
-         */
-        tx.equipment.findMany({
-            orderBy: { name: 'asc' },
-            take: 200,
-            select: { id: true, key: true, name: true },
-        }),
-    ]);
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const rows = await tx.personUnavailability.findMany({
+        where: { personId },
+        orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+        select: {
+            id: true,
+            days: true,
+            blocks: true,
+            weeks: true,
+            reason: true,
+            status: true,
+            decisionNote: true,
+            decidedAt: true,
+            createdAt: true,
+            termId: true,
+            term: { select: { name: true } },
+        },
+    });
+    const preference = await tx.personPreference.findUnique({
+        where: { personId },
+        select: {
+            preferredDays: true,
+            preferredBlocks: true,
+            roomFeatures: { select: { equipmentId: true } },
+        },
+    });
+    const limits = await tenantGridLimits(tx, identity.tenantId);
+    const terms = await tenantTerms(tx, identity.tenantId);
+    /*
+     * The room-type vocabulary this person can choose from — sent WITH the
+     * page rather than fetched from `/api/equipment`, which requires
+     * `equipment.read`. This page's own gate is `availability.manage_own`,
+     * and a page must not depend on a permission its gate does not imply:
+     * one 403 inside the reference fetch renders the whole form empty.
+     */
+    const roomFeatureOptions = await tx.equipment.findMany({
+        orderBy: { name: 'asc' },
+        take: 200,
+        select: { id: true, key: true, name: true },
+    });
 
     /*
      * Counted over APPROVED windows only, because that is what is actually in

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { requireStaffIdentity } from '../../../utils/tenantDb';
 import { getPrisma } from '../../../utils/prisma';
-import { UnknownFederationIdError, UnknownTenantIdError, setTenantFederationViaFunction } from '../../../utils/staffFederation';
+import { UnknownTenantIdError } from '../../../utils/staffCreateTenant';
+import { UnknownFederationIdError, setTenantFederationViaFunction } from '../../../utils/staffFederation';
 
 const bodySchema = z.object({
     // `null` detaches; the key must be PRESENT to change anything — omitting

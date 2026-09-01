@@ -1,4 +1,6 @@
 import type { EntityRow } from '~/utils/manageRegistry';
+import type { CapacityGroup } from '#shared/groupCapacity';
+import { estimatedGroupSizes } from '#shared/groupCapacity';
 
 /**
  * Client-side shaping of the flat `/api/groups` response into a hierarchy.
@@ -22,6 +24,30 @@ function parentOf(row: EntityRow): string | null {
     const value = row.parentGroupId;
 
     return typeof value === 'string' && value ? value : null;
+}
+
+function expectedSizeOf(row: EntityRow): number | null {
+    const value = row.expectedSize;
+
+    return typeof value === 'number' ? value : null;
+}
+
+/**
+ * Every row's displayed size: its own `expectedSize`, or — where a row has
+ * none — the sum of its nested groups' estimates, the same derivation the
+ * solver's own capacity check uses for an Offering's attached Group
+ * (`estimatedGroupSizes`, `#shared/groupCapacity`). Requires the WHOLE set,
+ * same constraint as `buildGroupTree`: a partial page cannot know a group's
+ * real descendants, so `ManageGroupTree` only reads this when `showTree`.
+ */
+export function estimatedSizes(rows: EntityRow[]): Map<string, number | null> {
+    const groups: CapacityGroup[] = rows.map((row) => ({
+        id: String(row.id),
+        parentGroupId: parentOf(row),
+        expectedSize: expectedSizeOf(row),
+    }));
+
+    return estimatedGroupSizes(groups);
 }
 
 /**

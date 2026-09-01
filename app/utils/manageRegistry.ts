@@ -372,7 +372,7 @@ export interface ManageEntity {
 const OFFERING_TEMPLATE_SHAPE_FIELDS = [
     'title', 'kindId', 'code', 'color', 'frequency', 'durationBlocks',
     'schedulingPattern', 'requiredRoleId', 'requiredCapacity',
-    'requiredRoomCount', 'allowOnline', 'notes',
+    'requiredRoomCount', 'requiredLecturerCount', 'allowOnline', 'notes',
 ] as const;
 
 export const OFFERING_ENTITY: ManageEntity = {
@@ -511,6 +511,16 @@ export const OFFERING_ENTITY: ManageEntity = {
             },
         },
         {
+            key: 'requiredLecturerCount',
+            label: 'Lecturers needed at once',
+            type: 'number',
+            min: 1,
+            help: 'Leave blank to require exactly one, chosen by the solver from '
+                + '“Who leads it” below. Set higher only for genuine '
+                + 'co-teaching — the list below is a candidate pool, not a '
+                + 'guaranteed roster.',
+        },
+        {
             key: 'requiredRoomCount',
             label: 'Rooms needed at once',
             type: 'number',
@@ -616,7 +626,9 @@ export const OFFERING_ENTITY: ManageEntity = {
         {
             key: 'lecturers',
             label: 'Who leads it',
-            help: 'Optionally state the scheduling role each person fills here.',
+            help: 'Eligible to lead it — a candidate pool the solver chooses from, '
+                + 'sized by “Lecturers needed at once” above. Optionally state '
+                + 'the scheduling role each person fills here.',
             resource: 'persons',
             valueKey: 'personId',
             searchable: true,
@@ -719,6 +731,7 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
         },
         { key: 'requiredCapacity', label: 'Required room capacity', type: 'number', min: 0 },
         { key: 'requiredRoomCount', label: 'Rooms needed at once', type: 'number', min: 1, max: MAX_ROOMS_PER_SESSION },
+        { key: 'requiredLecturerCount', label: 'Lecturers needed at once', type: 'number', min: 1 },
         { key: 'allowOnline', label: 'May be scheduled online', type: 'boolean' },
         { key: 'notes', label: 'Notes', type: 'textarea' },
     ],
@@ -842,6 +855,9 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         description: 'Everyone the timetable places or notifies.',
         keywords: ['people', 'staff', 'student', 'lecturer', 'teacher', 'roster', 'directory'],
         title: (row) => `${row.givenName ?? ''} ${row.familyName ?? ''}`.trim() || 'Person',
+        // Every field below is plain — this exists solely to add issue #84's
+        // GDPR export action outside the generic form. See detailComponents.ts.
+        detailComponent: 'PersonForm',
         columns: [
             { key: 'familyName', label: 'Family name' },
             { key: 'givenName', label: 'Given name' },
@@ -1088,6 +1104,22 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                     label: (row) => String(row.name ?? row.id),
                     nullable: true,
                     emptyHint: 'No other groups to nest under yet.',
+                },
+            },
+            {
+                key: 'curriculumPlanId',
+                label: 'Curriculum plan',
+                type: 'reference',
+                help: 'The plan this group is meant to follow — an intent, set before it has '
+                    + 'any offerings. Lets the plan’s own "roll out to several groups" panel '
+                    + 'pre-select this group instead of it being picked by hand every time. '
+                    + 'Not the same as which plan this group already has offerings from — see '
+                    + 'the "Curriculum plans" panel below for that.',
+                reference: {
+                    resource: 'offering-plans',
+                    label: (row) => String(row.name ?? row.id),
+                    nullable: true,
+                    emptyHint: 'No curriculum plans defined yet.',
                 },
             },
         ],

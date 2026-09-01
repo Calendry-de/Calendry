@@ -76,10 +76,11 @@ export default defineEventHandler(async (event) => {
         // Both fetched under the tenant predicate, so swapping with a Session
         // from another tenant reads as "not found" rather than partially
         // succeeding.
-        const [a, b] = await Promise.all([
-            tx.session.findFirst({ where: { id, tenantId: identity.tenantId } }),
-            tx.session.findFirst({ where: { id: body.withSessionId, tenantId: identity.tenantId } }),
-        ]);
+        // Sequential, not `Promise.all`: both share the request's one
+        // interactive transaction connection, and issuing two queries on it
+        // concurrently is deprecated pg client behaviour (removed in pg@9).
+        const a = await tx.session.findFirst({ where: { id, tenantId: identity.tenantId } });
+        const b = await tx.session.findFirst({ where: { id: body.withSessionId, tenantId: identity.tenantId } });
 
         if (!a || !b) {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
@@ -126,13 +127,12 @@ export default defineEventHandler(async (event) => {
             generationId,
         });
 
-        const [sessionA, sessionB, violations] = await Promise.all([
-            tx.session.findFirst({ where: { id: a.id } }),
-            tx.session.findFirst({ where: { id: b.id } }),
-            tx.constraintViolation.findMany({
-                where: { tenantId: identity.tenantId, sessionId: { in: [a.id, b.id] } },
-            }),
-        ]);
+        // Sequential — see the earlier note: `tx` is one shared connection.
+        const sessionA = await tx.session.findFirst({ where: { id: a.id } });
+        const sessionB = await tx.session.findFirst({ where: { id: b.id } });
+        const violations = await tx.constraintViolation.findMany({
+            where: { tenantId: identity.tenantId, sessionId: { in: [a.id, b.id] } },
+        });
 
         return { sessions: [sessionA, sessionB], event: logged, violations };
     });

@@ -115,6 +115,34 @@ function estimateOf(id: string, byId: Map<string, CapacityGroup>, childrenOf: Ma
     return (childrenOf.get(id) ?? []).reduce((sum, child) => sum + estimateOf(child, byId, childrenOf), 0);
 }
 
+/**
+ * Every Group's displayed size, all at once: its own `expectedSize` where set,
+ * or — where it is not — the sum of its nested groups' estimates. The same
+ * "own value, else sum of children" rule `estimateOf` applies to a single
+ * attached Group inside `deriveCapacity`, run here for every Group a tenant
+ * has so a list view can show one without walking a closure per row.
+ *
+ * NULL, not 0, where neither the Group nor anything beneath it carries a
+ * number — the same "absence is not zero" reasoning `DerivedCapacity.estimate`
+ * follows.
+ */
+export function estimatedGroupSizes(groups: CapacityGroup[]): Map<string, number | null> {
+    const byId = new Map(groups.map((g) => [g.id, g]));
+    const childrenOf = new Map<string, string[]>();
+
+    for (const group of groups) {
+        if (group.parentGroupId) {
+            childrenOf.set(group.parentGroupId, [...(childrenOf.get(group.parentGroupId) ?? []), group.id]);
+        }
+    }
+
+    return new Map(groups.map((group) => {
+        const estimate = estimateOf(group.id, byId, childrenOf);
+
+        return [group.id, estimate > 0 ? estimate : null] as const;
+    }));
+}
+
 export function deriveCapacity(
     attachedGroupIds: string[],
     groups: CapacityGroup[],

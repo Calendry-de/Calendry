@@ -599,6 +599,9 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             name: z.string().min(1),
             description: z.string().nullish(),
             expectedSize: z.number().int().nonnegative().nullish(),
+            // Intent only — see the column's schema comment. Never resolved
+            // against what Offerings this Group actually has.
+            curriculumPlanId: optionalId,
         }),
         update: z.object({
             // Reparenting is allowed; group_closure is rebuilt by the database
@@ -607,6 +610,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             name: z.string().min(1).optional(),
             description: z.string().nullish(),
             expectedSize: z.number().int().nonnegative().nullish(),
+            curriculumPlanId: optionalId,
         }),
         filters: z.object({
             parentGroupId: z.string().optional(),
@@ -729,6 +733,14 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * friendly refusal, that one is the guarantee.
              */
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).optional(),
+            /*
+             * NO UPPER BOUND, unlike `requiredRoomCount`: there is no solver
+             * structural cap to enforce, and the real ceiling — the attached
+             * lecturer pool — lives in a different table saved by a separate
+             * request (see the column's schema comment). Left unbounded here on
+             * purpose; `assembleSolverInput` clamps and reports instead.
+             */
+            requiredLecturerCount: z.number().int().min(1).nullish(),
             allowOnline: z.boolean().optional(),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
@@ -773,6 +785,9 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * friendly refusal, that one is the guarantee.
              */
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).optional(),
+            // See `create` above — no upper bound, clamped and reported at
+            // solve-assembly time instead.
+            requiredLecturerCount: z.number().int().min(1).nullish(),
             allowOnline: z.boolean().optional(),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
@@ -814,6 +829,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
+            requiredLecturerCount: z.number().int().min(1).nullish(),
             allowOnline: z.boolean().nullish(),
             notes: z.string().nullish(),
         }),
@@ -832,6 +848,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             requiredRoleId: optionalId,
             requiredCapacity: z.number().int().nonnegative().nullish(),
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
+            requiredLecturerCount: z.number().int().min(1).nullish(),
             allowOnline: z.boolean().nullish(),
             notes: z.string().nullish(),
         }),

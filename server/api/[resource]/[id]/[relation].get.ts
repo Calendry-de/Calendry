@@ -10,7 +10,7 @@ defineRouteMeta({
         summary: 'Read a relation membership set',
         description: 'The current membership set of one relation, e.g. the Groups an Offering is for. Requires the PARENT resource read permission. Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
             { name: 'relation', in: 'path', required: true, schema: { type: 'string' } },
         ],

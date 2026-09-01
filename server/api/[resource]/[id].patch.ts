@@ -11,7 +11,7 @@ defineRouteMeta({
         summary: 'Update one row by id',
         description: 'Generic update route (permission <resource>.update). The body is the per-resource update schema, matched by the resource path segment (see the oneOf variants); all fields are optional and identifier keys (key, type, termId) are create-only. A cross-tenant id updates zero rows and reports 404. Federation-owned rows are readable but never writable here.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         requestBody: {
@@ -85,6 +85,11 @@ defineRouteMeta({
                                         type: 'integer',
                                         minimum: 0,
                                         nullable: true,
+                                    },
+                                    curriculumPlanId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering — an administrative hint, never derived from or resolved against its actual offerings.',
                                     },
                                 },
                                 description: 'All fields optional.',
@@ -195,6 +200,92 @@ defineRouteMeta({
                                     },
                                 },
                                 description: 'All fields optional; identifier keys are create-only and absent here.',
+                            },
+                            {
+                                title: 'offering-templates',
+                                type: 'object',
+                                description: 'A reusable Offering shape (issue #8); all fields optional, including name.',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                    },
+                                    title: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    kindId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'A session kind of this tenant.',
+                                    },
+                                    code: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    color: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    frequency: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        nullable: true,
+                                    },
+                                    durationBlocks: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        nullable: true,
+                                    },
+                                    schedulingPattern: {
+                                        type: 'string',
+                                        enum: ['DISTRIBUTED', 'BLOCK'],
+                                        nullable: true,
+                                        description: 'Empty string is treated as null (unclassified).',
+                                    },
+                                    requiredRoleId: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    requiredCapacity: {
+                                        type: 'integer',
+                                        minimum: 0,
+                                        nullable: true,
+                                    },
+                                    requiredRoomCount: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        maximum: 4,
+                                        nullable: true,
+                                        description: 'Hard-capped at 4; above it the solver refuses the whole input.',
+                                    },
+                                    allowOnline: {
+                                        type: 'boolean',
+                                        nullable: true,
+                                    },
+                                    notes: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                },
+                            },
+                            {
+                                title: 'offering-plans',
+                                type: 'object',
+                                description: 'A reusable, ordered bundle of offering-templates; all fields optional. Item membership/order and the apply action are separate resources, not nested under this one.',
+                                properties: {
+                                    name: {
+                                        type: 'string',
+                                    },
+                                    description: {
+                                        type: 'string',
+                                        nullable: true,
+                                    },
+                                    nextPlanId: {
+                                        type: 'string',
+                                        nullable: true,
+                                        description: 'Chains plans into a sequence; null if this is the last (or only) plan.',
+                                    },
+                                },
                             },
                             {
                                 title: 'time-grids',

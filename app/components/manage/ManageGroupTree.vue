@@ -109,6 +109,10 @@
                             v-if="node.row.expectedSize"
                             class="tree_meta"
                         >~{{ node.row.expectedSize }} people</span>
+                        <span
+                            v-else-if="showTree && derivedSizes.get(node.id)"
+                            class="tree_meta"
+                        >~{{ derivedSizes.get(node.id) }} people (nested)</span>
                     </NuxtLink>
                 </li>
             </ul>
@@ -137,7 +141,7 @@
 <script setup lang="ts">
 import type { useEntityList } from '~/composables/entityList';
 import type { ManageEntity } from '~/utils/manageRegistry';
-import { buildGroupTree, flattenTree } from '~/utils/groupTree';
+import { buildGroupTree, estimatedSizes, flattenTree } from '~/utils/groupTree';
 
 /**
  * Groups as a hierarchy, because a flat table of nested things loses the only
@@ -164,6 +168,14 @@ const collapsed = ref(new Set<string>());
  * itself match.
  */
 const showTree = computed(() => props.list.isComplete.value && !props.list.isFiltered.value);
+
+/**
+ * Only meaningful alongside `showTree`: summing nested groups needs the whole
+ * set in hand, the same requirement `buildGroupTree` has for the hierarchy
+ * itself. Read as `derivedSizes.get(node.id)` — never for a node whose own
+ * `expectedSize` is already set, which always wins.
+ */
+const derivedSizes = computed(() => estimatedSizes(props.list.rows.value));
 
 const visibleNodes = computed(() => {
     if (!showTree.value) {

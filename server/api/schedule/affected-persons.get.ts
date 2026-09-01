@@ -65,16 +65,16 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
-        const [assignedPeople, assignedGroups] = await Promise.all([
-            tx.sessionPerson.findMany({
-                where: { sessionId: session.id },
-                select: { personId: true, roleId: true, role: { select: { key: true } } },
-            }),
-            tx.sessionGroup.findMany({
-                where: { sessionId: session.id },
-                select: { groupId: true },
-            }),
-        ]);
+        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // trip pg's deprecated overlapping-query warning.
+        const assignedPeople = await tx.sessionPerson.findMany({
+            where: { sessionId: session.id },
+            select: { personId: true, roleId: true, role: { select: { key: true } } },
+        });
+        const assignedGroups = await tx.sessionGroup.findMany({
+            where: { sessionId: session.id },
+            select: { groupId: true },
+        });
 
         const groupIds = await descendantGroupIds(tx, assignedGroups.map((g) => g.groupId));
 

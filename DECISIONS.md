@@ -48,7 +48,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Landing page & routing | Landing page / routing |
 | Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log — the fifth tenant-isolation exception · Calendar links gain a permission and a Group subject |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
-| Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
+| Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` · The demand ledger, and why a short answer cannot authorise a delete |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
 | Solver: operations | Solver & proto: operational detail |
 | Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · A Session that spans a break · Stage 6c: why the review screen shows two panels |
@@ -2382,3 +2382,166 @@ already has.
 
 ---
 
+
+# Solver: the demand ledger, and why a short answer cannot authorise a delete
+
+## The incident (2026-09-01)
+
+`planMaterialization()` partitions three ways, and the third is destructive:
+an in-scope, unlocked, unbanked Session the solver did not return is DELETED,
+event reason `not_returned_by_solver`. The inference behind it — "the solver
+was asked about this Offering, said nothing about this Session, therefore it
+refused to place it" — is only sound while the output is COMPLETE.
+
+It was not. Run `01a05ea6-c9de-713f-9993-9517125806f6` against the #120 tenant
+reported `converged` after 45,840,896 moves (not budget-bound, on a solver
+binary built one minute earlier, so this is the post-#120 code). Decoding its
+`SolverInputSnapshot` — the exact bytes sent, not a reconstruction — against
+its stored `result`:
+
+| | |
+|---|---|
+| Wire Offerings in scope | 208 (`rebuild`, `LOCK_POLICY_HARD`, all of them) |
+| `requiredSessionCount` histogram | `{ 1: 208 }` — 208 demanded |
+| Existing Sessions sent | 196, each mapping 1:1 to a distinct in-scope wire Offering |
+| Placements returned | 197 — 185 reusing a `sessionId`, 12 new |
+| Sent, never returned | **11** |
+
+**The app's input was correct, and that is the finding.** None of the three
+ways a Session can silently stop being demand applied: every Offering was in
+scope, the term had ZERO banked Sessions (so `requiredSessionCount` took no
+correction), and NO Offering had more Session rows than it required. Zero
+orphan `offeringId`s, zero Events. The solver simply dropped eleven existing
+in-scope Sessions from a `converged` answer.
+
+The apply then deleted exactly those eleven. Every applied Generation in that
+tenant had done the same — the DELETE count equalled the run's shortfall
+exactly, run after run (36/36, 23/23, 12/12, 10/10, 7/7, 11/11), 127 DELETE
+events deep. Two consecutive runs dropped sets with ZERO overlap, so the next
+run recreated what the last one deleted and dropped a different eleven: a
+stable churn loop with the Session count flat and eleven rows dying per cycle.
+
+Group load did not explain which eleven — cohorts carrying 9–10 series lost
+nothing while two cohorts carrying a single series each lost their one Session
+— which is what rules out structural infeasibility and puts the cause in the
+solver's search or output assembly. That half is filed cross-repo; it is not
+fixable here.
+
+## What changed here
+
+The app's part was believing an incomplete answer. `server/utils/solverDemand.ts`
+records what was ASKED and reconciles it against what was ANSWERED:
+
+- `assembleSolverInput()` writes a `demand` ledger into `AssemblyReport` — one
+  entry per wire Offering, carrying the real Offering id, the
+  `requiredSessionCount` as sent, and the existing Sessions sent for it. It
+  rides in `solver_run.meta.report`, which already carried the whole report.
+- `planMaterialization()` takes that ledger, and an Offering whose answer
+  returned fewer placements than were asked of it has its unreturned Sessions
+  moved from `deletes` to `withheldDeletes`. Counted as `deletesWithheld`, so
+  the withholding rides in the APPLY_GENERATION event payload rather than being
+  a silent correction.
+- The review screen leads with it: "the solver returned 197 of the 208
+  placements this run asked it for."
+
+**Why the ledger is recorded rather than recomputed.** Apply happens whenever a
+human decides, days after the run and across restarts. Re-deriving demand from
+`Offering.frequency` at that point answers a question about the Offering as it
+is NOW; an Offering whose frequency changed in between would make the
+reconciliation wrong in the one direction that matters. Same reasoning as the
+self-describing wire Offering id in `offeringSplit.ts`.
+
+**Why the reconciliation is per-Offering while the ledger is per-series.**
+Deciding which SERIES an existing Session belongs to means re-deriving the
+split from its Groups at apply time, and the Groups may have changed since the
+run — a second derivation of something the assembly already decided. So an
+Offering short in ANY of its series protects ALL of its Sessions. Coarser, and
+the honest reading: which of its Sessions the solver meant to drop is not
+knowable.
+
+**Why a missing ledger does not withhold.** A run started before this existed
+recorded nothing, so `PlanDemand.verified` is false and its deletes proceed on
+the old assumption — with the review saying so. Withholding on no evidence
+would refuse legitimate deletes for every historical proposal; claiming
+`verified` would restore the exact silent assumption being removed. The third
+option, reporting the unknown as unknown, is the one this file's "Guards must
+fail loudly" section already argues for.
+
+## `stagnated`, and two deny-lists that answered wrong by default
+
+The same run class exposed both readers of `termination_reason` defaulting to
+the reassuring answer for a string they had never seen — so the solver's new
+`stagnated` ("could not place everything and stopped searching") arrived
+described as good news, without a line of code being wrong about `stagnated`
+specifically:
+
+- `isReproducible()` was `reason !== 'time_budget'`, which answers TRUE for
+  every unknown. Now an allow-list (`converged`, `move_budget`), `false` for
+  the one known-irreproducible reason, and `null` — unknown — for everything
+  else, including reasons that do not exist yet.
+- `terminationSentence()` merged NULL and unrecognised into one `default`
+  branch reading "this run predates termination capture", so a run that gave up
+  was rendered as archaeology. NULL now has its own early return, `stagnated`
+  its own sentence, and an unrecognised reason is named rather than explained
+  away.
+
+The general shape, worth more than either fix: **a deny-list of one is an
+allow-list of everything.** Both of these were correct the day they were
+written and became wrong when the vocabulary grew, with nothing to notice.
+
+---
+
+## Lecturer candidate pools: `requiredLecturerCount` decouples eligibility from assignment
+
+Reported by a tenant: two lecturers attached to an Offering's "Who leads it"
+came back from every solve co-teaching every Session together, which nobody
+had asked for. Groups already had the equivalent bug and the equivalent fix
+— TAXONOMY.md's 2026-08-24 correction turned "N Groups attached" into N
+independent parallel series rather than one shared Session for the union.
+Lecturers never got it.
+
+**Why this was app-side, not solver-side.** The wire message already
+distinguishes the two things a reader would expect: `candidateLecturerIds`
+(the eligible pool) and `requiredLecturerCount` (how many of that pool one
+Session needs). The proto's own contract is explicit —
+`candidate_lecturer_ids.len() == required_lecturer_count` means the
+assignment is FIXED, otherwise the solver chooses — and it carries an unused
+`LecturerConsistency` soft constraint that only activates once a real pool
+exists (`candidate_lecturer_ids.len() > required_lecturer_count`, solver
+ADR-0026). `assembleSolverInput` was simply setting
+`requiredLecturerCount: offering.lecturers.length` unconditionally, which
+makes the pool equal the requirement on every Offering, always — the solver
+was doing exactly what it was told.
+
+**The fix.** `Offering.requiredLecturerCount`, nullable, added instead of
+reusing any existing field. NULL derives to `min(1, pool size)` at assembly
+time: zero attached lecturers still sends zero required (kinds that need
+nobody named are unaffected), one or more attached lecturers now sends one,
+chosen by the solver. An explicit value is a deliberate co-teaching
+requirement and is used as-is.
+
+**Why NULL rather than a stored default, and why nothing was backfilled.**
+This repo's established pattern — `requiredCapacity`, `schedulingPattern` on
+the same model — is that NULL is itself a meaningful, derived state, not an
+absence to fill in. Using it here meant every existing row, untouched, is
+already correct: leaving the column NULL for the whole table is what applies
+the fix retroactively to every Offering that currently over-attaches
+lecturers, instead of running a backfill that would have to freeze each
+row's *current* (wrong) lecturer count as its new explicit requirement —
+which would have shipped the bug forward under a different name.
+
+**Why there is no database CHECK bounding it against the pool.** The pool
+lives in `offering_lecturer`, a different table saved through a *separate*
+request from the Offering row — `lecturers` is a `relations`-mechanism
+picker (its own PUT), not a `childKeys` child saved atomically with the
+entity (`manageRegistry.ts`'s `lecturers` relation; contrast
+`requiredRoomCount`, which bounds against `MAX_ROOMS_PER_SESSION`, a
+constant, with both a friendly zod refusal and a DB CHECK). No single
+transaction ever holds both counts, so nothing here can enforce it exactly.
+Instead `assembleSolverInput` clamps `requiredLecturerCount` to the pool
+size before it reaches the wire — the solver is never sent a demand for more
+lecturers than exist — and reports any mismatch on
+`AssemblyReport.offeringsWithInsufficientLecturers`, the same warn-and-allow
+shape as `offeringsWithNoDerivableCapacity`.
+
+---

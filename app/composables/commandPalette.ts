@@ -1,6 +1,8 @@
 import type { ComputedRef, Ref } from 'vue';
-import type { NavSection, ResolvedNavEntry } from '~/composables/navigation';
-import { NAV_SECTION_LABELS, useNavEntries } from '~/composables/navigation';
+import type { ResolvedNavEntry } from '~/composables/navigation';
+import type { NavSection } from '~/utils/navPlaces';
+import { useNavEntries } from '~/composables/navigation';
+import { NAV_SECTION_LABELS } from '~/utils/navPlaces';
 import { useOverlay } from '~/composables/overlay';
 import { fuzzyScoreEntry, highlightRuns } from '~/utils/fuzzy';
 

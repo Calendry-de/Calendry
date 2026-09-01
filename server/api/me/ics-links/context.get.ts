@@ -27,20 +27,20 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
 
     const canTargetGroups = await holdsPermission(event, tx, 'ics_link.generate');
 
-    const [terms, groups] = await Promise.all([
-        tx.term.findMany({
+    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // trip pg's deprecated overlapping-query warning.
+    const terms = await tx.term.findMany({
+        where: { tenantId: identity.tenantId },
+        select: { id: true, name: true },
+        orderBy: { startDate: 'asc' },
+    });
+    const groups = canTargetGroups
+        ? await tx.group.findMany({
             where: { tenantId: identity.tenantId },
             select: { id: true, name: true },
-            orderBy: { startDate: 'asc' },
-        }),
-        canTargetGroups
-            ? tx.group.findMany({
-                where: { tenantId: identity.tenantId },
-                select: { id: true, name: true },
-                orderBy: { name: 'asc' },
-            })
-            : Promise.resolve([]),
-    ]);
+            orderBy: { name: 'asc' },
+        })
+        : [];
 
     return { terms, groups, canTargetGroups };
 }));

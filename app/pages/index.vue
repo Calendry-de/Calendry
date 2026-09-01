@@ -9,6 +9,7 @@
             <main id="main">
                 <LandingHero/>
 
+                <LandingAudience/>
 
                 <LandingSection
                     id="what"
@@ -17,7 +18,7 @@
                         it is made of; a separate solver service builds candidate placements from your
                         rules and hands them back for a person to accept or reject."
                 >
-                    <LandingCapabilityList :items="FEATURES"/>
+                    <LandingCapabilityRows :items="FEATURES"/>
                 </LandingSection>
 
 
@@ -27,7 +28,7 @@
                     lead="Not a demo reel. Everything below is implemented, in use against a real
                         database, and covered by this repository's integration suite."
                 >
-                    <LandingRoadmapList :items="BUILT"/>
+                    <LandingBuiltClusters :items="BUILT"/>
 
                     <LandingCallout
                         text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
@@ -41,16 +42,18 @@
                     title="Not built yet, and honest about it"
                     lead="Calendry is being built in phases, and each of these is a phase rather than a
                         promise with a date on it. Where a decision is still open, it says which one."
+                    layout="narrow"
                 >
-                    <LandingRoadmapList :items="NEXT"/>
+                    <LandingNextList :items="NEXT"/>
                 </LandingSection>
 
                 <LandingSection
                     id="why"
                     title="Decisions worth defending"
                     lead="Timetabling software fails in specific, recognisable ways. These are the
-                        choices made against them — each one is a rule the codebase is actually built
+                        choices made against them. Each one is a rule the codebase is actually built
                         on, not a slogan."
+                    layout="aside"
                 >
                     <LandingPrincipleList :items="PRINCIPLES"/>
                 </LandingSection>
@@ -125,6 +128,27 @@ import { useFirstVisit } from '~/composables/pageOpener';
  * COMPOSITION. Content lives in `~/utils/landingContent`, section markup in
  * `app/components/landing/`. This file only arranges them: pages compose, they
  * do not implement.
+ *
+ * EVERY SECTION IS A DIFFERENT SHAPE, and that is a rule rather than a
+ * flourish. The page previously ran `what`, `built`, `next` and `why` as four
+ * consecutive sections of hairline-separated title-and-body rows: correct,
+ * legible, and completely undifferentiated, so twelve hundred words of the
+ * middle of the page offered a scanner no landmark at all. They are now paired
+ * figure rows, a grouped list, a single-column marker rail and a sticky aside.
+ * Adding a section means picking a shape none of its neighbours already use.
+ *
+ * `what` IS THE ONLY SECTION WITH DRAWINGS IN IT, and that is deliberate too.
+ * Its four claims are the only ones on the page that describe something a
+ * schedule DOES, so they are the only ones a moving timetable can state better
+ * than a sentence can. Putting a figure beside the roadmap rows or the
+ * architectural principles would be decoration, because those claims are about
+ * what exists and why, not about behaviour.
+ *
+ * `who` IS THE ONE SECTION WITH NO HEADING, deliberately: it is a single
+ * sentence naming the reader, lifted out of the hero (where it was the fourth
+ * text element and pushed the buttons down) into the one position where it is
+ * the only thing on the line. A heading above one sentence would be longer than
+ * the sentence.
  *
  * THE OPENER runs here and NOWHERE ELSE, on a visitor's first arrival only.
  * `/` is the one route where a brand moment is the job — every other page in

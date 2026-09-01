@@ -67,10 +67,35 @@ export interface ReviewPreview {
         movedCollateral?: number;
         unchanged: number;
         deleted: number;
+        /**
+         * Sessions this proposal would have deleted and is keeping, because the
+         * run returned fewer placements for their Offering than it asked for.
+         *
+         * Optional for the same reason as `movedCollateral`: a Generation
+         * previewed before this counter existed has no value, and 0 would be a
+         * claim rather than a gap.
+         */
+        deletesWithheld?: number;
         skippedLocked: number;
         placementsUnmapped: number;
     };
+    /**
+     * What the run asked the solver for, against what its answer covered.
+     *
+     * `verified: false` means the run predates the demand ledger, so its deletes
+     * rest on the assumption that the output is complete — the assumption that
+     * cost this tenant eleven live Sessions per run. Optional because an older
+     * client payload has no field, and absent must not read as verified.
+     */
+    demand?: {
+        verified: boolean;
+        required: number;
+        returned: number;
+        shortOfferings: number;
+    };
     deletedByOffering: { offeringId: string; title: string; code: string | null; count: number }[];
+    /** The kept Sessions, named — a count alone is not something a human can act on. */
+    withheldByOffering?: { offeringId: string; title: string; code: string | null; count: number }[];
     /**
      * What the proposal does to each Offering over the whole term — the page's
      * primary evidence. Server-aggregated because `placements` is fetched one
@@ -124,6 +149,18 @@ export interface OfferingChange {
  * recorded, and claiming reproducibility there would be a guess.
  */
 export function terminationSentence(reason: string | null): string {
+    /**
+     * NULL AND UNRECOGNISED ARE DIFFERENT SENTENCES, and merging them told the
+     * reviewer a lie. Every unknown string fell into the `default` branch and
+     * read "this run predates termination capture" — so when the solver gained
+     * `stagnated`, a run that GAVE UP without placing everything was described
+     * as an old run from before the field existed. The one reason a reviewer
+     * most needs to see was the one rendered as archaeology.
+     */
+    if (!reason) {
+        return 'Unknown — this run predates termination capture.';
+    }
+
     switch (reason) {
         case 'converged':
             return 'Found an optimal solution and stopped.';
@@ -131,10 +168,12 @@ export function terminationSentence(reason: string | null): string {
             return 'Ran out of move budget — a longer run may do better.';
         case 'time_budget':
             return 'Ran out of time. Not reproducible — a re-run may differ.';
+        case 'stagnated':
+            return 'Gave up before placing everything — some sessions have no slot in this proposal.';
         case 'cancelled':
             return 'The run was cancelled.';
         default:
-            return 'Unknown — this run predates termination capture.';
+            return `Ended for a reason this version does not recognise (${reason}).`;
     }
 }
 

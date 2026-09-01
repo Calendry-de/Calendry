@@ -10,7 +10,7 @@ defineRouteMeta({
         summary: 'Fetch one row by id',
         description: 'Generic read route (permission <resource>.read). A guessed id from another tenant reads as 404, never as a permission error that would confirm the row exists. Federation-ownable resources also resolve rows shared into the federation.',
         parameters: [
-            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
+            { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],
         responses: {

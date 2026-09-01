@@ -82,3 +82,93 @@ html, body {
 .theme-dark {
     color-scheme: dark;
 }
+
+/*
+ * THE FRAMED SHELL: the content pane scrolls, the page does not.
+ *
+ * Keyed on a body class that `CommonAppShell` sets through `useHead`, so it
+ * reaches exactly the routes that render the shell (`/dashboard`, `/manage/*`,
+ * `/staff`) and NOWHERE else. That scoping is the point, not tidiness:
+ *
+ *   `/schedule` MUST keep the document scroll. Its grid carries `_corner` and
+ *   `_day` at `sticky; top: 0` and `_side` at `sticky; top: var(--space-5)`,
+ *   and the note above `.header` in default.vue records that pinning the header
+ *   app-wide would hide the day-name row and the side column on the app's most
+ *   important surface. `/schedule` does not render `CommonAppShell`, so it
+ *   never takes this class and that hazard is not in play here.
+ *
+ *   `/` MUST keep the document scroll too. The landing surface's reveals run on
+ *   `animation-timeline: view()`, which resolves against the scroll container;
+ *   moving the scroll to an inner pane would silently stop every one of them.
+ *
+ * `flex`, not `grid-template-rows`: `.app` has six children and four of them
+ * (toast, palette, drawer, version) are `position: fixed`. Out of flow, they
+ * add no flex line, whereas explicit grid rows would have to account for them.
+ *
+ * No `--header-height` anywhere. The header is an `auto` flex item and the pane
+ * takes the rest, so the frame needs no magic number and cannot drift from the
+ * header's real height when the nav collapses and it changes.
+ */
+body.is-framed {
+    overflow: hidden;
+    height: 100dvh;
+
+    /*
+     * `100dvh` ON `.app`, not `100%`, and this was the bug the first attempt
+     * shipped. Nuxt mounts the layout inside `<div id="__nuxt">`, so `.app` is
+     * a grandchild of `body`, not a child. A percentage height resolves against
+     * the parent's height, `#__nuxt` has none, and the whole chain silently
+     * collapsed to `auto`: the sidebar then sized to its own 31 links and
+     * `overflow-y: auto` had nothing to scroll, so it was simply clipped by the
+     * body instead. The viewport unit skips the broken link entirely.
+     *
+     * `#__nuxt` is pinned too so the wrapper cannot grow past the frame and
+     * reintroduce a document scrollbar beside the pane's own.
+     */
+    #__nuxt {
+        overflow: hidden;
+        height: 100dvh;
+    }
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+    }
+
+    /*
+     * `min-height: 0` is load-bearing. A flex item's default `min-height: auto`
+     * refuses to shrink below its content, so without this the pane grows to
+     * its content's full height, pushes past the viewport, and the document
+     * scrolls after all: the exact bug this block exists to remove, and it
+     * would look like the rule simply had no effect.
+     */
+    .app_content {
+        overflow: hidden;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+
+        min-height: 0;
+    }
+
+    /*
+     * Below the shell's own mobile breakpoint the sidebar is already a
+     * horizontal strip, and a phone wants its native document scroll: the URL
+     * bar collapse, the overscroll behaviour and the scroll restoration are all
+     * things an inner pane gives up for nothing.
+     */
+    @include mobile() {
+        overflow: visible;
+        height: auto;
+
+        #__nuxt,
+        .app,
+        .app_content {
+            overflow: visible;
+            display: block;
+            height: auto;
+            min-height: 0;
+        }
+    }
+}

@@ -63,10 +63,10 @@
  * A run does not become slower because the cap is higher — the demo tenant still
  * finishes in 4.3 s by converging. The cap only bounds the pathological case.
  */
-export const DEFAULT_MAX_MOVES = 100_000_000;
+export const DEFAULT_MAX_MOVES = 100_000_000_000;
 
 /** Backstop only — see above. Whichever budget is hit first ends the run. */
-export const DEFAULT_MAX_WALL_MILLIS = 80_000;
+export const DEFAULT_MAX_WALL_MILLIS = 100_000;
 
 /**
  * How many Rooms one Session can carry across the wire.

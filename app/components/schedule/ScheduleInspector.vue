@@ -186,8 +186,37 @@
                     disagreement IS the information this row exists to show.
                 -->
                 <div v-if="session.substitution || canSubstitute">
-                    <dt>Covered by</dt>
+                    <dt>Substituted</dt>
                     <dd v-if="!canSubstitute">{{ lookup.person(session.substitution!.coveringPersonId) }}</dd>
+
+                    <!--
+                        NO SUBSTITUTE IS THE NORMAL STATE, so the resting view is
+                        a sentence and a button, not an open form. This used to
+                        render the picker unconditionally, which put a "Nobody is
+                        covering this session." advisory and an empty search box
+                        under every session on the board: on a panel that also
+                        says "Lecturer: Dozent S" two rows above, that read as a
+                        contradiction — as though the class had nobody teaching
+                        it — rather than as "there is no Vertretung today", which
+                        is true of almost every session almost every week.
+
+                        The button is the declaration. A person is only asked for
+                        once somebody has said there IS a substitution, which is
+                        also the order the decision is actually made in.
+                    -->
+                    <dd
+                        v-else-if="!session.substitution && !addingSubstitute"
+                        class="inspector_cover"
+                    >
+                        <span class="inspector_muted">{{ coverRestingLabel }}</span>
+                        <CommonButton
+                            type="secondary"
+                            size="S"
+                            :disabled="busy"
+                            @click="addingSubstitute = true"
+                        >Add a substitute</CommonButton>
+                    </dd>
+
                     <dd v-else>
                         <ManageRelationPicker
                             :def="substituteRelation"
@@ -198,6 +227,20 @@
                             @add="onSubstituteAdd"
                             @remove="onSubstituteRemove"
                         />
+
+                        <!--
+                            Only while the form is open with nothing chosen yet.
+                            Once a substitution exists the picker carries its own
+                            remove, and a second control that also means "undo
+                            this" would be two ways to say one thing.
+                        -->
+                        <CommonButton
+                            v-if="!session.substitution"
+                            type="secondary"
+                            size="S"
+                            :disabled="busy"
+                            @click="addingSubstitute = false"
+                        >Cancel</CommonButton>
                     </dd>
                 </div>
 
@@ -543,13 +586,57 @@ const substituteRelation = computed<RelationDef>(() => ({
     searchable: true,
     optionLabel: personOptionLabel,
     emptyHint: 'Nobody is free to cover this slot right now.',
-    emptyWarning: 'Nobody is covering this session.',
+
+    /*
+     * NO `emptyWarning`, deliberately. That field exists for a relation whose
+     * emptiness is a PROBLEM — `access-roles`, where it means a person can sign
+     * in and be shown nothing. A session with no substitute is not a problem; it
+     * is what almost every session looks like almost every week, and flagging it
+     * in the warning style said the class had nobody teaching it while the
+     * Lecturer row two lines above named the person who does.
+     *
+     * The empty case is not stated here at all any more: the panel answers it
+     * before the picker is ever opened. See the `Covered by` block above.
+     */
 }));
 
 /** At most one — the picker's "assigned" row is just today's substitute, if any. */
 const substituteRows = computed(() => (props.session?.substitution
     ? [{ id: props.session.substitution.coveringPersonId }]
     : []));
+
+/**
+ * Whether the substitute picker is open on a session that has no substitute yet.
+ *
+ * PURELY LOCAL, and it has to be: it records that somebody clicked "Add a
+ * substitute", which is a statement about this panel and not about the Session.
+ * Once a substitution exists the flag stops mattering — the picker renders off
+ * `session.substitution` — so this only ever gates the empty case.
+ */
+const addingSubstitute = ref(false);
+
+/**
+ * What the resting "Covered by" row says when there is no substitute.
+ *
+ * TWO WORDINGS, because one of them is false half the time. "Taught by the
+ * assigned lecturer" is the reassurance this row exists to give — it is what
+ * makes "no substitute" read as normal rather than as nobody teaching the class
+ * — but a Session with no lecturer assigned yet would then be told it has one.
+ * That is the same class of untruth this whole change was fixing, one row lower.
+ */
+const coverRestingLabel = computed(() => (lecturers.value.length > 0
+    ? 'Taught by the assigned lecturer.'
+    : 'No substitute for this occurrence.'));
+
+/*
+ * THE PANEL IS REUSED, NOT REMOUNTED. Selecting a different session swaps the
+ * prop while the component stays alive, so without this an operator who opened
+ * the form on one session and clicked away would find the next one already
+ * asking for a substitute it has no reason to want.
+ */
+watch(() => props.session?.id, () => {
+    addingSubstitute.value = false;
+});
 
 /** Each control sends the WHOLE set it owns, matching how rooms already save. */
 function onGroupAdd(value: string) {
@@ -584,8 +671,15 @@ function onSubstituteAdd(value: string) {
     emit('substitute', value);
 }
 
-/** Removes the overlay entirely — "wrong person picked" or "no longer needed". */
+/**
+ * Removes the overlay entirely — "wrong person picked" or "no longer needed".
+ *
+ * Closes the form with it. Leaving it open would drop the panel straight back to
+ * an empty picker, which is the state this change exists to stop it resting in;
+ * reopening is one click away for the operator who removed the wrong person.
+ */
 function onSubstituteRemove() {
+    addingSubstitute.value = false;
     emit('uncover');
 }
 
@@ -819,6 +913,20 @@ const attendeeNames = computed(() => attendees.value
     }
 
     &_muted { color: $content7; }
+
+    /*
+     * The resting "Covered by" row: a statement of fact and the control that
+     * changes it, stacked and left-aligned. The button sits on its own line
+     * rather than beside the sentence, because at this panel width a label and a
+     * button on one row leaves the button hard against the edge, and the two are
+     * read in sequence anyway.
+     */
+    &_cover {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+        align-items: start;
+    }
 
     /* Editable fields on an Event. Read-only Sessions render text instead, so
        these never appear where nothing may change. */

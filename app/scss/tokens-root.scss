@@ -67,6 +67,18 @@
     // /schedule should reach for it.
     --font-size-3xl: 44px;
 
+    // The hero headline, and the only thing that may use it. 3xl is now the
+    // step BELOW the headline rather than the headline itself: it still sets
+    // the hero on a tablet, and the technical band's measured figure. Split out
+    // because 44px was the largest thing on a 1040px page and still read as a
+    // section title with ambition rather than as a first impression, which is
+    // the one job the top of a marketing page has.
+    // 52 and not 64: the headline is 41 characters, and the hero gives its copy
+    // about 650px. At 64px that wraps to three lines, and a three-line hero
+    // headline is a font-size mistake every time. 52px is the largest step that
+    // still breaks it cleanly in two.
+    --font-size-4xl: 52px;
+
     // Border radius — 4 steps. The stray 9px was an inner corner and stays a
     // derivation: calc(var(--radius-xl) - 1px).
     --radius-sm: 4px;
@@ -92,4 +104,31 @@
     --space-9: 48px;
     --space-10: 64px;
     --space-11: 96px;
+}
+
+/*
+ * The landing surface's scroll reveal, declared here because this file is the
+ * one stylesheet the app loads exactly once. Vue's scoped CSS renames keyframes
+ * DEFINED inside a scoped block, so a per-component copy would be both
+ * duplicated and differently named in every landing component; referencing a
+ * global name from a scoped block is unaffected.
+ *
+ * Driven by `animation-timeline: view()` rather than by JavaScript. There is no
+ * scroll listener, no IntersectionObserver, and nothing to clean up: the
+ * compositor runs it, so it cannot jank the main thread, and SSR has no
+ * hydration state to get wrong. `@mixin landingReveal` in variables.scss is the
+ * only caller and gates this behind both `prefers-reduced-motion: no-preference`
+ * and an `@supports` test, so the rest state below is also the state a browser
+ * without scroll-driven animations shows: fully arrived, never a blank section.
+ */
+@keyframes landingReveal {
+    from {
+        transform: translateY(var(--reveal-shift, 12px));
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
 }

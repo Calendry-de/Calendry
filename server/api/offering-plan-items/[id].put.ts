@@ -5,6 +5,33 @@ import { withRequestTenant } from '../../utils/tenantDb';
 
 const bodySchema = z.array(z.object({ templateId: z.string().min(1) })).max(200);
 
+defineRouteMeta({
+    openAPI: {
+        tags: ['Curriculum plans'],
+        summary: 'Replace a curriculum plan\'s item list',
+        description: 'Replaces the plan\'s WHOLE item list, in the order given (max 200) — not the generic relation route, because a plan\'s items are an ORDERED SEQUENCE and that mechanism replaces an unordered set. Idempotent: re-sending the same order changes nothing. Requires offering_plan.update, the same permission that edits the plan itself.',
+        parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Curriculum plan id.' },
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                'application/json': {
+                    schema: { type: 'array', maxItems: 200, items: { type: 'object', required: ['templateId'], properties: { templateId: { type: 'string' } } } },
+                },
+            },
+        },
+        responses: {
+            200: {
+                description: 'The plan\'s items after the replace, in position order.',
+                content: { 'application/json': { schema: { type: 'array', items: { type: 'object', properties: { templateId: { type: 'string' } } } } } },
+            },
+            403: { description: 'Caller lacks offering_plan.update.' },
+            404: { description: 'Plan not found, or one or more templateIds not found in this tenant.' },
+        },
+    },
+});
+
 /**
  * Replaces a plan's WHOLE item list, in the order given.
  *

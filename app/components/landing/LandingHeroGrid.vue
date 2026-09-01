@@ -13,9 +13,10 @@
             </div>
 
             <span
-                v-for="target in TARGETS"
+                v-for="(target, index) in TARGETS"
                 :key="`t-${ target.col }-${ target.row }`"
                 class="grid_target"
+                :class="{ 'grid_target--consumed': index === 0 }"
                 :style="{ gridColumn: target.col, gridRow: target.row }"
             />
 
@@ -76,7 +77,12 @@
  * The rest state is the FINAL state, so the figure is complete with no
  * animation at all: the sequence is added only under
  * `prefers-reduced-motion: no-preference`, and a reader who asked for less
- * motion gets the composed picture, targets included, rather than an empty box.
+ * motion gets the composed picture rather than an empty box. What they see is
+ * the end of the story and not a frame from the middle of it: the travelled
+ * session sitting in its slot, and ONE candidate still open. The candidate the
+ * mover consumed is hidden at rest, because a placement target underneath an
+ * already-placed session is a contradiction. See `_target--consumed`.
+ *
  * Only `opacity` and `transform` are animated, and the travel distance is
  * expressed in the chip's own size so it stays exact at every viewport.
  */
@@ -172,6 +178,24 @@ const TARGETS = [
         background: varToRgba('primary500', 0.09);
     }
 
+    /*
+     * THE TARGET THE MOVER LANDS ON, hidden at rest.
+     *
+     * It is the same cell as `MOVER`, so once the chip has arrived there is an
+     * offered slot underneath an already-placed session, which is a
+     * contradiction in the product's own language. It also looked like a defect:
+     * the chip covers the target's box exactly, so the only thing that survived
+     * was a 2px dashed teal edge fringing the chip's rounded corners.
+     *
+     * Zero opacity is therefore the RESTING state, which is also what a
+     * reduced-motion reader sees: one placed session and one still-open
+     * candidate, which is the honest still frame. The sequence below fades it in
+     * with the other target and back out as the chip arrives on top of it.
+     */
+    &_target--consumed {
+        opacity: 0;
+    }
+
     &_chip {
         z-index: 2;
 
@@ -185,10 +209,17 @@ const TARGETS = [
         background: $surface3;
 
         &--moving {
-            // Above its neighbours while it travels, and it keeps the accent
-            // ring it was offered so the pairing reads at rest.
+            /*
+             * Above its neighbours while it travels. Nothing else: this chip
+             * carried a drop shadow, and because the rest state IS the final
+             * state that shadow never went away. A permanently elevated tile in
+             * a flat grid read as one session sitting on top of the one beside
+             * it rather than next to it, and the blur bled across the hairline
+             * into the neighbouring chip. `DESIGN.md` is explicit that this
+             * surface is flat by default and that depth belongs to things that
+             * genuinely float above the page; a placed session is not one.
+             */
             z-index: 3;
-            box-shadow: 0 2px 6px varToRgba('content4', 0.16);
         }
     }
 
@@ -230,6 +261,12 @@ const TARGETS = [
 
     .grid_target {
         animation: grid-target-in 320ms cubic-bezier(0.16, 1, 0.3, 1) 850ms both;
+    }
+
+    // Revealed with its sibling, gone by the time the chip settles on it. The
+    // 710ms window ends at 1560ms against the mover's arrival at 1520ms.
+    .grid_target--consumed {
+        animation: grid-target-consumed 710ms ease-in-out 850ms both;
     }
 
     /*
@@ -304,3 +341,21 @@ const TARGETS = [
     }
 }
 </style>
+
+@keyframes grid-target-consumed {
+    0% {
+        transform: scale(0.96);
+        opacity: 0;
+    }
+
+    20%,
+    72% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
