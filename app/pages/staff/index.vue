@@ -39,7 +39,24 @@
                         <td>{{ tenant.slug }}</td>
                         <td>{{ tenant.name }}</td>
                         <td>{{ tenant.timezone }}</td>
-                        <td>{{ tenant.federation?.name ?? '—' }}</td>
+                        <td>
+                            <select
+                                :disabled="assigningTenantId === tenant.id"
+                                :value="tenant.federation?.id ?? ''"
+                                @change="setTenantFederation(tenant, ($event.target as HTMLSelectElement).value || null)"
+                            >
+                                <option
+                                    :selected="!tenant.federation"
+                                    value=""
+                                >— none —</option>
+                                <option
+                                    v-for="federation in federations"
+                                    :key="federation.id"
+                                    :selected="federation.id === tenant.federation?.id"
+                                    :value="federation.id"
+                                >{{ federation.name }}</option>
+                            </select>
+                        </td>
                         <td>{{ new Date(tenant.createdAt).toLocaleDateString() }}</td>
                     </tr>
                     <tr v-if="tenants.length === 0">
@@ -47,6 +64,93 @@
                     </tr>
                 </tbody>
             </table>
+
+            <p
+                v-if="federationAssignError"
+                class="staff_note staff_note--error"
+                role="alert"
+            >{{ federationAssignError }}</p>
+        </section>
+
+        <section class="staff_section">
+            <h2>Federations</h2>
+
+            <p class="staff_note">
+                Wraps the same creation transaction as
+                <code>bun run provision:federation</code> — see issue #64.
+                Attach or detach a Tenant from the Federation column above.
+            </p>
+
+            <p
+                v-if="federationsListError"
+                class="staff_note staff_note--error"
+                role="alert"
+            >{{ federationsListError }}</p>
+
+            <table
+                v-else
+                class="staff_table"
+            >
+                <thead>
+                    <tr>
+                        <th>Slug</th>
+                        <th>Name</th>
+                        <th>Member tenants</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr
+                        v-for="federation in federations"
+                        :key="federation.id"
+                    >
+                        <td>{{ federation.slug }}</td>
+                        <td>{{ federation.name }}</td>
+                        <td>{{ federation.tenants.map((t) => t.slug).join(', ') || '—' }}</td>
+                        <td>{{ new Date(federation.createdAt).toLocaleDateString() }}</td>
+                    </tr>
+                    <tr v-if="federations.length === 0">
+                        <td colspan="4">No federations yet.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <form
+                class="staff_form"
+                @submit.prevent="createFederation"
+            >
+                <CommonInputText
+                    v-model="federationForm.slug"
+                    placeholder="Slug"
+                    :disabled="creatingFederation"
+                    :input-attrs="{ required: true, autocomplete: 'off' }"
+                >Slug</CommonInputText>
+
+                <CommonInputText
+                    v-model="federationForm.name"
+                    placeholder="Federation name"
+                    :disabled="creatingFederation"
+                    :input-attrs="{ required: true }"
+                >Name</CommonInputText>
+
+                <p
+                    v-if="createFederationError"
+                    class="staff_note staff_note--error"
+                    role="alert"
+                >{{ createFederationError }}</p>
+
+                <p
+                    v-if="createFederationInfo"
+                    class="staff_note staff_note--success"
+                    role="status"
+                >{{ createFederationInfo }}</p>
+
+                <CommonButton
+                    native-type="submit"
+                    type="primary"
+                    :disabled="creatingFederation"
+                >{{ creatingFederation ? 'Creating…' : 'Create federation' }}</CommonButton>
+            </form>
         </section>
 
         <section class="staff_section">
@@ -132,7 +236,8 @@ import CommonInputText from '~/components/common/CommonInputText.vue';
 import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
 
 /**
- * Staff tenant list + creation — issue #76. Deliberately NOT wrapped in
+ * Staff tenant list + creation (issue #76), plus Federation list, creation
+ * and Tenant attach/detach (issue #64's UI half). Deliberately NOT wrapped in
  * `CommonAppShell`/`useNavRegistry`: those back the TENANT-scoped nav, and a
  * staff session has no tenant context to render that shell around (an
  * internal tool, not a polished tenant-facing surface).
@@ -156,6 +261,14 @@ interface StaffTenant {
     federation: { id: string; slug: string; name: string } | null;
 }
 
+interface StaffFederation {
+    id: string;
+    slug: string;
+    name: string;
+    createdAt: string;
+    tenants: { id: string; slug: string; name: string }[];
+}
+
 const route = useRoute();
 const request = useRequestFetch();
 
@@ -174,6 +287,22 @@ if (error.value) {
 
 const tenants = computed(() => data.value?.rows ?? []);
 const listError = computed(() => (error.value ? 'Could not load tenants.' : ''));
+
+/**
+ * Federation list — issue #64's UI half. A SEPARATE `useAsyncData` rather
+ * than folded into the tenants response: the two are independent resources
+ * (a Federation without a Tenant yet is a normal, freshly-created state),
+ * and the tenants fetch above already owns the "no session, bounce to
+ * login" redirect for this page — a second identical redirect here would be
+ * redundant, so a failure here just renders its own error note instead.
+ */
+const federationsData = await useAsyncData(
+    'staff-federations',
+    () => request<{ rows: StaffFederation[] }>('/api/staff/federations'),
+);
+
+const federations = computed(() => federationsData.data.value?.rows ?? []);
+const federationsListError = computed(() => (federationsData.error.value ? 'Could not load federations.' : ''));
 
 const loggingOut = ref(false);
 
@@ -246,6 +375,9 @@ async function createTenant() {
         form.timezone = '';
 
         await refresh();
+        // A new tenant may have named an existing federationSlug — that
+        // federation's member list just changed too.
+        await federationsData.refresh();
     } catch (caught) {
         const statusCode = (caught as { statusCode?: number; data?: { statusMessage?: string } })?.statusCode;
         const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
@@ -255,6 +387,73 @@ async function createTenant() {
             : (statusMessage ?? 'Could not create the tenant.');
     } finally {
         creating.value = false;
+    }
+}
+
+const federationForm = reactive({ slug: '', name: '' });
+const creatingFederation = ref(false);
+const createFederationError = ref('');
+const createFederationInfo = ref('');
+
+interface CreateFederationResult {
+    federation: { id: string; slug: string; name: string };
+    alreadyExisted: boolean;
+}
+
+async function createFederation() {
+    if (creatingFederation.value) {
+        return;
+    }
+
+    createFederationError.value = '';
+    createFederationInfo.value = '';
+    creatingFederation.value = true;
+
+    try {
+        const result = await $fetch<CreateFederationResult>('/api/staff/federations', {
+            method: 'POST',
+            body: { slug: federationForm.slug, name: federationForm.name },
+        });
+
+        createFederationInfo.value = result.alreadyExisted
+            ? `Federation '${result.federation.slug}' already existed — nothing created.`
+            : `Created federation '${result.federation.slug}'.`;
+
+        federationForm.slug = '';
+        federationForm.name = '';
+
+        await federationsData.refresh();
+    } catch (caught) {
+        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+
+        createFederationError.value = statusMessage ?? 'Could not create the federation.';
+    } finally {
+        creatingFederation.value = false;
+    }
+}
+
+const assigningTenantId = ref('');
+const federationAssignError = ref('');
+
+/** Attach (`federationId` set) or detach (`null`) one Tenant's Federation, from the select in the Tenants table. */
+async function setTenantFederation(tenant: StaffTenant, federationId: string | null) {
+    assigningTenantId.value = tenant.id;
+    federationAssignError.value = '';
+
+    try {
+        await $fetch(`/api/staff/tenants/${tenant.id}`, {
+            method: 'PATCH',
+            body: { federationId },
+        });
+
+        await refresh();
+        await federationsData.refresh();
+    } catch (caught) {
+        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+
+        federationAssignError.value = statusMessage ?? `Could not update '${tenant.slug}''s federation.`;
+    } finally {
+        assigningTenantId.value = '';
     }
 }
 </script>
