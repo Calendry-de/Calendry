@@ -74,23 +74,16 @@
             institution. An administrator can grant it through your access role.
         </p>
 
-        <details
+        <DashboardPermissionSummary
             v-if="session"
-            class="landing_permissions"
-        >
-            <summary>{{ session.permissions.length }} permissions in this tenant</summary>
-            <ul>
-                <li
-                    v-for="permission in session.permissions"
-                    :key="permission"
-                >{{ permission }}</li>
-            </ul>
-        </details>
+            :permissions="session.permissions"
+        />
     </CommonAppShell>
 </template>
 
 <script setup lang="ts">
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
+import DashboardPermissionSummary from '~/components/dashboard/PermissionSummary.vue';
 import { logout, useSession } from '~/composables/session';
 import { useManageSections } from '~/composables/navigation';
 
@@ -223,26 +216,6 @@ async function signOut() {
             line-height: 1.45;
             color: $content7;
         }
-    }
-
-    &_permissions {
-        max-width: 480px;
-
-        ul {
-            columns: 2;
-            margin: var(--space-4) 0 0;
-            font-size: var(--font-size-md);
-        }
-    }
-
-    /*
-     * Native <details> snaps its content open with no transition of its own.
-     * Fading and lifting the list on the OPEN transition alone makes that
-     * state change legible; the close stays the instant native collapse,
-     * matching "exit faster than entrance" at its logical limit.
-     */
-    &_permissions[open] ul {
-        animation: landing-reveal 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
     &_empty {
