@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
-import { login } from './helpers/client';
+import { api, login } from './helpers/client';
 
 /**
  * A Generation belongs to a TERM, and its bookkeeping is scoped to it.
@@ -96,9 +96,12 @@ describe('generation scoping', () => {
     it('applying one term does not supersede another term', async () => {
         await makeGeneration({ id: 'g-term-b-next', termId: f.termB, version: 2, status: 'READY', isCurrent: false });
 
-        const res = await fetch(`${BASE}/api/generations/g-term-b-next/apply`, {
+        // `api()`, not a raw `fetch`: a state-changing call needs the CSRF
+        // pairing `api()` attaches (issue #113) — a raw `fetch` here has no
+        // way to learn or send it and always 403s.
+        const res = await api('/api/generations/g-term-b-next/apply', {
             method: 'POST',
-            headers: { cookie, 'content-type': 'application/json' },
+            cookie,
             body: '{}',
         });
 

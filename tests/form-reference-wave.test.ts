@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
-import { login } from './helpers/client';
+import { api, login } from './helpers/client';
 
 /**
  * A form's REFERENCE wave must not be able to blank the record it is editing.
@@ -145,9 +145,12 @@ describe('the row survives a reference list it may not read', () => {
 
         // Exactly what the UI does when somebody edits the one field they can:
         // the payload omits the locked references.
-        const res = await fetch(`${BASE}/api/offerings/${offeringId}`, {
+        // `api()`, not a raw `fetch`: a state-changing call needs the CSRF
+        // pairing `api()` attaches (issue #113) — a raw `fetch` here has no
+        // way to learn or send it and always 403s.
+        const res = await api(`/api/offerings/${offeringId}`, {
             method: 'PATCH',
-            headers: { cookie: cookie!, 'content-type': 'application/json' },
+            cookie: cookie!,
             body: JSON.stringify({ title: 'Databases II' }),
         });
 
