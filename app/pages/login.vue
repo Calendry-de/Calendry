@@ -41,6 +41,19 @@
             >{{ error }}</p>
 
             <!--
+                Rendered only past CAPTCHA_ATTEMPT_THRESHOLD failed attempts
+                (issue #79) — see renderTurnstile(). Cloudflare's script fills
+                this element with its own iframe; it is never used for
+                anything else, so there is nothing to keep in sync besides the
+                element existing when the widget wants to mount into it.
+            -->
+            <div
+                v-if="showCaptcha"
+                ref="turnstileContainer"
+                class="login_captcha"
+            />
+
+            <!--
                 native-type="submit" makes this a real submit button inside the
                 <form>, so Enter in either field works and the @submit.prevent
                 handler is the single entry point. No @click here — that would
@@ -103,6 +116,28 @@
 import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
 import { useStore } from '~/store';
 import { HOME_ROUTE, LANDING_ROUTE, isInternalPath } from '~/utils/routes';
+import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
+
+/**
+ * Cloudflare's widget script attaches itself to `window.turnstile`. Declared
+ * narrowly rather than reached for through `any` (CLAUDE.md: no `any`) —
+ * `render`/`reset` are the only two calls this page makes.
+ */
+interface TurnstileApi {
+    render: (
+        container: HTMLElement,
+        options: { sitekey: string; callback: (token: string) => void; 'expired-callback'?: () => void },
+    ) => string;
+    reset: (widgetId: string) => void;
+}
+
+declare global {
+    interface Window {
+        turnstile?: TurnstileApi;
+    }
+}
+
+const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
 /**
  * Two-step sign-in.
@@ -128,6 +163,78 @@ const error = ref('');
 const busy = ref(false);
 const availableTenants = ref<SessionTenant[]>([]);
 const justChanged = computed(() => route.query.changed === '1');
+
+/*
+ * CAPTCHA (issue #79) — a local counter, not server state. The server is the
+ * real gate (it counts by email across devices/tabs); this counter only
+ * decides when to render the widget so a legitimate user is not shown it on
+ * their very first attempt. Never reset except by navigating away: a widget
+ * that vanished after a correct guess would be pointless, but a widget that
+ * vanished after ANOTHER wrong guess would let an attacker dodge it by
+ * alternating device/tab, so it stays up for the rest of this page load once
+ * shown.
+ */
+const failedAttempts = ref(0);
+const showCaptcha = computed(() => failedAttempts.value >= CAPTCHA_ATTEMPT_THRESHOLD);
+const turnstileToken = ref('');
+const turnstileContainer = ref<HTMLDivElement | null>(null);
+let turnstileWidgetId: string | null = null;
+let turnstileScriptPromise: Promise<void> | null = null;
+
+/** Loads Cloudflare's widget script at most once per page load. */
+function loadTurnstileScript(): Promise<void> {
+    if (window.turnstile) {
+        return Promise.resolve();
+    }
+
+    turnstileScriptPromise ??= new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = TURNSTILE_SCRIPT_URL;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Turnstile.'));
+        document.head.appendChild(script);
+    });
+
+    return turnstileScriptPromise;
+}
+
+/**
+ * Renders the widget into `turnstileContainer` the first time it becomes
+ * visible. Guarded by `turnstileWidgetId` so a later re-render of this
+ * `v-if` block (there is none today, but the guard is what makes that safe to
+ * add) does not leak a second Cloudflare iframe into the same element.
+ */
+async function renderTurnstile() {
+    if (turnstileWidgetId || !turnstileContainer.value) {
+        return;
+    }
+
+    try {
+        await loadTurnstileScript();
+    } catch {
+        // No widget, no token — the next submit will 400 with "CAPTCHA
+        // verification required.", which is an honest description of what
+        // happened (Cloudflare's script did not load) rather than a fake
+        // "sign in" attempt.
+        return;
+    }
+
+    turnstileWidgetId = window.turnstile?.render(turnstileContainer.value, {
+        sitekey: useRuntimeConfig().public.turnstileSiteKey,
+        callback: (token) => { turnstileToken.value = token; },
+        'expired-callback': () => { turnstileToken.value = ''; },
+    }) ?? null;
+}
+
+watch(showCaptcha, (shown) => {
+    if (shown) {
+        // Wait for the `v-if="showCaptcha"` div to actually exist in the DOM
+        // before asking Cloudflare to mount into it.
+        nextTick(() => { void renderTurnstile(); });
+    }
+});
 
 // Arriving with ?select=1 means an already-signed-in user came back to change
 // institution. Skip straight to the selection step using the identities the
@@ -165,7 +272,14 @@ async function submitCredentials() {
             availableTenants: SessionTenant[];
         }>('/api/auth/login', {
             method: 'POST',
-            body: { email: email.value, password: password.value },
+            body: {
+                email: email.value,
+                password: password.value,
+                // Absent below the threshold — the server treats a missing
+                // token as "not required yet" and only checks it once its own
+                // count (per email, not this tab's local counter) agrees.
+                ...(turnstileToken.value ? { turnstileToken: turnstileToken.value } : {}),
+            },
         });
 
         // Credentials were correct, but an operator forced a reset: no session
@@ -192,6 +306,16 @@ async function submitCredentials() {
         // deliberately avoids.
         error.value = LOGIN_ERROR;
         password.value = '';
+        failedAttempts.value += 1;
+
+        // A used or expired token must not be resubmitted silently — reset
+        // the widget so the next submit carries a fresh one, matching
+        // Turnstile's own single-use-token contract.
+        turnstileToken.value = '';
+
+        if (turnstileWidgetId) {
+            window.turnstile?.reset(turnstileWidgetId);
+        }
     } finally {
         busy.value = false;
     }
@@ -267,6 +391,12 @@ async function finish() {
         margin: 8px 0 0;
         font-size: var(--font-size-sm);
         color: $content7;
+    }
+
+    // Cloudflare sizes its own iframe (300x65 in the default widget mode);
+    // this only reserves the slot so the form does not jump when it mounts.
+    &_captcha {
+        min-height: 65px;
     }
 
     &_link {

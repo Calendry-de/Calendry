@@ -6,19 +6,27 @@ import {
     checkRateLimit, createSession, findAccountByEmail, listAccountIdentities,
     resetRateLimit, touchAccountLogin,
 } from '../../utils/authDb';
+import { verifyTurnstileToken } from '../../utils/turnstile';
+import { CAPTCHA_ATTEMPT_THRESHOLD } from '../../../shared/turnstile';
 
 const bodySchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
     /** Optional: skip tenant selection when the caller already knows the slug. */
     tenantSlug: z.string().optional(),
+    /**
+     * Cloudflare Turnstile response token (issue #79). Optional below
+     * `CAPTCHA_ATTEMPT_THRESHOLD` failed attempts; required above it — see
+     * the check right after `checkRateLimit` below.
+     */
+    turnstileToken: z.string().optional(),
 });
 
 defineRouteMeta({
     openAPI: {
         tags: ['Auth'],
         summary: 'Log in',
-        description: 'Authenticates an Account and opens a cookie session. Login is global, not tenant-scoped: if the account maps to exactly one Person (or tenantSlug is given) the tenant is selected implicitly, otherwise the session opens with no active Person and the client must call /api/auth/select-tenant. A forced or expired password authenticates but sets no cookie and returns requiresPasswordChange: true; clear it via /api/auth/change-password. Rate-limited per email (10 attempts / 15 min).',
+        description: 'Authenticates an Account and opens a cookie session. Login is global, not tenant-scoped: if the account maps to exactly one Person (or tenantSlug is given) the tenant is selected implicitly, otherwise the session opens with no active Person and the client must call /api/auth/select-tenant. A forced or expired password authenticates but sets no cookie and returns requiresPasswordChange: true; clear it via /api/auth/change-password. Rate-limited per email (10 attempts / 15 min). After 3 failed attempts in the window, a valid Cloudflare Turnstile token is also required (issue #79).',
         requestBody: {
             required: true,
             content: {
@@ -30,6 +38,7 @@ defineRouteMeta({
                             email: { type: 'string', format: 'email' },
                             password: { type: 'string' },
                             tenantSlug: { type: 'string', description: 'Optional: skip tenant selection when the caller already knows the slug.' },
+                            turnstileToken: { type: 'string', description: 'Cloudflare Turnstile response token. Required once 3 failed attempts have been recorded for this email in the current rate-limit window; ignored below that.' },
                         },
                     },
                 },
@@ -53,6 +62,7 @@ defineRouteMeta({
                     },
                 },
             },
+            400: { description: 'Missing or invalid Turnstile token, required past the failed-attempt threshold.' },
             401: { description: 'Invalid credentials. Deliberately identical for unknown email and wrong password.' },
             403: { description: 'Account is active in no tenant, or has no identity in the requested tenantSlug.' },
         },
@@ -76,7 +86,23 @@ export default defineEventHandler(async (event) => {
 
     // BEFORE any password work — issue #13 item 3. Failing fast on a rate
     // limit also means an attacker's blocked guesses cost no scrypt work.
-    await checkRateLimit('login', body.email, { maxAttempts: 10, windowMinutes: 15 });
+    const attemptCount = await checkRateLimit('login', body.email, { maxAttempts: 10, windowMinutes: 15 });
+
+    /*
+     * CAPTCHA gate on top of the rate limit — issue #79. Below the threshold
+     * this is a no-op; at and above it, a valid Turnstile token is required
+     * for the login to proceed at all. Checked here, before any password
+     * work, for the same reason the rate limit itself is: a blocked guess
+     * should cost no scrypt work. Additive — the rate limit above is
+     * unchanged and still the backstop if this is ever misconfigured.
+     */
+    if (attemptCount > CAPTCHA_ATTEMPT_THRESHOLD) {
+        const captchaOk = await verifyTurnstileToken(body.turnstileToken);
+
+        if (!captchaOk) {
+            throw createError({ statusCode: 400, statusMessage: 'CAPTCHA verification required.' });
+        }
+    }
 
     const account = await findAccountByEmail(body.email);
 

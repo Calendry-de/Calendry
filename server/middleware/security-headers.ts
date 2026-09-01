@@ -19,13 +19,19 @@ export default defineEventHandler(event => {
     const cspDirectives = [
         "default-src 'self'",
         // unsafe-inline and unsafe-eval are required by Nuxt's hydration and
-        // Vue's runtime compiler respectively.
-        `script-src 'self' 'unsafe-inline' 'unsafe-eval'${__impeccableLiveDev}`,
+        // Vue's runtime compiler respectively. challenges.cloudflare.com is
+        // Turnstile's widget script (issue #79), loaded from login.vue only
+        // once the failed-attempt threshold is reached.
+        `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com${__impeccableLiveDev}`,
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         "font-src 'self' data:",
-        // ws:/wss: for Vite's dev-server HMR socket.
-        `connect-src 'self' ws: wss:${__impeccableLiveDev}`,
+        // ws:/wss: for Vite's dev-server HMR socket. challenges.cloudflare.com
+        // is Turnstile's own client-side verification traffic.
+        `connect-src 'self' ws: wss: https://challenges.cloudflare.com${__impeccableLiveDev}`,
+        // Turnstile renders its challenge in an iframe — no frame-src existed
+        // before issue #79 because nothing on this site framed anything.
+        "frame-src https://challenges.cloudflare.com",
         "frame-ancestors 'self'",
         "base-uri 'self'",
         "form-action 'self'",

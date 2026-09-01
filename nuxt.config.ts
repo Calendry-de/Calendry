@@ -56,8 +56,19 @@ const csrfFetchPatchScript = `(function () {
 
 export default defineNuxtConfig({
     runtimeConfig: {
+        // Cloudflare Turnstile secret key (issue #79) — server-only, read
+        // directly from process.env by server/utils/turnstile.ts, declared
+        // here too so it is documented and typed like every other server
+        // secret. PRODUCTION MUST SET A REAL SECRET; left unset, login skips
+        // the CAPTCHA requirement entirely and relies on the rate limit
+        // alone — see turnstile.ts's own comment.
+        turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? '',
         public: {
             version: pkg.version,
+            // Public Turnstile site key — safe to ship to the client.
+            // Defaults to Cloudflare's published always-pass TEST key so
+            // local dev renders a working widget with zero configuration.
+            turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA',
         },
     },
     app: {

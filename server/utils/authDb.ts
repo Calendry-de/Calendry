@@ -304,12 +304,18 @@ export async function deleteExpiredSessions(now = new Date()): Promise<{ deleted
  * NO RLS, NO TENANT CONTEXT — this runs on the base Prisma client for the
  * identical reason every other function in this file does: the routes it
  * guards are pre-tenant.
+ *
+ * RETURNS the post-increment attempt count (issue #79) rather than nothing, so
+ * a caller can layer a second, lower threshold on top of it — e.g. login's
+ * CAPTCHA gate — without a second read of the same row and without
+ * re-deriving the reset-if-expired-else-increment logic that already lives in
+ * this one statement.
  */
 export async function checkRateLimit(
     route: string,
     identifier: string,
     options: { maxAttempts: number; windowMinutes: number },
-): Promise<void> {
+): Promise<number> {
     const key = `${route}:${identifier.toLowerCase()}`;
 
     const [row] = await getPrisma().$queryRaw<{ attempt_count: number }[]>(
@@ -331,12 +337,16 @@ export async function checkRateLimit(
         `,
     );
 
-    if ((row?.attempt_count ?? 0) > options.maxAttempts) {
+    const attemptCount = row?.attempt_count ?? 0;
+
+    if (attemptCount > options.maxAttempts) {
         throw createError({
             statusCode: 429,
             statusMessage: 'Too many attempts. Wait a few minutes and try again.',
         });
     }
+
+    return attemptCount;
 }
 
 /**
