@@ -131,7 +131,7 @@ export default defineEventHandler(async (event) => {
         const scope = await accountScope(tx, identity.tenantId, accountId);
         const view = await accountView(tx, scope);
 
-        auditAccount({
+        await auditAccount({
             action: existing ? 'account.attached' : 'account.created',
             tenantId: identity.tenantId,
             accountId,

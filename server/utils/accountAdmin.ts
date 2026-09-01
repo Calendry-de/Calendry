@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { writeAuditLog } from './auditLog';
 import type { Tx } from './tenantDb';
 import { PASSWORD_MIN_LENGTH, randomPassword } from '../../shared/password';
 
@@ -311,22 +312,35 @@ export async function resolveAttachablePerson(
 }
 
 /**
- * One structured line per credential write, to stdout.
+ * One persisted row per credential write (issue #78).
  *
- * Deliberately the same shape the operator CLIs emit, and deliberately NOT a
- * database table — same reasoning as there: a tenant admin who can mint logins
- * can also edit any row this tenant owns, so a local audit row is not
- * tamper-evident against the actor it audits. stdout to a collector is honest
- * about where the trust boundary is.
+ * Until issue #78 this was a structured `console.log` line, on the reasoning
+ * that a tenant admin who can mint logins can also edit any row this tenant
+ * owns, so a local audit row would not be tamper-evident against the actor it
+ * audits. `AuditLog` does not reopen that hole: it carries no RLS and is not
+ * a `CRUD_RESOURCES` entry, so it is unreachable through the generic
+ * `/api/[resource]` routes a tenant admin's permissions actually reach — the
+ * only write path is `writeAuditLog()` itself, called from server code, never
+ * from a request body. `email` becomes the row's `target` (the human-readable
+ * identifier of the account being acted on); everything else in `record`
+ * (besides the fields named explicitly) rides along in `detail`.
  */
-export function auditAccount(record: {
+export async function auditAccount(record: {
     action: string;
     tenantId: string;
     accountId: string;
     email: string;
     actorPersonId: string;
     [key: string]: unknown;
-}): void {
-    // The audit sink IS stdout, by design — see the note above.
-    console.log(`AUDIT ${JSON.stringify({ ...record, ts: new Date().toISOString(), via: 'api:accounts' })}`);
+}): Promise<void> {
+    const { action, tenantId, accountId, email, actorPersonId, ...detail } = record;
+
+    await writeAuditLog({
+        action,
+        outcome: 'SUCCESS',
+        actorPersonId,
+        target: email,
+        tenantId,
+        detail: { accountId, ...detail, via: 'api:accounts' },
+    });
 }

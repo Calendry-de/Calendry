@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
 
         await mapDbErrors(() => tx.account.delete({ where: { id: scope.id } }));
 
-        auditAccount({
+        await auditAccount({
             action: 'account.deleted',
             tenantId: identity.tenantId,
             accountId: scope.id,

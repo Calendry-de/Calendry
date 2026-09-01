@@ -140,7 +140,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (touched.length > 0 || relinking) {
-            auditAccount({
+            await auditAccount({
                 action: 'account.updated',
                 tenantId: identity.tenantId,
                 accountId: scope.id,

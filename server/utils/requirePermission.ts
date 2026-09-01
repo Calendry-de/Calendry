@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import { writeAuditLog } from './auditLog';
 import type { Tx } from './tenantDb';
 
 /**
@@ -53,6 +54,17 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
      * grant access via is also the field the stream route legitimately reads.
      */
     if (!identity.actorPersonId || identity.kind === 'ics_link') {
+        // issue #78 — a principal with no acting Person (or one deliberately
+        // barred from permission checks) reaching a permission-gated route at
+        // all is itself the denial; there is no permission key to name yet.
+        await writeAuditLog({
+            action: 'access.denied',
+            outcome: 'DENIED',
+            tenantId: identity.tenantId,
+            target: event.path,
+            detail: { reason: 'no_acting_person', identityKind: identity.kind },
+        });
+
         throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
     }
 
@@ -103,6 +115,19 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
     const held = await heldPermissions(event, tx);
 
     if (!held.has(permission)) {
+        // issue #78 — every denied permission check is audited, not only the
+        // ones on generic CRUD routes.
+        const identity = requireIdentity(event);
+
+        await writeAuditLog({
+            action: 'access.denied',
+            outcome: 'DENIED',
+            actorPersonId: identity.actorPersonId,
+            tenantId: identity.tenantId,
+            target: permission,
+            detail: { route: event.path, permission },
+        });
+
         // 403 rather than 404: the caller is legitimately inside this tenant, so
         // hiding the existence of the action buys nothing and makes the API
         // hard to use. Cross-TENANT access still reports 404 (see dbErrors).
@@ -144,6 +169,18 @@ export async function requireAnyPermission(
     if (permissions.some((permission) => held.has(permission))) {
         return;
     }
+
+    // issue #78 — same as requirePermission()'s own denial.
+    const identity = requireIdentity(event);
+
+    await writeAuditLog({
+        action: 'access.denied',
+        outcome: 'DENIED',
+        actorPersonId: identity.actorPersonId,
+        tenantId: identity.tenantId,
+        target: permissions.join(' or '),
+        detail: { route: event.path, permissions },
+    });
 
     // Every acceptable permission is named. A caller told only the first one
     // would go and get granted a permission they may not need, and a tenant

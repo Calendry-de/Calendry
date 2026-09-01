@@ -2597,3 +2597,85 @@ model IcsLink {
   @@index([personId])
   @@map("ics_link")
 }
+
+// ---------------------------------------------------------------------------
+// AUDIT LOG — persisted trail for permission changes, login attempts, and
+// denied cross-tenant access (issue #78)
+// ---------------------------------------------------------------------------
+
+/// Outcome of an audited event, kept separate from `action` so a listing can
+/// filter by outcome without parsing the action key.
+enum AuditOutcome {
+  SUCCESS
+  FAILURE
+  DENIED
+
+  @@map("audit_outcome")
+}
+
+/// An append-only record of a security-relevant event: a login attempt, an
+/// AccessRole/permission change, or a denied cross-tenant access attempt.
+///
+/// NO RLS — same family of exception as `account`/`auth_session`/
+/// `account_person` (CLAUDE.md, exception 2), for a related but distinct
+/// reason: a denied cross-tenant attempt is BY DEFINITION about more than one
+/// tenant, and this table must be writable and (for cross-tenant auditing)
+/// readable without any one tenant's RLS context ever applying to it. Writes
+/// go through `server/utils/auditLog.ts` on the base Prisma client — the same
+/// "read/write without `withTenant()`" pattern `server/utils/authDb.ts`
+/// already uses for the pre-tenant plane, not a new mechanism.
+///
+/// `actorPersonId`/`actorAccountId` are DELIBERATELY PLAIN IDS, not relations:
+/// the actor may be deleted long after the event they caused, and the audit
+/// row must remain legible when that happens, so `actorLabel` denormalizes a
+/// human-readable name/email captured at write time. `tenantId` is plain for
+/// the same reason, with one more: for a denied cross-tenant attempt it names
+/// the tenant that was DENIED, never the actor's own tenant, and a login
+/// attempt may predate tenant selection entirely — hence nullable.
+model AuditLog {
+  id String @id @default(uuid(7))
+
+  /// Free-form event key, e.g. "login.success", "login.failure",
+  /// "access_role.permissions_updated", "person_access_role.granted",
+  /// "access.denied", "access.denied_cross_tenant". Deliberately NOT drawn
+  /// from the fixed Permission catalogue (shared/permissions.ts) — this names
+  /// an EVENT that happened, not a grantable capability, and the two sets
+  /// must stay free to diverge.
+  action String
+
+  outcome AuditOutcome
+
+  /// The Person/Account that performed the action, when one could be
+  /// resolved. Both null for, e.g., a login attempt against an email with no
+  /// matching Account — there is no actor to name, only an attempt.
+  actorPersonId  String? @map("actor_person_id")
+  actorAccountId String? @map("actor_account_id")
+
+  /// Denormalized human-readable actor (name and/or email) captured at write
+  /// time, so the row stays legible after the Person/Account it names is
+  /// deleted. See the model comment for why this is not a relation.
+  actorLabel String? @map("actor_label")
+
+  /// What was acted on: an AccessRole name, an email, a permission key — free
+  /// text because the target varies per action and is sometimes absent (a
+  /// bare login attempt names no target beyond the actor).
+  target String?
+
+  /// The tenant this event belongs to, or — for a denied cross-tenant
+  /// attempt — the tenant that was DENIED. Never a foreign key: see the model
+  /// comment. Null for an event that predates tenant selection.
+  tenantId String? @map("tenant_id")
+
+  /// Action-specific context: e.g. the permission set before/after a role
+  /// edit, the permission key a denied check required, or the request's
+  /// user-agent. Always present, defaulting to empty, matching
+  /// ConstraintViolation.detail's convention.
+  detail Json @default("{}")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([tenantId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}

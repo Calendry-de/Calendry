@@ -6,6 +6,7 @@ import {
     checkRateLimit, createSession, findAccountByEmail, listAccountIdentities,
     resetRateLimit, touchAccountLogin,
 } from '../../utils/authDb';
+import { writeAuditLog } from '../../utils/auditLog';
 import { verifyTurnstileToken } from '../../utils/turnstile';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '../../../shared/turnstile';
 
@@ -114,6 +115,21 @@ export default defineEventHandler(async (event) => {
         : await verifyPassword(body.password, 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA');
 
     if (!account || !account.isActive || !passwordOk) {
+        // Past the dummy-verify branch, whether or not an Account exists —
+        // issue #78. `actorAccountId` is populated when one does, even
+        // though the guess was wrong or the account is deactivated: knowing
+        // WHICH account was targeted is exactly what an audit trail of failed
+        // logins is for. `target` stays the submitted email either way, the
+        // same "identical response either way" reasoning `verifyPassword`
+        // above already follows.
+        await writeAuditLog({
+            action: 'login.failure',
+            outcome: 'FAILURE',
+            actorAccountId: account?.id ?? null,
+            target: body.email,
+            detail: { reason: !account ? 'no_such_account' : !account.isActive ? 'account_inactive' : 'wrong_password' },
+        });
+
         throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
     }
 
@@ -140,6 +156,16 @@ export default defineEventHandler(async (event) => {
     // session": every route would then have to know about a half-privileged
     // state, and one that forgot would be a hole.
     if (account.mustChangePassword || passwordExpired) {
+        // Credentials WERE correct — this is a successful authentication, not
+        // a failure, even though no session is issued yet.
+        await writeAuditLog({
+            action: 'login.success',
+            outcome: 'SUCCESS',
+            actorAccountId: account.id,
+            target: body.email,
+            detail: { requiresPasswordChange: true },
+        });
+
         return {
             requiresPasswordChange: true,
             tenantSelectionRequired: false,
@@ -151,6 +177,14 @@ export default defineEventHandler(async (event) => {
     const identities = (await listAccountIdentities(account.id)).filter((i) => i.person_active);
 
     if (identities.length === 0) {
+        await writeAuditLog({
+            action: 'login.failure',
+            outcome: 'FAILURE',
+            actorAccountId: account.id,
+            target: body.email,
+            detail: { reason: 'no_active_tenant_identity' },
+        });
+
         throw createError({
             statusCode: 403,
             statusMessage: 'This account is not active in any tenant.',
@@ -164,6 +198,19 @@ export default defineEventHandler(async (event) => {
             : undefined;
 
     if (body.tenantSlug && !selected) {
+        // The Account is real and authenticated, but has no identity in the
+        // TENANT it named — a denied cross-tenant access attempt, not an
+        // ordinary login failure. `tenantId` is left null: the requested
+        // slug does not resolve to a tenant this Account may act in, so there
+        // is no id to name safely; the slug itself is recorded in `target`.
+        await writeAuditLog({
+            action: 'access.denied_cross_tenant',
+            outcome: 'DENIED',
+            actorAccountId: account.id,
+            target: body.tenantSlug,
+            detail: { route: 'auth.login', requestedTenantSlug: body.tenantSlug },
+        });
+
         throw createError({ statusCode: 403, statusMessage: 'No identity in that tenant.' });
     }
 
@@ -186,6 +233,16 @@ export default defineEventHandler(async (event) => {
         secure: process.env.NODE_ENV === 'production',
         path: '/',
         maxAge: Math.floor(SESSION_TTL_MS / 1000),
+    });
+
+    await writeAuditLog({
+        action: 'login.success',
+        outcome: 'SUCCESS',
+        actorPersonId: selected?.person_id ?? null,
+        actorAccountId: account.id,
+        target: body.email,
+        tenantId: selected?.tenant_id ?? null,
+        detail: { tenantSelectionRequired: selected === undefined },
     });
 
     return {

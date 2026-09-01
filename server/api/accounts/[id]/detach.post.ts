@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
             });
         });
 
-        auditAccount({
+        await auditAccount({
             action: 'account.detached',
             tenantId: identity.tenantId,
             accountId: scope.id,

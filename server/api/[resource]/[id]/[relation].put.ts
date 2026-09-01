@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { writeAuditLog } from '../../../utils/auditLog';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { getRelation, relationDelegate } from '../../../utils/relations';
 import { delegate, getResource } from '../../../utils/resources';
@@ -251,6 +252,13 @@ export default defineEventHandler(async (event) => {
 
         const parentConfig = getResource(config.parent);
 
+        /*
+         * issue #78 — granting or revoking a Person's AccessRoles is audited.
+         * `resource`/`relation` come straight off the URL, not `config`,
+         * which has no field naming which relation it is.
+         */
+        const isAccessRoleGrantChange = resource === 'persons' && relation === 'access-roles';
+
         return mapDbErrors(async () => {
             /**
              * The parent must exist IN THIS TENANT before anything is written.
@@ -275,6 +283,15 @@ export default defineEventHandler(async (event) => {
             }
 
             const rows = body as Record<string, unknown>[];
+
+            // Read BEFORE the delete, in the same transaction, so `before`
+            // names the set this request actually replaced.
+            const previousAccessRoleIds = isAccessRoleGrantChange
+                ? ((await relationDelegate(tx, config.model).findMany({
+                    where: { [config.parentKey]: id, tenantId: identity.tenantId },
+                    select: config.select,
+                })) as { accessRoleId: string }[]).map((row) => row.accessRoleId)
+                : [];
 
             await relationDelegate(tx, config.model).deleteMany({
                 where: {
@@ -314,6 +331,25 @@ export default defineEventHandler(async (event) => {
              * which describe a set that stood.
              */
             await config.afterWrite?.({ tx, tenantId: identity.tenantId, id: id as string });
+
+            if (isAccessRoleGrantChange) {
+                const nextAccessRoleIds = (written as { accessRoleId: string }[]).map((row) => row.accessRoleId);
+
+                await writeAuditLog({
+                    action: 'person_access_role.set_updated',
+                    outcome: 'SUCCESS',
+                    actorPersonId: identity.actorPersonId,
+                    target: id as string,
+                    tenantId: identity.tenantId,
+                    detail: {
+                        personId: id,
+                        before: previousAccessRoleIds,
+                        after: nextAccessRoleIds,
+                        granted: nextAccessRoleIds.filter((roleId) => !previousAccessRoleIds.includes(roleId)),
+                        revoked: previousAccessRoleIds.filter((roleId) => !nextAccessRoleIds.includes(roleId)),
+                    },
+                });
+            }
 
             /**
              * RESPONSE SHAPE IS CONDITIONAL, deliberately:

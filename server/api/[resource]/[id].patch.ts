@@ -1,3 +1,4 @@
+import { writeAuditLog } from '../../utils/auditLog';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { delegate, demoteExclusiveSiblings, getResource, splitChildren } from '../../utils/resources';
 import { crudPermission } from '../../utils/permissions';
@@ -469,6 +470,21 @@ export default defineEventHandler(async (event) => {
 
         const { columns, children } = splitChildren(config, body as Record<string, unknown>);
 
+        /*
+         * issue #78 — an AccessRole's permission set changing is audited.
+         * Read BEFORE the write, in the same transaction, so `before` names
+         * the set this request actually replaced rather than whatever the
+         * table happens to hold when the audit line is written.
+         */
+        const isAccessRolePermissionChange = resource === 'access-roles' && children.permissions !== undefined;
+
+        const previousPermissionKeys = isAccessRolePermissionChange
+            ? (await tx.accessRolePermission.findMany({
+                where: { accessRoleId: id as string, tenantId: identity.tenantId },
+                select: { permissionKey: true },
+            })).map((row) => row.permissionKey)
+            : [];
+
         const result = await mapDbErrors(async () => {
             // Same transaction as the update below, so the two-defaults state is
             // never observable and a failed update demotes nothing.
@@ -503,6 +519,24 @@ export default defineEventHandler(async (event) => {
 
         if (result.count === 0) {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        }
+
+        if (isAccessRolePermissionChange) {
+            const role = await tx.accessRole.findFirst({
+                where: { id: id as string, tenantId: identity.tenantId },
+                select: { name: true },
+            });
+
+            const nextPermissionKeys = (children.permissions as { permissionKey: string }[]).map((row) => row.permissionKey);
+
+            await writeAuditLog({
+                action: 'access_role.permissions_updated',
+                outcome: 'SUCCESS',
+                actorPersonId: identity.actorPersonId,
+                target: role?.name ?? (id as string),
+                tenantId: identity.tenantId,
+                detail: { accessRoleId: id, before: previousPermissionKeys, after: nextPermissionKeys },
+            });
         }
 
         return delegate(tx, config.model).findFirst({ where: { id, tenantId: identity.tenantId } });

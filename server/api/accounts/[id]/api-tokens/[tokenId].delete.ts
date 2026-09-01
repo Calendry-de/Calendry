@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
-        auditAccount({
+        await auditAccount({
             action: 'account.api_token_revoked',
             tenantId: identity.tenantId,
             accountId: scope.id,

@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
             return result.count;
         });
 
-        auditAccount({
+        await auditAccount({
             action: 'account.password_reset',
             tenantId: identity.tenantId,
             accountId: scope.id,
