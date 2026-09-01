@@ -11,6 +11,23 @@
 /** Where signing in lands, and what a protected page redirects back to. */
 export const HOME_ROUTE = '/dashboard';
 
+/**
+ * Issue #107. `/dashboard` is no longer reachable unconditionally — it needs
+ * `dashboard.view` (shared/permissions.ts). A caller who lacks it (the
+ * `member` AccessRole, or any tenant's own AccessRole shaped the same way:
+ * exactly `session.read_own`) belongs at `/schedule` instead, which is the
+ * whole of what such a caller may see.
+ *
+ * The single place that decision is made, so the route guard and the login
+ * page's destination resolver cannot disagree about it — same reasoning as
+ * `HOME_ROUTE` itself. `HOME_ROUTE` stays a bare constant for call sites that
+ * are not deciding a destination (see `auth.global.ts`'s `to.fullPath ===
+ * HOME_ROUTE` check, which only avoids double-decorating a redirect query).
+ */
+export function resolveHomeRoute(permissions: readonly string[]): string {
+    return permissions.includes('dashboard.view') ? HOME_ROUTE : '/schedule';
+}
+
 /** The public landing page: the domain root, readable with no session. */
 export const LANDING_ROUTE = '/';
 

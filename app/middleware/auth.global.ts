@@ -1,7 +1,7 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
 import { useStore } from '~/store';
 import {
-    HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, isInternalPath,
+    HOME_ROUTE, LANDING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, isInternalPath, resolveHomeRoute,
 } from '~/utils/routes';
 
 /**
@@ -75,13 +75,13 @@ export default defineNuxtRouteMiddleware(async (to) => {
             // unconditionally HOME_ROUTE.
             const redirect = typeof to.query.redirect === 'string'
                 ? to.query.redirect
-                : (store.lastVisitedPage || HOME_ROUTE);
+                : (store.lastVisitedPage || resolveHomeRoute(session.value?.permissions ?? []));
 
             // Only internal paths: an open redirect would let a crafted link
             // bounce a freshly authenticated user to another origin. `/\` is
             // rejected too — browsers treat a backslash in a Location header
             // as `/`, so `/\evil.com` is `//evil.com` in disguise.
-            return navigateTo(isInternalPath(redirect) ? redirect : HOME_ROUTE);
+            return navigateTo(isInternalPath(redirect) ? redirect : resolveHomeRoute(session.value?.permissions ?? []));
         }
 
         return;
@@ -92,6 +92,15 @@ export default defineNuxtRouteMiddleware(async (to) => {
             path: '/login',
             query: to.fullPath === HOME_ROUTE ? undefined : { redirect: to.fullPath },
         });
+    }
+
+    // Issue #107. A DIRECT-NAVIGATION guard, not just a default-destination
+    // one: someone bookmarking or typing `/dashboard` must not reach it
+    // either, not only avoid being SENT there. `dashboard.view` is the same
+    // key `resolveHomeRoute()` checks; `/schedule` is where a caller who
+    // lacks it belongs, since that is the whole of what such a caller may see.
+    if (to.path === HOME_ROUTE && !(session.value?.permissions.includes('dashboard.view') ?? false)) {
+        return navigateTo('/schedule');
     }
 
     // Reached only by a signed-in visit to a protected route — remember it as

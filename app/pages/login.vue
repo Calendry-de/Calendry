@@ -115,7 +115,7 @@
 <script setup lang="ts">
 import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
 import { useStore } from '~/store';
-import { HOME_ROUTE, LANDING_ROUTE, isInternalPath } from '~/utils/routes';
+import { LANDING_ROUTE, isInternalPath, resolveHomeRoute } from '~/utils/routes';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
 
 /**
@@ -253,8 +253,12 @@ function destination(): string {
 
     // #73: an ordinary sign-in with no `?redirect=` returns a visitor to where
     // they left off rather than always HOME_ROUTE — empty on a session's first
-    // sign-in, since nothing has been visited yet.
-    return store.lastVisitedPage || HOME_ROUTE;
+    // sign-in, since nothing has been visited yet. Issue #107: the fallback
+    // itself is no longer the bare constant — `resolveHomeRoute()` sends a
+    // caller who lacks `dashboard.view` to `/schedule` instead. `finish()`
+    // calls `fetchSession(true)` before this runs, so `session.value` already
+    // carries this sign-in's permissions.
+    return store.lastVisitedPage || resolveHomeRoute(session.value?.permissions ?? []);
 }
 
 async function submitCredentials() {
