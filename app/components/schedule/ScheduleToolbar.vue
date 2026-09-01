@@ -68,28 +68,6 @@
         <!-- ACTIONS — the only controls here that change anything, which is why
              they hold the right edge on their own. -->
         <div class="bar_group bar_group--end">
-            <!--
-                NO PERMISSION PROP HERE, deliberately: this page's own route
-                middleware (`SCHEDULE_PERMISSIONS`) already requires
-                `session.read` or `session.read_own` to be standing here at
-                all, which is exactly what `GET /api/me/schedule.ics` itself
-                re-checks — the same gate, not a second one to keep in sync.
-                A plain `href`, not a click handler: the request must carry the
-                browser's own session cookie, and CommonButton's `href` prop
-                renders a real `<a>` rather than a NuxtLink, so the browser
-                does a real (if invisible) navigation and treats the response's
-                `content-disposition: attachment` as a download instead of
-                routing it through the SPA. No `from`/`to` — the endpoint's own
-                default, the whole current Term, is exactly the "sensible
-                default range" this button wants.
-            -->
-            <CommonButton
-                v-if="solverTermId"
-                icon="material-symbols:download"
-                type="transparent"
-                :href="`/api/me/schedule.ics?termId=${encodeURIComponent(solverTermId)}`"
-            >Download .ics</CommonButton>
-
             <!-- Hidden without `session.create`, not disabled: there is no
                  read-only version of "add an event", and disabled reads as
                  "unavailable right now" rather than "not yours". -->

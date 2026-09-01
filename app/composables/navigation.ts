@@ -255,6 +255,24 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
         ...manageEntries(),
 
         {
+            id: 'manage.external-references',
+            label: 'External references',
+            description: 'Links you hand to something outside the app — calendar subscriptions today.',
+            icon: 'material-symbols:link',
+            section: 'manage',
+            keywords: ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external'],
+            /*
+             * NOT a registry entity (no `manageEntries()` projection) and
+             * DELIBERATELY NO PERMISSION — unlike every other `manage.*` entry,
+             * which gates on the institution's own data. A calendar link only
+             * ever streams the CREATOR's own Sessions, the same self-service
+             * authority `my.account` exercises with no permission; filed here
+             * for discoverability alongside Screens, a comparable device/link
+             * credential, not because it needs a grant.
+             */
+            to: '/manage/external-references',
+        },
+        {
             id: 'manage.display',
             label: 'Display',
             description: 'How the schedule is drawn — colour sources, online marking, fallbacks.',

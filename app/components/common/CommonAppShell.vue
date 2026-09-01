@@ -130,7 +130,10 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
         ],
     },
     { label: 'People', paths: ['/manage/persons', '/manage/roles', '/manage/availability/preferences'] },
-    { label: 'Resources', paths: ['/manage/rooms', '/manage/equipment', '/manage/groups', '/manage/screens'] },
+    {
+        label: 'Resources',
+        paths: ['/manage/rooms', '/manage/equipment', '/manage/groups', '/manage/screens', '/manage/external-references'],
+    },
     {
         label: 'Curriculum',
         paths: [
