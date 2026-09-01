@@ -81,7 +81,7 @@ async function main() {
             const passwordHash = await hashPassword(initialPassword);
 
             const staffAccount = await tx.staffAccount.create({
-                data: { email, passwordHash },
+                data: { email, passwordHash, mustChangePassword: true },
             });
 
             return { staffAccount, created: true, initialPassword };
@@ -95,7 +95,8 @@ async function main() {
         } else {
             console.log(`\nProvisioned StaffAccount '${email}' (${result.staffAccount.id})`);
             console.log(`\n  Initial password: ${result.initialPassword}`);
-            console.log('  Shown once and never recoverable. Sign in at /staff/login.\n');
+            console.log('  Shown once and never recoverable, and must be changed at first sign-in.');
+            console.log('  Sign in at /staff/login.\n');
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
