@@ -9,6 +9,7 @@ import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 import { applyDefaultAccessRole } from './defaultAccessRole';
 import { isPermissionKey } from '../../shared/permissions';
 import type { PermissionKey } from '../../shared/permissions';
+import { logger } from './logger';
 
 /**
  * Registry driving generic CRUD for the nine tenant-scoped core entities.
@@ -1014,10 +1015,17 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             if (dangling.length) {
                 await tx.timeGridBreak.deleteMany({ where: { id: { in: dangling.map((b) => b.id) } } });
 
-                console.warn('[time-grid] dropped %d break override(s) left dangling by a shrink: %s',
-                    dangling.length,
-                    dangling.map((b) => `${b.label} (after block ${b.afterBlockIndex}`
-                        + `${b.dayOfWeek ? `, day ${b.dayOfWeek}` : ''})`).join('; '));
+                logger.warn(
+                    {
+                        count: dangling.length,
+                        breaks: dangling.map((b) => ({
+                            label: b.label,
+                            afterBlockIndex: b.afterBlockIndex,
+                            dayOfWeek: b.dayOfWeek ?? null,
+                        })),
+                    },
+                    '[time-grid] dropped break override(s) left dangling by a shrink',
+                );
             }
         },
     },

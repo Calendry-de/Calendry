@@ -1,4 +1,5 @@
 import { SESSION_RETENTION_MS, deleteExpiredSessions } from '../utils/authDb';
+import { logger } from '../utils/logger';
 
 /**
  * Sweep long-expired `auth_session` rows.
@@ -51,7 +52,7 @@ function isEnabled(): boolean {
 
 export default defineNitroPlugin(() => {
     if (!isEnabled()) {
-        console.log('[session-sweeper] disabled (CALENDRY_SESSION_SWEEP=off)');
+        logger.info('[session-sweeper] disabled (CALENDRY_SESSION_SWEEP=off)');
 
         return;
     }
@@ -77,10 +78,12 @@ export default defineNitroPlugin(() => {
              * cutoff is included so the retention window is visible in the log
              * rather than only in the source.
              */
-            console.log(`[session-sweeper] deleted ${deleted} session(s) expired before `
-                + `${before.toISOString()}`);
+            logger.info(
+                { deleted, expiredBefore: before.toISOString() },
+                '[session-sweeper] sweep completed',
+            );
         } catch (error) {
-            console.error('[session-sweeper] sweep failed:', error);
+            logger.error({ err: error }, '[session-sweeper] sweep failed');
             delay = ERROR_BACKOFF_MS;
         }
 
@@ -95,8 +98,10 @@ export default defineNitroPlugin(() => {
     // describing it is a log line that lies.
     const retentionDays = SESSION_RETENTION_MS / 86_400_000;
 
-    console.log(`[session-sweeper] started (first sweep in ${FIRST_RUN_MS / 1000}s, then every `
-        + `${INTERVAL_MS / 3_600_000}h, retaining ${retentionDays} days)`);
+    logger.info(
+        { firstSweepSeconds: FIRST_RUN_MS / 1000, intervalHours: INTERVAL_MS / 3_600_000, retentionDays },
+        '[session-sweeper] started',
+    );
     timer = setTimeout(() => void tick(), FIRST_RUN_MS);
 
     return () => {

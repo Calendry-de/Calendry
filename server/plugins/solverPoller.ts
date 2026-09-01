@@ -1,5 +1,6 @@
 import { claimDueRuns, inTenant, tenantsWithDueRuns } from '../utils/solverPollClaim';
 import { pollSolverRun, recoverRunResult } from '../utils/solverPolling';
+import { logger } from '../utils/logger';
 
 /**
  * Stage 4 — the background solver poller.
@@ -40,7 +41,7 @@ function isEnabled(): boolean {
 
 export default defineNitroPlugin(() => {
     if (!isEnabled()) {
-        console.log('[solver-poller] disabled (CALENDRY_SOLVER_POLL=off)');
+        logger.info('[solver-poller] disabled (CALENDRY_SOLVER_POLL=off)');
 
         return;
     }
@@ -71,11 +72,15 @@ export default defineNitroPlugin(() => {
                         const outcome = await inTenant(tenantId, (tx) => recoverRunResult(tx, run));
 
                         if (outcome.recovered) {
-                            console.log(`[solver-poller] run ${run.id} → result recovered on attempt ${outcome.attempts}`
-                                + (outcome.generationId ? ` → generation ${outcome.generationId} (READY)` : ''));
+                            logger.info(
+                                { runId: run.id, attempts: outcome.attempts, generationId: outcome.generationId ?? null },
+                                '[solver-poller] result recovered',
+                            );
                         } else if (outcome.lost) {
-                            console.warn(`[solver-poller] run ${run.id} → RESULT LOST after ${outcome.attempts} `
-                                + `attempt(s): ${outcome.detail}`);
+                            logger.warn(
+                                { runId: run.id, attempts: outcome.attempts, detail: outcome.detail },
+                                '[solver-poller] RESULT LOST',
+                            );
                         }
 
                         continue;
@@ -86,15 +91,20 @@ export default defineNitroPlugin(() => {
                     const outcome = await inTenant(tenantId, (tx) => pollSolverRun(tx, run));
 
                     if (outcome.becameTerminal) {
-                        console.log(`[solver-poller] run ${run.id} → ${outcome.status}`
-                            + (outcome.detail ? ` (${outcome.detail})` : ''));
+                        logger.info(
+                            { runId: run.id, status: outcome.status, detail: outcome.detail ?? null },
+                            '[solver-poller] run became terminal',
+                        );
 
                         if (outcome.generationId) {
-                            console.log(`[solver-poller] run ${run.id} → generation ${outcome.generationId} (READY)`);
+                            logger.info(
+                                { runId: run.id, generationId: outcome.generationId },
+                                '[solver-poller] generation ready',
+                            );
                         }
                     }
                 } catch (error) {
-                    console.error(`[solver-poller] run ${run.id} failed to poll:`, error);
+                    logger.error({ err: error, runId: run.id }, '[solver-poller] run failed to poll');
                 }
             }
         }
@@ -112,7 +122,7 @@ export default defineNitroPlugin(() => {
         } catch (error) {
             // Reaching here means the sweep itself broke — most likely the
             // database. Backing off rather than hammering it every 500ms.
-            console.error('[solver-poller] sweep failed:', error);
+            logger.error({ err: error }, '[solver-poller] sweep failed');
             delay = ERROR_BACKOFF_MS;
         }
 
@@ -123,7 +133,7 @@ export default defineNitroPlugin(() => {
         }
     }
 
-    console.log(`[solver-poller] started (tick ${TICK_MS}ms)`);
+    logger.info({ tickMs: TICK_MS }, '[solver-poller] started');
     timer = setTimeout(() => void tick(), TICK_MS);
 
     return () => {
