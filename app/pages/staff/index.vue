@@ -76,8 +76,7 @@
             <h2>Federations</h2>
 
             <p class="staff_note">
-                Wraps the same creation transaction as
-                <code>bun run provision:federation</code> — see issue #64.
+                Same effect as the <code>provision:federation</code> CLI.
                 Attach or detach a Tenant from the Federation column above.
             </p>
 
@@ -157,10 +156,7 @@
             <h2>Create a tenant</h2>
 
             <p class="staff_note">
-                Wraps the same provisioning transaction as
-                <code>bun run provision:tenant</code> — see issue #76. The
-                support-code redemption flow ("staff assumes a tenant role")
-                is a separate, dependent card and is not built here.
+                Same effect as the <code>provision:tenant</code> CLI.
             </p>
 
             <form

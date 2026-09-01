@@ -8,7 +8,7 @@
         >
             <p class="staff_login_lead">
                 Internal sign-in. This is a separate credential from a tenant
-                account — see issue #76.
+                account.
             </p>
 
             <CommonInputText
