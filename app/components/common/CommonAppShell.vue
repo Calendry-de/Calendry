@@ -133,7 +133,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
     { label: 'People', paths: ['/manage/persons', '/manage/roles', '/manage/availability/preferences'] },
     {
         label: 'Resources',
-        paths: ['/manage/rooms', '/manage/equipment', '/manage/groups', '/manage/screens'],
+        paths: ['/manage/rooms', '/manage/equipment', '/manage/groups'],
     },
     {
         label: 'Curriculum',
@@ -157,6 +157,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
             '/manage/display',
             '/manage/exams/reviews',
             '/manage/availability/reviews',
+            '/manage/screens',
         ],
     },
 ];
