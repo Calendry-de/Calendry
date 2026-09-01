@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import type { Tx } from './tenantDb';
 import type { RequestIdentity } from './tenantResolver';
+import { invalidateScheduleCache } from './scheduleCache';
 
 export type EventType =
     | 'CREATE' | 'MOVE' | 'SWAP' | 'DELETE' | 'UPDATE_DETAILS' | 'SET_LECTURERS'
@@ -48,6 +49,33 @@ export async function appendEvent(
             reason: input.reason ?? null,
         },
     });
+
+    /**
+     * Cache invalidation for issue #66, hooked in HERE rather than at each of
+     * this function's 14+ call sites. Every write that changes what a cached
+     * schedule response would contain — a manual edit, a Generation apply, a
+     * materialized solver result — appends a SessionEvent, so this is the one
+     * choke point all of them already pass through. Finding and hooking each
+     * call site individually is exactly the way to miss one, which the issue
+     * calls out explicitly: "a stale cache is worse than no cache."
+     *
+     * The Generation's OWN `termId` decides the blast radius (null = a
+     * tenant-wide Generation, so every bucket for the tenant is dropped) —
+     * see `invalidateScheduleCache`. Never allowed to fail the write: this
+     * runs inside the same transaction as the event it is reacting to, and a
+     * cache-invalidation problem must not become a reason a manual edit
+     * fails to save.
+     */
+    try {
+        const generation = await tx.generation.findUnique({
+            where: { id: input.generationId },
+            select: { termId: true },
+        });
+
+        await invalidateScheduleCache(identity.tenantId, generation?.termId ?? null);
+    } catch (error) {
+        console.error('[cache] schedule cache invalidation failed after appendEvent:', error);
+    }
 
     // `seq` is a BigInt, which JSON.stringify refuses to serialize — returning
     // the row as-is makes every editing route throw at response time. Converted

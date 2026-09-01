@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { getCached } from '../../utils/cache';
 import { ancestorGroupIds } from '../../utils/groupClosure';
+import { contextCacheKey, SCHEDULE_CACHE_TTL_SECONDS } from '../../utils/scheduleCache';
 import { sessionReadScope } from '../../utils/scheduleScope';
 import { withRequestTenant } from '../../utils/tenantDb';
 
@@ -123,85 +125,106 @@ export default defineEventHandler(async (event) => {
          */
         const termId = query.termId || terms[0]?.id || '';
 
-        /*
-         * The join rows of the visible sessions, and only those. Selected rather
-         * than the sessions themselves: this needs ids to look names up with,
-         * and pulling the full rows would be a second copy of a response the
-         * client is fetching anyway.
+        /**
+         * Cache freshness (issue #66): the query above (terms/timeGrids —
+         * needed just to resolve `termId`, which the cache key depends on) is
+         * deliberately NOT cached and always current. Everything below IS —
+         * the whole response is the cached value, terms/timeGrids included,
+         * so a cache hit still returns the exact wire shape this route always
+         * returned. "Immediately visible after a manual edit" depends on
+         * `invalidateScheduleCache()` firing from `appendEvent()`
+         * (server/utils/sessionEvents.ts) — the single choke point every
+         * write that could change this response passes through. The TTL is a
+         * backstop only, in case an invalidation path is ever missed.
          */
-        const visible = await tx.session.findMany({
-            where: { ...where, ...(termId ? { termId } : {}) },
-            select: {
-                rooms: { select: { roomId: true } },
-                people: { select: { personId: true } },
-                groups: { select: { groupId: true } },
-                // Issue #30: a substitute is never in `people` (their
-                // `session_person` row is deliberately untouched), so without
-                // this the inspector's "Covered by …" would resolve nothing.
-                substitution: { select: { coveringPersonId: true } },
-            },
+        const cacheKey = contextCacheKey({
+            tenantId: identity.tenantId,
+            termId,
+            scope,
+            actorPersonId: identity.actorPersonId,
         });
 
-        const roomIds = [...new Set(visible.flatMap((s) => s.rooms.map((r) => r.roomId)))];
-        const personIds = [...new Set(visible.flatMap((s) => [
-            ...s.people.map((p) => p.personId),
-            ...(s.substitution ? [s.substitution.coveringPersonId] : []),
-        ]))];
-        const referencedGroupIds = [...new Set(visible.flatMap((s) => s.groups.map((g) => g.groupId)))];
-
-        /*
-         * ANCESTORS TOO, and this is not a widening. The inspector shows a
-         * Group's parent to disambiguate two identically-named seminars, so a
-         * Group whose parent is missing renders as an orphan — and the parent is
-         * already implied by the child being visible. `ancestorGroupIds` walks
-         * UP; `descendantGroupIds` here would publish sibling cohorts the caller
-         * has nothing to do with.
-         */
-        const groupIds = await ancestorGroupIds(tx, referencedGroupIds);
-
-        const [rooms, people, groups] = await Promise.all([
-            roomIds.length
-                ? tx.room.findMany({
-                    /*
-                     * No tenant predicate: the ids came from Sessions this caller
-                     * may read, and a federation-shared Session names a
-                     * federation-owned Room that `tenantId` would exclude — the
-                     * shared lecture hall would lose its name on the one
-                     * timetable that most needs it. RLS still applies.
-                     */
-                    where: { id: { in: roomIds } },
-                    select: { id: true, code: true, name: true, isVirtual: true },
-                })
-                : [],
-            personIds.length
-                ? tx.person.findMany({
-                    where: { id: { in: personIds } },
-                    select: { id: true, givenName: true, familyName: true },
-                })
-                : [],
-            groupIds.length
-                ? tx.group.findMany({
-                    where: { id: { in: groupIds } },
-                    select: { id: true, name: true, parentGroupId: true },
-                })
-                : [],
-        ]);
-
-        return {
+        return getCached(cacheKey, async () => {
             /*
-             * REPORTED, not inferred. The client renders a different page for
-             * each — no filters, no editor, a heading that says whose timetable
-             * this is — and deriving that from "did the person list come back
-             * empty" would make a tenant with one room look like a restricted
-             * caller.
+             * The join rows of the visible sessions, and only those. Selected
+             * rather than the sessions themselves: this needs ids to look
+             * names up with, and pulling the full rows would be a second copy
+             * of a response the client is fetching anyway.
              */
-            scope,
-            resolvedTermId: termId,
-            terms,
-            timeGrids,
-            rooms,
-            people,
-            groups,
-        };
+            const visible = await tx.session.findMany({
+                where: { ...where, ...(termId ? { termId } : {}) },
+                select: {
+                    rooms: { select: { roomId: true } },
+                    people: { select: { personId: true } },
+                    groups: { select: { groupId: true } },
+                    // Issue #30: a substitute is never in `people` (their
+                    // `session_person` row is deliberately untouched), so without
+                    // this the inspector's "Covered by …" would resolve nothing.
+                    substitution: { select: { coveringPersonId: true } },
+                },
+            });
+
+            const roomIds = [...new Set(visible.flatMap((s) => s.rooms.map((r) => r.roomId)))];
+            const personIds = [...new Set(visible.flatMap((s) => [
+                ...s.people.map((p) => p.personId),
+                ...(s.substitution ? [s.substitution.coveringPersonId] : []),
+            ]))];
+            const referencedGroupIds = [...new Set(visible.flatMap((s) => s.groups.map((g) => g.groupId)))];
+
+            /*
+             * ANCESTORS TOO, and this is not a widening. The inspector shows a
+             * Group's parent to disambiguate two identically-named seminars, so a
+             * Group whose parent is missing renders as an orphan — and the parent is
+             * already implied by the child being visible. `ancestorGroupIds` walks
+             * UP; `descendantGroupIds` here would publish sibling cohorts the caller
+             * has nothing to do with.
+             */
+            const groupIds = await ancestorGroupIds(tx, referencedGroupIds);
+
+            const [rooms, people, groups] = await Promise.all([
+                roomIds.length
+                    ? tx.room.findMany({
+                        /*
+                         * No tenant predicate: the ids came from Sessions this caller
+                         * may read, and a federation-shared Session names a
+                         * federation-owned Room that `tenantId` would exclude — the
+                         * shared lecture hall would lose its name on the one
+                         * timetable that most needs it. RLS still applies.
+                         */
+                        where: { id: { in: roomIds } },
+                        select: { id: true, code: true, name: true, isVirtual: true },
+                    })
+                    : [],
+                personIds.length
+                    ? tx.person.findMany({
+                        where: { id: { in: personIds } },
+                        select: { id: true, givenName: true, familyName: true },
+                    })
+                    : [],
+                groupIds.length
+                    ? tx.group.findMany({
+                        where: { id: { in: groupIds } },
+                        select: { id: true, name: true, parentGroupId: true },
+                    })
+                    : [],
+            ]);
+
+            return {
+                /*
+                 * REPORTED, not inferred. The client renders a different page for
+                 * each — no filters, no editor, a heading that says whose timetable
+                 * this is — and deriving that from "did the person list come back
+                 * empty" would make a tenant with one room look like a restricted
+                 * caller.
+                 */
+                scope,
+                resolvedTermId: termId,
+                terms,
+                timeGrids,
+                rooms,
+                people,
+                groups,
+            };
+        }, SCHEDULE_CACHE_TTL_SECONDS);
     });
 });

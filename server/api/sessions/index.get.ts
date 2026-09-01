@@ -1,5 +1,7 @@
 import { z } from 'zod';
+import { getCached } from '../../utils/cache';
 import { conflictGroupIds } from '../../utils/groupClosure';
+import { sessionsCacheKey, SCHEDULE_CACHE_TTL_SECONDS } from '../../utils/scheduleCache';
 import { sessionReadScope } from '../../utils/scheduleScope';
 import { withRequestTenant } from '../../utils/tenantDb';
 
@@ -75,7 +77,7 @@ export default defineEventHandler(async (event) => {
          * and RLS permits that read without ever asking for it — already
          * narrowed to the caller's own sessions when that is all they may see.
          */
-        const { where } = await sessionReadScope(event, tx, identity);
+        const { scope, where } = await sessionReadScope(event, tx, identity);
 
         if (query.termId) where.termId = query.termId;
 
@@ -114,7 +116,30 @@ export default defineEventHandler(async (event) => {
         if (query.roomId) where.rooms = { some: { roomId: query.roomId } };
         if (query.personId) where.people = { some: { personId: query.personId } };
 
-        return tx.session.findMany({
+        /**
+         * Cache freshness (issue #66): "immediately visible after a manual
+         * edit" now depends on `invalidateScheduleCache()` actually firing —
+         * it does, from `appendEvent()` (server/utils/sessionEvents.ts), the
+         * single choke point every write below this GET passes through. The
+         * TTL here is a backstop only, in case an invalidation path is ever
+         * missed.
+         */
+        const cacheKey = sessionsCacheKey({
+            tenantId: identity.tenantId,
+            termId: query.termId,
+            scope,
+            actorPersonId: identity.actorPersonId,
+            termWeek: query.termWeek,
+            groupId: query.groupId,
+            includeNested: query.includeNested,
+            roomId: query.roomId,
+            personId: query.personId,
+            offeringId: query.offeringId,
+            isLocked: query.isLocked,
+            banked: query.banked,
+        });
+
+        return getCached(cacheKey, () => tx.session.findMany({
             where,
             orderBy: [{ termWeek: 'asc' }, { dayOfWeek: 'asc' }, { blockIndex: 'asc' }],
             include: {
@@ -144,6 +169,6 @@ export default defineEventHandler(async (event) => {
                 // lecturer's `session_person` row is untouched by a substitution.
                 substitution: { select: { coveringPersonId: true } },
             },
-        });
+        }), SCHEDULE_CACHE_TTL_SECONDS);
     });
 });

@@ -9,6 +9,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     env_file:
       - .env
@@ -56,6 +58,25 @@ services:
       retries: 10
     env_file:
       - .env
+
+  redis:
+    # Cache for issue #66 — a read-through cache for calendar reads,
+    # invalidated on schedule changes (server/utils/cache.ts). Never the
+    # database of record: every key it holds is disposable, so a lost
+    # `redis_data` volume degrades reads back to hitting Postgres directly
+    # rather than losing anything.
+    image: 'redis:7-alpine'
+    container_name: calendry-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli ping | grep -q PONG'
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   db_data:

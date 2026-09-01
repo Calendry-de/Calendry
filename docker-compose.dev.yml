@@ -85,3 +85,11 @@ services:
     ports:
       - "50051:50051"
     restart: unless-stopped
+
+  redis:
+    # Published for HOST-side tooling only, same reasoning as db/solver above.
+    # Not 6379, so this cannot collide with a Redis already installed on the
+    # machine — matches db's 55432 for the same reason. REDIS_URL_HOST in
+    # .env(.example) points here.
+    ports:
+      - "63790:6379"
