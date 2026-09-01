@@ -74,6 +74,7 @@ defineRouteMeta({
                                 rooms: { type: 'array', items: { type: 'object' } },
                                 people: { type: 'array', items: { type: 'object' } },
                                 groups: { type: 'array', items: { type: 'object' }, description: 'Referenced groups plus their ancestors, for disambiguation.' },
+                                tenantTimezone: { type: 'string', description: 'IANA zone name. "Today"/"now" for the schedule (the Today button, the live now-indicator) resolve against THIS, never the viewer\'s own zone — timezone is per-Person and display-only (CLAUDE.md).' },
                             },
                         },
                     },
@@ -95,7 +96,7 @@ export default defineEventHandler(async (event) => {
          * no sessions at all, and `termId` is resolved against them by the
          * client exactly as it was before.
          */
-        const [terms, timeGrids] = await Promise.all([
+        const [terms, timeGrids, tenant] = await Promise.all([
             tx.term.findMany({
                 where: { tenantId: identity.tenantId },
                 select: { id: true, name: true, startDate: true, endDate: true, timeGridId: true },
@@ -110,6 +111,19 @@ export default defineEventHandler(async (event) => {
                  * includes them.
                  */
                 include: { breaks: true },
+            }),
+            /*
+             * THE ONE PLACE THE CLIENT LEARNS THE TENANT'S ZONE. "Today"/"now"
+             * on the schedule (the Today button, the live now-indicator) must
+             * resolve in `Tenant.timezone`, never the viewer's own — the same
+             * rule `localNow` already enforces server-side for
+             * `computeReferenceSlot`. Fetched alongside terms/timeGrids, not
+             * inside the cached block below: a tenant's timezone changing
+             * must not wait out a stale cache entry.
+             */
+            tx.tenant.findUniqueOrThrow({
+                where: { id: identity.tenantId },
+                select: { timezone: true },
             }),
         ]);
 
@@ -202,6 +216,7 @@ export default defineEventHandler(async (event) => {
             rooms,
             people,
             groups,
+            tenantTimezone: tenant.timezone,
         };
     });
 });

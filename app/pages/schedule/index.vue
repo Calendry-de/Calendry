@@ -54,6 +54,7 @@
             :active-days="data.grid.value?.activeDays ?? []"
             :slot-date-of="data.slotDateOf"
             @toggle-create="editing.toggleCreating"
+            @jump-today="jumpToToday"
         />
 
         <ScheduleFilterPanel
@@ -233,6 +234,8 @@
                     :show-person="!filters.personId.value"
                     :term-week="filters.week.value"
                     :slot-date-of="data.slotDateOf"
+                    :term-start="data.term.value?.startDate ?? null"
+                    :tenant-timezone="data.tenantTimezone.value"
                     :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
                     @select="onSelect"
                     @place="placeAt"
@@ -254,6 +257,7 @@
                 />
 
                 <ScheduleAgenda
+                    ref="agenda"
                     class="schedule_agenda"
                     :grid="data.grid.value"
                     :sessions="data.onGridSessions.value"
@@ -372,6 +376,7 @@ import ScheduleToolbar from '~/components/schedule/ScheduleToolbar.vue';
 import ScheduleWeekNav from '~/components/schedule/ScheduleWeekNav.vue';
 import ScheduleViolationsPanel from '~/components/schedule/ScheduleViolationsPanel.vue';
 import { isPlacedSession } from '#shared/sessionPlacement';
+import { isoWeekday, localNow, weekIndexOf } from '#shared/academicCalendar';
 import { useScheduleData } from '~/composables/scheduleData';
 import { useScheduleEditing } from '~/composables/scheduleEditing';
 import { resolveTermId, useScheduleFilters } from '~/composables/scheduleFilters';
@@ -409,6 +414,8 @@ const canTriggerSolver = useHasPermission('solver.trigger');
  * it was started from.
  */
 const toolbar = useTemplateRef<{ startRepair: () => void }>('toolbar');
+/** Issue #109's Today button: sets the mobile agenda's day, once resolved. */
+const agenda = useTemplateRef<{ showDay: (day: number) => void }>('agenda');
 /**
  * The proposals list, not the solver: reviewing needs `session.read`, producing
  * needs `solver.trigger`, and a department head typically holds only the first.
@@ -507,6 +514,44 @@ function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
 }
 
 const pendingSlot = ref<{ dayOfWeek: number; blockIndex: number } | null>(null);
+
+/**
+ * Issue #109's Today button. A ONE-OFF read of `localNow` at click time —
+ * unlike the grid's live now-indicator, a click has no need for a ticking
+ * ref — resolved in the TENANT's zone (`data.tenantTimezone`), never the
+ * browser's: CLAUDE.md, timezone is per-Person and display-only, and this is
+ * exactly the "same day" logic that rule says must stay tenant-local.
+ *
+ * FALLS BACK RATHER THAN DOING NOTHING when today is outside the current
+ * Term's range: clamped to the nearest boundary week, the same clamp
+ * `reconcileFilters` already applies when a URL's `?week=` outruns the term.
+ */
+function jumpToToday() {
+    const term = data.term.value;
+
+    if (!term) {
+        return;
+    }
+
+    const today = localNow(new Date(), data.tenantTimezone.value).date;
+    const weekIndex = weekIndexOf(new Date(term.startDate), today);
+    // `weekIndex` is 0-based; the term week shown on screen is 1-based.
+    const clampedWeek = Math.min(Math.max(weekIndex + 1, 1), data.totalWeeks.value);
+
+    filters.week.value = clampedWeek;
+
+    // Only meaningful when today landed inside the week just selected AND is
+    // a day this grid actually teaches — otherwise the mobile agenda is left
+    // on whichever day it already showed, same as the desktop grid draws no
+    // now-line for a day it does not teach.
+    if (clampedWeek === weekIndex + 1) {
+        const dayOfWeek = isoWeekday(today);
+
+        if (data.grid.value?.activeDays.includes(dayOfWeek)) {
+            agenda.value?.showDay(dayOfWeek);
+        }
+    }
+}
 
 /**
  * Focus goes back to the control that started the flow.

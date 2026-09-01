@@ -223,3 +223,49 @@ export function blackedOutWeeks(
 
     return out;
 }
+
+/** An instant, resolved as the TENANT's calendar day and time. See `localNow`. */
+export interface TenantLocalNow {
+    /** UTC-midnight Date of the tenant's local calendar day. */
+    date: Date;
+    /** Minutes since local midnight. */
+    minutes: number;
+}
+
+/**
+ * An instant, expressed as the TENANT's calendar day and time.
+ *
+ * In `shared/` — not `server/utils/solverCalendar.ts`, which re-exports it —
+ * because it now has TWO callers that must not disagree: `computeReferenceSlot`
+ * server-side, and the schedule page's Today button / live now-indicator
+ * client-side (CLAUDE.md, "Timezone is per-Person and display-only... All of
+ * that is tenant-local time" — the grid resolves "today" and "now" in
+ * `Tenant.timezone`, never the viewer's own zone, so both sides need the exact
+ * same function rather than two implementations that could quietly drift).
+ *
+ * Uses Intl rather than a date library — no new dependency, and it is the only
+ * correct way to ask "what day is it in Europe/Berlin right now" without
+ * reimplementing tzdata.
+ */
+export function localNow(now: Date, timeZone: string): TenantLocalNow {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+    }).formatToParts(now);
+
+    const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0');
+
+    // `hour: '2-digit'` with hour12:false yields 24 for midnight in some ICU
+    // versions rather than 0, which would put midnight at the END of the day.
+    const hour = get('hour') % 24;
+
+    return {
+        date: new Date(Date.UTC(get('year'), get('month') - 1, get('day'))),
+        minutes: hour * 60 + get('minute'),
+    };
+}

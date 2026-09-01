@@ -69,6 +69,21 @@
              they hold the right edge on their own. -->
         <div class="bar_group bar_group--end">
             <!--
+                ISSUE #109. Gated on `solverTermId` alone, like the two buttons
+                after it — not on today actually falling inside the visible
+                term/week, which the page decides at CLICK time and answers
+                with a graceful fallback (nearest boundary week) rather than by
+                hiding the control, per the issue's own note that "no term
+                visible today" must say so instead of doing nothing silently.
+            -->
+            <CommonButton
+                v-if="solverTermId"
+                icon="material-symbols:today-outline"
+                type="transparent"
+                @click="$emit('jump-today')"
+            >Today</CommonButton>
+
+            <!--
                 NO PERMISSION PROP HERE, deliberately: this page's own route
                 middleware (`SCHEDULE_PERMISSIONS`) already requires
                 `session.read` or `session.read_own` to be standing here at
@@ -167,7 +182,7 @@ defineProps<{
     solverTermId: string;
 }>();
 
-defineEmits<{ 'toggle-create': [] }>();
+defineEmits<{ 'toggle-create': []; 'jump-today': [] }>();
 
 // Owned by the page, toggling `ScheduleFilterPanel` — not a data filter itself.
 const filtersOpenModel = defineModel<boolean>('filtersOpen', { required: true });
