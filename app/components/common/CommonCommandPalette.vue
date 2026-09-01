@@ -155,7 +155,10 @@ function trapFocus(event: KeyboardEvent) {
 
     padding: 12vh var(--space-6) var(--space-6);
 
-    background: varToRgba('content0', 0.45);
+    // `black`, not the theme-relative `content0` — see `ScheduleFilterPanel`'s
+    // own comment on this exact backdrop rule for why: `content0` flips to
+    // near-white in dark mode, turning a dimming scrim into a light wash.
+    background: varToRgba('black', 0.45);
 
     &_dialog {
         display: flex;
@@ -168,7 +171,7 @@ function trapFocus(event: KeyboardEvent) {
         border-radius: var(--radius-xl);
 
         background: $surface1;
-        box-shadow: 0 24px 60px varToRgba('content0', 0.28);
+        box-shadow: 0 24px 60px varToRgba('black', 0.28);
     }
 
     &_search {

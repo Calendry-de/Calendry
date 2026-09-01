@@ -61,10 +61,6 @@ $primary400Raw: toRawRGB(#58B4A7);
 $primary400Orig: #58B4A7;
 $primary300Raw: toRawRGB(#8ACDC3);
 $primary300Orig: #8ACDC3;
-$primary200Raw: toRawRGB(#D9EDE9);
-$primary200Orig: #D9EDE9;
-$primary100Raw: toRawRGB(#EFF7F5);
-$primary100Orig: #EFF7F5;
 $secondary700Raw: toRawRGB(#94502F);
 $secondary700Orig: #94502F;
 $secondary600Raw: toRawRGB(#A85E38);
@@ -158,8 +154,6 @@ iprimary600: var(--primary600, $primary600Raw),
 iprimary500: var(--primary500, $primary500Raw),
 iprimary400: var(--primary400, $primary400Raw),
 iprimary300: var(--primary300, $primary300Raw),
-iprimary200: var(--primary200, $primary200Raw),
-iprimary100: var(--primary100, $primary100Raw),
 isecondary700: var(--secondary700, $secondary700Raw),
 isecondary600: var(--secondary600, $secondary600Raw),
 isecondary500: var(--secondary500, $secondary500Raw),
@@ -233,8 +227,6 @@ $primary600: rgb(map.get($colorsMap, iprimary600));
 $primary500: rgb(map.get($colorsMap, iprimary500));
 $primary400: rgb(map.get($colorsMap, iprimary400));
 $primary300: rgb(map.get($colorsMap, iprimary300));
-$primary200: rgb(map.get($colorsMap, iprimary200));
-$primary100: rgb(map.get($colorsMap, iprimary100));
 $secondary700: rgb(map.get($colorsMap, isecondary700));
 $secondary600: rgb(map.get($colorsMap, isecondary600));
 $secondary500: rgb(map.get($colorsMap, isecondary500));

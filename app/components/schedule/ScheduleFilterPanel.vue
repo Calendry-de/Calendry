@@ -232,7 +232,13 @@ function trapFocus(event: KeyboardEvent) {
     display: flex;
     justify-content: flex-start;
 
-    background: varToRgba('content0', 0.45);
+    // `black`, NOT `content0`: `content0` is a THEME-RELATIVE text colour —
+    // dark mode swaps it to near-white (`app/utils/styles.ts`) — so a scrim
+    // built from it turned into a light wash instead of a dimming backdrop
+    // exactly when the surrounding UI was already dark. A backdrop must dim
+    // regardless of theme, which is what the theme-INVARIANT `black`/
+    // `blackAlpha*` family is for.
+    background: varToRgba('black', 0.45);
 
     &_sheet {
         overflow-y: auto;
@@ -246,7 +252,7 @@ function trapFocus(event: KeyboardEvent) {
         padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
 
         background: $surface1;
-        box-shadow: 24px 0 60px varToRgba('content0', 0.28);
+        box-shadow: 24px 0 60px varToRgba('black', 0.28);
     }
 
     &_head {

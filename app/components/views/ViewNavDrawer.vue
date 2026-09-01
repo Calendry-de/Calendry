@@ -246,7 +246,10 @@ onMounted(() => {
     display: flex;
     justify-content: flex-end;
 
-    background: varToRgba('content0', 0.45);
+    // `black`, not the theme-relative `content0` — see `ScheduleFilterPanel`'s
+    // own comment on this exact backdrop rule for why: `content0` flips to
+    // near-white in dark mode, turning a dimming scrim into a light wash.
+    background: varToRgba('black', 0.45);
 
     &_panel {
         display: flex;
@@ -261,7 +264,7 @@ onMounted(() => {
         padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
 
         background: $surface1;
-        box-shadow: -24px 0 60px varToRgba('content0', 0.28);
+        box-shadow: -24px 0 60px varToRgba('black', 0.28);
     }
 
     &_head {

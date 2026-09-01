@@ -259,13 +259,22 @@ const cells = computed<Cell[]>(() => {
 
         &--out { color: $surface6; }
 
-        // The whole week reads as a band, the same tint `primary200` already
-        // carries for a selected row elsewhere (`utils/styles.ts`) — not a new
-        // meaning for the colour.
+        // The whole week reads as a band. `varToRgba('primary500', 0.14)`,
+        // not the flat `primary200` this used to be: `primary200` is a LIGHT-
+        // ONLY tint with no dark-theme override, while `primary700` (the text
+        // sitting on top of it) DOES flip to a light value in dark mode —
+        // light text on a background that stayed light regardless of theme,
+        // which is exactly the low-contrast selected-week band reported live.
+        // `primary500` at low opacity is the pattern every OTHER "selected/
+        // highlighted" surface in this app already uses (`ManageList`,
+        // `ScheduleGrid`, `ManageConstraintVariantGroup`, …) because it is
+        // translucent over whatever ground sits under it — light in light
+        // mode, dark in dark mode — so it composes correctly with
+        // `primary700`'s own per-theme flip instead of fighting it.
         &--selected {
             font-weight: 650;
             color: $primary700;
-            background: $primary200;
+            background: varToRgba('primary500', 0.14);
         }
 
         &--today:not(&--selected) {

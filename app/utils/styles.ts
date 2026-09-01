@@ -72,17 +72,24 @@ export const colorsList = {
     // cannot drift apart. Purple retired here: the mark said one thing and
     // every button said another.
     //
-    // Two steps below 300 exist that no other ramp has, because no other ramp
-    // is ever used as a GROUND: `primary200` tints a selected row, `primary100`
-    // is a hover ground. Adding them to the semantic ramps would invite tinted
-    // error/success grounds nobody has designed.
+    // NO STEPS BELOW 300: an earlier `primary200`/`primary100` pair (used as
+    // flat GROUND tints for a "selected" state) was removed — they had no
+    // dark-theme override, while the foreground text sitting on them
+    // (`primary700`) DOES flip per theme, so the pairing silently went
+    // low-contrast the moment dark mode turned that text light against a
+    // ground that stayed light too. `varToRgba('primary500', <opacity>)` is
+    // the ramp's own answer to "tint a selected/highlighted ground": a
+    // translucent wash over whatever surface sits underneath, correct in
+    // either theme by construction, and already how every other such state in
+    // this app is built (`ManageList`, `ScheduleGrid`,
+    // `ManageConstraintVariantGroup`, `ScheduleMiniMonth`, …). Add a flat
+    // tinted-ground token again only with a measured dark-theme value to go
+    // with it.
     primary700: '#1E6B61',
     primary600: '#257F72',
     primary500: BRAND,
     primary400: '#58B4A7',
     primary300: '#8ACDC3',
-    primary200: '#D9EDE9',
-    primary100: '#EFF7F5',
 
     /**
      * CONTRAST, MEASURED — the reason the ramp has a direction of use.
