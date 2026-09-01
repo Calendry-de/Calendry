@@ -119,6 +119,14 @@ export interface IcsLinkIdentity extends IdentityBase {
     scope: 'ALL' | 'TERM';
     termId: string | null;
     weeksAhead: number | null;
+    /**
+     * The SUBJECT (issue #115), orthogonal to `scope`'s time window: empty
+     * means "this Person's own Sessions" (`ownSessionClause`, unchanged since
+     * issue #15); one or more Group ids means those Groups' Sessions instead,
+     * via the same ancestor-closure `ownSessionClause` walks for a member's
+     * own timetable — see `GET /api/ics/stream.ics`'s own comment.
+     */
+    groupIds: string[];
 }
 
 /**
@@ -389,6 +397,7 @@ export const icsLinkResolver: TenantResolver = async (event) => {
         scope: link.scope,
         termId: link.term_id,
         weeksAhead: link.weeks_ahead,
+        groupIds: link.group_ids,
     };
 };
 

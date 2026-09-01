@@ -3,9 +3,9 @@
         <h2>Calendar links</h2>
         <p class="links_hint">
             A link an external calendar app (Google Calendar, Outlook, Apple Calendar…)
-            re-fetches on its own schedule, showing only your own Sessions — never
-            downloaded once and forgotten. Unlike an API token this address stays visible
-            here so you can re-copy it any time; deleting a link stops it immediately.
+            re-fetches on its own schedule — never downloaded once and forgotten. Unlike
+            an API token this address stays visible here so you can re-copy it any time;
+            deleting a link stops it immediately.
         </p>
 
         <p
@@ -26,6 +26,7 @@
                 <div class="links_row_main">
                     <span class="links_row_name">{{ row.name }}</span>
                     <span class="links_row_scope">{{ scopeLabel(row) }}</span>
+                    <span class="links_row_scope">{{ subjectLabel(row) }}</span>
                 </div>
 
                 <div class="links_row_url">
@@ -80,6 +81,50 @@
                     type="text"
                 >
             </label>
+
+            <fieldset
+                v-if="canTargetGroups"
+                class="links_scope"
+            >
+                <legend>Whose schedule</legend>
+
+                <label class="links_scope-option">
+                    <input
+                        v-model="form.subject"
+                        type="radio"
+                        value="OWN"
+                    >
+                    <span>My own schedule</span>
+                </label>
+
+                <label class="links_scope-option">
+                    <input
+                        v-model="form.subject"
+                        type="radio"
+                        value="GROUPS"
+                    >
+                    <span>Specific group(s)</span>
+                </label>
+
+                <label
+                    v-if="form.subject === 'GROUPS'"
+                    class="links_field links_field--indent"
+                >
+                    <span>Groups</span>
+                    <select
+                        v-model="form.groupIds"
+                        multiple
+                        size="5"
+                    >
+                        <option
+                            v-for="group in groups"
+                            :key="group.id"
+                            :selected="form.groupIds.includes(group.id)"
+                            :value="group.id"
+                        >{{ group.name }}</option>
+                    </select>
+                </label>
+            </fieldset>
 
             <fieldset class="links_scope">
                 <legend>What it streams</legend>
@@ -167,6 +212,7 @@ interface IcsLinkRow {
     scope: 'ALL' | 'TERM';
     termId: string | null;
     weeksAhead: number | null;
+    groupIds: string[];
 }
 
 interface TermOption {
@@ -174,19 +220,28 @@ interface TermOption {
     name: string;
 }
 
+interface GroupOption {
+    id: string;
+    name: string;
+}
+
 /**
- * Self-service calendar-subscription links (issue #15, stream half).
+ * Self-service calendar-subscription links (issue #15, stream half;
+ * group-targeting and the permission gate below are issue #115).
  *
  * CLIENT-ONLY FETCHES (`server: false`), the same departure `ApiTokensPanel`
- * makes on `/my/account`: two independent lists (links, terms) with nothing
- * else on the page to await, so there is no SSR-meaningful content lost by
- * fetching after mount.
+ * makes on `/my/account`: two independent lists (links, reference data) with
+ * nothing else on the page to await, so there is no SSR-meaningful content
+ * lost by fetching after mount.
  *
- * TERMS COME FROM `/api/schedule/context`, not a `term.read`-gated CRUD list
- * — the same reasoning that endpoint's own comment gives: `terms` is the
- * frame the schedule page draws itself on, offered to anyone who may look at
- * a timetable at all (`session.read`/`session.read_own`), not just an admin.
- * A Person who cannot see the full directory can still pick their own Term.
+ * REFERENCE DATA COMES FROM `GET /api/me/ics-links/context`, not the generic
+ * `term.read`/`group.read`-gated CRUD lists — same reasoning
+ * `/api/me/exam-requests/context` gives (issue #108): this page's own gate is
+ * `ics_link.generate_own`/`ics_link.generate` alone, and a page must not need
+ * a wider permission than its own gate implies just to draw its form.
+ * `canTargetGroups` names the group-picker capability explicitly rather than
+ * the client inferring it from `groups` being non-empty — a tenant with zero
+ * Groups would otherwise look ungated.
  */
 const request = useRequestFetch();
 
@@ -196,14 +251,22 @@ const linksData = useAsyncData(
     { default: () => [] as IcsLinkRow[], server: false },
 );
 
-const termsData = useAsyncData(
-    'me:ics-links:terms',
-    () => request<{ terms: TermOption[] }>('/api/schedule/context'),
-    { default: () => ({ terms: [] as TermOption[] }), server: false },
+interface ContextResponse {
+    terms: TermOption[];
+    groups: GroupOption[];
+    canTargetGroups: boolean;
+}
+
+const contextData = useAsyncData(
+    'me:ics-links:context',
+    () => request<ContextResponse>('/api/me/ics-links/context'),
+    { default: () => ({ terms: [], groups: [], canTargetGroups: false }) as ContextResponse, server: false },
 );
 
 const links = computed(() => linksData.data.value ?? []);
-const terms = computed(() => termsData.data.value?.terms ?? []);
+const terms = computed(() => contextData.data.value?.terms ?? []);
+const groups = computed(() => contextData.data.value?.groups ?? []);
+const canTargetGroups = computed(() => contextData.data.value?.canTargetGroups ?? false);
 const loadError = computed(() => (linksData.error.value ? 'Could not load your calendar links.' : ''));
 
 function scopeLabel(row: IcsLinkRow): string {
@@ -218,6 +281,16 @@ function scopeLabel(row: IcsLinkRow): string {
     return term ? `Term: ${term.name}` : 'One term';
 }
 
+function subjectLabel(row: IcsLinkRow): string {
+    if (!row.groupIds.length) {
+        return 'My own schedule';
+    }
+
+    const names = row.groupIds.map((id) => groups.value.find((g) => g.id === id)?.name ?? 'Unknown group');
+
+    return `Group: ${names.join(', ')}`;
+}
+
 /** The server's sentence, or a generic one. Same extraction the account form uses. */
 function messageOf(error: unknown): string {
     const e = error as { statusMessage?: string; data?: { statusMessage?: string } };
@@ -228,8 +301,17 @@ function messageOf(error: unknown): string {
 const creating = ref(false);
 const creatingBusy = ref(false);
 const createError = ref('');
-const form = reactive<{ name: string; scope: 'ALL' | 'TERM'; weeksAhead: number; termId: string }>({
+const form = reactive<{
+    name: string;
+    subject: 'OWN' | 'GROUPS';
+    groupIds: string[];
+    scope: 'ALL' | 'TERM';
+    weeksAhead: number;
+    termId: string;
+}>({
     name: '',
+    subject: 'OWN',
+    groupIds: [],
     scope: 'ALL',
     weeksAhead: 4,
     termId: '',
@@ -237,6 +319,10 @@ const form = reactive<{ name: string; scope: 'ALL' | 'TERM'; weeksAhead: number;
 
 const canSubmit = computed(() => {
     if (!form.name.trim()) {
+        return false;
+    }
+
+    if (form.subject === 'GROUPS' && form.groupIds.length === 0) {
         return false;
     }
 
@@ -249,6 +335,8 @@ function startCreate() {
     creating.value = true;
     createError.value = '';
     form.name = '';
+    form.subject = 'OWN';
+    form.groupIds = [];
     form.scope = 'ALL';
     form.weeksAhead = 4;
     form.termId = '';
@@ -267,9 +355,10 @@ async function create() {
     createError.value = '';
 
     try {
+        const groupIds = canTargetGroups.value && form.subject === 'GROUPS' ? form.groupIds : [];
         const body = form.scope === 'ALL'
-            ? { name: form.name.trim(), scope: 'ALL' as const, weeksAhead: form.weeksAhead }
-            : { name: form.name.trim(), scope: 'TERM' as const, termId: form.termId };
+            ? { name: form.name.trim(), scope: 'ALL' as const, weeksAhead: form.weeksAhead, groupIds }
+            : { name: form.name.trim(), scope: 'TERM' as const, termId: form.termId, groupIds };
 
         await request('/api/me/ics-links', { method: 'POST', body });
 

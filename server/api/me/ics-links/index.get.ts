@@ -21,6 +21,7 @@ defineRouteMeta({
                                     scope: { type: 'string', enum: ['ALL', 'TERM'] },
                                     termId: { type: 'string', nullable: true },
                                     weeksAhead: { type: 'integer', nullable: true },
+                                    groupIds: { type: 'array', items: { type: 'string' }, description: 'Empty means the link streams the caller\'s own Sessions (issue #115).' },
                                     lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
                                     createdAt: { type: 'string', format: 'date-time' },
                                 },
@@ -48,6 +49,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
 
     const links = await tx.icsLink.findMany({
         where: { personId: identity.actorPersonId as string },
+        include: { groups: { select: { groupId: true } } },
         orderBy: { createdAt: 'desc' },
     });
 
@@ -60,6 +62,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         scope: link.scope,
         termId: link.termId,
         weeksAhead: link.weeksAhead,
+        groupIds: link.groups.map((row) => row.groupId),
         lastUsedAt: link.lastUsedAt,
         createdAt: link.createdAt,
     }));

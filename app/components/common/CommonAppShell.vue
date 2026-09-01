@@ -126,13 +126,14 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
             '/my/exams',
             '/my/preferences',
             '/my/teaching-pattern',
+            '/my/calendar-links',
             '/my/account',
         ],
     },
     { label: 'People', paths: ['/manage/persons', '/manage/roles', '/manage/availability/preferences'] },
     {
         label: 'Resources',
-        paths: ['/manage/rooms', '/manage/equipment', '/manage/groups', '/manage/screens', '/manage/external-references'],
+        paths: ['/manage/rooms', '/manage/equipment', '/manage/groups', '/manage/screens'],
     },
     {
         label: 'Curriculum',

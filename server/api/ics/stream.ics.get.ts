@@ -4,7 +4,7 @@ import { getCached } from '../../utils/cache';
 import type { ExportSession, ExportTermGroup } from '../../utils/icalExport';
 import { buildIcs, weekRangeOf } from '../../utils/icalExport';
 import { icsCacheKey, SCHEDULE_CACHE_TTL_SECONDS } from '../../utils/scheduleCache';
-import { ownSessionClause } from '../../utils/scheduleScope';
+import { groupSessionClause, ownSessionClause } from '../../utils/scheduleScope';
 import { localNow } from '../../utils/solverCalendar';
 import type { Tx } from '../../utils/tenantDb';
 import { withTenant } from '../../utils/tenantDb';
@@ -14,8 +14,8 @@ import { icsLinkResolver } from '../../utils/tenantResolver';
 defineRouteMeta({
     openAPI: {
         tags: ['Calendar links'],
-        summary: 'Stream one Person’s own Sessions as a subscribable .ics feed',
-        description: 'The stream half of issue #15 — a calendar app fetches this on its own schedule, unlike GET /api/me/schedule.ics which no longer exists. Identified by the ics_link token in the query string alone; there is no session and no permission check, only the link’s own scope (ALL, bounded to its stored weeksAhead window, or one TERM in full). Public in the sense that `/api/screens/board` is: reachable with no cookie, because the token in the query string IS the credential — see tenant-context.ts.',
+        summary: 'Stream a Person’s own Sessions, or specific Groups’, as a subscribable .ics feed',
+        description: 'The stream half of issue #15 — a calendar app fetches this on its own schedule, unlike GET /api/me/schedule.ics which no longer exists. Identified by the ics_link token in the query string alone; there is no session and no permission check, only the link’s own scope (ALL, bounded to its stored weeksAhead window, or one TERM in full) and subject (issue #115: the creator’s own Sessions, or one or more Groups’ instead). Public in the sense that `/api/screens/board` is: reachable with no cookie, because the token in the query string IS the credential — see tenant-context.ts.',
         parameters: [
             { name: 'token', in: 'query', required: true, schema: { type: 'string' } },
         ],
@@ -79,7 +79,12 @@ export default defineEventHandler(async (event) => {
 
 /** The actual query + iCal assembly, extracted so it can be read-through cached. */
 async function buildIcsFeed(tx: Tx, identity: IcsLinkIdentity): Promise<string> {
-    const own = await ownSessionClause(tx, identity);
+    // SUBJECT (issue #115): explicit Group(s) if the link named any, else the
+    // creator's own Sessions — unchanged since issue #15. See the `ics_link`
+    // model's own comment.
+    const own = identity.groupIds.length
+        ? await groupSessionClause(tx, identity.groupIds)
+        : await ownSessionClause(tx, identity);
     const tenant = await tx.tenant.findUniqueOrThrow({
         where: { id: identity.tenantId },
         select: { timezone: true },

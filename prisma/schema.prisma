@@ -363,6 +363,7 @@ model Tenant {
   screens                      Screen[]
   apiTokens                    ApiToken[]
   icsLinks                     IcsLink[]
+  icsLinkGroups                IcsLinkGroup[]
   screenRooms                  ScreenRoom[]
   memberships                  Membership[]
   personRoles                  PersonRole[]
@@ -758,6 +759,7 @@ model Group {
   memberships    Membership[]
   offeringGroups OfferingGroup[]
   sessionGroups  SessionGroup[]
+  icsLinkGroups  IcsLinkGroup[]
   terms          GroupTerm[]
   availability   GroupTermAvailability[]
 
@@ -2618,12 +2620,21 @@ enum IcsLinkScope {
 /// not a one-time bearer credential, it is a "capability URL" a person must be
 /// able to come back and re-copy — into a second device, after clearing a
 /// calendar app's subscriptions — without losing sync elsewhere by rotating
-/// it. It is read-only, scoped to exactly this Person's own Sessions, and
-/// revoked by deleting the row.
+/// it. It is read-only and revoked by deleting the row.
 ///
 /// Resolution is privileged the same way Screen/ApiToken are —
 /// `calendry_internal.ics_link_identity()`, by the token alone — and the
 /// table itself is tenant-scoped and RLS-protected like everything else.
+///
+/// SUBJECT, as opposed to `scope`'s TIME WINDOW (issue #115): absent `groups`
+/// rows means "this Person's own Sessions" (`ownSessionClause`, unchanged
+/// from issue #15) — the default and the only shape `ics_link.generate_own`
+/// may create. One or more `groups` rows means "these Groups' Sessions
+/// instead", resolved the same ancestor-closure way a member's own timetable
+/// is (`ancestorGroupIds` — a Session assigned to a Group's ANCESTOR belongs
+/// to it too), just seeded from the link's chosen Groups rather than a
+/// Person's memberships. Minting a GROUPS link needs `ics_link.generate`, the
+/// wider of the two keys — see that permission's own comment.
 model IcsLink {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -2658,11 +2669,31 @@ model IcsLink {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
   term   Term?  @relation(fields: [termId], references: [id], onDelete: Cascade)
+  groups IcsLinkGroup[]
 
   @@unique([token])
   @@index([tenantId])
   @@index([personId])
   @@map("ics_link")
+}
+
+/// IcsLink ↔ Group — issue #115. Same shape as `SessionGroup`: a link may
+/// name several Groups, each just a row here, cascade-deleted with either
+/// side. An IcsLink with no rows here streams its creator's own Sessions
+/// instead — see the model's own comment.
+model IcsLinkGroup {
+  icsLinkId String @map("ics_link_id")
+  groupId   String @map("group_id")
+  tenantId  String @map("tenant_id")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  icsLink IcsLink @relation(fields: [icsLinkId], references: [id], onDelete: Cascade)
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([icsLinkId, groupId])
+  @@index([groupId])
+  @@index([tenantId])
+  @@map("ics_link_group")
 }
 
 // ---------------------------------------------------------------------------

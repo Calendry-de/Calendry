@@ -318,6 +318,35 @@ const EXPLICIT_PERMISSIONS = [
      */
     { key: 'tenant.read', category: 'tenant', description: "View this institution's own settings" },
     { key: 'tenant.update', category: 'tenant', description: "Change this institution's own settings" },
+
+    /**
+     * Calendar-subscription links (issue #15's stream half; issue #115 added
+     * the gate). `/manage/external-references` used to mint these with NO
+     * permission at all — any signed-in Person could create one, because it
+     * only ever streamed the CREATOR's own Sessions. That stopped being true
+     * once a link could target a GROUP instead: streaming "Grade 10's
+     * schedule" is institution data, not self-service over your own row, so
+     * minting a link at all now needs one of these two keys.
+     *
+     * SAME SHAPE AS `session.read`/`session.read_own`: `_own` is the narrow
+     * grant — a link scoped to the caller's own Sessions, which is exactly
+     * what `ownSessionClause` already resolves for a student (their Group
+     * memberships' ancestor closure) or a lecturer (their assigned
+     * Sessions). The bare key is the wide one and is the ONLY one that may
+     * also name explicit Group(s) — see `POST /api/me/ics-links`.
+     *
+     * Every EXISTING tenant's AccessRoles were backfilled `generate_own`
+     * wherever they already held `session.read` or `session.read_own` (see
+     * `scripts/backfill-ics-link-generate-own.ts`) — the same "a capability
+     * everyone silently had is about to require a grant nobody has yet" risk
+     * `dashboard.view` named, so it gets the same treatment. `generate` is a
+     * brand-new capability with no prior equivalent, so it follows the
+     * ordinary "new permission" path (`grant:permissions --role tenant-admin
+     * --all-missing`) instead. Freshly provisioned tenants seed `member`
+     * with `generate_own` directly (`calendry_internal.staff_create_tenant`).
+     */
+    { key: 'ics_link.generate_own', category: 'ics_link', description: 'Create a calendar-subscription link for your own schedule' },
+    { key: 'ics_link.generate', category: 'ics_link', description: 'Create a calendar-subscription link for your own schedule or for specific Groups' },
 ] as const satisfies readonly PermissionShape[];
 
 /**

@@ -271,40 +271,30 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             // own terms; not this card's fix to make.
             to: '/my/account',
         },
+        {
+            /*
+             * MOVED from `/manage/external-references` (issue #115), and now
+             * permission-gated where it previously carried none — see
+             * `ics_link.generate_own`/`ics_link.generate`'s own comments in
+             * shared/permissions.ts for why. Self-service over the caller's
+             * own data (or, with the wider key, over Groups they may target),
+             * never institution data, so `section: 'my'` alongside
+             * availability/exams/preferences is the right home — it was
+             * filed under Management only because it started out
+             * permission-less and self-service pages had nowhere else to go.
+             */
+            id: 'my.calendar-links',
+            label: 'Calendar links',
+            description: 'Subscribe an external calendar app to your schedule, or a Group\'s.',
+            icon: 'material-symbols:link',
+            section: 'my',
+            keywords: ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external'],
+            permission: MY_SECTION_PERMISSIONS['/my/calendar-links'],
+            to: '/my/calendar-links',
+        },
 
         ...manageEntries(),
 
-        {
-            /*
-             * DELIBERATELY NOT `manage.external-references` (issue #108).
-             * `useManageSections()` — the dashboard's cards grid — includes
-             * ANY entry whose id starts with `manage.` with no further
-             * check, on the assumption that every such entry carries its own
-             * institution-data permission; that prefix is what makes "no
-             * manage.* entries visible" mean "no read access to any
-             * management section", the exact claim `dashboard.vue`'s empty
-             * state makes. This entry carries NO permission — a calendar
-             * link only ever streams the CREATOR's own Sessions, the same
-             * self-service authority `my.account` exercises with no
-             * permission — so the `manage.` prefix would have put this card
-             * in front of every signed-in person, including one holding no
-             * institution-wide capability at all, and made the empty
-             * state's claim false.
-             *
-             * `section: 'manage'` and `to: '/manage/external-references'`
-             * still place it in the Manage area's sidebar group and the
-             * Ctrl+K palette, alongside Screens, a comparable device/link
-             * credential; it is simply not one of the entity sections the
-             * dashboard grid enumerates.
-             */
-            id: 'external-references',
-            label: 'External references',
-            description: 'Links you hand to something outside the app — calendar subscriptions today.',
-            icon: 'material-symbols:link',
-            section: 'manage',
-            keywords: ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external'],
-            to: '/manage/external-references',
-        },
         {
             id: 'manage.display',
             label: 'Display',

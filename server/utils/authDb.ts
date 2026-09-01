@@ -147,6 +147,8 @@ export interface IcsLinkIdentityRow {
     scope: 'ALL' | 'TERM';
     term_id: string | null;
     weeks_ahead: number | null;
+    /** Empty means "this Person's own Sessions" — see the `ics_link` model comment (issue #115). */
+    group_ids: string[];
 }
 
 /**

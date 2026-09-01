@@ -46,7 +46,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
 | Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
-| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log — the fifth tenant-isolation exception |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log — the fifth tenant-isolation exception · Calendar links gain a permission and a Group subject |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
@@ -2276,6 +2276,77 @@ must not turn a successful login or a legitimate 403 into an unrelated 500.
 them, the one place in this codebase where a database write is deliberately
 allowed to fail silently, because the alternative (an audit write blocking
 the operation it's auditing) is worse than an occasional missed row.
+
+---
+
+# Calendar links gain a permission and a Group subject (issue #115)
+
+Three changes to the self-service calendar-subscription link (issue #15),
+made together: it moved from `/manage/external-references` to `/my`, it
+gained a permission gate where it previously had none, and a link can now
+target one or more Groups instead of always streaming its creator's own
+Sessions. The order they're explained in below is the order the design
+actually followed — the Group feature is what forced the other two.
+
+**Why a Group subject needed a permission at all.** `POST
+/api/me/ics-links` had no permission check because it only ever narrowed to
+the caller's own Sessions — authority a Person always has over themselves,
+the same reasoning `/my/account`'s locale setting needs none. That stopped
+holding the moment a link could name a Group instead: streaming "Grade 10's
+schedule" is institution data, not self-service over your own row. Two
+keys, not one, mirroring `session.read`/`session.read_own`:
+`ics_link.generate_own` (own Sessions only — the pre-existing behavior,
+now named) and `ics_link.generate` (also may set `groupIds`).
+
+**Why the group closure reuses `ancestorGroupIds`, not `descendantGroupIds`.**
+A link targeting Group X is meant to answer the same question a MEMBER of X
+would ask of their own timetable — "what am I in" — just seeded from an
+explicit Group instead of a Person's memberships. `ownSessionClause`
+already answers that with `ancestorGroupIds` (attendance flows DOWN, so a
+Session assigned to X's ANCESTOR belongs to X too — TAXONOMY.md §6). Walking
+DOWN instead — showing a cohort-link every seminar's individual Sessions —
+was considered and rejected: it answers a different, broader question
+("everything happening inside X"), is not what `ownSessionClause` means for
+a member, and would have needed its own justification and its own test
+rather than reusing an existing, already-proven closure. `groupSessionClause`
+(`server/utils/scheduleScope.ts`) is the one-line function this produced;
+`tests/ics-links.test.ts`'s "does NOT walk down to a child Group's Sessions"
+case pins the direction.
+
+**Why the backfill for `generate_own` grants by SHAPE, not by role key,
+and why it's inclusive rather than exclusive** — the opposite direction
+from `dashboard.view`'s backfill. `dashboard.view` had to EXCLUDE the
+`session.read_own`-only shape, because the whole point was to stop routing
+that shape to `/dashboard`. Here, nothing about the capability was meant to
+change: before this issue, ANY signed-in Person could mint a link
+regardless of what else they held (it just streamed an empty feed for
+someone with no schedule visibility). So `backfill-ics-link-generate-own.ts`
+grants to every AccessRole already holding `session.read` OR
+`session.read_own` — every role for which the capability was ever
+MEANINGFUL — which makes it a non-regression backfill despite widening
+`access_role_permission` the same way `dashboard.view`'s did. `ics_link.generate`
+(the Group-targeting key) has no such backfill: it is a brand-new
+capability with no prior equivalent, so it follows the ordinary
+`grant:permissions --role tenant-admin --all-missing` path instead.
+
+**Why the reference data got its own endpoint instead of reusing
+`/api/schedule/context` or the generic `/api/groups`/`/api/terms`.** Same
+reasoning as issue #108's `GET /api/me/exam-requests/context`: a page's own
+fetches must not need a wider permission than its own gate implies.
+`GET /api/me/ics-links/context` returns Terms unconditionally (needed by
+every holder, to fill the TERM-scope picker) and Groups only when the
+caller holds `ics_link.generate` — flagged explicitly via `canTargetGroups`
+rather than the client inferring it from an empty `groups` array, because a
+tenant with zero Groups would otherwise look indistinguishable from one
+that just isn't permitted to see any.
+
+**Why the page moved to `/my`.** It was filed under Management originally
+only because a permission-less self-service page had nowhere else to go —
+`useManageSections()`'s dashboard grid includes anything whose nav id starts
+with `manage.`, which this deliberately avoided. Once it carries a real
+permission, `/my` — alongside availability, exams, teaching pattern — is
+just the correct home, the same self-service shape every other entry there
+already has.
 
 ---
 

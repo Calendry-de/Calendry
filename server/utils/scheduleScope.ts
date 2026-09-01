@@ -129,3 +129,24 @@ export async function ownSessionClause(tx: Tx, identity: TenantScopedIdentity): 
         ],
     };
 }
+
+/**
+ * "Sessions belonging to these Groups" — the calendar-link equivalent of
+ * `ownSessionClause`'s Group branch (issue #115), for a link that names
+ * explicit Groups instead of streaming its creator's own Sessions.
+ *
+ * SAME ANCESTOR WALK, deliberately: a Group's own calendar must show a
+ * Session assigned to one of its ANCESTORS too (a cohort-wide lecture reaches
+ * its seminars — TAXONOMY.md §6, attendance flows DOWN), which is exactly
+ * what a MEMBER of that Group would see via `ownSessionClause`. This omits
+ * `ownSessionClause`'s other two branches on purpose: there is no specific
+ * Person here to attach a direct `session_person` row or a substitution to.
+ *
+ * `groupIds` must already be validated as belonging to the caller's tenant —
+ * this function does not re-check that.
+ */
+export async function groupSessionClause(tx: Tx, groupIds: string[]): Promise<Record<string, unknown>> {
+    const attendedGroupIds = await ancestorGroupIds(tx, groupIds);
+
+    return { groups: { some: { groupId: { in: attendedGroupIds } } } };
+}

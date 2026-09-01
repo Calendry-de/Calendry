@@ -18,10 +18,27 @@ import { api, login } from './helpers/client';
  * `test-tenant-a`'s timezone is set to Europe/Berlin here for the same reason
  * the old suite set it: the fixture defaults to UTC, which would make a wrong
  * UTC conversion invisible.
+ *
+ * PERMISSION FIXTURES (issue #115). `adminA` holds the whole catalogue
+ * (`allPermissions` in `tests/helpers/seed.ts`), so it covers both
+ * `ics_link.generate` and `ics_link.generate_own` — the "may target Groups"
+ * cases below use it. `viewerA` holds exactly `session.read` — pinned exactly
+ * by `auth-permissions.test.ts` and shared by 24 other suites, so it is
+ * deliberately NOT widened here — it stands in for "holds neither ics_link
+ * key". `multiA` (personMultiA, `ACCOUNTS.multi` logged into `test-a`) is a
+ * SECOND admin-shaped person in the same tenant, used wherever the "own
+ * links only" tests need somebody who is not `adminA` but can still mint one.
+ * `ownOnly` is a file-local fixture (own AccessRole, own Person, own Account)
+ * holding EXACTLY `ics_link.generate_own` — the one shape that can mint a
+ * link at all but must be refused `groupIds`.
  */
 let f: Fixtures;
 let adminCookie = '';
 let viewerCookie = '';
+let multiCookie = '';
+let ownOnlyCookie = '';
+
+const OWN_ONLY_EMAIL = 'ics-own-only@test.local';
 
 interface CreatedLink {
     id: string;
@@ -30,6 +47,7 @@ interface CreatedLink {
     scope: 'ALL' | 'TERM';
     termId: string | null;
     weeksAhead: number | null;
+    groupIds: string[];
 }
 
 function tokenOf(url: string): string {
@@ -46,15 +64,44 @@ async function createLink(cookie: string, body: Record<string, unknown>) {
     return { status: res.status, body: res.body };
 }
 
+/** A Person/AccessRole/Account holding exactly `ics_link.generate_own` — no `session.read_own`, no `ics_link.generate`. */
+async function seedOwnOnly(tenantId: string) {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${OWN_ONLY_EMAIL}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId, key: 'ics-own-only', name: 'Own calendar link only' },
+    });
+
+    await ownerDb.accessRolePermission.create({
+        data: { accessRoleId: role.id, permissionKey: 'ics_link.generate_own', tenantId },
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId, givenName: 'Own', familyName: 'Only', email: 'own-only-ics@a.test' },
+    });
+
+    await ownerDb.personAccessRole.create({ data: { personId: person.id, accessRoleId: role.id, tenantId } });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({ data: { email: OWN_ONLY_EMAIL, passwordHash: template.passwordHash } });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     f = await seed();
     adminCookie = (await login(ACCOUNTS.adminA, TEST_PASSWORD)).cookie;
     viewerCookie = (await login(ACCOUNTS.viewerA, TEST_PASSWORD)).cookie;
+    multiCookie = (await login(ACCOUNTS.multi, TEST_PASSWORD, 'test-a')).cookie;
+
+    await seedOwnOnly(f.tenantA);
+    ownOnlyCookie = (await login(OWN_ONLY_EMAIL, TEST_PASSWORD)).cookie;
 
     await ownerDb.tenant.update({ where: { id: f.tenantA }, data: { timezone: 'Europe/Berlin' } });
 });
 
 afterAll(async () => {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${OWN_ONLY_EMAIL}'`);
     await teardown();
     await ownerDb.$disconnect();
 });
@@ -127,10 +174,35 @@ describe('creating a link', () => {
     });
 });
 
+describe('permission gating (issue #115)', () => {
+    it('refuses a caller holding neither ics_link key', async () => {
+        const { status } = await createLink(viewerCookie, { name: 'Nope', scope: 'ALL', weeksAhead: 4 });
+
+        expect(status).toBe(403);
+    });
+
+    it('ics_link.generate_own may mint an own-schedule link', async () => {
+        const { status, body } = await createLink(ownOnlyCookie, { name: 'Own', scope: 'ALL', weeksAhead: 4 });
+
+        expect(status).toBe(201);
+        expect(body.groupIds).toEqual([]);
+
+        await api(`/api/me/ics-links/${body.id}`, { method: 'DELETE', cookie: ownOnlyCookie });
+    });
+
+    it('ics_link.generate_own may NOT target a Group', async () => {
+        const { status } = await createLink(ownOnlyCookie, {
+            name: 'Overreach', scope: 'ALL', weeksAhead: 4, groupIds: [f.groupSeminarA],
+        });
+
+        expect(status).toBe(403);
+    });
+});
+
 describe('listing and deleting', () => {
     it('lists only the callers own links, with the streamable url every time', async () => {
         const mine = await createLink(adminCookie, { name: 'Mine', scope: 'TERM', termId: f.termA });
-        const theirs = await createLink(viewerCookie, { name: 'Theirs', scope: 'TERM', termId: f.termA });
+        const theirs = await createLink(multiCookie, { name: 'Theirs', scope: 'TERM', termId: f.termA });
 
         try {
             const list = await api<CreatedLink[]>('/api/me/ics-links', { cookie: adminCookie });
@@ -143,7 +215,7 @@ describe('listing and deleting', () => {
             expect(list.body.some((l) => l.id === theirs.body.id)).toBe(false);
         } finally {
             await api(`/api/me/ics-links/${mine.body.id}`, { method: 'DELETE', cookie: adminCookie });
-            await api(`/api/me/ics-links/${theirs.body.id}`, { method: 'DELETE', cookie: viewerCookie });
+            await api(`/api/me/ics-links/${theirs.body.id}`, { method: 'DELETE', cookie: multiCookie });
         }
     });
 
@@ -257,5 +329,63 @@ describe('the stream', () => {
         const res = await api('/api/ics/stream.ics', { cookie: adminCookie });
 
         expect(res.status).toBe(401);
+    });
+});
+
+describe('group-scoped links (issue #115)', () => {
+    it('refuses a groupId not found in the caller\'s own tenant', async () => {
+        const { status } = await createLink(adminCookie, {
+            name: 'Bad group', scope: 'ALL', weeksAhead: 4, groupIds: ['does-not-exist'],
+        });
+
+        expect(status).toBe(404);
+    });
+
+    it('streams a Group\'s own Sessions, not the creator\'s', async () => {
+        // test-session-a is attached DIRECTLY to groupSeminarA (session_group)
+        // — the fixture's own creator, personA, is also directly attached to
+        // it via session_person. A group-scoped link must reach it through
+        // the GROUP row alone: `multiA` (personMultiA) creates this link and
+        // is attached to no Session at all, so the only way it can show up
+        // is the Group match.
+        const { status, body } = await createLink(multiCookie, {
+            name: 'Seminar feed', scope: 'TERM', termId: f.termA, groupIds: [f.groupSeminarA],
+        });
+
+        expect(status).toBe(201);
+        expect(body.groupIds).toEqual([f.groupSeminarA]);
+
+        try {
+            const res = await api(`/api/ics/stream.ics?token=${tokenOf(body.url)}`);
+
+            expect(res.status).toBe(200);
+            expect((res.body as unknown as string)).toContain('SUMMARY:Databases');
+        } finally {
+            await api(`/api/me/ics-links/${body.id}`, { method: 'DELETE', cookie: multiCookie });
+        }
+    });
+
+    it('does NOT walk down to a child Group\'s Sessions — only ancestors, same as a member\'s own timetable', async () => {
+        // groupCohortA is groupSeminarA's PARENT. test-session-a is assigned
+        // to the SEMINAR, not the cohort, so a link scoped to the cohort must
+        // miss it — the same "attendance flows down, not up" rule
+        // `ownSessionClause`'s own comment states. Getting this backwards
+        // would also accidentally leak `multiA`'s creator identity never
+        // mattering here, since a DESCENDANT walk would show the seminar's
+        // session to anyone targeting the cohort regardless of membership.
+        const { status, body } = await createLink(multiCookie, {
+            name: 'Cohort feed', scope: 'TERM', termId: f.termA, groupIds: [f.groupCohortA],
+        });
+
+        expect(status).toBe(201);
+
+        try {
+            const res = await api(`/api/ics/stream.ics?token=${tokenOf(body.url)}`);
+
+            expect(res.status).toBe(200);
+            expect((res.body as unknown as string)).not.toContain('Databases');
+        } finally {
+            await api(`/api/me/ics-links/${body.id}`, { method: 'DELETE', cookie: multiCookie });
+        }
     });
 });
