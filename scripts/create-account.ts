@@ -55,6 +55,7 @@ import { hostname, userInfo } from 'node:os';
 // The real hashing path, never a re-implementation — a second copy of the KDF
 // drifts silently the moment the original changes.
 import { hashPassword } from '../server/utils/auth';
+import { createAccountRow, linkAccountToPerson } from '../server/utils/accountAdmin';
 import { randomPassword } from '../shared/password';
 import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 import { arg, createOwnerPrisma, formatUnreachableDatabaseError, isUnreachableDatabaseError } from './lib/cli';
@@ -247,12 +248,12 @@ async function main() {
             }
 
             const account = existingAccount
-                ?? (await tx.account.create({
-                    data: { email, passwordHash: passwordHash as string, mustChangePassword: true },
+                ?? (await createAccountRow(tx, {
+                    email, passwordHash: passwordHash as string, mustChangePassword: true,
                 }));
 
             if (!linkExists) {
-                await tx.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+                await linkAccountToPerson(tx, account.id, person.id);
             }
 
             return { person, account };

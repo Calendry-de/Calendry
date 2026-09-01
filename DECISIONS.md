@@ -46,7 +46,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
 | Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
-| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log — the fifth tenant-isolation exception |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
@@ -2242,6 +2242,40 @@ so `scripts/provision-tenant.ts` calls this exact function too, passing its
 own owner-connected client — nothing about the function's own privilege
 model changes; `SECURITY DEFINER` was always what mattered, never which
 connection happened to call it. `provisionTenantCore()` is deleted.
+
+---
+
+# The persisted audit log — the fifth tenant-isolation exception
+
+`audit_log` (issue #78) carries no RLS and a nullable `tenant_id` with no FK,
+exactly the shape exception 2 (the pre-tenant auth plane) and exception 4
+(the staff principal) already have — but it shipped without being named in
+CLAUDE.md's "deliberate exceptions to tenant isolation" list, found during an
+unrelated database-access audit. Naming it here after the fact, per this
+project's own rule that an exception needs a recorded reason, not a silent
+existence.
+
+**Why it can't be scoped to one tenant.** Two of its own event shapes are
+structurally cross-tenant or pre-tenant: a denied cross-tenant access attempt
+names the tenant that was DENIED — not the actor's own, which may be a
+different tenant or no tenant at all — and a login failure against an email
+with no matching Account happens before any tenant is known. A `tenant_id`
+column that MUST be set would have nowhere honest to put either fact.
+
+**Why it doesn't need a `SECURITY DEFINER` function, unlike exceptions 2 and
+4.** Those two need one because their pre-tenant lookup has to JOIN into an
+RLS-protected table (`person`, `tenant`) to learn which tenant a credential
+belongs to. `audit_log` joins to nothing — it is an append-only fact table
+with denormalized actor/target strings precisely so it never needs to. So
+`writeAuditLog()` (`server/utils/auditLog.ts`) is a plain insert on the
+ordinary runtime connection (`getPrisma()`), not a privileged function call.
+
+**Why it never throws.** A logging failure — a full disk, a bad connection —
+must not turn a successful login or a legitimate 403 into an unrelated 500.
+`writeAuditLog()` catches and logs its own errors rather than propagating
+them, the one place in this codebase where a database write is deliberately
+allowed to fail silently, because the alternative (an audit write blocking
+the operation it's auditing) is worse than an occasional missed row.
 
 ---
 

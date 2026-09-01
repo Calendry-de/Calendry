@@ -48,6 +48,45 @@ export const passwordSchema = z
 /** A one-time password, shown once by the caller and never stored in the clear. */
 export const generatePassword = randomPassword;
 
+export interface CreateAccountRowInput {
+    email: string;
+    passwordHash: string;
+    mustChangePassword: boolean;
+    /** Omitted keeps the column's own default — stated because callers vary on this. */
+    isActive?: boolean;
+}
+
+/**
+ * Creates a new `account` row. The caller decides whether to reuse an
+ * existing one by email first — this always creates, never upserts, matching
+ * how both callers already treat "an existing Account for this email" as a
+ * question they answer themselves before reaching here.
+ *
+ * Shared by `POST /api/accounts` and `scripts/create-account.ts`, which used
+ * to each write this same `tx.account.create()` call independently.
+ */
+export async function createAccountRow(tx: Tx, input: CreateAccountRowInput): Promise<{ id: string }> {
+    return tx.account.create({
+        data: {
+            email: input.email,
+            passwordHash: input.passwordHash,
+            mustChangePassword: input.mustChangePassword,
+            ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+        },
+        select: { id: true },
+    });
+}
+
+/**
+ * Links an Account to a Person — the `account_person` row every
+ * account-creation or account-attach path ends with, whether the Account was
+ * just created or an existing one is being reused. Shared for the same
+ * reason `createAccountRow` is.
+ */
+export async function linkAccountToPerson(tx: Tx, accountId: string, personId: string): Promise<void> {
+    await tx.accountPerson.create({ data: { accountId, personId } });
+}
+
 /** One row of `account_person`, resolved to the tenant it acts in. */
 interface Identity {
     personId: string;

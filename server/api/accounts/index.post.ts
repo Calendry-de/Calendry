@@ -4,7 +4,9 @@ import {
     accountScope,
     accountView,
     auditAccount,
+    createAccountRow,
     generatePassword,
+    linkAccountToPerson,
     passwordSchema,
     resolveAttachablePerson,
 } from '../../utils/accountAdmin';
@@ -104,26 +106,19 @@ export default defineEventHandler(async (event) => {
                  * this credential; touching any of them here would let one
                  * institution reconfigure another's login by claiming an email.
                  */
-                await tx.accountPerson.create({
-                    data: { accountId: existing.id, personId: person.id },
-                });
+                await linkAccountToPerson(tx, existing.id, person.id);
 
                 return existing.id;
             }
 
-            const created = await tx.account.create({
-                data: {
-                    email: body.email,
-                    passwordHash: await hashPassword(password as string),
-                    mustChangePassword,
-                    ...(body.isActive === undefined ? {} : { isActive: body.isActive }),
-                },
-                select: { id: true },
+            const created = await createAccountRow(tx, {
+                email: body.email,
+                passwordHash: await hashPassword(password as string),
+                mustChangePassword,
+                isActive: body.isActive,
             });
 
-            await tx.accountPerson.create({
-                data: { accountId: created.id, personId: person.id },
-            });
+            await linkAccountToPerson(tx, created.id, person.id);
 
             return created.id;
         });

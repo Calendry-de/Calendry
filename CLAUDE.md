@@ -82,6 +82,19 @@ values. **Never hardcode an open value into logic** — never assume a Role call
 - **Never query outside `withTenant()`.** Route handlers go through
   `withRequestTenant`. A query outside it sees zero rows, not all rows —
   deliberate. Sole exception: `server/utils/authDb.ts`.
+- **One implementation per database operation, never two kept "in agreement
+  by hand."** `provisionTenantCore()` (TypeScript) and
+  `calendry_internal.staff_create_tenant()` (SQL) briefly both existed as
+  independent implementations of "create a tenant" — issue #107 had to add
+  `student`/`parent` Role seeding to both by hand, which is exactly the
+  silent-drift failure mode this rule exists to name. Fixed by deleting the
+  TypeScript copy: the SQL function is `SECURITY DEFINER`, so it runs
+  privileged regardless of which connection calls it, and both the CLI and
+  the HTTP route now call the same `provisionTenantViaFunction()` wrapper
+  with their own connection. If a second caller needs a database operation a
+  `SECURITY DEFINER` function (or any other single source of truth) already
+  implements, make it callable from there — never re-derive the logic. §
+  "Tenant creation has one implementation" (DECISIONS.md).
 - **Migrations are schema-only; seed populates data.** A freshly migrated
   database is deliberately unusable: `permission` is empty and provisioning fails
   loudly on the `access_role_permission` FK.
@@ -148,11 +161,11 @@ Never give a screen or the poller an `actorPersonId` to make a check pass. The
 check is the boundary; widen the route deliberately, or add a scope the way
 screens did.
 
-### The four deliberate exceptions to tenant isolation
+### The five deliberate exceptions to tenant isolation
 
-Conscious boundaries, not oversights. **A fifth is a bug** — do not add one
+Conscious boundaries, not oversights. **A sixth is a bug** — do not add one
 without a comparably strong reason, approved explicitly and recorded here and
-in DECISIONS.md, the way the fourth was.
+in DECISIONS.md, the way the fourth and fifth were.
 
 1. **Federation-owned resources.** `room`/`equipment`/`offering`/`session` may be
    Federation- instead of Tenant-owned (a shared lecture hall, a cross-enrolled
@@ -186,6 +199,15 @@ in DECISIONS.md, the way the fourth was.
    (`getOwnerPrisma()`) — a plain cross-tenant read, not a write, and outside
    #105's scope. § "Staff principal — the fourth tenant-isolation exception",
    § "Staff tenant creation: SECURITY DEFINER instead of owner-Prisma".
+5. **The persisted audit log** (issue #78). `audit_log` carries a nullable
+   `tenant_id` with **no FK and no RLS** — a denied cross-tenant attempt
+   names the tenant that was DENIED, and a bare login failure against an
+   unknown email predates any tenant at all, so the table cannot be scoped to
+   one. `writeAuditLog()` (`server/utils/auditLog.ts`) writes through
+   `getPrisma()` directly, never `withTenant()`, and never throws — a logging
+   failure must not turn a successful login or a 403 into a 500. This
+   exception was shipped before it was named here; naming it after the fact
+   doesn't relax the rule for the next one.
 
 ## The traps that keep recurring
 
@@ -469,6 +491,6 @@ Production image and CI specifics: § "Bootstrap & deploy".
 - Hardcode a tenant-open value (role name, `kind`, equipment tag) into logic
 - Bypass the event log for a Session mutation
 - Implement solver logic in this repo
-- Relax tenant isolation beyond the four declared exceptions
+- Relax tenant isolation beyond the five declared exceptions
 - Let a tenant change a credential on an Account another tenant also uses, or
   leave an Account with no `account_person` row
