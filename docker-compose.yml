@@ -15,9 +15,16 @@ services:
     env_file:
       - .env
     healthcheck:
+      # curl, not wget: the runner image (`.config/Dockerfile`) never installed
+      # wget, only curl (via the base image / apt), so this healthcheck has
+      # been failing outright ("wget: not found") since #92 gave `/health`
+      # something worth checking — Docker reported the container unhealthy
+      # while `/health` itself answered correctly. `-f` makes curl exit
+      # non-zero on a non-2xx response (the 503 `/health` now returns when
+      # degraded), matching wget's default failure behaviour.
       test:
           - CMD-SHELL
-          - 'wget --no-verbose http://127.0.0.1:3000/health || exit 1'
+          - 'curl -fsS http://127.0.0.1:3000/health || exit 1'
       interval: 30s
       timeout: 20s
       retries: 10

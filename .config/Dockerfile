@@ -33,7 +33,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN apk add --no-cache wget
+RUN apk add --no-cache curl
 
 # `prisma db seed` runs `bun run prisma/seed.ts`, and this is a node image.
 COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
