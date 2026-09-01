@@ -134,31 +134,54 @@
                 v-if="variants.length"
                 class="cgrid_rows"
             >
-                <ManageConstraintRow
-                    v-for="variant in variants"
-                    :key="variant.row.id"
-                    :busy="busy.has(variant.row.id)"
-                    :can-read-kinds="canReadKinds"
-                    :can-update="canUpdate"
-                    :heading="variant.row.name"
-                    :kinds="kinds"
-                    :row="variant.row"
-                    :scope-required="true"
-                    :subtitle="`${variant.type.label} — narrowed from the tenant-wide rule.`"
-                    :type="variant.type"
-                    @update:enabled="setEnabled(variant.row, $event)"
-                    @update:param="setParam(variant.row, $event.key, $event.value)"
-                    @update:scopes="setScopes(variant.row, $event)"
-                    @update:weight="setWeight(variant.row, $event)"
+                <template
+                    v-for="group in variantGroups"
+                    :key="group.key"
                 >
-                    <template #actions>
-                        <CommonButton
-                            icon="material-symbols:edit-outline"
-                            :to="`/manage/constraints/${variant.row.id}`"
-                            type="transparent"
-                        >Edit</CommonButton>
-                    </template>
-                </ManageConstraintRow>
+                    <!--
+                        A GROUP OF ONE renders exactly as an ungrouped variant always
+                        has — issue #103 asks that grouping only kick in where it
+                        actually saves scrolling, never as a pointless wrapper around
+                        a config nothing else shares.
+                    -->
+                    <ManageConstraintRow
+                        v-if="group.entries.length === 1"
+                        :busy="busy.has(group.row.id)"
+                        :can-read-kinds="canReadKinds"
+                        :can-update="canUpdate"
+                        :heading="group.row.name"
+                        :kinds="kinds"
+                        :row="group.row"
+                        :scope-required="true"
+                        :subtitle="`${group.type.label} — narrowed from the tenant-wide rule.`"
+                        :type="group.type"
+                        @update:enabled="setEnabled(group.row, $event)"
+                        @update:param="setParam(group.row, $event.key, $event.value)"
+                        @update:scopes="setScopes(group.row, $event)"
+                        @update:weight="setWeight(group.row, $event)"
+                    >
+                        <template #actions>
+                            <CommonButton
+                                icon="material-symbols:edit-outline"
+                                :to="`/manage/constraints/${group.row.id}`"
+                                type="transparent"
+                            >Edit</CommonButton>
+                        </template>
+                    </ManageConstraintRow>
+
+                    <ManageConstraintVariantGroup
+                        v-else
+                        :busy="busy"
+                        :can-read-kinds="canReadKinds"
+                        :can-update="canUpdate"
+                        :group="group"
+                        :kinds="kinds"
+                        @update:enabled="setEnabled($event.row, $event.value)"
+                        @update:param="setParam($event.row, $event.key, $event.value)"
+                        @update:scopes="setScopes($event.row, $event.kindIds)"
+                        @update:weight="setWeight($event.row, $event.value)"
+                    />
+                </template>
             </ul>
 
             <p
@@ -190,8 +213,10 @@ import type { ManageEntity } from '~/utils/manageRegistry';
 import type { useEntityList } from '~/composables/entityList';
 import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
+import ManageConstraintVariantGroup from '~/components/manage/ManageConstraintVariantGroup.vue';
 import { CONSTRAINT_TYPES, defaultConstraintTypes, findConstraintType } from '#shared/constraintTypes';
 import { isConstraintTypeSuggested } from '#shared/tenantMode';
+import { groupConstraintVariants } from '~/utils/constraintGrouping';
 
 /**
  * The constraint list, as a configuration surface rather than a table of rows.
@@ -257,6 +282,15 @@ const variants = computed(() => rows.value
         return type ? { type, row } : null;
     })
     .filter((entry): entry is { type: ConstraintTypeDef; row: ConstraintRow } => entry !== null));
+
+/**
+ * Issue #103: variants sharing the exact same type/severity/weight/params/
+ * enabled state, collapsed to one entry each. Computed from `variants`
+ * alone — the whole set the grid already holds (see `listPageSize` on
+ * `CONSTRAINT_ENTITY`) — so this needs no fetch of its own and reflects
+ * every edit immediately, the same as everything else on this page.
+ */
+const variantGroups = computed(() => groupConstraintVariants(variants.value));
 
 /*
  * `useAsyncData` + `useRequestFetch`, NOT an `onMounted` fetch: a client-only hook
