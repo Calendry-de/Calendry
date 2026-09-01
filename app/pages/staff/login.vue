@@ -192,7 +192,7 @@ async function submit() {
     busy.value = true;
 
     try {
-        await $fetch('/api/staff-auth/login', {
+        const result = await $fetch<{ requiresPasswordChange?: boolean }>('/api/staff-auth/login', {
             method: 'POST',
             body: {
                 email: email.value,
@@ -203,6 +203,17 @@ async function submit() {
                 ...(turnstileToken.value ? { turnstileToken: turnstileToken.value } : {}),
             },
         });
+
+        // Credentials were correct, but the password is forced-reset or
+        // expired (issue #106): no session was issued, so navigating to
+        // STAFF_ROUTE would only bounce right back here. There is no staff
+        // change-password page yet — this names the situation rather than
+        // silently pretending the sign-in succeeded.
+        if (result.requiresPasswordChange) {
+            error.value = 'This password must be changed before signing in. Contact an administrator.';
+
+            return;
+        }
 
         await navigateTo(destination());
     } catch {

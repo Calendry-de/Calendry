@@ -255,6 +255,26 @@ export async function touchStaffAccountLogin(staffAccountId: string) {
     });
 }
 
+/**
+ * Mirrors `updatePasswordAndRevokeSessions` above, for the staff plane —
+ * issue #106. Setting the password but failing to revoke sessions would be
+ * worse than doing neither: the old session would keep working under a
+ * password its holder no longer knows.
+ */
+export async function updateStaffPasswordAndRevokeSessions(staffAccountId: string, passwordHash: string): Promise<void> {
+    await getPrisma().$transaction(async (tx) => {
+        await tx.staffAccount.update({
+            where: { id: staffAccountId },
+            data: { passwordHash, mustChangePassword: false, passwordChangedAt: new Date() },
+        });
+
+        await tx.staffSession.updateMany({
+            where: { staffAccountId, revokedAt: null },
+            data: { revokedAt: new Date() },
+        });
+    });
+}
+
 /** The tenants this account can act in. */
 export async function listAccountIdentities(accountId: string): Promise<AccountIdentityRow[]> {
     const prisma = getPrisma();

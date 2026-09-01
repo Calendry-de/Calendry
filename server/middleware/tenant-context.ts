@@ -16,6 +16,10 @@ const PUBLIC_API_PATHS = [
     // already-revoked token), exactly like `/api/auth/logout`.
     '/api/staff-auth/login',
     '/api/staff-auth/logout',
+    // Same reasoning as '/api/auth/change-password' above, for the staff
+    // plane — issue #106. A staff forced reset issues no staff session, so
+    // requiring one here would make the flag unclearable.
+    '/api/staff-auth/change-password',
     /*
      * The board is reachable without an ACCOUNT, never without identity. A
      * screen key resolves to a real `ScreenIdentity` through the resolver like

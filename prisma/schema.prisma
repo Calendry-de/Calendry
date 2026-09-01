@@ -2277,7 +2277,17 @@ model StaffAccount {
   passwordHash String  @map("password_hash")
   isActive     Boolean @default(true) @map("is_active")
 
+  /// Set by the operator (`provision-staff.ts`, or a future reset CLI). While
+  /// true, staff login authenticates but issues NO session — same policy as
+  /// `Account.mustChangePassword`, issue #106.
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
+
+  /// When the password itself last changed — drives expiry via the SAME
+  /// `MAX_PASSWORD_AGE_MS` constant `Account.passwordChangedAt` uses
+  /// (`server/utils/auth.ts`), not a second policy. Issue #106.
+  passwordChangedAt DateTime @default(now()) @map("password_changed_at") @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
