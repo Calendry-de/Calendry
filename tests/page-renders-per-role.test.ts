@@ -78,6 +78,25 @@ const SELF_SERVICE = 'self-service@test.local';
 const PROPOSAL_REVIEWER = 'proposal-reviewer@test.local';
 
 /**
+ * `session.read` PLUS `dashboard.view` — issue #112.
+ *
+ * File-local rather than a widening of `viewer`: `viewer` is pinned to hold
+ * EXACTLY `['session.read']` by `auth-permissions.test.ts`
+ * (`expect(viewerSession.body.permissions).toEqual(['session.read'])`), and
+ * is shared by 24 test files (`grep -rl "ACCOUNTS.viewerA\|personViewerA\|
+ * viewerRole" tests/*.test.ts`). Adding `dashboard.view` to it would break
+ * that exact-match pin and risk every other consumer — exactly the blast
+ * radius issue #112 warns about.
+ *
+ * This shape is not synthetic: it is what a role that existed BEFORE issue
+ * #107 shipped looks like today, after `scripts/backfill-dashboard-view.ts`'s
+ * one-time grant. `/dashboard`'s empty-state rendering is reachable only by a
+ * role that legitimately holds `dashboard.view`, so testing it needs exactly
+ * this shape.
+ */
+const NO_MANAGE_ACCESS = 'no-manage-access@test.local';
+
+/**
  * `viewer` holds ONLY `session.read` (pinned by auth-permissions.test.ts), so
  * it is the sharpest instrument available: any page it can reach that depends
  * on a second permission fails here.
@@ -85,6 +104,7 @@ const PROPOSAL_REVIEWER = 'proposal-reviewer@test.local';
 const ROLES = [
     { name: 'admin', account: ACCOUNTS.adminA },
     { name: 'viewer', account: ACCOUNTS.viewerA },
+    { name: 'noManageAccess', account: NO_MANAGE_ACCESS },
     { name: 'constraintViewer', account: CONSTRAINT_VIEWER },
     { name: 'personEditor', account: PERSON_EDITOR },
     { name: 'entityEditor', account: ENTITY_EDITOR },
@@ -238,17 +258,26 @@ const PAGES = [
     },
     {
         /*
-         * The viewer holds ONLY `session.read`, which after this change reaches
-         * no management section at all — Display and Proposals were the last two
-         * it did reach. The dashboard must therefore say so rather than render
-         * an empty card grid, which would be indistinguishable from a failed
-         * load.
+         * ISSUE #112. This used to be `roles: ['viewer']`: `/manage` redirects
+         * to `/dashboard`, and before issue #107 that reached everyone
+         * signed in. Now `/dashboard` itself needs `dashboard.view` — a
+         * direct-navigation guard in `auth.global.ts`, not just a default
+         * destination — so `viewer` (`session.read` only, no `dashboard.view`)
+         * is redirected straight to `/schedule` before ever reaching this
+         * empty state. `noManageAccess` is the shape this now needs: it holds
+         * `dashboard.view` (so it reaches `/dashboard` at all) and no
+         * `manage.*` read permission (so the grid is empty once it does) —
+         * exactly what a role that existed BEFORE #107 and got the one-time
+         * `dashboard.view` backfill looks like today. `viewer` itself was left
+         * untouched rather than widened: it is pinned to hold EXACTLY
+         * `['session.read']` by `auth-permissions.test.ts`, and shared by 24
+         * other test files.
          *
          * Paired with the admin row above deliberately: "the empty message is
          * present" proves nothing unless the same page fills for somebody.
          */
         path: '/manage',
-        roles: ['viewer'],
+        roles: ['noManageAccess'],
         marker: 'do not have read access to any management section',
         why: 'the stated empty state, not an empty grid',
     },
@@ -330,14 +359,32 @@ const PAGES = [
          * The marker moved AGAIN with issue #3: the page now reads the real
          * `person_preference_fit` state from `/api/me/enforcement` instead of
          * hedging, and renders one of two sentences depending on it.
+         *
+         * ISSUE #112, UNRELATED TO #107/#108: this used to assert
+         * "does not currently weigh these", on the stated assumption that
          * `person_preference_fit` is OFF by default and this fixture tenant
-         * never enables it, so the "not currently weighed" branch is the one
-         * that actually renders here — still the honest disclosure this
-         * paragraph exists for, just the other half of it.
+         * never enables it. Neither half is true any more. The catalogue
+         * entry (`shared/constraintTypes.ts`) now declares
+         * `defaultEnabled: true` for this type — `constraint-defaults.test.ts`
+         * pins exactly this as "auto-enables person_preference_fit now that
+         * its solver evaluator has shipped" — and `seedConstraintViewer`
+         * above seeds TENANT_A with one `defaultConstraintRow()` per LIVE
+         * catalogue type specifically so its own fixture matches
+         * `provision:tenant`'s behaviour. That means TENANT_A gets a
+         * `person_preference_fit` row that is ENABLED from `beforeAll`
+         * onward, in this file alone — confirmed live, not assumed: fetching
+         * this page as `selfService` renders "Your institution weighs these."
+         * `/my/preferences` is not behind the `/dashboard` redirect at all
+         * (`middleware/my.ts` checks `MY_SECTION_PERMISSIONS`, which
+         * `selfService`'s `availability.manage_own` already satisfies), so
+         * this had nothing to do with issue #107's gate — the comment above
+         * had simply gone stale against an unrelated, already-shipped
+         * catalogue change, exactly the drift CLAUDE.md warns a tracked
+         * assumption can suffer.
          */
         path: '/my/preferences',
         roles: ['selfService'],
-        marker: 'does not currently weigh these',
+        marker: 'Your institution weighs these.',
         why: 'the honest disclosure of what saving a preference now does',
     },
     {
@@ -540,6 +587,41 @@ async function seedProposalReviewer() {
     await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
 }
 
+/**
+ * A person + account + role holding `session.read` and `dashboard.view` and
+ * NOTHING else — issue #112. Same lifecycle reasoning as `seedConstraintViewer`
+ * above, and file-local for the same reason: `viewer` cannot grow this
+ * permission without breaking `auth-permissions.test.ts`'s exact-match pin.
+ */
+async function seedNoManageAccess() {
+    await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${NO_MANAGE_ACCESS}'`);
+
+    const role = await ownerDb.accessRole.create({
+        data: { tenantId: TENANT_A, key: 'no-manage-access-page', name: 'No Manage Access' },
+    });
+
+    await ownerDb.accessRolePermission.createMany({
+        data: ['session.read', 'dashboard.view'].map((permissionKey) => ({
+            accessRoleId: role.id, permissionKey, tenantId: TENANT_A,
+        })),
+    });
+
+    const person = await ownerDb.person.create({
+        data: { tenantId: TENANT_A, givenName: 'Noa', familyName: 'NoManage', email: 'noa@a.test' },
+    });
+
+    await ownerDb.personAccessRole.create({
+        data: { personId: person.id, accessRoleId: role.id, tenantId: TENANT_A },
+    });
+
+    const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
+    const account = await ownerDb.account.create({
+        data: { email: NO_MANAGE_ACCESS, passwordHash: template.passwordHash },
+    });
+
+    await ownerDb.accountPerson.create({ data: { accountId: account.id, personId: person.id } });
+}
+
 beforeAll(async () => {
     await seed();
     await seedConstraintViewer();
@@ -547,6 +629,7 @@ beforeAll(async () => {
     await seedEntityEditor();
     await seedSelfService();
     await seedProposalReviewer();
+    await seedNoManageAccess();
 
     for (const role of ROLES) {
         const { cookie } = await login(role.account, TEST_PASSWORD);
@@ -556,7 +639,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    for (const email of [CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR, SELF_SERVICE, PROPOSAL_REVIEWER]) {
+    for (const email of [
+        CONSTRAINT_VIEWER, PERSON_EDITOR, ENTITY_EDITOR, SELF_SERVICE, PROPOSAL_REVIEWER, NO_MANAGE_ACCESS,
+    ]) {
         await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${email}'`);
     }
 
@@ -743,11 +828,19 @@ describe('every page renders for every role that can reach it', () => {
      * the timetable" — so every lecturer was shown a link to the institution's
      * own settings and a link to every solver proposal it had ever produced.
      *
-     * Read off `/manage`, because that is the one page the viewer can still
-     * render, and asserted BOTH WAYS in one test: the admin's copy of the same
-     * page must contain both labels. An absence check alone would pass against a
-     * build where the navigation stopped rendering entirely, which is precisely
-     * the trap this file exists to catch.
+     * ISSUE #112: read off `/manage` as `noManageAccess`, not `viewer`. Since
+     * issue #107, `/manage` (a redirect stub to `/dashboard`) needs
+     * `dashboard.view` to reach the empty state at all — `viewer` lacks it and
+     * is redirected to `/schedule` before this page ever renders, which is a
+     * different page with neither label to begin with and would pass this
+     * check for the wrong reason. `noManageAccess` holds `session.read` (the
+     * same "can only look at a schedule" shape the docstring above describes)
+     * PLUS `dashboard.view` and no `manage.*` read permission — a role that
+     * predates #107 and got the one-time `dashboard.view` backfill. Asserted
+     * BOTH WAYS in one test: the admin's copy of the same page must contain
+     * both labels. An absence check alone would pass against a build where the
+     * navigation stopped rendering entirely, which is precisely the trap this
+     * file exists to catch.
      */
     it('keeps Display and Proposals out of a schedule viewer\'s navigation', async () => {
         const body = async (role: string) => fetch(`${BASE}/manage`, {
@@ -758,7 +851,7 @@ describe('every page renders for every role that can reach it', () => {
             // every role and prove nothing.
             .then((html) => html.split('<script type="application/json"')[0] ?? '');
 
-        const viewer = await body('viewer');
+        const viewer = await body('noManageAccess');
 
         expect(viewer).toContain('do not have read access to any management section');
         expect(viewer).not.toContain('Proposals');
@@ -812,20 +905,58 @@ describe('every page renders for every role that can reach it', () => {
 
     /**
      * The manage sections a role may not read are not there AT ALL — no nav
-     * entry, and a direct URL redirects to /dashboard. Asserted as a REDIRECT
-     * rather than as an absent marker: "the page did not contain X" passes just
-     * as well for a page that failed to render, which is the trap this whole
+     * entry, and a direct URL redirects away. Asserted as a REDIRECT rather
+     * than as an absent marker: "the page did not contain X" passes just as
+     * well for a page that failed to render, which is the trap this whole
      * file exists to catch.
+     *
+     * ISSUE #112: the outcome is NOT uniform across the three roles, and is no
+     * longer always a redirect to `/dashboard`, as of issue #107.
+     * `manage.ts`'s own middleware still calls `navigateTo('/dashboard')`
+     * literally — but with `redirect: 'manual'` the fetch below sees only the
+     * FIRST hop, and Nuxt resolves that hop's target route (including ITS OWN
+     * middleware) within the same server-side navigation before replying, so
+     * what's observed here is `/dashboard`'s own resolution, not the literal
+     * string passed to `navigateTo`. `auth.global.ts`'s direct-navigation
+     * guard on `/dashboard` fires next and sends every one of these three
+     * roles on to `/schedule`, since none holds `dashboard.view` — and THAT
+     * route has its own gate (`schedule.ts`, `SCHEDULE_PERMISSIONS`):
+     *
+     *   - `viewer` holds `session.read`, so `/schedule` succeeds as a
+     *     navigation and the chain ends in an ordinary 302 to `/schedule`.
+     *   - `constraintViewer` and `personEditor` hold NEITHER `session.read`
+     *     nor `session.read_own`, so `schedule.ts` throws a FATAL error
+     *     (`abortNavigation(createError(...))`) instead of completing the
+     *     redirect — which becomes the response to the ORIGINAL request: 403,
+     *     no `Location` header at all, not a redirect to anywhere.
+     *
+     * Confirmed against the running app, not assumed — the two redirect
+     * literals in the codebase disagreeing with the observed responses is
+     * exactly the kind of drift CLAUDE.md warns a comment can have with the
+     * code.
      */
     it('hides /manage/access-roles from a role without access_role.manage', async () => {
-        for (const role of ['viewer', 'constraintViewer', 'personEditor']) {
+        const viewer = await fetch(`${BASE}/manage/access-roles`, {
+            headers: { cookie: cookies.viewer! },
+            redirect: 'manual',
+        });
+
+        expect(viewer.status, 'viewer should be redirected away').toBe(302);
+        expect(viewer.headers.get('location'), 'viewer should land where dashboard.view resolves it')
+            .toBe('/schedule');
+
+        // `constraintViewer` and `personEditor` hold neither `session.read`
+        // nor `session.read_own`, so the chase through `/dashboard` to
+        // `/schedule` ends in `/schedule`'s OWN fatal denial rather than a
+        // redirect anywhere — refused outright, not sent somewhere else.
+        for (const role of ['constraintViewer', 'personEditor'] as const) {
             const res = await fetch(`${BASE}/manage/access-roles`, {
                 headers: { cookie: cookies[role]! },
                 redirect: 'manual',
             });
 
-            expect(res.status, `${role} should be redirected away`).toBe(302);
-            expect(res.headers.get('location')).toBe('/dashboard');
+            expect(res.status, `${role} should be refused outright`).toBe(403);
+            expect(res.headers.get('location'), `${role} was refused, not redirected`).toBeNull();
         }
 
         // The control: the section EXISTS and renders for someone. Without this
@@ -980,14 +1111,26 @@ describe('every page renders for every role that can reach it', () => {
      * here fetches a URL directly, which is how the /my section shipped with
      * working pages, correct gating and no way to click into it. So the header is
      * asserted too, in both directions.
+     *
+     * ISSUE #112: no longer reads the header off `/dashboard` for every role.
+     * Since issue #107 that page itself needs `dashboard.view`, which neither
+     * `selfService` nor `entityEditor` holds — `auth.global.ts` sends both on
+     * to `/schedule`, where `schedule.ts`'s OWN gate then refuses them outright
+     * (`abortNavigation(createError(...))`, a fatal 403 that renders Nuxt's
+     * bare error page, no `default` layout, no header at all). Confirmed live:
+     * fetching `/dashboard` as `selfService` returned an empty header match,
+     * not a header without the link. Every role here now reads its header off
+     * a page from the PAGES table above already proven to render 200 for it,
+     * so the header check cannot fail for a reason that has nothing to do with
+     * the header.
      */
     it('offers the /my section in the header to exactly the roles that can use it', async () => {
-        const header = async (role: string) => {
-            // `/dashboard`, not `/`: the root is the PUBLIC landing page and uses
-            // the `empty` layout, which renders no header at all — so fetching it
+        const header = async (role: string, path: string) => {
+            // Not `/`: the root is the PUBLIC landing page and uses the
+            // `empty` layout, which renders no header at all — so fetching it
             // here would find no nav and report every role as "correctly not
             // offered the section".
-            const html = await fetch(`${BASE}/dashboard`, { headers: { cookie: cookies[role]! } })
+            const html = await fetch(`${BASE}${path}`, { headers: { cookie: cookies[role]! } })
                 .then((res) => res.text());
 
             // The header nav only — the command palette renders every permitted
@@ -996,18 +1139,25 @@ describe('every page renders for every role that can reach it', () => {
             return html.match(/<nav class="header__menu"[\s\S]*?<\/nav>/)?.[0] ?? '';
         };
 
-        expect(await header('selfService'), 'the one role that needs it').toContain('My settings');
-        expect(await header('admin'), 'an admin holds manage_own too').toContain('My settings');
+        // `selfService` holds `availability.manage_own` and no `dashboard.view`,
+        // so it is read off `/my/availability` — its own reachable page,
+        // proven in the PAGES table above.
+        expect(await header('selfService', '/my/availability'), 'the one role that needs it')
+            .toContain('My settings');
+        expect(await header('admin', '/dashboard'), 'an admin holds manage_own too')
+            .toContain('My settings');
 
-        // The viewer holds only `session.read`; the person editor only
-        // `person.*`. Neither can use the section, so neither is offered it.
-        expect(await header('viewer')).not.toContain('My settings');
-        expect(await header('entityEditor')).not.toContain('My settings');
+        // The viewer holds only `session.read`; the entity editor only
+        // `person.*`/`room.*`. Neither can use the section, so neither is
+        // offered it. Read off `/schedule` and a Room page respectively —
+        // both roles' own proven-reachable pages, not `/dashboard`.
+        expect(await header('viewer', '/schedule')).not.toContain('My settings');
+        expect(await header('entityEditor', '/manage/rooms/test-room-private-a')).not.toContain('My settings');
 
         // The control: the header rendered at all for the roles asserted to
         // lack the entry, rather than being empty for an unrelated reason.
-        expect(await header('viewer')).toContain('Home');
-        expect(await header('entityEditor')).toContain('Home');
+        expect(await header('viewer', '/schedule')).toContain('Home');
+        expect(await header('entityEditor', '/manage/rooms/test-room-private-a')).toContain('Home');
     });
 
     it('offers both administrator availability screens on the dashboard', async () => {
