@@ -40,22 +40,6 @@
                 />
 
                 <div class="fpanel_fields">
-                    <label class="fpanel_field">
-                        <span>Term</span>
-                        <select
-                            v-model="termIdModel"
-                            class="fpanel_select"
-                            :title="selectedName(terms, termIdModel || (terms[0]?.id ?? ''), '')"
-                        >
-                            <option
-                                v-for="t in terms"
-                                :key="t.id"
-                                :value="t.id"
-                                :selected="t.id === (termIdModel || terms[0]?.id)"
-                            >{{ t.name }}</option>
-                        </select>
-                    </label>
-
                     <label
                         v-if="showGroupFilter"
                         class="fpanel_field"
@@ -135,15 +119,24 @@ import { useOverlay } from '~/composables/overlay';
 import ScheduleMiniMonth from './ScheduleMiniMonth.vue';
 
 /**
- * Term/Group/Room/Person, moved here verbatim from `ScheduleToolbar` — same
- * gating rule ("a filter exists when it has something to choose between"),
- * same models, just laid out vertically in a panel instead of a horizontal
- * row. A toggleable overlay rather than a permanent sidebar column: see the
- * comment on `.schedule_side` in `schedule/index.vue` for why a fixed
- * reservation was removed once already and should not come back here.
+ * Group/Room/Person — actual narrowing filters, moved here verbatim from
+ * `ScheduleToolbar` (same gating rule: "a filter exists when it has
+ * something to choose between", same models), just laid out vertically in a
+ * panel instead of a horizontal row. A toggleable overlay rather than a
+ * permanent sidebar column: see the comment on `.schedule_side` in
+ * `schedule/index.vue` for why a fixed reservation was removed once already
+ * and should not come back here.
+ *
+ * TERM DELIBERATELY LIVES IN `ScheduleToolbar` INSTEAD, not here — it is not
+ * a filter (it does not narrow what the caller can already see; it decides
+ * WHICH schedule is being looked at), so burying it behind this panel's
+ * toggle made the single most-used control on the page a two-click action.
+ * `term`/`totalWeeks` stay as props: `ScheduleMiniMonth` still needs the
+ * ACTIVE Term's own dates to draw its grid, which is a different fact from
+ * "every Term the caller could switch to" (the `terms` array, now owned by
+ * the toolbar alone).
  */
 const props = defineProps<{
-    terms: Term[];
     groups: NamedRow[];
     rooms: NamedRow[];
     people: NamedRow[];
@@ -152,7 +145,6 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { required: true });
-const termIdModel = defineModel<string>('termId', { required: true });
 const groupIdModel = defineModel<string>('groupId', { required: true });
 const roomIdModel = defineModel<string>('roomId', { required: true });
 const personIdModel = defineModel<string>('personId', { required: true });

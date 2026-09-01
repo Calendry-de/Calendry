@@ -42,6 +42,8 @@
             v-model:filters-open="filtersOpen"
             v-model:row-height="rowHeight"
             v-model:show-violations="showViolations"
+            v-model:term-id="filters.termId.value"
+            :terms="data.terms.value"
             :active-filter-count="activeFilterCount"
             :violation-count="data.violations.value.length"
             :can-read-violations="data.canReadViolations.value"
@@ -59,13 +61,11 @@
 
         <ScheduleFilterPanel
             v-model:open="filtersOpen"
-            v-model:term-id="filters.termId.value"
             v-model:group-id="filters.groupId.value"
             v-model:room-id="filters.roomId.value"
             v-model:person-id="filters.personId.value"
             v-model:include-nested="filters.includeNested.value"
             v-model:week="filters.week.value"
-            :terms="data.terms.value"
             :groups="data.groups.value"
             :rooms="data.rooms.value"
             :people="data.people.value"

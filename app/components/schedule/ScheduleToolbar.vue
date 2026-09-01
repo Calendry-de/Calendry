@@ -5,7 +5,33 @@
     >
         <div class="bar_group">
             <!--
-                Term/Group/Room/Person moved to `ScheduleFilterPanel` — a
+                Term lives HERE, not in `ScheduleFilterPanel` with Group/Room/
+                Person: it is not a filter — it does not narrow what a caller
+                who can already see the data sees, it decides WHICH schedule
+                (whole term of data) is being looked at at all, the same kind
+                of choice `resolveTermId()`/`patchScheduleSettings()` persist
+                across visits. Burying it inside a togglable drawer made
+                switching terms a two-click, easy-to-miss action for the one
+                control most likely to be reached for on every visit.
+            -->
+            <label class="bar_field">
+                <span>Term</span>
+                <select
+                    v-model="termIdModel"
+                    class="bar_select"
+                    :title="selectedTermName"
+                >
+                    <option
+                        v-for="t in terms"
+                        :key="t.id"
+                        :value="t.id"
+                        :selected="t.id === (termIdModel || terms[0]?.id)"
+                    >{{ t.name }}</option>
+                </select>
+            </label>
+
+            <!--
+                Group/Room/Person moved to `ScheduleFilterPanel` — a
                 toggleable drawer rather than a permanent reservation, for the
                 same reason `.schedule_side` in `schedule/index.vue` gave up its
                 fixed width. This button is the only trace of them left here.
@@ -139,10 +165,12 @@
 </template>
 
 <script setup lang="ts">
+import type { Term } from '~/composables/schedule';
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
 import ScheduleBlockedDayButton from '~/components/schedule/ScheduleBlockedDayButton.vue';
 
-defineProps<{
+const props = defineProps<{
+    terms: Term[];
     /** The visible week and its real dates, for "I can't teach this week". */
     week?: number;
     activeDays?: number[];
@@ -162,6 +190,12 @@ defineProps<{
 }>();
 
 defineEmits<{ 'toggle-create': []; 'jump-today': [] }>();
+
+const termIdModel = defineModel<string>('termId', { required: true });
+
+const selectedTermName = computed(
+    () => props.terms.find((t) => t.id === (termIdModel.value || props.terms[0]?.id))?.name ?? '',
+);
 
 // Owned by the page, toggling `ScheduleFilterPanel` — not a data filter itself.
 const filtersOpenModel = defineModel<boolean>('filtersOpen', { required: true });
@@ -189,13 +223,17 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 .bar {
     /*
      * TWO NAMED ROWS, NOT A WRAPPING FLEX ROW. One row per group, so each row is
-     * sized by one group and the bar's height is a constant 146px through every
+     * sized by one group and the bar's height is a constant through every
      * solver state and every length of tenant name.
      *
-     * One row does not fit: scope 621 + view 231 + actions 507 + gaps is 1407px
-     * of a 1408px row at 1440, so every variable in it decided the bar's height
-     * — a longer tenant name re-wrapped the filters, and so did the solver
-     * (254px idle against 112px running).
+     * One row does not fit at 1440 — the exact scope-group width shifted when
+     * Term joined it (previously just the Filters toggle: measured then at
+     * 621px against a 1408px row) and has not been re-measured since, but the
+     * underlying reason a single row fails is unchanged: `view`/`actions`
+     * alone already vary enough on their own (a longer tenant name re-wraps
+     * the filters, and so does the solver: 254px idle against 112px running)
+     * that `scope` growing by one field does not change the conclusion, only
+     * the margin.
      *
      * `--space-7` (24px) between areas against `--space-5` (12px) within one.
      */
