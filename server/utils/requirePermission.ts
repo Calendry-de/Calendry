@@ -42,7 +42,7 @@ export async function loadPermissions(tx: Tx, personId: string): Promise<Set<str
  * trips inside an already-open transaction.
  */
 async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
-    const identity = requireIdentity(event);
+    const identity = requireTenantScopedIdentity(event);
 
     /*
      * `ics_link` DOES carry a real `actorPersonId` — `ownSessionClause()` needs
@@ -117,7 +117,7 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
     if (!held.has(permission)) {
         // issue #78 — every denied permission check is audited, not only the
         // ones on generic CRUD routes.
-        const identity = requireIdentity(event);
+        const identity = requireTenantScopedIdentity(event);
 
         await writeAuditLog({
             action: 'access.denied',
@@ -171,7 +171,7 @@ export async function requireAnyPermission(
     }
 
     // issue #78 — same as requirePermission()'s own denial.
-    const identity = requireIdentity(event);
+    const identity = requireTenantScopedIdentity(event);
 
     await writeAuditLog({
         action: 'access.denied',

@@ -106,6 +106,31 @@ export async function withRequestTenant<T>(
 }
 
 /**
+ * Identity for the current request, asserted NOT to be staff — issue #76.
+ *
+ * `heldPermissions()`/`requirePermission()`/`requireAnyPermission()`
+ * (`requirePermission.ts`) are only ever reachable from a route already
+ * holding a `tx` from `withTenant()`, which a `StaffIdentity` cannot obtain —
+ * so in practice `identity.kind` is never `'staff'` there. TypeScript does not
+ * know that fact from `requireIdentity()`'s return type alone, and
+ * `StaffIdentity` carries no `tenantId` for those call sites' audit-log writes
+ * to read. This is the narrowing counterpart to `requireStaffIdentity()`
+ * below, for exactly that situation.
+ */
+export function requireTenantScopedIdentity(event: H3Event): TenantScopedIdentity {
+    const identity = requireIdentity(event);
+
+    if (identity.kind === 'staff') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: 'A staff session cannot hold tenant permissions.',
+        });
+    }
+
+    return identity;
+}
+
+/**
  * Identity for the current request, asserted to be staff — issue #76.
  *
  * The guard `server/api/staff/*` routes use INSTEAD OF `withRequestTenant`,
