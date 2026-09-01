@@ -2,6 +2,7 @@ import type { ComputedRef } from 'vue';
 import type { PermissionRequirement } from '#shared/permissions';
 import { satisfiesPermissionRequirement } from '#shared/permissions';
 import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
+import { MY_HUB_PERMISSIONS, MY_SECTION_PERMISSIONS } from '~/utils/mySectionPermissions';
 import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { useThemeToggle } from '~/composables/layout';
 import { logout, useSession } from '~/composables/session';
@@ -162,16 +163,29 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'my',
             keywords: ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences'],
             /*
-             * IN THE HEADER, gated on the one permission both its pages need.
-             * Without this entry the section was unreachable by clicking:
-             * `ViewMenu` renders only entries carrying `inHeader`, and the two
-             * pages deliberately do not. The pages rendered, the middleware gated
-             * correctly, and every test passed while a lecturer had no way in.
+             * IN THE HEADER, gated on ANY of the section's own keys
+             * (`MY_HUB_PERMISSIONS`) — not one hardcoded permission. Without
+             * this entry the section was unreachable by clicking: `ViewMenu`
+             * renders only entries carrying `inHeader`, and its sub-pages
+             * deliberately do not.
              *
-             * Unlike `manage`, this hub DOES name a permission — that one has none
-             * because "may read at least one section" is not a single key.
+             * ISSUE #108: this used to be the single literal
+             * `'availability.manage_own'`, correct back when
+             * `/my/availability` and `/my/preferences` were the whole
+             * section and both needed it. `/my/exams` (`exam.request_own`)
+             * and `/my/teaching-pattern` (`offering.set_scheduling_pattern`)
+             * joined later without this entry changing, so a lecturer holding
+             * only one of THOSE two keys never saw "My settings" in the
+             * header at all — correctly gated pages, unreachable navigation.
+             * `MY_HUB_PERMISSIONS` is the any-of set of every sub-page's key,
+             * shared with `middleware/my.ts` so hub and pages cannot drift
+             * apart again the same way.
+             *
+             * Unlike `manage`, this hub DOES name a permission — "may use at
+             * least one section" is expressible here because the section is
+             * four pages, not an open-ended entity list.
              */
-            permission: 'availability.manage_own',
+            permission: MY_HUB_PERMISSIONS,
             to: '/my',
             inHeader: true,
         },
@@ -187,9 +201,11 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
              * `/schedule` needs. Everything this page renders — the grid, the
              * block times, the person's own rows — travels in the response of
              * the single endpoint behind this key, precisely so the link cannot
-             * lead somewhere that then 403s on a reference fetch.
+             * lead somewhere that then 403s on a reference fetch. Read from
+             * `MY_SECTION_PERMISSIONS`, the same map `middleware/my.ts` reads,
+             * so this entry and the route guard cannot disagree.
              */
-            permission: 'availability.manage_own',
+            permission: MY_SECTION_PERMISSIONS['/my/availability'],
             to: '/my/availability',
         },
         {
@@ -200,14 +216,17 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             section: 'my',
             keywords: ['exam', 'klausur', 'assessment', 'request', 'my'],
             /*
-             * FOUR endpoints, ONE key, and the page enumerates them: its own
-             * requests, the modules to choose from, the exam kinds, and the
-             * grid. `exam.request_own` is the section's authority — "may I ask
-             * for an exam" — and the others are reference data every signed-in
-             * person can already read. Gating on the narrowest of the four
-             * would hide the page from the people it is for.
+             * ONE key, and the page's OWN fetches now match it exactly
+             * (issue #108): its own requests and `GET
+             * /api/me/exam-requests/context` (offerings led, exam kinds,
+             * grids, terms, calendar periods) are both gated on
+             * `exam.request_own` alone — replacing four generic CRUD reads
+             * that each needed a wider `<resource>.read` a lecturer holding
+             * only this key would not have held. `exam.request_own` is the
+             * section's authority — "may I ask for an exam" — and gating on
+             * anything wider would hide the page from the people it is for.
              */
-            permission: 'exam.request_own',
+            permission: MY_SECTION_PERMISSIONS['/my/exams'],
             to: '/my/exams',
         },
         {
@@ -217,7 +236,7 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             icon: 'material-symbols:favorite-outline',
             section: 'my',
             keywords: ['preference', 'preferred', 'mornings', 'days', 'teaching', 'my'],
-            permission: 'availability.manage_own',
+            permission: MY_SECTION_PERMISSIONS['/my/preferences'],
             to: '/my/preferences',
         },
         {
@@ -232,9 +251,10 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
              * ("may I set my own module's pattern"), and the page's other
              * fetch — the list of modules to choose from — is scoped to the
              * SAME key server-side (`GET /api/me/offerings`), so there is no
-             * wider permission for this gate to under-name.
+             * wider permission for this gate to under-name. Read from
+             * `MY_SECTION_PERMISSIONS`, matching `middleware/my.ts`.
              */
-            permission: 'offering.set_scheduling_pattern',
+            permission: MY_SECTION_PERMISSIONS['/my/teaching-pattern'],
             to: '/my/teaching-pattern',
         },
         {
@@ -255,21 +275,34 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
         ...manageEntries(),
 
         {
-            id: 'manage.external-references',
+            /*
+             * DELIBERATELY NOT `manage.external-references` (issue #108).
+             * `useManageSections()` — the dashboard's cards grid — includes
+             * ANY entry whose id starts with `manage.` with no further
+             * check, on the assumption that every such entry carries its own
+             * institution-data permission; that prefix is what makes "no
+             * manage.* entries visible" mean "no read access to any
+             * management section", the exact claim `dashboard.vue`'s empty
+             * state makes. This entry carries NO permission — a calendar
+             * link only ever streams the CREATOR's own Sessions, the same
+             * self-service authority `my.account` exercises with no
+             * permission — so the `manage.` prefix would have put this card
+             * in front of every signed-in person, including one holding no
+             * institution-wide capability at all, and made the empty
+             * state's claim false.
+             *
+             * `section: 'manage'` and `to: '/manage/external-references'`
+             * still place it in the Manage area's sidebar group and the
+             * Ctrl+K palette, alongside Screens, a comparable device/link
+             * credential; it is simply not one of the entity sections the
+             * dashboard grid enumerates.
+             */
+            id: 'external-references',
             label: 'External references',
             description: 'Links you hand to something outside the app — calendar subscriptions today.',
             icon: 'material-symbols:link',
             section: 'manage',
             keywords: ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external'],
-            /*
-             * NOT a registry entity (no `manageEntries()` projection) and
-             * DELIBERATELY NO PERMISSION — unlike every other `manage.*` entry,
-             * which gates on the institution's own data. A calendar link only
-             * ever streams the CREATOR's own Sessions, the same self-service
-             * authority `my.account` exercises with no permission; filed here
-             * for discoverability alongside Screens, a comparable device/link
-             * credential, not because it needs a grant.
-             */
             to: '/manage/external-references',
         },
         {
