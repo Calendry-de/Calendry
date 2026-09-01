@@ -122,6 +122,19 @@
                 @select="$emit('select', session.id)"
             />
         </div>
+
+        <!-- Issue #109: the live now-line, drawn last so it paints over chips
+             it happens to cross rather than under them. -->
+        <ScheduleNowIndicator
+            v-if="termStart"
+            :grid="grid"
+            :rows="rows"
+            :per-minute="perMinute"
+            :line-of="lineOf"
+            :term-week="termWeek"
+            :term-start="termStart"
+            :tenant-timezone="tenantTimezone"
+        />
     </div>
 </template>
 
@@ -134,6 +147,7 @@ import { useViewerLocale } from '~/composables/locale';
 import { clusterSlots, useGridGeometry } from '~/composables/gridGeometry';
 import type { DisplaySettings } from '#shared/sessionColor';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
+import ScheduleNowIndicator from './ScheduleNowIndicator.vue';
 
 /**
  * The week grid, laid out in ROWS that grow with what is in them.
@@ -162,6 +176,14 @@ const props = defineProps<{
     termWeek: number;
     /** Resolves a slot to a calendar date; null before a term is chosen. */
     slotDateOf: (termWeek: number, dayOfWeek: number) => Date | null;
+    /**
+     * The resolved Term's start date and the tenant's zone — issue #109's
+     * live now-indicator needs both to know whether TODAY falls in the week
+     * on screen and where "now" sits in tenant-local time. `termStart` is
+     * null before a Term resolves, same as `slotDateOf`.
+     */
+    termStart: string | null;
+    tenantTimezone: string;
     /** Resolves a room id to its name, for the chip's room label. */
     roomName?: (id: string) => string;
     /** Virtual room ids and the tenant's display standards, for chip colour. */
@@ -196,7 +218,9 @@ const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
  */
 const dense = computed(() => props.rowHeight < 60);
 
-const { rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines, perMinute } = useGridGeometry(
+const {
+    rows, rowSpan, bandWithin, dayDiffers, cssVars, labelledLines, perMinute, lineOf,
+} = useGridGeometry(
     computed(() => props.grid),
     computed(() => props.rowHeight),
 );

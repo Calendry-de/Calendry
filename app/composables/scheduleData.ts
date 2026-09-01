@@ -26,6 +26,14 @@ interface ScheduleContext {
     rooms: DirectoryRoom[];
     people: DirectoryPerson[];
     groups: DirectoryGroup[];
+    /**
+     * IANA zone name. The ONE source for "what timezone is the tenant in" —
+     * the Today button and the grid's live now-indicator both resolve
+     * "today"/"now" against this, never `Intl`'s guess at the viewer's own
+     * zone (CLAUDE.md: timezone is per-Person and display-only; grid
+     * resolution is always tenant-local).
+     */
+    tenantTimezone: string;
 }
 
 /**
@@ -180,6 +188,7 @@ export function useScheduleData(filters: {
             scope: context.scope,
             terms: context.terms,
             timeGrids: context.timeGrids,
+            tenantTimezone: context.tenantTimezone,
             groups,
             rooms: rooms.map((r) => ({ id: r.id, name: `${r.code} · ${r.name}` })),
             /*
@@ -223,6 +232,12 @@ export function useScheduleData(filters: {
     const people = computed(() => reference.value?.people ?? []);
     const kinds = computed(() => reference.value?.kinds ?? []);
     const virtualRoomIds = computed(() => new Set(reference.value?.virtualRoomIds ?? []));
+    /**
+     * `'UTC'` before the fetch lands, never the browser's zone — an absent
+     * answer must not silently fall back to guessing at the viewer's own
+     * timezone, which is exactly the source CLAUDE.md says this may never be.
+     */
+    const tenantTimezone = computed(() => reference.value?.tenantTimezone ?? 'UTC');
 
     /**
      * A separate, tolerant fetch: its absence is harmless, so a tenant that has
@@ -378,7 +393,7 @@ export function useScheduleData(filters: {
 
     return {
         terms, groups, rooms, people, kinds, resolvedTermId,
-        virtualRoomIds, displaySettings,
+        virtualRoomIds, displaySettings, tenantTimezone,
         /**
          * Whether this caller is looking at the institution's timetable or their
          * own. Read off the server's answer rather than inferred from the

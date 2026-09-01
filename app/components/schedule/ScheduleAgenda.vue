@@ -157,6 +157,22 @@ const daySessions = computed(() => props.sessions
 function countFor(day: number): number {
     return props.sessions.filter((s) => s.dayOfWeek === day).length;
 }
+
+/**
+ * Issue #109's Today button: the desktop grid already shows every day as a
+ * column, but this presentation shows ONE day at a time, so jumping the week
+ * alone would leave the agenda open on whichever day it last was rather than
+ * today's. Exposed rather than modelled — `activeDay` otherwise stays this
+ * component's own business (it also follows selection, above), and the page
+ * only ever needs to set it at the moment of one click.
+ */
+function showDay(day: number) {
+    if (props.grid.activeDays.includes(day)) {
+        activeDay.value = day;
+    }
+}
+
+defineExpose({ showDay });
 </script>
 
 <style scoped lang="scss">

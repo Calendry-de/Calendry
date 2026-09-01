@@ -2,7 +2,7 @@ import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@calen
 import type { BlockGrid } from '../../shared/timeGrid';
 import { blockAtMinute } from '../../shared/timeGrid';
 import {
-    WEEK_KIND, addDays, classifyWeeks, isoDate, isoWeekday, mondayOf, overlaps, weekIndexOf,
+    WEEK_KIND, addDays, classifyWeeks, isoDate, isoWeekday, localNow, mondayOf, overlaps, weekIndexOf,
 } from '../../shared/academicCalendar';
 
 /**
@@ -24,7 +24,10 @@ import {
  * which weeks a period reclassifies. Re-exported here because several server
  * modules already import them from this file.
  */
-export { isoDate, isoWeekday, mondayOf, weekCountOf, weekIndexOf } from '../../shared/academicCalendar';
+export {
+    isoDate, isoWeekday, localNow, mondayOf, weekCountOf, weekIndexOf,
+} from '../../shared/academicCalendar';
+export type { TenantLocalNow } from '../../shared/academicCalendar';
 
 // ---------------------------------------------------------------------------
 // TimeGrid
@@ -174,42 +177,11 @@ export class TermEndedError extends Error {
     }
 }
 
-export interface TenantLocalNow {
-    /** UTC-midnight Date of the tenant's local calendar day. */
-    date: Date;
-    /** Minutes since local midnight. */
-    minutes: number;
-}
-
-/**
- * An instant, expressed as the TENANT's calendar day and time.
- *
- * Uses Intl rather than a date library — no new dependency, and it is the only
- * correct way to ask "what day is it in Europe/Berlin right now" without
- * reimplementing tzdata.
+/*
+ * `TenantLocalNow`/`localNow` now live in `shared/academicCalendar.ts` (see
+ * the re-export above) — the schedule page's Today button and its live
+ * now-indicator need the exact same tenant-local clock, client-side.
  */
-export function localNow(now: Date, timeZone: string): TenantLocalNow {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).formatToParts(now);
-
-    const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0');
-
-    // `hour: '2-digit'` with hour12:false yields 24 for midnight in some ICU
-    // versions rather than 0, which would put midnight at the END of the day.
-    const hour = get('hour') % 24;
-
-    return {
-        date: new Date(Date.UTC(get('year'), get('month') - 1, get('day'))),
-        minutes: hour * 60 + get('minute'),
-    };
-}
 
 /**
  * Maps "now" onto the tenant's academic calendar.
