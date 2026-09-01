@@ -67,15 +67,8 @@
  */
 import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { arg, createOwnerPrisma } from './lib/cli';
 
 interface Candidate {
     id: string;
@@ -91,7 +84,7 @@ async function main() {
     const tenantSlug = arg('tenant');
 
     const url = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+    const prisma = createOwnerPrisma();
 
     try {
         console.log(`Inspecting ${describeTarget(url)}...`);

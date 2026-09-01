@@ -32,17 +32,10 @@
  *
  *   bun run provision:staff -- --email ops@calendry.de
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import { hashPassword } from '../server/utils/auth';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { arg, createOwnerPrisma, isUnreachableDatabaseError } from './lib/cli';
 
 function required(name: string): string {
     const value = arg(name);
@@ -71,7 +64,7 @@ async function main() {
         process.exit(1);
     }
 
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         const result = await prisma.$transaction(async (tx) => {
@@ -109,7 +102,7 @@ async function main() {
 
         if (message.includes('Unique constraint')) {
             console.error(`\nA StaffAccount for '${email}' already exists. Nothing was written.\n`);
-        } else if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
+        } else if (isUnreachableDatabaseError(message)) {
             const host = describeTarget(connectionString);
 
             console.error(

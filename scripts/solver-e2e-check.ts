@@ -19,10 +19,8 @@
  *
  *   bun run scripts/solver-e2e-check.ts [--seed-relations] [--cancel]
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { LockPolicy, RunStatus } from '@calendry-de/calendry-proto';
-import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { createOwnerPrisma } from './lib/cli';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { LECTURER_ROLE_KEY } from '../shared/roles';
 import { cancelRun, getStatus, startRun, toWireU64 } from '../server/utils/solverClient';
@@ -39,7 +37,7 @@ const DO_CANCEL = process.argv.includes('--cancel');
  * database; the demo tenant is untouched.
  */
 const STRESS = Number(process.argv.find((arg) => arg.startsWith('--stress='))?.split('=')[1] ?? '0');
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: resolveOwnerDatabaseUrl() }) });
+const prisma = createOwnerPrisma();
 
 const line = (text = '') => console.log(text);
 const rule = (text: string) => line(`\n${'─'.repeat(78)}\n${text}\n${'─'.repeat(78)}`);

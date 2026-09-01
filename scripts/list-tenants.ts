@@ -8,13 +8,12 @@
  *
  *   bun run list:tenants
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { createOwnerPrisma, formatUnreachableDatabaseError, isUnreachableDatabaseError } from './lib/cli';
 
 async function main() {
     const connectionString = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         const tenants = await prisma.tenant.findMany({
@@ -47,12 +46,8 @@ async function main() {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
-            console.error(
-                `\nCould not reach the database at ${describeTarget(connectionString)}.\n`
-                + '  - Running?  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db\n'
-                + '  - Reachable from here? See MIGRATION_DATABASE_URL_HOST in .env.example.\n',
-            );
+        if (isUnreachableDatabaseError(message)) {
+            console.error(formatUnreachableDatabaseError(connectionString));
         } else {
             console.error(`\nFailed: ${message}\n`);
         }

@@ -63,8 +63,7 @@
  */
 import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import {
     CONSTRAINT_TYPE_KEYS,
     defaultConstraintRow,
@@ -72,12 +71,7 @@ import {
     findConstraintType,
 } from '../shared/constraintTypes';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { arg, createOwnerPrisma } from './lib/cli';
 
 /**
  * Realign every stored row of ONE type with the catalogue's current severity.
@@ -233,7 +227,7 @@ async function main() {
     }
 
     const url = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+    const prisma = createOwnerPrisma();
 
     if (retype) {
         try {

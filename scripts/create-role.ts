@@ -56,16 +56,9 @@
  */
 import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { isPermissionKey } from '../shared/permissions';
-import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { arg, createOwnerPrisma, formatUnreachableDatabaseError, isUnreachableDatabaseError } from './lib/cli';
 
 async function main() {
     const tenantSlug = arg('tenant');
@@ -113,7 +106,7 @@ async function main() {
     }
 
     const connectionString = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         const tenant = await prisma.tenant.findUnique({ where: { slug: tenantSlug } });
@@ -248,12 +241,8 @@ async function main() {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
-            console.error(
-                `\nCould not reach the database at ${describeTarget(connectionString)}.\n`
-                + '  - Running?  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db\n'
-                + '  - Reachable from here? See MIGRATION_DATABASE_URL_HOST in .env.example.\n',
-            );
+        if (isUnreachableDatabaseError(message)) {
+            console.error(formatUnreachableDatabaseError(connectionString));
         } else {
             console.error(`\nCreation failed, nothing was written: ${message}\n`);
         }

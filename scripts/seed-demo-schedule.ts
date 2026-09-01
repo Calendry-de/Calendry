@@ -29,27 +29,20 @@
  * Runs on the OWNER role because it disables append-only triggers on --reset.
  * Everything it writes is still tenant-scoped.
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { arg, createOwnerPrisma } from './lib/cli';
 import { LECTURER_ROLE_KEY } from '../shared/roles';
 import { applyOfferingPlanItems } from '../server/utils/offeringPlans';
 import {
     BREAKS, GRID, GROUPS, GROUP_SOURCES, GROUP_TERMS, KINDS, LECTURERS, MODULES, ROOMS, TERMS,
 } from './lib/demoData';
 
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
-
 const tenantSlug = arg('tenant') ?? 'test';
 const reset = process.argv.includes('--reset');
 
 async function main() {
     const connectionString = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     console.log(`Seeding demo institution on ${describeTarget(connectionString)} for tenant '${tenantSlug}'...`);
 

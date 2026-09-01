@@ -12,12 +12,10 @@
  *
  *   bun run scripts/solver-claim-check.ts
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
-import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { createOwnerPrisma } from './lib/cli';
 import { claimDueRuns } from '../server/utils/solverPollClaim';
 
-const owner = new PrismaClient({ adapter: new PrismaPg({ connectionString: resolveOwnerDatabaseUrl() }) });
+const owner = createOwnerPrisma();
 
 const line = (t = '') => console.log(t);
 const rule = (t: string) => line(`\n${'─'.repeat(78)}\n${t}\n${'─'.repeat(78)}`);

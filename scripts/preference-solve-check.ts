@@ -48,11 +48,9 @@
  *
  *   CALENDRY_SOLVER_ADDR_HOST=127.0.0.1:50052 bun run scripts/preference-solve-check.ts
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { LockPolicy, RunStatus } from '@calendry-de/calendry-proto';
 import type { PlacedSession, SolverInput } from '@calendry-de/calendry-proto';
-import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { createOwnerPrisma } from './lib/cli';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { getStatus, startRun, toWireU64 } from '../server/utils/solverClient';
 
@@ -80,7 +78,7 @@ const TAG = `pref-${Date.now()}`;
 const CLAMP_MIN = 0.5;
 const CLAMP_MAX = 2.0;
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: resolveOwnerDatabaseUrl() }) });
+const prisma = createOwnerPrisma();
 
 const line = (text = '') => console.log(text);
 const rule = (text: string) => line(`\n${'─'.repeat(78)}\n${text}\n${'─'.repeat(78)}`);

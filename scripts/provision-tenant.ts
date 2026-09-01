@@ -40,18 +40,11 @@
  *     --admin-email dean@example.edu --admin-name "Ada Lovelace" \
  *     [--federation <slug>] [--timezone Europe/Berlin]
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { PERMISSIONS } from '../shared/permissions';
 import { DEFAULT_CONSTRAINTS, UnknownFederationError } from '../server/utils/provisionTenant';
 import { provisionTenantViaFunction, rawPostgresErrorCode } from '../server/utils/staffCreateTenant';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { arg, createOwnerPrisma, isUnreachableDatabaseError } from './lib/cli';
 
 function required(name: string): string {
     const value = arg(name);
@@ -88,7 +81,7 @@ async function main() {
         process.exit(1);
     }
 
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         const result = await provisionTenantViaFunction(prisma, {
@@ -132,7 +125,7 @@ async function main() {
             // is the only reliable field here — same check
             // `POST /api/staff/tenants` uses for the identical error.
             console.error(`\nA tenant with slug '${slug}' already exists. Provisioning creates, it does not update.\n`);
-        } else if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
+        } else if (isUnreachableDatabaseError(message)) {
             // Prisma reports an unreachable host as a transaction-acquisition
             // timeout, which reads like a load problem and sends people looking
             // in the wrong place entirely.

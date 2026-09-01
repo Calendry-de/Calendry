@@ -42,19 +42,13 @@
  *   bun run backfill:dashboard-view                      # real run, prompts to confirm
  *   bun run backfill:dashboard-view -- --yes             # real run, no prompt
  */
-import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
-import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import {
+    arg, confirmOrExit, createOwnerPrisma, formatUnreachableDatabaseError, isUnreachableDatabaseError,
+} from './lib/cli';
 
 const DASHBOARD_VIEW = 'dashboard.view';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
 
 interface RolePlan {
     tenantSlug: string;
@@ -74,7 +68,7 @@ async function main() {
     const skipConfirm = process.argv.includes('--yes');
 
     const connectionString = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         // The catalogue must already carry the key, or the FK below fails —
@@ -158,17 +152,11 @@ async function main() {
         }
 
         if (!skipConfirm) {
-            const rl = createInterface({ input: process.stdin, output: process.stdout });
-            const answer = await rl.question(
+            await confirmOrExit(
                 `\nGrant ${DASHBOARD_VIEW} to ${toGrant.length} AccessRole(s)? Type "yes" to confirm: `,
+                'yes',
+                { caseInsensitive: true },
             );
-
-            rl.close();
-
-            if (answer.trim().toLowerCase() !== 'yes') {
-                console.error('\nDoes not match. Nothing was changed.\n');
-                process.exit(1);
-            }
         }
 
         // One transaction across every tenant — a partial backfill leaves
@@ -208,12 +196,8 @@ async function main() {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
-            console.error(
-                `\nCould not reach the database at ${describeTarget(connectionString)}.\n`
-                + '  - Running?  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db\n'
-                + '  - Reachable from here? See MIGRATION_DATABASE_URL_HOST in .env.example.\n',
-            );
+        if (isUnreachableDatabaseError(message)) {
+            console.error(formatUnreachableDatabaseError(connectionString));
         } else {
             console.error(`\nBackfill failed, nothing was changed: ${message}\n`);
         }

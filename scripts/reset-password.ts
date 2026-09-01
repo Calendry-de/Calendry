@@ -62,12 +62,7 @@ import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../server/utils/auth';
 import { randomPassword } from '../shared/password';
 import { describeTarget, resolveAppDatabaseUrl, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { arg, formatUnreachableDatabaseError, isUnreachableDatabaseError } from './lib/cli';
 
 /** One roster entry that could be given this credential. */
 interface Candidate {
@@ -342,13 +337,11 @@ async function main() {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
-            console.error(
-                `\nCould not reach the database at ${describeTarget(connectionString)}.\n`
-                + '  - Running?  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db\n'
-                + '  - Reachable from here? See '
-                + `${create ? 'MIGRATION_DATABASE_URL_HOST' : 'DATABASE_URL_HOST'} in .env.example.\n`,
-            );
+        if (isUnreachableDatabaseError(message)) {
+            console.error(formatUnreachableDatabaseError(
+                connectionString,
+                create ? 'MIGRATION_DATABASE_URL_HOST' : 'DATABASE_URL_HOST',
+            ));
         } else {
             console.error(`\nReset failed, nothing was changed: ${message}\n`);
         }

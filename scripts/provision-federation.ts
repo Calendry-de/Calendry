@@ -34,27 +34,8 @@
  *   bun run provision:federation -- --slug ruhr --name "Ruhr Federation" \
  *       --attach-tenant bergakademie --attach-tenant clausthal
  */
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
-
-function args(name: string): string[] {
-    const values: string[] = [];
-
-    for (let i = 0; i < process.argv.length; i += 1) {
-        if (process.argv[i] === `--${name}` && process.argv[i + 1]) {
-            values.push(process.argv[i + 1]);
-        }
-    }
-
-    return values;
-}
+import { arg, createOwnerPrisma, isUnreachableDatabaseError, multiArg } from './lib/cli';
 
 function required(name: string): string {
     const value = arg(name);
@@ -70,8 +51,8 @@ function required(name: string): string {
 async function main() {
     const slug = required('slug');
     const name = arg('name');
-    const attachTenantSlugs = args('attach-tenant');
-    const detachTenantSlugs = args('detach-tenant');
+    const attachTenantSlugs = multiArg('attach-tenant');
+    const detachTenantSlugs = multiArg('detach-tenant');
 
     if (!name && attachTenantSlugs.length === 0 && detachTenantSlugs.length === 0) {
         console.error(
@@ -96,7 +77,7 @@ async function main() {
         process.exit(1);
     }
 
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         const result = await prisma.$transaction(async (tx) => {
@@ -175,7 +156,7 @@ async function main() {
 
         if (message.includes('Unique constraint')) {
             console.error(`\nA federation with slug '${slug}' already exists. Nothing was written.\n`);
-        } else if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
+        } else if (isUnreachableDatabaseError(message)) {
             // Prisma reports an unreachable host as a transaction-acquisition
             // timeout, which reads like a load problem and sends people looking
             // in the wrong place entirely.

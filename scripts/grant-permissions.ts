@@ -38,18 +38,12 @@
  *   bun run grant:permissions -- --role tenant-admin --all-missing --tenant test
  *   bun run grant:permissions -- --role tenant-admin --all-missing --dry-run
  */
-import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 import { PERMISSION_KEYS, isPermissionKey } from '../shared/permissions';
-import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
-
-function arg(name: string): string | undefined {
-    const index = process.argv.indexOf(`--${name}`);
-
-    return index === -1 ? undefined : process.argv[index + 1];
-}
+import { resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
+import {
+    arg, confirmOrExit, createOwnerPrisma, formatUnreachableDatabaseError, isUnreachableDatabaseError,
+} from './lib/cli';
 
 interface PlannedGrant {
     tenantSlug: string;
@@ -100,7 +94,7 @@ async function main() {
     }
 
     const connectionString = resolveOwnerDatabaseUrl();
-    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    const prisma = createOwnerPrisma();
 
     try {
         // The catalogue must already be in the database, or the FK below fails.
@@ -180,15 +174,7 @@ async function main() {
         }
 
         if (!skipConfirm) {
-            const rl = createInterface({ input: process.stdin, output: process.stdout });
-            const answer = await rl.question(`\nGrant ${totalMissing} permission(s)? Type the role key to confirm (${roleKey}): `);
-
-            rl.close();
-
-            if (answer.trim() !== roleKey) {
-                console.error('\nDoes not match. Nothing was changed.\n');
-                process.exit(1);
-            }
+            await confirmOrExit(`\nGrant ${totalMissing} permission(s)? Type the role key to confirm (${roleKey}): `, roleKey);
         }
 
         // One transaction across every tenant: a partial backfill leaves some
@@ -240,12 +226,8 @@ async function main() {
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
-        if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
-            console.error(
-                `\nCould not reach the database at ${describeTarget(connectionString)}.\n`
-                + '  - Running?  docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db\n'
-                + '  - Reachable from here? See MIGRATION_DATABASE_URL_HOST in .env.example.\n',
-            );
+        if (isUnreachableDatabaseError(message)) {
+            console.error(formatUnreachableDatabaseError(connectionString));
         } else {
             console.error(`\nGrant failed, nothing was changed: ${message}\n`);
         }
