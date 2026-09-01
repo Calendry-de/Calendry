@@ -6,20 +6,38 @@ const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 /**
  * Paths exempt from the token check below.
  *
- * `/api/auth/login`: the CSRF cookie is set unconditionally on every response
- * (this same middleware, step 1), so any real browser that has rendered so
- * much as one page before submitting the login form already carries it.
- * Exempted anyway, rather than relying on that: login is the one
- * state-changing route a client can legitimately reach as its very first
- * request of a browsing session (a bookmarked/shared deep link straight to a
- * login form that POSTs without a prior same-origin GET isn't something this
- * app controls), and unlike every other route here, a false rejection has no
- * retry path worth the name — the caller isn't authenticated yet, so there is
- * no session to fall back to. The exemption lives here, at the path level,
- * rather than inside `login.post.ts` itself, which issues #78/#79 are editing
- * concurrently.
+ * `/api/auth/login` (and its staff-plane counterpart, `/api/staff-auth/login`):
+ * the CSRF cookie is set unconditionally on every response (this same
+ * middleware, step 1), so any real browser that has rendered so much as one
+ * page before submitting the login form already carries it. Exempted anyway,
+ * rather than relying on that: login is the one state-changing route a client
+ * can legitimately reach as its very first request of a browsing session (a
+ * bookmarked/shared deep link straight to a login form that POSTs without a
+ * prior same-origin GET isn't something this app controls), and unlike every
+ * other route here, a false rejection has no retry path worth the name — the
+ * caller isn't authenticated yet, so there is no session to fall back to.
+ *
+ * `/api/auth/change-password` and `/api/staff-auth/change-password` are the
+ * SAME shape, for the SAME reason: both are "public by necessity" (their own
+ * route comments) — a forced or expired password issues NO session, so the
+ * only way out is re-authenticating from credentials in the body, exactly
+ * like login. A caller here may have no prior same-origin request at all
+ * (`login.vue`'s own `navigateTo('/change-password?forced=1...')` is a
+ * same-session SPA navigation and would carry the cookie, but nothing stops a
+ * bookmarked/shared link to this page either, same as login's own argument).
+ * This gap shipped un-exempted and broke every test exercising a forced/
+ * expired password change with a 403 that had nothing to do with credentials —
+ * found via the integration suite, not by inspection.
+ *
+ * The exemption lives here, at the path level, rather than inside each
+ * route file, matching login's own precedent above.
  */
-const EXEMPT_PATHS = ['/api/auth/login'];
+const EXEMPT_PATHS = [
+    '/api/auth/login',
+    '/api/auth/change-password',
+    '/api/staff-auth/login',
+    '/api/staff-auth/change-password',
+];
 
 /**
  * Double-submit cookie CSRF protection, defense-in-depth alongside the

@@ -60,6 +60,17 @@ export async function api<T = unknown>(
 
             if (csrfToken) {
                 headers[CSRF_HEADER] = csrfToken;
+
+                // THE HEADER ALONE PROVES NOTHING without the cookie it is
+                // supposed to match. `cookie` (the caller-supplied session
+                // cookie string, as returned by `login()`/`cookieFrom()`)
+                // never carries `calendry_csrf` — only `calendry_session` —
+                // so without this the server's double-submit check
+                // (`getCookie(event, CSRF_COOKIE)` vs. this header) always
+                // finds no cookie to compare against and rejects every
+                // state-changing call, regardless of the header being
+                // correctly echoed.
+                headers.cookie = `${cookie}; ${CSRF_COOKIE}=${csrfToken}`;
             }
         }
     }

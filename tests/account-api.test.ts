@@ -628,6 +628,12 @@ describe('the pages', () => {
         });
 
         expect(res.status).toBe(302);
-        expect(res.headers.get('location')).toBe('/dashboard');
+        // Not `/dashboard`: `viewerA` holds only `session.read`, not
+        // `dashboard.view` (issue #107) — `/dashboard` itself is gated on
+        // that key now, so a caller who never held it is routed to
+        // `/schedule`, the same destination `resolveHomeRoute()` computes
+        // for this role everywhere else. See issue #112's identical finding
+        // in `page-renders-per-role.test.ts`.
+        expect(res.headers.get('location')).toBe('/schedule');
     });
 });
