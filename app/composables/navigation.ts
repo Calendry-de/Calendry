@@ -335,6 +335,19 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
             to: '/manage/access-defaults',
         },
         {
+            id: 'manage.curriculum-progression',
+            label: 'Curriculum progression',
+            description: 'Which curriculum plan each group is on, and advancing every eligible one at once.',
+            icon: 'material-symbols:trending-up',
+            section: 'manage',
+            keywords: ['phase', 'progression', 'advance', 'curriculum', 'plan', 'semester', 'promote', 'cohort'],
+            // The same key `ManageGroupApplyPlan.vue`'s single-Group "Advance"
+            // button already needs — this is the bulk form of the identical
+            // action, so it needs no wider authority than that one does.
+            permission: 'offering_plan.apply',
+            to: '/manage/curriculum-progression',
+        },
+        {
             id: 'manage.exam-reviews',
             label: 'Exam review',
             description: 'Approve or reject exams lecturers have asked for on their own modules.',

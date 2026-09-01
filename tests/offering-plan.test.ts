@@ -416,3 +416,174 @@ describe('curriculum plan succession — group-plan-applications and "advance"',
         expect(entry?.advance).toBeNull();
     });
 });
+
+describe('curriculum progression: the tenant-wide list and bulk "advance all"', () => {
+    /**
+     * Same derivation as `GET /api/group-plan-applications/:id`
+     * (`deriveGroupPlanApplications`, `server/utils/offeringPlans.ts`), just
+     * for every group in one call — the settings page needs to show every
+     * group's current phase without one request per group.
+     */
+    it('lists every group with a derived application, not just one', async () => {
+        const plan = await createPlan('Tenant-wide list — plan');
+        const template = await createTemplate('Tenant-wide list — subject');
+
+        await addItems(plan.id, [template.id]);
+
+        await api(`/api/offering-plan-apply/${plan.id}`, {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({ termId: ids.termA, groupIds: [ids.groupCohortA, ids.groupSeminarA] }),
+        });
+
+        const res = await api<{ rows: { groupId: string; groupName: string; applications: { planId: string }[] }[] }>(
+            '/api/group-plan-applications',
+            { cookie: adminCookie },
+        );
+
+        expect(res.status).toBe(200);
+
+        const groupIds = res.body.rows.map((r) => r.groupId);
+
+        expect(groupIds).toContain(ids.groupCohortA);
+        expect(groupIds).toContain(ids.groupSeminarA);
+
+        const cohortRow = res.body.rows.find((r) => r.groupId === ids.groupCohortA);
+
+        expect(cohortRow?.applications.some((a) => a.planId === plan.id)).toBe(true);
+    });
+
+    it('refuses a caller without offering_plan.apply', async () => {
+        const res = await api('/api/group-plan-applications', { cookie: viewerCookie });
+
+        expect(res.status).toBe(403);
+    });
+
+    it('advances every eligible group to its OWN next plan and term in one call', async () => {
+        // Both fresh and far in the future, deliberately: "the next Term" is
+        // resolved GLOBALLY (the earliest Term after the current one, across
+        // the whole tenant) — reusing `ids.termA` here would let some OTHER
+        // test's own "successor term" (created earlier in this same file,
+        // dated well before 2040) win that lookup instead of the one THIS
+        // test creates, which is exactly the failure this comment is pinning
+        // against.
+        const currentTerm = await api<{ id: string; name: string }>('/api/terms', {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({
+                name: 'Advance-all current term', timeGridId: 'test-grid-a',
+                startDate: '2040-10-01', endDate: '2041-02-28',
+            }),
+        });
+        const nextTerm = await api<{ id: string; name: string }>('/api/terms', {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({
+                name: 'Advance-all successor term', timeGridId: 'test-grid-a',
+                startDate: '2041-10-01', endDate: '2042-02-28',
+            }),
+        });
+
+        const nextPlan = await createPlan('Advance-all — successor plan');
+        const nextTemplate = await createTemplate('Advance-all — successor subject');
+
+        await addItems(nextPlan.id, [nextTemplate.id]);
+
+        const plan = await createPlan('Advance-all — current plan', { nextPlanId: nextPlan.id });
+        const template = await createTemplate('Advance-all — current subject');
+
+        await addItems(plan.id, [template.id]);
+
+        // Two groups on the SAME current plan, so their advance targets land
+        // in the SAME batch — the case that proves batching by
+        // (planId, termId) rather than looping per-group naively.
+        await api(`/api/offering-plan-apply/${plan.id}`, {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({ termId: currentTerm.body.id, groupIds: [ids.groupCohortA, ids.groupSeminarA] }),
+        });
+
+        const res = await api<{
+            advanced: { groupId: string; toPlanId: string; toTermName: string }[];
+            failed: unknown[];
+        }>('/api/group-plan-applications/advance-all', { method: 'POST', cookie: adminCookie, body: '{}' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.failed).toEqual([]);
+
+        const advancedGroupIds = res.body.advanced.map((a) => a.groupId);
+
+        expect(advancedGroupIds).toContain(ids.groupCohortA);
+        expect(advancedGroupIds).toContain(ids.groupSeminarA);
+        expect(res.body.advanced.every((a) => a.toPlanId === nextPlan.id)).toBe(true);
+
+        const rows = await ownerDb.offering.findMany({
+            where: { tenantId: ids.tenantA, createdFromTemplateId: nextTemplate.id, termId: nextTerm.body.id },
+            include: { groups: true },
+        });
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.groups.map((g) => g.groupId).sort()).toEqual([ids.groupCohortA, ids.groupSeminarA].sort());
+
+        // IDEMPOTENT: both groups are now ON `nextPlan`, which has no
+        // successor of its own — running advance-all again must not re-offer
+        // (let alone re-apply) the exact move it just made.
+        const again = await api<{ advanced: { groupId: string; toPlanId: string }[]; failed: unknown[] }>(
+            '/api/group-plan-applications/advance-all',
+            { method: 'POST', cookie: adminCookie, body: '{}' },
+        );
+
+        expect(again.status).toBe(200);
+        expect(again.body.advanced.some(
+            (a) => a.toPlanId === nextPlan.id && [ids.groupCohortA, ids.groupSeminarA].includes(a.groupId),
+        )).toBe(false);
+    });
+
+    it('reports a batch failure by name, without blocking other groups in the same call', async () => {
+        // A successor plan with NO items — every group pointing at it fails
+        // the same way a single apply already does (422 "no offerings to
+        // apply yet"), just reported per-batch instead of refusing the call.
+        const emptyNextPlan = await createPlan('Advance-all — empty successor');
+        const plan = await createPlan('Advance-all — points at an empty plan', { nextPlanId: emptyNextPlan.id });
+        const template = await createTemplate('Advance-all — orphaned subject');
+
+        await addItems(plan.id, [template.id]);
+
+        await api('/api/terms', {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({
+                name: 'Advance-all — later term for the empty-plan case', timeGridId: 'test-grid-a',
+                startDate: '2031-10-01', endDate: '2032-02-28',
+            }),
+        });
+
+        await api(`/api/offering-plan-apply/${plan.id}`, {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({ termId: ids.termA, groupId: ids.groupCohortA }),
+        });
+
+        const res = await api<{
+            advanced: { groupId: string; toPlanId: string }[];
+            failed: { planId: string; groupIds: string[]; reason: string }[];
+        }>('/api/group-plan-applications/advance-all', { method: 'POST', cookie: adminCookie, body: '{}' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.advanced.some((a) => a.toPlanId === emptyNextPlan.id)).toBe(false);
+
+        const failedBatch = res.body.failed.find((f) => f.planId === emptyNextPlan.id);
+
+        expect(failedBatch).toBeTruthy();
+        expect(failedBatch!.groupIds).toContain(ids.groupCohortA);
+        expect(failedBatch!.reason).toContain('no offerings to apply yet');
+    });
+
+    it('refuses a caller without offering_plan.apply', async () => {
+        const res = await api('/api/group-plan-applications/advance-all', {
+            method: 'POST', cookie: viewerCookie, body: '{}',
+        });
+
+        expect(res.status).toBe(403);
+    });
+});

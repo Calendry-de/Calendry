@@ -143,6 +143,7 @@ const NAV_GROUPS: { label: string; paths: string[] }[] = [
             '/manage/offerings',
             '/manage/offering-templates',
             '/manage/offering-plans',
+            '/manage/curriculum-progression',
             '/manage/constraints',
             '/manage/terms',
             '/manage/calendar-periods',
