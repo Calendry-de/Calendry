@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
-import { assertPlacementFits, materializeExam } from '../../../utils/examRequests';
+import { assertPlacementFits, assertTeachingComplete, materializeExam } from '../../../utils/examRequests';
 
 const bodySchema = z.object({ note: z.string().max(2000).nullish() });
 
@@ -70,6 +70,11 @@ export default defineEventHandler(async (event) => {
             },
         });
 
-        return { request: decided, sessionId };
+        // Warn, don't block: approval already happened above. This is
+        // reported alongside it, not gated on it — the module's teaching plan
+        // being incomplete does not make the exam any less approved.
+        const teachingComplete = await assertTeachingComplete(tx, identity.tenantId, request.offeringId);
+
+        return { request: decided, sessionId, teachingComplete };
     });
 });

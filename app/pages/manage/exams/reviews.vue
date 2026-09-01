@@ -15,6 +15,17 @@
             role="alert"
         >{{ error }}</p>
 
+        <!--
+            WARN, DON'T BLOCK: the approval above already went through. This
+            names the fact that the module's own teaching plan is not fully
+            placed yet, which the decision does not depend on.
+        -->
+        <p
+            v-if="teachingWarning"
+            class="note note--warn"
+            role="status"
+        >{{ teachingWarning }}</p>
+
         <section
             v-for="group in groups"
             :key="group.status"
@@ -185,13 +196,24 @@ function personName(person: Named | null): string {
 
 const busy = ref('');
 const error = ref('');
+const teachingWarning = ref('');
 
 async function decide(id: string, action: 'approve' | 'reject') {
     busy.value = id;
     error.value = '';
+    teachingWarning.value = '';
 
     try {
-        await request(`/api/exam-requests/${id}/${action}`, { method: 'POST', body: {} });
+        const result = await request<{
+            teachingComplete?: { complete: boolean; placedCount: number; requiredCount: number };
+        }>(`/api/exam-requests/${id}/${action}`, { method: 'POST', body: {} });
+
+        if (action === 'approve' && result.teachingComplete && !result.teachingComplete.complete) {
+            teachingWarning.value = `Approved, but this module has only ${result.teachingComplete.placedCount} of its `
+                + `${result.teachingComplete.requiredCount} sessions placed — its teaching plan is not fully `
+                + 'scheduled yet.';
+        }
+
         await refresh();
     } catch (cause) {
         // The server's own sentence: approving can fail because the grid changed
@@ -226,6 +248,11 @@ async function decide(id: string, action: 'approve' | 'reject') {
     &--error {
         color: $error700;
         background: varToRgba('error500', 0.14);
+    }
+
+    &--warn {
+        color: $warning700;
+        background: varToRgba('warning500', 0.12);
     }
 }
 

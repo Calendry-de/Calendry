@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { mapDbErrors } from '../../../utils/dbErrors';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
-import { assertExamKind, assertLeadsOffering, assertPlacementFits } from '../../../utils/examRequests';
+import { assertExamKind, assertLeadsOffering, assertPlacementFits, assertTeachingComplete } from '../../../utils/examRequests';
 
 const bodySchema = z.object({
     offeringId: z.string().min(1),
@@ -77,6 +77,11 @@ export default defineEventHandler(async (event) => {
             },
         }));
 
-        return { request: created };
+        // Warn, don't block: an exam can be requested before every Session of
+        // the module's own teaching plan is placed — this is a fact for the
+        // reviewer to weigh, not a reason to refuse the request.
+        const teachingComplete = await assertTeachingComplete(tx, identity.tenantId, body.offeringId);
+
+        return { request: created, teachingComplete };
     });
 });

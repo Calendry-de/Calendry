@@ -6,6 +6,7 @@ import { refreshViolations } from './violations';
 import { fitsGrid } from './gridBounds';
 import { WEEK_KIND_NAME, classifyWeeks, weekCountOf } from '../../shared/academicCalendar';
 import type { WeekKindName } from '../../shared/academicCalendar';
+import { isPlacedSession } from '../../shared/sessionPlacement';
 
 /**
  * The rules behind a lecturer's exam request, in one place because four routes
@@ -144,6 +145,65 @@ export async function assertPlacementFits(
             data: { ...placement, blocksPerDay: grid.blocksPerDay, activeDays: grid.activeDays },
         });
     }
+}
+
+/** COUNT-BASED result of {@link assertTeachingComplete}: how much of the module's own teaching plan is actually on the calendar. */
+export interface TeachingCompleteness {
+    /** `placedCount >= requiredCount`. */
+    complete: boolean;
+    placedCount: number;
+    requiredCount: number;
+}
+
+/**
+ * Has the module's whole teaching plan actually been PLACED — not whether any
+ * of it has already happened.
+ *
+ * COUNT-BASED, deliberately: it does not matter whether the placed Sessions'
+ * dates are in the past or future, only that `offering.frequency` worth of
+ * them exist on the calendar. `isPlacedSession` is the one predicate for "has
+ * a real placement" — a banked/cancelled Session (issue #22) has
+ * `termWeek: null` and must not count as taught.
+ *
+ * WARN, DON'T BLOCK — same convention as a manual edit's hard-constraint
+ * violations: this returns a result rather than throwing, so a caller can
+ * surface it as queryable state instead of refusing the request or the
+ * approval. An exam on a module whose teaching is not yet fully scheduled is
+ * a fact worth showing, not a reason to stop someone.
+ *
+ * PURE READ, no side effects — safe to call from both the request and the
+ * approval routes, and safe to call twice with the same DB state.
+ */
+export async function assertTeachingComplete(
+    tx: Tx,
+    tenantId: string,
+    offeringId: string,
+): Promise<TeachingCompleteness> {
+    const offering = await tx.offering.findFirst({
+        where: { id: offeringId, tenantId },
+        select: { frequency: true },
+    });
+
+    // No such Offering is not this function's question to answer — callers
+    // that need it to exist already assert that themselves. Reporting
+    // "complete" here would be a lie; reporting a fixed 0/0 keeps the shape
+    // honest without inventing a verdict.
+    if (!offering) {
+        return { complete: true, placedCount: 0, requiredCount: 0 };
+    }
+
+    const sessions = await tx.session.findMany({
+        where: { offeringId, tenantId },
+        select: { termWeek: true, dayOfWeek: true, blockIndex: true },
+    });
+
+    const placedCount = sessions.filter(isPlacedSession).length;
+
+    return {
+        complete: placedCount >= offering.frequency,
+        placedCount,
+        requiredCount: offering.frequency,
+    };
 }
 
 /**

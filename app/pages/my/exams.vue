@@ -14,6 +14,18 @@
         >{{ error }}</p>
 
         <!--
+            WARN, DON'T BLOCK: the request above already went through. This
+            says the module's own teaching plan is not fully placed yet — a
+            fact for the lecturer to know, never a reason the request was
+            refused.
+        -->
+        <p
+            v-if="teachingWarning"
+            class="note note--warn"
+            role="status"
+        >{{ teachingWarning }}</p>
+
+        <!--
             The two blocking states, named separately. "You lead no modules" and
             "this institution has no exam kind" both leave the form unusable and
             call for completely different action — one is a staffing fact, the
@@ -372,6 +384,7 @@ const durationBlocks = ref(1);
 const note = ref('');
 const busy = ref(false);
 const error = ref('');
+const teachingWarning = ref('');
 
 /*
  * Seeded from a COMPUTED read at setup, not from a watcher. Vue does not flush
@@ -391,9 +404,12 @@ termWeek.value = examWeeks.value[0]?.week ?? 1;
 async function submit() {
     busy.value = true;
     error.value = '';
+    teachingWarning.value = '';
 
     try {
-        await request('/api/me/exam-requests', {
+        const { teachingComplete } = await request<{
+            teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
+        }>('/api/me/exam-requests', {
             method: 'POST',
             body: {
                 offeringId: offeringId.value,
@@ -405,6 +421,12 @@ async function submit() {
                 note: note.value || null,
             },
         });
+
+        if (!teachingComplete.complete) {
+            teachingWarning.value = `This module has ${teachingComplete.placedCount} of its `
+                + `${teachingComplete.requiredCount} sessions placed so far — the teaching plan `
+                + 'is not fully scheduled yet, though that does not stop the exam request.';
+        }
 
         note.value = '';
         await refresh();
