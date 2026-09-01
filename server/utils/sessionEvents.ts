@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { Tx } from './tenantDb';
-import type { RequestIdentity } from './tenantResolver';
+import type { TenantScopedIdentity } from './tenantResolver';
 import { invalidateScheduleCache } from './scheduleCache';
 
 export type EventType =
@@ -22,12 +22,14 @@ export async function appendEvent(
     tx: Tx,
     /**
      * Structurally `{ tenantId, actorPersonId }` rather than a full
-     * `RequestIdentity`, because those are the only two fields used and the
-     * materialize layer has no request identity to offer — it runs from a plan.
-     * A `RequestIdentity` still satisfies this, so every existing caller is
-     * unchanged.
+     * `TenantScopedIdentity`, because those are the only two fields used and
+     * the materialize layer has no request identity to offer — it runs from a
+     * plan. A `TenantScopedIdentity` still satisfies this, so every existing
+     * caller is unchanged. NOT `RequestIdentity` (issue #76): `StaffIdentity`
+     * has no `tenantId` at all, and an event can never be attributed to a
+     * principal that is not inside any tenant to begin with.
      */
-    identity: Pick<RequestIdentity, 'tenantId' | 'actorPersonId'>,
+    identity: Pick<TenantScopedIdentity, 'tenantId' | 'actorPersonId'>,
     input: {
         type: EventType;
         generationId: string;

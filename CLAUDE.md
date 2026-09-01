@@ -148,10 +148,11 @@ Never give a screen or the poller an `actorPersonId` to make a check pass. The
 check is the boundary; widen the route deliberately, or add a scope the way
 screens did.
 
-### The three deliberate exceptions to tenant isolation
+### The four deliberate exceptions to tenant isolation
 
-Conscious boundaries, not oversights. **A fourth is a bug** — do not add one
-without a comparably strong reason.
+Conscious boundaries, not oversights. **A fifth is a bug** — do not add one
+without a comparably strong reason, approved explicitly and recorded here and
+in DECISIONS.md, the way the fourth was.
 
 1. **Federation-owned resources.** `room`/`equipment`/`offering`/`session` may be
    Federation- instead of Tenant-owned (a shared lecture hall, a cross-enrolled
@@ -167,6 +168,17 @@ without a comparably strong reason.
    `calendry_internal.tenants_with_due_solver_runs()` runs when nobody is logged
    in, so `current_tenant_id()` is NULL. Returns **tenant ids only**, no
    parameters; every write happens inside an ordinary `withTenant()` transaction.
+4. **The Calendry staff principal** (issue #76). `staff_account`/`staff_session`
+   carry **no `tenant_id` and no RLS**, same access shape as exception 2 — a
+   staff session is never IN a tenant at all, not even transiently, so
+   `StaffIdentity` does not extend the common identity shape and cannot even be
+   passed to `withTenant()` (a compile error, not a runtime check).
+   `actorPersonId` is always `null`, so it can never satisfy a permission
+   check, same as a screen. `server/api/staff/*` (`requireStaffIdentity`) reads
+   and writes across every tenant through the OWNER database connection —
+   never `withRequestTenant`/RLS, which structurally cannot express "no
+   tenant, and that's fine." § "Staff principal — the fourth tenant-isolation
+   exception".
 
 ## The traps that keep recurring
 
@@ -384,6 +396,7 @@ The rest are area-specific: read the section before working in that area.
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
 | Schedule toolbar | Height is invariant; the solver's tall states are anchored panels. `.bar_select` is capped. | § "The schedule toolbar" |
 | Screens | A lobby display is a DEVICE credential, not a fourth RLS exception: resolved by secret alone through `screen_identity()`, then ordinary `withTenant()`. Key hashed, shown once, generated in the browser. Empty room scope = every room. | § "Screens" |
+| Staff | `StaffIdentity` IS the fourth RLS exception, unlike screens: no tenant at all, ever. `server/api/staff/*` (`requireStaffIdentity`) reads/writes through the OWNER connection, never `withRequestTenant`. `provisionTenantCore()` is the one tenant-creation implementation the CLI and this route both call. | § "Staff principal — the fourth tenant-isolation exception" |
 
 ## Bootstrap & deploy sequence
 
@@ -449,6 +462,6 @@ Production image and CI specifics: § "Bootstrap & deploy".
 - Hardcode a tenant-open value (role name, `kind`, equipment tag) into logic
 - Bypass the event log for a Session mutation
 - Implement solver logic in this repo
-- Relax tenant isolation beyond the three declared exceptions
+- Relax tenant isolation beyond the four declared exceptions
 - Let a tenant change a credential on an Account another tenant also uses, or
   leave an Account with no `account_person` row

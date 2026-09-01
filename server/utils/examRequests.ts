@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3';
 import type { Tx } from './tenantDb';
-import type { RequestIdentity } from './tenantResolver';
+import type { TenantScopedIdentity } from './tenantResolver';
 import { appendEvent, placementOf, requireBaselineGeneration } from './sessionEvents';
 import { refreshViolations } from './violations';
 import { fitsGrid } from './gridBounds';
@@ -23,7 +23,7 @@ import { deriveCapacity } from '../../shared/groupCapacity';
 /** An Offering the acting Person LEADS. Nothing else is "mine". */
 export async function assertLeadsOffering(
     tx: Tx,
-    identity: RequestIdentity,
+    identity: TenantScopedIdentity,
     offeringId: string,
     termId: string,
 ): Promise<{ id: string; title: string }> {
@@ -316,7 +316,7 @@ export async function assertExamRoomCapacity(
 export async function materializeExam(
     event: H3Event,
     tx: Tx,
-    identity: RequestIdentity,
+    identity: TenantScopedIdentity,
     request: {
         id: string;
         offeringId: string;

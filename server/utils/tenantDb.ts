@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { H3Event } from 'h3';
-import type { RequestIdentity } from './tenantResolver';
+import type { RequestIdentity, StaffIdentity, TenantScopedIdentity } from './tenantResolver';
 // Explicit rather than relying on Nitro's auto-import: this module is also
 // loaded by scripts/ and by the background poller's verification, where the
 // auto-import does not exist and the failure is a bare "getPrisma is not
@@ -29,9 +29,14 @@ export type Tx = Prisma.TransactionClient;
  *
  * A handler that forgets to use this sees zero rows rather than every row,
  * because the policies compare against NULL.
+ *
+ * Takes a `TenantScopedIdentity`, not the full `RequestIdentity` — issue #76.
+ * `StaffIdentity` carries no `tenantId` at all (a staff principal is never IN
+ * a tenant), so passing one here is a COMPILE ERROR, not a runtime check
+ * `withRequestTenant()` below has to remember to make.
  */
 export async function withTenant<T>(
-    identity: RequestIdentity,
+    identity: TenantScopedIdentity,
     fn: (tx: Tx) => Promise<T>,
     options: { timeoutMs?: number } = {},
 ): Promise<T> {
@@ -70,13 +75,56 @@ export function requireIdentity(event: H3Event): RequestIdentity {
     return identity;
 }
 
-/** Convenience: resolve identity and open a tenant transaction in one step. */
+/**
+ * Convenience: resolve identity and open a tenant transaction in one step.
+ *
+ * Refuses `kind === 'staff'` BEFORE calling `withTenant()` — issue #76. This
+ * is what makes "staff routes must not be reachable by a tenant-scoped
+ * identity, and vice versa" hold for the tenant-scoped half: a `StaffIdentity`
+ * is not a `TenantScopedIdentity` at all (see that type's comment in
+ * `tenantResolver.ts`), so `withTenant(identity, …)` a few lines down would
+ * not even compile without this guard narrowing `identity` first. The 403,
+ * not 401, matters too — a staff session IS authenticated, just never as this
+ * kind of principal, the same distinction `requirePermission` draws for a
+ * signed-in Account missing a permission.
+ */
 export async function withRequestTenant<T>(
     event: H3Event,
-    fn: (tx: Tx, identity: RequestIdentity) => Promise<T>,
+    fn: (tx: Tx, identity: TenantScopedIdentity) => Promise<T>,
     options: { timeoutMs?: number } = {},
 ): Promise<T> {
     const identity = requireIdentity(event);
 
+    if (identity.kind === 'staff') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: 'A staff session cannot access tenant-scoped routes.',
+        });
+    }
+
     return withTenant(identity, (tx) => fn(tx, identity), options);
+}
+
+/**
+ * Identity for the current request, asserted to be staff — issue #76.
+ *
+ * The guard `server/api/staff/*` routes use INSTEAD OF `withRequestTenant`,
+ * never alongside it: a staff principal has no tenant, so there is no RLS
+ * context for those routes to open, and `withTenant()`'s parameter type does
+ * not even accept a `StaffIdentity` (see its own comment) — this function
+ * only adds the runtime check that a NON-staff caller (an `account` session, a
+ * `token`, anything else) is turned away before a staff route does anything
+ * with the owner database connection.
+ */
+export function requireStaffIdentity(event: H3Event): StaffIdentity {
+    const identity = requireIdentity(event);
+
+    if (identity.kind !== 'staff') {
+        throw createError({
+            statusCode: 403,
+            statusMessage: 'Staff identity required.',
+        });
+    }
+
+    return identity;
 }

@@ -14,6 +14,18 @@ export const SESSION_COOKIE = 'calendry_session';
 export const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 /**
+ * The STAFF session cookie — issue #76, deliberately named nothing like
+ * `SESSION_COOKIE` above. A tenant session and a staff session are two
+ * different principals with two different security postures (see
+ * `StaffIdentity` in `tenantResolver.ts`), and a name one keystroke away from
+ * the other is exactly how a route ends up reading the wrong one and treating
+ * a Calendry staffer as a tenant Account, or vice versa. Same TTL as a tenant
+ * session for now — nothing about issue #76 asked for a different one.
+ */
+export const STAFF_SESSION_COOKIE = 'calendry_staff_session';
+export const STAFF_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
+
+/**
  * Maximum password age before login treats an account like a forced reset —
  * issue #13 item 1. GLOBAL, not per-tenant: an Account is tenant-independent
  * (`CLAUDE.md`, "the auth plane") — one login can act in several

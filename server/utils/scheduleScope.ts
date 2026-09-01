@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3';
-import type { RequestIdentity } from './tenantResolver';
+import type { TenantScopedIdentity } from './tenantResolver';
 import type { Tx } from './tenantDb';
 import { ancestorGroupIds } from './groupClosure';
 import { holdsPermission, requireAnyPermission } from './requirePermission';
@@ -47,7 +47,7 @@ export interface SessionReadScope {
 export async function sessionReadScope(
     event: H3Event,
     tx: Tx,
-    identity: RequestIdentity,
+    identity: TenantScopedIdentity,
 ): Promise<SessionReadScope> {
     await requireAnyPermission(event, tx, SESSION_READ_PERMISSIONS);
 
@@ -98,7 +98,7 @@ export async function sessionReadScope(
  * calls this directly rather than going through the read-permission switch
  * above.
  */
-export async function ownSessionClause(tx: Tx, identity: RequestIdentity): Promise<Record<string, unknown>> {
+export async function ownSessionClause(tx: Tx, identity: TenantScopedIdentity): Promise<Record<string, unknown>> {
     const personId = identity.actorPersonId;
 
     if (!personId) {

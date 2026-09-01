@@ -46,7 +46,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
 | Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
-| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal — the fourth tenant-isolation exception |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
@@ -2038,6 +2038,82 @@ to the other soft rules.
 **Not a bug, and deliberately kept as-is.** It is written down only because the
 shape looks alarming: a future session finding it will otherwise spend time
 deciding whether it was intended. It was.
+
+---
+
+# Staff principal — the fourth tenant-isolation exception
+
+Issue #76 added `StaffIdentity`/`StaffAccount`/`StaffSession` — Calendry's own
+onboarding/support staff, logging in with a credential that answers to no
+tenant at all. CLAUDE.md's own rule on this ("a fourth is a bug — do not add
+one without a comparably strong reason") is why this exists: the request was
+explicitly approved for this issue, and the rule says record the reason, not
+just implement the exception silently.
+
+**Why not a flag on `Account`.** Every `Account` row is reachable only through
+`account_person -> person.tenant_id` — that graph IS what makes an Account a
+tenant-scoped credential, even though the row itself carries no `tenant_id`
+(exception 2). A staff principal acts as no Person in any tenant, so there is
+nothing to hang a flag off without making every Account query in the codebase
+ask "or is this staff" forever. A second table pair with the identical access
+shape (no RLS, resolved by verified credential, never a tenant filter) is the
+one that generalises exception 2 rather than special-casing it — see the
+"Screens" section above for the same argument made once already about a
+different principal.
+
+**Why this needed no third `calendry_internal.*_identity()` function.**
+`session_identity()`/`screen_identity()`/`api_token_identity()` all exist
+because their pre-tenant lookup has to JOIN into an RLS-protected table
+(`person`, `tenant`) to learn which tenant the credential belongs to — that
+JOIN is what SECURITY DEFINER buys. `staff_session` joins to nothing but
+`staff_account`, which is equally outside RLS, so `resolveStaffSessionToken()`
+(`server/utils/authDb.ts`) is a plain query on the ordinary runtime
+connection. Reaching for the SECURITY DEFINER pattern anyway would have added
+a privileged path this credential never needed one for.
+
+**The type system carries the isolation, not just a runtime check.**
+`StaffIdentity` deliberately does NOT extend `IdentityBase` — it has no
+`tenantId` field, full stop. `withTenant()`
+(`server/utils/tenantDb.ts`) takes a `TenantScopedIdentity`, the
+five-member union that excludes `StaffIdentity`, so passing a staff identity
+to it is a compile error, not something a future route has to remember to
+guard against. `withRequestTenant()` narrows `RequestIdentity` down to
+`TenantScopedIdentity` by refusing `kind === 'staff'` (403) before it ever
+calls `withTenant()` — TypeScript's discriminated-union narrowing makes that
+refusal load-bearing for the type-check on the next line, not decorative.
+
+**`actorPersonId: null`, same structural guarantee `ScreenIdentity` has, for
+the same reason.** `heldPermissions()` throws 403 whenever there is no acting
+Person, which refuses a staff session against every tenant permission check —
+including ones written years from now by somebody who has never heard of
+staff accounts. A staff principal's authority is "may call
+`server/api/staff/*`" and NOTHING about any one tenant's data; the guard for
+that (`requireStaffIdentity`, `server/utils/tenantDb.ts`) is a separate,
+narrower function precisely because `withRequestTenant`/`heldPermissions` are
+tenant-scoped machinery that structurally cannot express "this caller has no
+tenant, and that's fine, they're allowed here anyway."
+
+**Tenant creation has one implementation, not two.** `provisionTenantCore()`
+(`server/utils/provisionTenant.ts`) is the exact transaction body that used
+to live inline in `scripts/provision-tenant.ts`; both the CLI and
+`POST /api/staff/tenants` call it now. Both callers still open the transaction
+on the OWNER connection themselves (`resolveOwnerDatabaseUrl()`
+/ `getOwnerPrisma()`) — the reason a tenant needs an owner connection at all
+(`tenant`'s RLS write policy is unsatisfiable for a row that does not exist
+yet) is unchanged and is still argued in full in the CLI's own header comment.
+The owner credential still never leaves routes gated specifically for it:
+ordinary tenant Accounts still cannot reach `server/api/staff/*`
+(`requireStaffIdentity`), so this is not the self-service tenant signup the
+CLI's comment explicitly rules out — it is the same restricted door, opened
+for a second, differently-authenticated caller.
+
+**Deliberately out of scope for this card: support-code redemption**, where
+staff temporarily assume a tenant role to help a customer. That is a separate,
+dependent card — building it means deciding how a staff-assumed session is
+distinguished from both a `StaffIdentity` and an ordinary `AccountIdentity`
+everywhere permission checks, RLS context and audit attribution read it, which
+issue #76 did not need to answer to ship login, tenant creation and the tenant
+list.
 
 ---
 

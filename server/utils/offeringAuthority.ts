@@ -1,6 +1,6 @@
 import type { SchedulingPattern } from '@prisma/client';
 import type { Tx } from './tenantDb';
-import type { RequestIdentity } from './tenantResolver';
+import type { TenantScopedIdentity } from './tenantResolver';
 
 /**
  * "Leads/lectures an Offering", the authority `assertLeadsOffering`
@@ -18,7 +18,7 @@ import type { RequestIdentity } from './tenantResolver';
  */
 export async function assertLecturesOffering(
     tx: Tx,
-    identity: RequestIdentity,
+    identity: TenantScopedIdentity,
     offeringId: string,
 ): Promise<{ id: string; title: string; schedulingPattern: SchedulingPattern | null }> {
     /*

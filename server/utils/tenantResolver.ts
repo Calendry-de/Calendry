@@ -1,7 +1,8 @@
 import type { H3Event } from 'h3';
-import { SESSION_COOKIE } from './auth';
+import { SESSION_COOKIE, STAFF_SESSION_COOKIE } from './auth';
 import {
-    resolveApiToken, resolveIcsLink, resolveScreenKey, resolveSessionToken, touchApiToken, touchIcsLink,
+    resolveApiToken, resolveIcsLink, resolveScreenKey, resolveSessionToken, resolveStaffSessionToken,
+    touchApiToken, touchIcsLink,
 } from './authDb';
 
 /**
@@ -121,18 +122,60 @@ export interface IcsLinkIdentity extends IdentityBase {
 }
 
 /**
+ * Every principal that can act INSIDE a tenant. The common shape every one of
+ * these carries (`tenantId`, `federationId`, `actorPersonId`) is what lets
+ * `withTenant()`/`withRequestTenant()` (`tenantDb.ts`) open an RLS context
+ * generically, without a per-kind branch.
+ */
+export type TenantScopedIdentity = AccountIdentity | TokenIdentity | ScreenIdentity | SystemIdentity | IcsLinkIdentity;
+
+/**
+ * Calendry's OWN staff, acting through their own session cookie
+ * (`STAFF_SESSION_COOKIE`) — issue #76, the FOURTH tenant-isolation exception
+ * (CLAUDE.md, "The deliberate exceptions to tenant isolation";
+ * DECISIONS.md, "Staff principal — the fourth tenant-isolation exception").
+ *
+ * DELIBERATELY DOES NOT EXTEND `IdentityBase`: a staff principal has no
+ * tenant, not "not yet chosen one" the way a fresh Account session does — it
+ * is never IN a tenant at all. That is not a detail, it is the whole point of
+ * the type: `withTenant()` takes a `TenantScopedIdentity`, which this is not
+ * a member of, so passing a `StaffIdentity` to it is a COMPILE ERROR, not a
+ * runtime check somebody has to remember to write. `withRequestTenant()`
+ * narrows `RequestIdentity` down to `TenantScopedIdentity` by refusing
+ * `kind === 'staff'` before it ever calls `withTenant()` — see that function.
+ *
+ * `actorPersonId` is `null` and always will be, exactly like `ScreenIdentity`
+ * above and for the identical reason: `heldPermissions()` throws 403 when
+ * there is no acting Person, so a staff session cannot satisfy ANY tenant
+ * permission check — including one added years from now by somebody who has
+ * never heard of staff accounts. A staff principal's authority is "may call
+ * `server/api/staff/*`, which reads/writes across every tenant through the
+ * OWNER database connection" and NOTHING about any one tenant's data model.
+ * Never give it an `actorPersonId` to make a check pass.
+ */
+export interface StaffIdentity {
+    kind: 'staff';
+    actorPersonId: null;
+    staffAccountId: string;
+    staffSessionId: string;
+}
+
+/**
  * Every principal this app recognises: a human with a session, a script with
- * a bearer token, a device with a key, a calendar app with a stream link, and
- * the background job.
+ * a bearer token, a device with a key, a calendar app with a stream link, the
+ * background job, and Calendry's own staff.
  *
  * Only `account` and `token` can hold permissions, because only they have an
  * acting Person AND route their checks through `heldPermissions()`, which
  * refuses without one — the token's set is further intersected with its
  * stored ceiling. `ics_link` also has an acting Person, but is refused by
  * `heldPermissions()` explicitly, AND — unlike every other member — is never
- * attached by the global resolver chain at all; see its own comment.
+ * attached by the global resolver chain at all; see its own comment. `staff`
+ * has NO acting Person and is refused the same way `screen`/`system` are —
+ * and additionally can never even reach `heldPermissions()`, because it is
+ * not a `TenantScopedIdentity` at all; see its own comment.
  */
-export type RequestIdentity = AccountIdentity | TokenIdentity | ScreenIdentity | SystemIdentity | IcsLinkIdentity;
+export type RequestIdentity = TenantScopedIdentity | StaffIdentity;
 
 /**
  * A tenant resolver turns an inbound request into a RequestIdentity, or returns
@@ -268,6 +311,43 @@ const apiTokenResolver: TenantResolver = async (event) => {
 };
 
 /**
+ * Staff-cookie resolver — issue #76. Tried FIRST, ahead of every tenant-scoped
+ * resolver, unlike screen/token which are tried only after a tenant session is
+ * ruled out.
+ *
+ * ORDER IS DELIBERATE BUT, UNLIKE THE SCREEN RESOLVER'S, NOT A PRIVILEGE
+ * CONCERN. A `StaffIdentity` cannot satisfy a single tenant permission check
+ * (see its own comment) and is refused outright by every `/api/*` route that
+ * is not under `server/api/staff/*` (`requireStaffIdentity`) or
+ * `server/api/staff-auth/*` (public) — `withRequestTenant()` refuses
+ * `kind === 'staff'` before it ever opens a transaction. So a request that
+ * somehow carried BOTH a valid staff cookie and a valid tenant session cookie
+ * cannot use staff-first ordering to gain tenant access; it can only ever be
+ * resolved as exactly one principal, unambiguously, which is the actual
+ * property this ordering buys — not a security boundary, a determinism one.
+ */
+const staffCookieResolver: TenantResolver = async (event) => {
+    const token = getCookie(event, STAFF_SESSION_COOKIE);
+
+    if (!token) {
+        return null;
+    }
+
+    const session = await resolveStaffSessionToken(token);
+
+    if (!session) {
+        return null;
+    }
+
+    return {
+        kind: 'staff',
+        actorPersonId: null,
+        staffAccountId: session.staff_account_id,
+        staffSessionId: session.session_id,
+    };
+};
+
+/**
  * ics_link resolver — DELIBERATELY NOT part of `activeResolver` below. Every
  * other resolver in this file is safe to attach to `event.context.identity`
  * for ANY `/api/*` route, because the middleware runs before routing decides
@@ -317,7 +397,10 @@ export const icsLinkResolver: TenantResolver = async (event) => {
  * `icsLinkResolver` is intentionally excluded — see its own comment.
  */
 const activeResolver: TenantResolver = async (event) => (
-    await sessionCookieResolver(event) ?? await apiTokenResolver(event) ?? screenKeyResolver(event)
+    await staffCookieResolver(event)
+        ?? await sessionCookieResolver(event)
+        ?? await apiTokenResolver(event)
+        ?? screenKeyResolver(event)
 );
 
 export async function resolveIdentity(event: H3Event): Promise<RequestIdentity | null> {

@@ -5,7 +5,7 @@ import { getCached } from '../../utils/cache';
 import { boardCacheKey, SCHEDULE_CACHE_TTL_SECONDS } from '../../utils/scheduleCache';
 import { localNow } from '../../utils/solverCalendar';
 import type { Tx } from '../../utils/tenantDb';
-import { requireIdentity, withRequestTenant } from '../../utils/tenantDb';
+import { withRequestTenant } from '../../utils/tenantDb';
 import { resolveScreenKey } from '../../utils/authDb';
 
 /**
@@ -50,9 +50,7 @@ export default defineEventHandler(async (event) => {
         }
     }
 
-    const identity = requireIdentity(event);
-
-    return withRequestTenant(event, async (tx) => {
+    return withRequestTenant(event, async (tx, identity) => {
         if (identity.kind !== 'screen') {
             // Everyone but the device pays the ordinary permission — a human
             // previewing, an API token just the same. `!== 'screen'` rather

@@ -2258,6 +2258,63 @@ model AuthSession {
   @@map("auth_session")
 }
 
+/// Calendry's OWN staff — issue #76, the fourth tenant-isolation exception
+/// (CLAUDE.md "The deliberate exceptions to tenant isolation";
+/// DECISIONS.md "Staff principal — the fourth tenant-isolation exception").
+///
+/// A SEPARATE credential, not a flag on `Account`. `Account` exists to let
+/// one human act as several tenant-scoped Persons — every row is reachable
+/// only via `account_person` -> `person.tenant_id`. Calendry staff act as no
+/// Person in any tenant; there is nothing in that graph to hang a flag off
+/// without making every Account query ask "or is this staff" forever.
+///
+/// NO RLS, matching `Account`/`AuthSession` for the identical reason: this
+/// table carries no `tenant_id` and never will. Access is by verified
+/// credential alone, never a tenant filter.
+model StaffAccount {
+  id           String  @id @default(uuid(7))
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+  isActive     Boolean @default(true) @map("is_active")
+
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions StaffSession[]
+
+  @@map("staff_account")
+}
+
+/// A staff session, addressed by an opaque token in `STAFF_SESSION_COOKIE` —
+/// a cookie DISTINCT from `SESSION_COOKIE` (`server/utils/auth.ts`) by name,
+/// so a staff session and a tenant session can never be confused by a code
+/// path that forgot which one it was reading.
+///
+/// Deliberately carries NO `tenantId`, unlike `AuthSession`: a staff
+/// principal is never "in" a tenant at all, not even transiently — see
+/// `StaffIdentity` in `server/utils/tenantResolver.ts`.
+model StaffSession {
+  id             String @id @default(uuid(7))
+  staffAccountId String @map("staff_account_id")
+
+  /// SHA-256 of the bearer token, same scheme as `AuthSession.tokenHash`.
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  userAgent String? @map("user_agent")
+  ipAddress String? @map("ip_address")
+
+  staffAccount StaffAccount @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+
+  @@index([staffAccountId])
+  @@map("staff_session")
+}
+
 // ---------------------------------------------------------------------------
 // AUTHORIZATION — permissions and tenant-defined access roles
 // ---------------------------------------------------------------------------

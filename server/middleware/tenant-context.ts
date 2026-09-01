@@ -10,6 +10,12 @@ const PUBLIC_API_PATHS = [
     // would make the flag unclearable and lock the account out permanently.
     // The handler re-authenticates from the credentials in the body instead.
     '/api/auth/change-password',
+    // The staff-plane equivalents of the two lines above — issue #76. A
+    // staff login obviously has no cookie yet; a staff logout must still
+    // clear one even if `resolveIdentity` cannot resolve it (an expired or
+    // already-revoked token), exactly like `/api/auth/logout`.
+    '/api/staff-auth/login',
+    '/api/staff-auth/logout',
     /*
      * The board is reachable without an ACCOUNT, never without identity. A
      * screen key resolves to a real `ScreenIdentity` through the resolver like

@@ -22,6 +22,16 @@ export const LANDING_ROUTE = '/';
 export const SCREEN_ROUTE = '/screen';
 
 /**
+ * Calendry staff's own area (issue #76) — a StaffAccount session, not a
+ * tenant Account one, so `auth.global.ts`'s tenant-session guard must treat
+ * both routes below as anonymous (no tenant session needed, and nobody
+ * signed into a TENANT is bounced away from them either). Each page checks
+ * for its OWN staff session itself; see `app/pages/staff/index.vue`.
+ */
+export const STAFF_LOGIN_ROUTE = '/staff/login';
+export const STAFF_ROUTE = '/staff';
+
+/**
  * Whether a `?redirect=` value is safe to navigate to — ONE definition, used by
  * both the route guard and the login page's destination resolver, so the two
  * cannot disagree about what counts as internal.

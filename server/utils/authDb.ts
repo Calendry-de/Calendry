@@ -173,6 +173,88 @@ export async function touchIcsLink(linkId: string): Promise<void> {
     await getPrisma().$executeRaw`SELECT calendry_internal.touch_ics_link(${linkId})`;
 }
 
+/**
+ * The STAFF plane — issue #76, the fourth tenant-isolation exception.
+ *
+ * `staff_account`/`staff_session` carry no `tenant_id` and no RLS, same as
+ * `account`/`auth_session` above, and for the same reason this module is
+ * where their queries live: nothing here needs `withTenant()`, because there
+ * is no tenant to open a context for.
+ *
+ * UNLIKE `resolveSessionToken`, this needs no `calendry_internal.*_identity()`
+ * SECURITY DEFINER function. That indirection exists only where a pre-tenant
+ * lookup must JOIN into an RLS-protected table (`person`, `tenant`) to learn
+ * which tenant a session belongs to — see `session_identity()`'s own
+ * migration comment. A staff session joins to nothing but its own
+ * `staff_account`, which is equally RLS-free, so a plain query on the
+ * runtime connection is the whole story.
+ */
+
+export interface StaffSessionIdentityRow {
+    session_id: string;
+    staff_account_id: string;
+    email: string;
+    expires_at: Date;
+    revoked_at: Date | null;
+    staff_account_active: boolean;
+}
+
+/** Resolves a raw staff bearer token to its session, or null if unusable. */
+export async function resolveStaffSessionToken(token: string): Promise<StaffSessionIdentityRow | null> {
+    const session = await getPrisma().staffSession.findUnique({
+        where: { tokenHash: hashToken(token) },
+        include: { staffAccount: true },
+    });
+
+    if (!session) {
+        return null;
+    }
+
+    // Same three checks as `resolveSessionToken`, and for the same reason: a
+    // disabled staff account must stop authenticating on its NEXT request,
+    // not whenever the session happens to expire.
+    if (session.revokedAt !== null || session.expiresAt.getTime() <= Date.now() || !session.staffAccount.isActive) {
+        return null;
+    }
+
+    return {
+        session_id: session.id,
+        staff_account_id: session.staffAccountId,
+        email: session.staffAccount.email,
+        expires_at: session.expiresAt,
+        revoked_at: session.revokedAt,
+        staff_account_active: session.staffAccount.isActive,
+    };
+}
+
+export async function findStaffAccountByEmail(email: string) {
+    return getPrisma().staffAccount.findUnique({ where: { email: email.toLowerCase() } });
+}
+
+export async function createStaffSession(input: {
+    staffAccountId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    userAgent?: string | null;
+    ipAddress?: string | null;
+}) {
+    return getPrisma().staffSession.create({ data: input });
+}
+
+export async function revokeStaffSession(sessionId: string) {
+    return getPrisma().staffSession.update({
+        where: { id: sessionId },
+        data: { revokedAt: new Date() },
+    });
+}
+
+export async function touchStaffAccountLogin(staffAccountId: string) {
+    return getPrisma().staffAccount.update({
+        where: { id: staffAccountId },
+        data: { lastLoginAt: new Date() },
+    });
+}
+
 /** The tenants this account can act in. */
 export async function listAccountIdentities(accountId: string): Promise<AccountIdentityRow[]> {
     const prisma = getPrisma();
