@@ -24,6 +24,7 @@
     "typecheck:server": "vue-tsc --noEmit -p .nuxt/tsconfig.server.json",
     "test": "bash tests/run-integration.sh",
     "provision:tenant": "bun run scripts/provision-tenant.ts",
+    "provision:federation": "bun run scripts/provision-federation.ts",
     "list:tenants": "bun run scripts/list-tenants.ts",
     "db-seed": "bun run prisma/seed.ts",
     "db-push": "docker compose -f docker-compose.yml -f docker-compose.dev.yml exec calendry-app bun run prisma db push",
