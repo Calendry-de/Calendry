@@ -5,17 +5,26 @@ import {
 import {
     checkRateLimit, createStaffSession, findStaffAccountByEmail, resetRateLimit, touchStaffAccountLogin,
 } from '../../utils/authDb';
+import { verifyTurnstileToken } from '../../utils/turnstile';
+import { CAPTCHA_ATTEMPT_THRESHOLD } from '../../../shared/turnstile';
 
 const bodySchema = z.object({
     email: z.string().email(),
     password: z.string().min(1),
+    /**
+     * Cloudflare Turnstile response token (issue #106, reusing #79's
+     * infrastructure). Optional below `CAPTCHA_ATTEMPT_THRESHOLD` failed
+     * attempts; required above it — see the check right after
+     * `checkRateLimit` below.
+     */
+    turnstileToken: z.string().optional(),
 });
 
 defineRouteMeta({
     openAPI: {
         tags: ['Staff auth'],
         summary: 'Calendry staff: log in',
-        description: 'Authenticates a StaffAccount and opens a staff session, distinct from a tenant Account session — issue #76. A staff session never carries a tenant and can never satisfy a tenant permission check; it only unlocks server/api/staff/* (onboarding, support). Rate-limited per email (10 attempts / 15 min), same posture as /api/auth/login.',
+        description: 'Authenticates a StaffAccount and opens a staff session, distinct from a tenant Account session — issue #76. A staff session never carries a tenant and can never satisfy a tenant permission check; it only unlocks server/api/staff/* (onboarding, support). Rate-limited per email (10 attempts / 15 min), same posture as /api/auth/login. After 3 failed attempts in the window, a valid Cloudflare Turnstile token is also required (issue #106, reusing #79\'s gate).',
         requestBody: {
             required: true,
             content: {
@@ -26,6 +35,7 @@ defineRouteMeta({
                         properties: {
                             email: { type: 'string', format: 'email' },
                             password: { type: 'string' },
+                            turnstileToken: { type: 'string', description: 'Cloudflare Turnstile response token. Required once 3 failed attempts have been recorded for this email in the current rate-limit window; ignored below that.' },
                         },
                     },
                 },
@@ -46,6 +56,7 @@ defineRouteMeta({
                     },
                 },
             },
+            400: { description: 'Missing or invalid Turnstile token, required past the failed-attempt threshold.' },
             401: { description: 'Invalid credentials. Deliberately identical for unknown staff account and wrong password.' },
         },
     },
@@ -72,7 +83,22 @@ export default defineEventHandler(async (event) => {
     // rate-limited caller's blocked guesses must not cost scrypt work.
     // Route-qualified key (`staff_login`, not `login`) so a tenant login and
     // a staff login against the same email do not share one budget.
-    await checkRateLimit('staff_login', body.email, { maxAttempts: 10, windowMinutes: 15 });
+    const attemptCount = await checkRateLimit('staff_login', body.email, { maxAttempts: 10, windowMinutes: 15 });
+
+    /*
+     * CAPTCHA gate on top of the rate limit — issue #106, reusing #79's
+     * infrastructure as-is rather than forking a second copy. Same threshold,
+     * same "checked before any password work" placement, same graceful dev
+     * fallback (verifyTurnstileToken() returns true when TURNSTILE_SECRET_KEY
+     * is unset).
+     */
+    if (attemptCount > CAPTCHA_ATTEMPT_THRESHOLD) {
+        const captchaOk = await verifyTurnstileToken(body.turnstileToken);
+
+        if (!captchaOk) {
+            throw createError({ statusCode: 400, statusMessage: 'CAPTCHA verification required.' });
+        }
+    }
 
     const account = await findStaffAccountByEmail(body.email);
 
