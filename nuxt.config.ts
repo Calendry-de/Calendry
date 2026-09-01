@@ -1,4 +1,58 @@
 import pkg from './package.json';
+import { CSRF_COOKIE, CSRF_HEADER } from './shared/csrf';
+
+/**
+ * Double-submit CSRF (issue #81): echoes the `CSRF_COOKIE` value back as the
+ * `CSRF_HEADER` on every state-changing same-origin request, so no existing
+ * `$fetch`/`useRequestFetch()` call site across `app/` has to change.
+ *
+ * This is a classic inline `<script>`, not a Nuxt plugin — see the long
+ * comment in `shared/csrf.ts` for why a plugin's `setup()` runs too late to
+ * intercept `fetch`: Nuxt's own `$fetch` singleton captures `globalThis.fetch`
+ * once, at MODULE EVALUATION time (`#build/fetch.mjs`), which always finishes
+ * before any plugin callback runs. A non-module script tag, by contrast,
+ * executes during HTML parsing — strictly before any deferred `type="module"`
+ * script, regardless of position in the document — so patching `window.fetch`
+ * here is the only place guaranteed to win the race. Safe under this app's CSP
+ * (`script-src ... 'unsafe-inline'`, `security-headers.ts`), so it needs no
+ * nonce.
+ */
+const csrfFetchPatchScript = `(function () {
+  var COOKIE = ${JSON.stringify(CSRF_COOKIE)};
+  var HEADER = ${JSON.stringify(CSRF_HEADER)};
+  var STATE_CHANGING = { POST: 1, PUT: 1, PATCH: 1, DELETE: 1 };
+  var nativeFetch = window.fetch.bind(window);
+
+  function csrfToken() {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + COOKIE + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function isSameOrigin(input) {
+    try {
+      var raw = typeof input === 'string' ? input : input.url;
+      return new URL(raw, window.location.href).origin === window.location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  window.fetch = function (input, init) {
+    var method = ((init && init.method) || (typeof input === 'object' && input.method) || 'GET').toUpperCase();
+
+    if (STATE_CHANGING[method] && isSameOrigin(input)) {
+      var token = csrfToken();
+
+      if (token) {
+        var headers = new Headers((init && init.headers) || (typeof input === 'object' && input.headers) || undefined);
+        headers.set(HEADER, token);
+        init = Object.assign({}, init, { headers: headers });
+      }
+    }
+
+    return nativeFetch(input, init);
+  };
+})();`;
 
 export default defineNuxtConfig({
     runtimeConfig: {
@@ -25,6 +79,11 @@ export default defineNuxtConfig({
                 { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
                 { rel: 'icon', type: 'image/x-icon', sizes: '16x16 32x32 48x48 64x64', href: '/favicon.ico' },
                 { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+            ],
+            script: [
+                // See csrfFetchPatchScript above for why this has to be a raw
+                // script tag rather than a plugin.
+                { key: 'csrf-fetch-patch', innerHTML: csrfFetchPatchScript },
             ],
         },
     },
