@@ -1,24 +1,26 @@
 /**
- * The HTTP-reachable half of tenant creation — issue #105.
+ * The ONE implementation of "what a brand-new tenant looks like" — issue
+ * #105, generalised into the sole implementation (superseding
+ * `provisionTenantCore()`, deleted from `server/utils/provisionTenant.ts`)
+ * once it became clear the CLI needed no second copy of its own.
  *
  * `POST /api/staff/tenants` used to call `provisionTenantCore()` inside a
  * transaction on `getOwnerPrisma()` (issue #76), handing the running app a
- * live, cached connection authenticated as the database OWNER. This module
- * replaces that with the SAME technique `calendry_internal.session_identity()`
+ * live, cached connection authenticated as the database OWNER. Issue #105
+ * replaced that with the SAME technique `calendry_internal.session_identity()`
  * / `screen_identity()` already use: a narrow SECURITY DEFINER function
  * (`calendry_internal.staff_create_tenant()`, in the
  * `20260901170000_staff_create_tenant_fn` migration — see that file's header
- * for the full argument), called through the ORDINARY runtime connection
- * (`getPrisma()`, `calendry_app`). `calendry_app` gains the ability to run
- * exactly this insert sequence; it gains no broader ability to bypass RLS.
- *
- * `provisionTenantCore()` itself is UNTOUCHED and still the CLI's
- * implementation (`scripts/provision-tenant.ts`, which keeps its own owner
- * connection deliberately — see that script's header). This module is a
- * second, SQL-side implementation of the same tenant shape, not a wrapper
- * around the first: the two must be kept in agreement by hand when either
- * changes, the same way a schema migration and `schema.prisma` already have
- * to agree by hand.
+ * for the full argument). Because the function itself is what runs
+ * privileged — `SECURITY DEFINER` executes with its OWNER's rights no matter
+ * which role calls it — `provisionTenantViaFunction()` needs no standing
+ * owner connection of its own; it takes whichever `PrismaClient` the caller
+ * already has. `POST /api/staff/tenants` passes its ordinary runtime
+ * connection (`getPrisma()`, `calendry_app`); `scripts/provision-tenant.ts`
+ * passes its owner connection (needed only to open the connection at all —
+ * see that script's header). One implementation, callable from either
+ * vantage point, rather than this SQL function and a second, hand-kept-in-sync
+ * TypeScript transaction.
  *
  * NOT wrapped in `withTenant()`/`withRequestTenant()`: there is no tenant to
  * scope to yet, and neither accepts a `StaffIdentity` in the first place (see
@@ -27,8 +29,7 @@
  * "ATOMICITY" note.
  */
 import { randomBytes } from 'node:crypto';
-import { Prisma } from '@prisma/client';
-import { getPrisma } from './prisma';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { hashPassword } from './auth';
 import { PERMISSION_KEYS } from '../../shared/permissions';
 import {
@@ -102,22 +103,27 @@ export function rawPostgresErrorCode(error: unknown): string | undefined {
 }
 
 /**
- * Creates a tenant via `calendry_internal.staff_create_tenant()`, returning
- * the same shape `provisionTenantCore()` does so
- * `POST /api/staff/tenants`'s response is unchanged.
+ * Creates a tenant via `calendry_internal.staff_create_tenant()`, on
+ * whichever `prisma` connection the caller passes in — the SECURITY DEFINER
+ * function is what runs privileged, not the caller's role, so this works
+ * identically over the app's ordinary runtime connection or the CLI's owner
+ * connection. Returns a `ProvisionTenantResult` so `POST /api/staff/tenants`'s
+ * response shape is unchanged from before this was the only implementation.
  *
- * Password hashing is the one piece of `provisionTenantCore()`'s work that
- * stays on the app side — `hashPassword()` is `scrypt`, which PL/pgSQL has no
- * primitive for (see the migration header) — computed here, on the ordinary
- * `calendry_app` connection, same as every other route that hashes a
- * password. The hash is passed in even when it turns out to go unused (the
- * email already has an Account), exactly like `provisionTenantCore()`'s own
- * unconditional `hashPassword()` call — simpler than threading a lazy hash
- * through the reused-account branch, and the branch itself is decided INSIDE
- * the function, not here, since only the function can see whether the email
- * is already taken without a second round trip.
+ * Password hashing is the one piece of work that stays on the app side —
+ * `hashPassword()` is `scrypt`, which PL/pgSQL has no primitive for (see the
+ * migration header) — computed here on whichever connection was passed in,
+ * same as every other caller that hashes a password. The hash is passed in
+ * even when it turns out to go unused (the email already has an Account) —
+ * simpler than threading a lazy hash through the reused-account branch, and
+ * the branch itself is decided INSIDE the function, not here, since only the
+ * function can see whether the email is already taken without a second round
+ * trip.
  */
-export async function provisionTenantViaFunction(input: ProvisionTenantInput): Promise<ProvisionTenantResult> {
+export async function provisionTenantViaFunction(
+    prisma: PrismaClient,
+    input: ProvisionTenantInput,
+): Promise<ProvisionTenantResult> {
     const adminEmail = input.adminEmail.toLowerCase();
     const trimmedName = input.adminName.trim();
     const parts = trimmedName.split(/\s+/);
@@ -128,7 +134,7 @@ export async function provisionTenantViaFunction(input: ProvisionTenantInput): P
     const passwordHash = await hashPassword(initialPassword);
 
     try {
-        const [row] = await getPrisma().$queryRaw<StaffCreateTenantRow[]>`
+        const [row] = await prisma.$queryRaw<StaffCreateTenantRow[]>`
             SELECT * FROM calendry_internal.staff_create_tenant(
                 ${input.slug}, ${input.name}, ${input.timezone ?? 'UTC'}, ${input.federationSlug ?? null},
                 ${adminEmail}, ${givenName}, ${familyName},

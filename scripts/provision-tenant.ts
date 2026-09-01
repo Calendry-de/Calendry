@@ -20,14 +20,20 @@
  * (an ordinary tenant Account can never reach it), so the property this
  * comment describes is unchanged: the RUNTIME app role still cannot create a
  * tenant, and the owner credential still never leaves routes gated
- * specifically for it. The actual transaction below moved to
- * `server/utils/provisionTenant.ts` (`provisionTenantCore`) so this CLI and
- * that route share one implementation rather than two that can drift; this
- * file is now the CLI shell around it — argument parsing, the owner
- * connection, and reporting.
+ * specifically for it. The actual tenant-creation logic lives in ONE place —
+ * `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER SQL function
+ * (issue #105) — called via `provisionTenantViaFunction()`
+ * (`server/utils/staffCreateTenant.ts`) so this CLI and that route share one
+ * implementation rather than two that can drift, the way they briefly did
+ * between issues #105 and #107. This file is the CLI shell around it —
+ * argument parsing, the owner connection (needed only because `tenant`'s RLS
+ * write policy is unsatisfiable before the row exists — the function itself
+ * is what runs privileged, not this connection), and reporting.
  *
- * Everything in `provisionTenantCore` happens in ONE transaction: a failure
- * leaves no half-built tenant for someone to discover later.
+ * `calendry_internal.staff_create_tenant()` is already atomic on its own — a
+ * single statement invoking a SQL function, see the migration's own
+ * "ATOMICITY" note — so this CLI wraps it in no `$transaction` of its own: a
+ * failure leaves no half-built tenant for someone to discover later.
  *
  *   bun run provision:tenant -- \
  *     --slug bergakademie --name "TU Bergakademie" \
@@ -37,7 +43,8 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import { PERMISSIONS } from '../shared/permissions';
-import { DEFAULT_CONSTRAINTS, UnknownFederationError, provisionTenantCore } from '../server/utils/provisionTenant';
+import { DEFAULT_CONSTRAINTS, UnknownFederationError } from '../server/utils/provisionTenant';
+import { provisionTenantViaFunction, rawPostgresErrorCode } from '../server/utils/staffCreateTenant';
 import { describeTarget, resolveOwnerDatabaseUrl } from './lib/ownerDatabaseUrl';
 
 function arg(name: string): string | undefined {
@@ -84,9 +91,9 @@ async function main() {
     const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 
     try {
-        const result = await prisma.$transaction((tx) => provisionTenantCore(tx, {
+        const result = await provisionTenantViaFunction(prisma, {
             slug, name, adminEmail, adminName, federationSlug, timezone,
-        }));
+        });
 
         console.log(`\nProvisioned tenant '${result.tenant.slug}' (${result.tenant.id})`);
         console.log(`  Admin Person : ${result.person.id} <${result.person.email}>`);
@@ -113,7 +120,17 @@ async function main() {
 
         if (error instanceof UnknownFederationError) {
             console.error(`\n${message}\n`);
-        } else if (message.includes('Unique constraint')) {
+        } else if (rawPostgresErrorCode(error) === '23505') {
+            // `calendry_internal.staff_create_tenant()` raises the ordinary
+            // `unique_violation` SQLSTATE for a duplicate slug — surfaced via
+            // `$queryRaw` as a P2010 wrapper, not the P2002
+            // `Prisma.PrismaClientKnownRequestError` a `tx.tenant.create()`
+            // call used to raise, so the old `message.includes('Unique
+            // constraint')` text match no longer fires. See
+            // `rawPostgresErrorCode()`'s own comment
+            // (`server/utils/staffCreateTenant.ts`) for why `.originalCode`
+            // is the only reliable field here — same check
+            // `POST /api/staff/tenants` uses for the identical error.
             console.error(`\nA tenant with slug '${slug}' already exists. Provisioning creates, it does not update.\n`);
         } else if (/Unable to start a transaction|Can't reach database server|ECONNREFUSED|ENOTFOUND/i.test(message)) {
             // Prisma reports an unreachable host as a transaction-acquisition

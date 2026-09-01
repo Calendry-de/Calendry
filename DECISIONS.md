@@ -2093,18 +2093,27 @@ narrower function precisely because `withRequestTenant`/`heldPermissions` are
 tenant-scoped machinery that structurally cannot express "this caller has no
 tenant, and that's fine, they're allowed here anyway."
 
-**Tenant creation had one implementation, then grew a second, deliberately.**
-`provisionTenantCore()` (`server/utils/provisionTenant.ts`) is the exact
-transaction body that used to live inline in `scripts/provision-tenant.ts`,
-and originally `POST /api/staff/tenants` called it too, both callers opening
-the transaction on the OWNER connection (`resolveOwnerDatabaseUrl()` /
-`getOwnerPrisma()`). Issue #105 (below, "Staff tenant creation: SECURITY
-DEFINER instead of owner-Prisma") replaced the ROUTE's half with a second,
-SQL-side implementation of the same tenant shape — the CLI's copy is
-unchanged and is still the argument in full for why provisioning needs an
-owner connection AT ALL (`tenant`'s RLS write policy is unsatisfiable for a
-row that does not exist yet). What changed is which connection the HTTP path
-uses to get there.
+**Tenant creation had one implementation, grew a second, then was unified
+back into one.** `provisionTenantCore()` (`server/utils/provisionTenant.ts`)
+was the exact transaction body that used to live inline in
+`scripts/provision-tenant.ts`, and originally `POST /api/staff/tenants`
+called it too, both callers opening the transaction on the OWNER connection
+(`resolveOwnerDatabaseUrl()` / `getOwnerPrisma()`). Issue #105 (below, "Staff
+tenant creation: SECURITY DEFINER instead of owner-Prisma") replaced the
+ROUTE's half with a second, SQL-side implementation of the same tenant
+shape, `calendry_internal.staff_create_tenant()` — but left the CLI calling
+`provisionTenantCore()` unchanged, so the two now had to be kept in
+agreement by hand. Issue #107 proved that risk real: it had to add
+`student`/`parent` Role seeding to BOTH by hand, once in TypeScript and once
+as a `CREATE OR REPLACE FUNCTION` migration. A follow-up fix (same day)
+closed the gap the other direction from #105's: the CLI now also calls
+`calendry_internal.staff_create_tenant()`, via `provisionTenantViaFunction()`
+taking an explicit `PrismaClient` parameter instead of a standing internal
+connection — the CLI passes its own owner-connected client (still needed:
+`tenant`'s RLS write policy is unsatisfiable for a row that does not exist
+yet), the route passes its ordinary runtime one. `provisionTenantCore()` is
+deleted; there is exactly one implementation of tenant creation now, not two
+kept in sync by hand.
 
 **Deliberately out of scope for this card: support-code redemption**, where
 staff temporarily assume a tenant role to help a customer. That is a separate,
@@ -2166,8 +2175,9 @@ would create a second copy that silently drifts from the one `prisma/seed.ts`
 and the constraint builder read — the same class of bug the permission-moves
 rule in CLAUDE.md already warns about, just introduced a different way. The
 function takes `p_permission_keys text[]` and `p_default_constraints jsonb`
-as plain data; `provisionTenantViaFunction()` resolves them from the SAME
-TypeScript catalogues `provisionTenantCore()` reads, key-renamed to
+as plain data; `provisionTenantViaFunction()` resolves them from
+`shared/permissions.ts`/`shared/constraintTypes.ts` directly (via
+`DEFAULT_CONSTRAINTS`, `server/utils/provisionTenant.ts`), key-renamed to
 snake_case to match the columns `jsonb_to_recordset()` projects them onto.
 The function knows how to INSERT rows shaped like that; it has no opinion on
 which rows those should be.
@@ -2217,6 +2227,21 @@ NOTHING from the second attempt.
 tenant) still uses `getOwnerPrisma()` — a plain cross-tenant READ, not a
 privileged write, and outside this issue's title. `server/utils/ownerPrisma.ts`
 stays for that reason; only its import from the CREATE route was removed.
+
+**Follow-up: the CLI was not updated to match, and issue #107 paid for it.**
+This issue's title and scope were "harden `POST /api/staff/tenants`" — it
+replaced the route's `provisionTenantCore()` call with this function, and
+left `scripts/provision-tenant.ts` calling `provisionTenantCore()` exactly
+as before, on the (correct) reasoning that the CLI's owner connection was
+never the risk this issue was closing. That left two implementations of the
+same tenant shape needing to agree by hand, which issue #107 then had to
+maintain by hand (`student`/`parent` Role seeding, added to both). A same-day
+fix closed that gap: `provisionTenantViaFunction()` now takes an explicit
+`PrismaClient` parameter rather than reaching for a module-level connection,
+so `scripts/provision-tenant.ts` calls this exact function too, passing its
+own owner-connected client — nothing about the function's own privilege
+model changes; `SECURITY DEFINER` was always what mattered, never which
+connection happened to call it. `provisionTenantCore()` is deleted.
 
 ---
 

@@ -82,7 +82,8 @@ async function main() {
             }
 
             // Shown once, never stored in plaintext — same shape as
-            // `provisionTenantCore`'s admin password.
+            // `provisionTenantViaFunction`'s admin password
+            // (`server/utils/staffCreateTenant.ts`).
             const initialPassword = randomBytes(12).toString('base64url');
             const passwordHash = await hashPassword(initialPassword);
 

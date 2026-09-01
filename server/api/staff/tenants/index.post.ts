@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requireStaffIdentity } from '../../../utils/tenantDb';
 import { UnknownFederationError } from '../../../utils/provisionTenant';
 import { provisionTenantViaFunction, rawPostgresErrorCode } from '../../../utils/staffCreateTenant';
+import { getPrisma } from '../../../utils/prisma';
 
 const bodySchema = z.object({
     slug: z.string().min(1),
@@ -16,7 +17,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Staff'],
         summary: 'Calendry staff: create a tenant',
-        description: 'Creates the same tenant shape `bun run provision:tenant` does (server/utils/provisionTenant.ts, issue #76), via a separate SQL-side implementation kept in agreement by hand: `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER function callable through the ordinary runtime role (issue #105). Requires a staff session. Unlike the CLI, this route holds no standing database-owner connection — the function itself is the only place any of this runs with elevated privilege, the same technique `session_identity()`/`screen_identity()` use for the pre-tenant auth plane.',
+        description: 'Creates the same tenant shape `bun run provision:tenant` does — both now call the ONE implementation, `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER function callable through the ordinary runtime role (issue #105). Requires a staff session. Unlike the CLI, this route holds no standing database-owner connection — the function itself is the only place any of this runs with elevated privilege, the same technique `session_identity()`/`screen_identity()` use for the pre-tenant auth plane.',
         requestBody: {
             required: true,
             content: {
@@ -67,7 +68,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
 
     try {
-        const result = await provisionTenantViaFunction(body);
+        const result = await provisionTenantViaFunction(getPrisma(), body);
 
         return result;
     } catch (error) {
