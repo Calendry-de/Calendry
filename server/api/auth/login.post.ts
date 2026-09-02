@@ -57,7 +57,7 @@ defineRouteMeta({
                                 requiresPasswordChange: { type: 'boolean' },
                                 tenantSelectionRequired: { type: 'boolean' },
                                 activeTenant: { type: 'object', nullable: true, properties: { id: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } },
-                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' } } } },
+                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' }, personId: { type: 'string' }, isActive: { type: 'boolean' }, federationId: { type: 'string', nullable: true } } } },
                             },
                         },
                     },
@@ -255,6 +255,9 @@ export default defineEventHandler(async (event) => {
             tenantId: i.tenant_id,
             slug: i.tenant_slug,
             name: i.tenant_name,
+            personId: i.person_id,
+            isActive: i.person_active,
+            federationId: i.federation_id,
         })),
     };
 });

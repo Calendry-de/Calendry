@@ -114,9 +114,15 @@ jobs:
           CALENDRY_SESSION_SWEEP=off
           ENV
 
-          # db and calendry-app by name: the solver service pulls a separately
-          # published image and is not needed for the app to boot.
-          docker compose -f docker-compose.yml up -d db calendry-app
+          # ALL FOUR NAMED, not just db + calendry-app. Booting doesn't need the
+          # solver, but `/health` (issue #92) checks it over a raw TCP probe and
+          # answers 503 — which the container HEALTHCHECK reads as unhealthy —
+          # if it can't reach one. `calendry-app` doesn't declare `solver` as a
+          # compose `depends_on` (no healthcheck exists on that service to
+          # depend on), so there's no start-order guarantee between them; the
+          # 5-minute wait loop below and the container's own healthcheck
+          # retries are what absorb that race, not ordering.
+          docker compose -f docker-compose.yml up -d db redis solver calendry-app
 
           for _ in $(seq 1 60); do
             STATE="$(docker inspect -f '{{ .State.Health.Status }}' calendry-app 2>/dev/null || echo starting)"

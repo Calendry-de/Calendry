@@ -15,6 +15,8 @@ export interface SessionTenant {
     name: string;
     personId: string;
     isActive: boolean;
+    /** Null when this Tenant belongs to no Federation. */
+    federationId: string | null;
 }
 
 export interface SessionState {

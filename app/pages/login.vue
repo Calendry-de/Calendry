@@ -95,7 +95,10 @@
                 width="100%"
                 :disabled="busy"
                 @click="chooseTenant(tenant.tenantId)"
-            >{{ tenant.name }}</CommonButton>
+            >
+                <span class="login_tenant-name">{{ tenant.name }}</span>
+                <span class="login_tenant-slug">{{ tenant.slug }}</span>
+            </CommonButton>
 
             <p
                 v-if="error"
@@ -395,6 +398,19 @@ async function finish() {
         margin: 8px 0 0;
         font-size: var(--font-size-sm);
         color: $content7;
+    }
+
+    &_tenant {
+        &-name {
+            display: block;
+        }
+
+        &-slug {
+            display: block;
+            margin-top: 2px;
+            font-size: var(--font-size-xs);
+            color: $content7;
+        }
     }
 
     // Cloudflare sizes its own iframe (300x65 in the default widget mode);

@@ -24,7 +24,7 @@ defineRouteMeta({
                                 activePersonId: { type: 'string' },
                                 activePerson: { type: 'object', nullable: true, properties: { id: { type: 'string' }, givenName: { type: 'string' }, familyName: { type: 'string' } } },
                                 permissions: { type: 'array', items: { type: 'string' } },
-                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' }, personId: { type: 'string' }, isActive: { type: 'boolean' } } } },
+                                availableTenants: { type: 'array', items: { type: 'object', properties: { tenantId: { type: 'string' }, slug: { type: 'string' }, name: { type: 'string' }, personId: { type: 'string' }, isActive: { type: 'boolean' }, federationId: { type: 'string', nullable: true } } } },
                                 locale: { type: 'string' },
                             },
                         },
@@ -64,6 +64,7 @@ export default defineEventHandler(async (event) => {
         name: i.tenant_name,
         personId: i.person_id,
         isActive: i.person_active,
+        federationId: i.federation_id,
     }));
 
     const acceptLanguage = getHeader(event, 'accept-language');
