@@ -61,7 +61,7 @@ defineProps<{
 
 const { t } = useT();
 
-const NEXT_ICON = 'material-symbols:radio-button-unchecked';
+const NEXT_ICON = 'ph:circle-dashed';
 </script>
 
 <style scoped lang="scss">

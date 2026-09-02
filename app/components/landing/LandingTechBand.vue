@@ -47,8 +47,18 @@ defineProps<{
         font-size: $fontSize2Xl;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
-        line-height: 1.15;
-        color: $surface0;
+        // Paired leading for this step, replacing a 1.15 literal.
+        line-height: $lineHeight2Xl;
+
+        /*
+         * PAGE-GROUND INK, not the inverse ramp's. This band used to be
+         * rendered with `tone="inverse"` and its ink was `$surface*`, which is
+         * correct on a dark ground and effectively invisible on a light one.
+         * The page rebuild left the hero and the closing action as the only two
+         * inverse bands, so this section is now painted on the page's own
+         * ground and takes `content*` like every other section body.
+         */
+        color: $content2;
         text-wrap: balance;
         letter-spacing: -0.02em;
 
@@ -62,8 +72,8 @@ defineProps<{
         margin: $space6 0 0;
 
         font-size: $fontSizeMd;
-        line-height: 1.75;
-        color: $surface4;
+        line-height: var(--leading-loose);
+        color: $content6;
     }
 
     &_notes {
@@ -86,14 +96,14 @@ defineProps<{
         padding-top: $space5;
         // Ink-side hairline: `surface6` reads as a rule against `content1` the
         // way `surface5` does against the page ground.
-        border-top: 1px solid $surface6;
+        border-top: 1px solid $surface4;
     }
 
     &_title {
         margin: 0 0 $space4;
         font-size: $fontSizeMd;
         font-weight: 700;
-        color: $surface1;
+        color: $content2;
     }
 
     &_body {
@@ -101,8 +111,8 @@ defineProps<{
         margin: 0;
 
         font-size: $fontSizeSm;
-        line-height: 1.75;
-        color: $surface4;
+        line-height: var(--leading-loose);
+        color: $content6;
     }
 }
 </style>

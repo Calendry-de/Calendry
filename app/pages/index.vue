@@ -43,6 +43,8 @@
                     :lead="t('landing.section.built.lead')"
                 >
                     <LandingBuiltClusters :items="built"/>
+
+                    <LandingRepoProof/>
                 </LandingSection>
 
                 <LandingSection

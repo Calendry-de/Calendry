@@ -132,8 +132,6 @@ onMounted(() => {
         return;
     }
 
-    armed.value = true;
-
     let queued = false;
 
     const onScroll = (): void => {
@@ -149,14 +147,39 @@ onMounted(() => {
         });
     };
 
-    measure();
+    /*
+     * MEASURE FIRST, ARM SECOND, AND MEASURE AFTER LAYOUT.
+     *
+     * Arming before the first measurement is a bug, and it showed up as one:
+     * the words mute the moment `armed` flips, so if the measurement that
+     * decides how many of them are lit has not run against final layout, the
+     * sentence sits muted at whatever `lit` happened to be. Measuring inside
+     * `onMounted` directly is not enough either, because that runs before the
+     * hero's figure and the webfont have settled the document height, so
+     * `getBoundingClientRect().top` is still wrong. A frame later it is right.
+     *
+     * The order matters for the case that made it visible: a reader who arrives
+     * with this section ALREADY on screen (a deep link, a restored scroll
+     * position, a very tall window) generates no scroll event at all, so the
+     * first measurement is also the only one. Getting it wrong left the page's
+     * largest sentence at 30% contrast until they happened to scroll.
+     *
+     * `load` is listened to as well, because images and fonts finishing after
+     * the first frame move this section's top edge again.
+     */
+    requestAnimationFrame(() => {
+        measure();
+        armed.value = true;
+    });
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll, { passive: true });
+    window.addEventListener('load', onScroll);
 
     onBeforeUnmount(() => {
         window.removeEventListener('scroll', onScroll);
         window.removeEventListener('resize', onScroll);
+        window.removeEventListener('load', onScroll);
     });
 });
 </script>

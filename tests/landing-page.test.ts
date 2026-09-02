@@ -413,7 +413,7 @@ describe('the contact capture is wired to something real', () => {
     it('says why it is an email rather than implying delivery it cannot do', async () => {
         const { html } = await page('/');
 
-        expect(html).toContain('no self-service sign-up');
+        expect(html).toContain('no sign up you can do yourself');
     });
 });
 

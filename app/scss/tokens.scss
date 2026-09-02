@@ -40,9 +40,10 @@ $fontSize5Xl: var(--font-size-5xl);
 
 // The line height Tailwind pairs with each font size. Pick the sibling of the
 // size you picked: the design system forbids snapping a size onto the scale and
-// then setting a line height elsewhere that fights it. The role-based
-// $leadingTight / $leadingProse / $leadingLoose steps in variables.scss still
-// cover everything written before this pairing existed.
+// then setting a line height elsewhere that fights it. The three ROLE-based
+// steps still cover everything written before this pairing existed, and they
+// have deliberately never had aliases: they are used as
+// `line-height: var(--leading-prose)`, the way layout.scss does it.
 $lineHeightXs: var(--line-height-xs);
 $lineHeightSm: var(--line-height-sm);
 $lineHeightMd: var(--line-height-md);

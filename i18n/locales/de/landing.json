@@ -68,7 +68,7 @@
         },
         "faq": {
             "title": "Häufige Fragen",
-            "lead": "Einschließlich der zwei, die wir lieber nicht gestellt bekämen: die fünfte und die neunte."
+            "lead": "Die ersten zwei sind die, an denen es scheitert. Sie werden mit einem teilweisen Nein und einem Nein beantwortet."
         },
         "finalCta": {
             "title": "Bringen Sie uns Ihre schwierigste Woche",
@@ -310,8 +310,7 @@
     },
     "proof": {
         "repoTitle": "Sie können alles davon lesen",
-        "repoBody": "Die Anwendung, der Solver und das gemeinsame Schema sind öffentlich unter {link}. Auf dem Repository liegt noch keine Lizenz, es ist also lesbar und nicht Open Source, und welche Lizenz es wird, ist eine noch offene Entscheidung.",
-        "repoAction": "Quellcode lesen"
+        "repoBody": "Die Anwendung, der Solver und das gemeinsame Schema sind öffentlich unter {link}. Auf dem Repository liegt noch keine Lizenz: Sie dürfen den Code lesen, ihn aber noch nicht weiterverwenden, und welche Lizenz es wird, ist eine noch offene Entscheidung."
     },
     "faq": {
         "runTerm": {

@@ -68,7 +68,7 @@
         },
         "faq": {
             "title": "Questions we get asked",
-            "lead": "Including the two we would rather not be asked, which are the fifth and the ninth."
+            "lead": "The first two are the ones that lose the sale. They are answered with a partial no and a no."
         },
         "finalCta": {
             "title": "Bring us your hardest week",
@@ -99,12 +99,12 @@
             "note": "Holidays, breaks and exam weeks, with a preview of exactly which weeks change classification before you save. Two dates do not obviously imply four exam weeks, and sometimes they do."
         },
         "events": {
-            "title": "One-off events alongside recurring courses",
+            "title": "Single events alongside recurring courses",
             "note": "Create a session that belongs to no course, such as an open day or a guest lecture, with its own room, groups and people."
         },
         "icalExport": {
             "title": "Download your schedule as a calendar file",
-            "note": "An .ics of your own sessions for a term, opened in whatever calendar app you already use. Real UTC times, converted from the institution’s own clock rather than sent as its wall-clock hours."
+            "note": "An .ics of your own sessions for a term, opened in whatever calendar app you already use. Real UTC times, converted from the institution’s own clock rather than sent as its own local clock hours."
         },
         "personSearch": {
             "title": "Finding a person by name",
@@ -115,7 +115,7 @@
             "note": "Request an exam on a module you lead, and see where the request got to. It reaches no timetable until somebody approves it, because an exam is a room and an hour the schedule has to find."
         },
         "availability": {
-            "title": "Self-service availability",
+            "title": "Availability the lecturer enters",
             "note": "A lecturer declares when they cannot teach, and which days, times and kinds of room they would rather have; staff approve or reject each declaration. Reaching only your own data is the point of that section."
         },
         "solverIntegration": {
@@ -124,7 +124,7 @@
         },
         "constraints": {
             "title": "Rules each institution configures for itself",
-            "note": "Thirty rule types, switched on and weighted per institution: double-booking, session counts, unavailability, online share, room rank and exam periods, plus the shape of a day: idle gaps, teaching without a break, how long it runs, and whether it crosses buildings. Rooms can be reserved institution-wide, sized to the group actually attending, and kept consistent for a class across the week."
+            "note": "Thirty rule types, switched on and weighted per institution: double booking, session counts, unavailability, online share, room rank and exam periods, plus the shape of a day: idle gaps, teaching without a break, how long it runs, and whether it crosses buildings. Rooms can be reserved across the institution, sized to the group actually attending, and kept consistent for a class across the week."
         },
         "federation": {
             "title": "Shared rooms across a federation",
@@ -132,14 +132,14 @@
         },
         "determinism": {
             "title": "Reproducible runs",
-            "note": "The same inputs and the same seed produce a byte-identical timetable, as long as the run ended on its move budget rather than on a clock, which the run itself reports."
+            "note": "The same inputs and the same seed produce a timetable identical byte for byte, as long as the run ended on its move budget rather than on a clock, which the run itself reports."
         },
         "auth": {
-            "title": "Sign-in and per-institution permission roles",
-            "note": "One account can act in several institutions and picks which at sign-in. Roles are composed from a fixed catalogue of permissions, per institution, in the UI."
+            "title": "Signing in, and permission roles per institution",
+            "note": "One account can act in several institutions and picks which one when signing in. Roles are composed from a fixed catalogue of permissions, per institution, in the UI."
         },
         "tenancy": {
-            "title": "Multi-tenant data model and API",
+            "title": "A data model and API built for many institutions",
             "note": "Institutions are isolated in the database itself, not only in application code. A query issued without institution context returns nothing rather than everything."
         }
     },
@@ -150,14 +150,14 @@
         },
         "export": {
             "title": "A live calendar subscription, not just a download",
-            "note": "The one-off .ics download is built. A stable URL your calendar app polls on its own is a different, harder question. A feed link is itself a credential, and it needs the same answer as letting a student view a schedule with no account."
+            "note": "The single .ics download is built. A stable URL your calendar app polls on its own is a different, harder question. A feed link is itself a credential, and it needs the same answer as letting a student view a schedule with no account."
         },
         "notifications": {
             "title": "Notification delivery",
             "note": "Calendry already works out who an edit affects. Nothing sends anything yet, so the answer currently goes to a screen instead of an inbox."
         },
         "eventEdit": {
-            "title": "Editing a one-off event after creating it",
+            "title": "Editing a single event after creating it",
             "note": "Its time can be moved, but its room, groups and people cannot be changed. Correcting a mistake means deleting and recreating it."
         },
         "candidates": {
@@ -166,7 +166,7 @@
         },
         "i18n": {
             "title": "A translated interface",
-            "note": "Under way now, German first, on the mechanism that made it safe to start: the locale is resolved once on the server and the interface is extracted a section at a time, so no page is ever half-translated in the browser."
+            "note": "Under way now, German first, on the mechanism that made it safe to start: the locale is resolved once on the server and the interface is extracted a section at a time, so no page is ever half translated in the browser."
         }
     },
     "principle": {
@@ -176,15 +176,15 @@
         },
         "groups": {
             "title": "Nested groups really do clash",
-            "body": "Booking a programme blocks its cohorts, and booking a cohort blocks the programme. Clash detection walks the whole ancestor-and-descendant relationship through a maintained closure, rather than comparing the two names it was handed."
+            "body": "Booking a programme blocks its cohorts, and booking a cohort blocks the programme. Clash detection walks the whole ancestor and descendant relationship through a maintained closure, rather than comparing the two names it was handed."
         },
         "isolation": {
             "title": "Isolation in the database, not in the code",
-            "body": "Every institution-scoped table is guarded by row-level security, and the application connects as a role that owns nothing. The failure mode of a mistake is seeing no rows, which is loud, rather than seeing someone else's, which is not."
+            "body": "Every institution scoped table is guarded by row level security, and the application connects as a role that owns nothing. The failure mode of a mistake is seeing no rows, which is loud, rather than seeing someone else's, which is not."
         },
         "time": {
             "title": "Nothing about time is hardcoded",
-            "body": "Days per week, blocks per day, block length and the uneven breaks between blocks come from each institution's own grid. There is no assumed Monday-to-Friday and no fallback shape anywhere. An institution without a grid gets an empty state, not a guess."
+            "body": "Days per week, blocks per day, block length and the uneven breaks between blocks come from each institution's own grid. There is no assumed Monday to Friday and no fallback shape anywhere. An institution without a grid gets an empty state, not a guess."
         },
         "events": {
             "title": "Every edit is an event",
@@ -193,16 +193,16 @@
     },
     "techLead": {
         "figure": "27,000 sessions, placed in about 350 milliseconds.",
-        "note": "That is a synthetic large-university instance. The development database's own term runs all the way to convergence in about four seconds. Both numbers came off a benchmark rather than a pitch deck, and both will move as the constraint set grows."
+        "note": "That is a synthetic instance the size of a large university. The development database's own term runs all the way to convergence in about four seconds. Both numbers came off a benchmark rather than a pitch deck, and both will move as the constraint set grows."
     },
     "technical": {
         "app": {
             "title": "The application",
-            "body": "Nuxt and TypeScript over PostgreSQL. Tenant isolation is enforced by row-level security policies; the schedule's history is an append-only event log applied on top of a versioned snapshot."
+            "body": "Nuxt and TypeScript over PostgreSQL. Tenant isolation is enforced by row level security policies; the schedule's history is an append only event log applied on top of a versioned snapshot."
         },
         "solver": {
             "title": "The solver",
-            "body": "A separate stateless Rust service, reached over gRPC against a shared schema. Hybrid constructive placement followed by large-neighbourhood local search with simulated annealing, over thirty constraint types. It holds no database: every run is a complete snapshot the application sends it."
+            "body": "A separate stateless Rust service, reached over gRPC against a shared schema. Hybrid constructive placement followed by large neighbourhood local search with simulated annealing, over thirty constraint types. It holds no database: every run is a complete snapshot the application sends it."
         }
     },
     "contact": {
@@ -216,8 +216,8 @@
         "messageCount": "{used} / {max}",
         "submit": "Open an email to us",
         "opened": "A draft should have opened in your email app, addressed to {email}. If nothing happened, your browser has no mail app configured. Write to us directly instead.",
-        "asideTitle": "Why this is an email and not a sign-up form",
-        "asideBody": "There is no self-service sign-up, and Calendry cannot send mail yet: notification delivery is on the list above, not behind us. A form that showed you a tick and filed your message nowhere would be worse than saying so, so this button composes a message in your own email app and you send it from your own account.",
+        "asideTitle": "Why this is an email and not a form",
+        "asideBody": "There is no sign up you can do yourself, and Calendry cannot send mail yet: notification delivery is on the list above, not behind us. A form that showed you a tick and filed your message nowhere would be worse than saying so, so this button composes a message in your own email app and you send it from your own account.",
         "asideContact": "Or write to {link}. Accounts for an existing institution are created by its administrator.",
         "error": {
             "name": "Tell us who you are, so a reply has somewhere to go.",
@@ -310,8 +310,7 @@
     },
     "proof": {
         "repoTitle": "You can read all of it",
-        "repoBody": "The application, the solver and the shared schema are public at {link}. There is no licence on the repository yet, so it is readable rather than open source, and which licence to use is a decision still to be made.",
-        "repoAction": "Read the code"
+        "repoBody": "The application, the solver and the shared schema are public at {link}. There is no licence on the repository yet, so you may read the code without being free to reuse it, and which licence to use is a decision still to be made."
     },
     "faq": {
         "runTerm": {

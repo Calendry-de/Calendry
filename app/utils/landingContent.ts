@@ -385,7 +385,7 @@ export function landingFaq(t: Translate): LandingFaqEntry[] {
  * project board includes editing this file in the same change.
  *
  * ORDER IS EDITORIAL. It was the old checklist's order, which
- * opened on "Multi-tenant data model and API" and buried "Schedule view and
+ * opened on the multi-institution data model and buried "Schedule view and
  * editor" third, answering an architecture question first for a reader whose
  * first question is "can it hold my week". The list now runs from what a
  * timetabling officer touches daily to what an evaluator asks about last.
