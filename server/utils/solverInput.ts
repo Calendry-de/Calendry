@@ -826,6 +826,31 @@ export async function assembleSolverInput(
          * `MinimizeSpecializedRoomUse` constraint exists to read it.
          */
         isSpecialized: false,
+        /*
+         * SHARED PHYSICAL FOOTPRINTS, which this app cannot express yet.
+         *
+         * The field (proto 0.17.0, solver ADR-0022's second half) says that two
+         * Room IDENTITIES occupy one physical space: a divisible hall listed as
+         * "A", "B" and "A+B" carries a tag shared between the parts and the
+         * whole, and the solver then refuses to place Sessions in both at once.
+         * Membership is a shared tag rather than a directed reference, so
+         * "A blocks B" and "B blocks A" cannot drift apart.
+         *
+         * EMPTY IS BEHAVIOUR-PRESERVING, NOT A GUESS, which is the only reason
+         * it is acceptable here: the proto states that "a tag only one Room
+         * carries is naturally inert", so no tags at all means no footprint
+         * blocking, exactly what the solver did before the field existed. This
+         * is the `site`/`isSpecialized` treatment above, for the same reason.
+         *
+         * A TRACKED GAP, not a finished field. There is no column, relation or
+         * UI for it: a tenant with a divisible hall cannot say so, and the
+         * solver will happily book both halves at once. Landing it means a
+         * Room-side model first, and note the proto REFUSES a tag on a virtual
+         * Room at conversion (a virtual room has no physical footprint), so the
+         * write boundary has to enforce that rather than the assembler
+         * discovering it as a run failure.
+         */
+        footprintTags: [],
     }));
 
     /**

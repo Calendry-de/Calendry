@@ -7,103 +7,111 @@
 // The SCSS aliases in tokens.scss point at these properties; the px values
 // exist only here.
 :root {
-    // Font size: 6 steps, collapsed from 14 values. ONE ROLE PER STEP, which is
-    // what the middle of this scale had stopped being: `sm` was 12.5 and `md`
-    // was 13, half a pixel apart, both meaning "text", with no rule for choosing
-    // between them. The usage counts show how that resolved itself: 210 call
-    // sites reached for `sm` and 103 for `md`, so `sm` had quietly become the
-    // body size while `md`'s own comment still called itself "the most-used
-    // value". Two tokens competing for one job, separated by nothing anyone
-    // could see, which is why size carried no hierarchy on the densest surface
-    // in the product and two near-identical greys were left doing the work.
+    // SCALES ARE NOT LOCAL TASTE ANY MORE. Every value in this block resolves
+    // through the project's landing-page design system
+    // (`.claude/skills/landing-page-design`): font sizes onto Tailwind's default
+    // type scale with its PAIRED line heights, spacing onto the system's
+    // spacing table, radii onto Tailwind's radius ladder. A value that does not
+    // land on a step is not allowed to stay, so the rule for adding one is to
+    // pick the step, never to invent a number.
 
-    // Respaced so each step is a role somebody can pick on purpose. Still
-    // COMPRESSED (11 through 17 for the whole app) because density is a
-    // committed decision (DESIGN.md), not an oversight to be corrected upward.
-    // That commitment is also why the web's ordinary 16px body floor does not
-    // apply here: this is the dense-role exemption, taken deliberately.
-    --font-size-xs: 11px;    // labels (uppercase, 0.05em) and fine metadata
-    --font-size-sm: 12px;    // secondary text, chips, table meta, the workhorse
-    --font-size-md: 14px;    // body prose and values: forms, panels, review copy
-    --font-size-lg: 17px;    // panel and section titles
-    --font-size-xl: 24px;    // page titles
-    --font-size-2xl: 32px;   // was 32, 38; display
+    // The token NAMES are this codebase's own (xs..5xl) and do not line up with
+    // Tailwind's step names, because renaming them would rewrite ~1,900 call
+    // sites for no gain. The mapping is written out per step below so the
+    // correspondence is recorded rather than remembered.
 
-    // xs and sm sit 1px apart, which would be the very fault above if size were
-    // the only thing separating them. It is not: xs carries either uppercase
-    // with 0.05em tracking (the label register) or tabular fine print, and both
-    // read as a different KIND of text rather than a smaller one. Steps that
-    // must be told apart by size alone are 12 / 14 / 17, and those are 2px and
-    // 3px.
+    // Font size: 9 steps on Tailwind's scale. `px` values, and their paired
+    // line height as a sibling token, so a size and its leading are chosen
+    // together; the system forbids snapping a size onto the scale and then
+    // setting a line height somewhere else that fights it.
 
-    // Line height: 3 steps, collapsed from 14 values. The same consolidation
-    // the font sizes above already had, on the axis nobody did it for. Leading
-    // was never missing: it was declared 91 times across components in FOURTEEN
-    // distinct values: 1.5 (45×), 1.6 (16×), 1.75 (7×), 1.45 (5×), 1.55 (3×),
-    // 1.4 (3×), 1.35 (3×), 1.25 (2×), and six more used once or twice each.
-    // Nothing was choosing between them, because there was nothing to choose
-    // from.
+    // WHAT THIS REPLACED, and the one commitment it gave up. These were 11 /
+    // 12 / 14 / 17 / 24 / 32 / 44 / 52, a deliberately COMPRESSED range whose
+    // comment called the web's 16px body floor a "dense-role exemption, taken
+    // deliberately" for the schedule grid and the manage tables. The floor now
+    // applies: `md` is 16px and is the body step. That is a real loss of
+    // density on the app's densest surfaces and it was accepted knowingly, not
+    // overlooked. The grid is px-exact at a constant scale, so it reflows.
+    --font-size-xs: 12px;    // Tailwind text-xs.   labels (uppercase, 0.05em), fine metadata
+    --font-size-sm: 14px;    // Tailwind text-sm.   secondary text, chips, table meta
+    --font-size-md: 16px;    // Tailwind text-base. body prose and values: forms, panels, review copy
+    --font-size-lg: 18px;    // Tailwind text-lg.   panel and section titles
+    --font-size-xl: 24px;    // Tailwind text-2xl.  page titles
+    --font-size-2xl: 30px;   // Tailwind text-3xl.  display
+    --font-size-3xl: 36px;   // Tailwind text-4xl.  landing section heads, hero on a tablet
+    --font-size-4xl: 48px;   // Tailwind text-5xl.  the hero headline, and the tagline reveal
+    --font-size-5xl: 60px;   // Tailwind text-6xl.  the largest step the system allows here
 
-    // The values are the codebase's own, not new taste: 1.5 is what 45 call
-    // sites already settled on, and `ScheduleEmptyState` had independently
-    // arrived at prose leading as a local literal. Absorbed 1.45/1.55/1.6 into
-    // prose and 1.15–1.35 into tight. Applied to WRAPPING text only: chrome is
-    // single-line and sits in px-exact rows where extra leading pushes glyphs
-    // off-centre, which is why the schedule grid must never take the prose step.
+    // The line height Tailwind pairs with each step above. Use the sibling of
+    // the size you picked. The three ROLE-based steps below still exist for
+    // everything that predates this pairing.
+    --line-height-xs: 16px;
+    --line-height-sm: 20px;
+    --line-height-md: 24px;
+    --line-height-lg: 28px;
+    --line-height-xl: 32px;
+    --line-height-2xl: 36px;
+    --line-height-3xl: 40px;
+    --line-height-4xl: 1;
+    --line-height-5xl: 1;
+
+    // Line height by ROLE: 3 steps, collapsed from the fourteen distinct values
+    // that were once declared 91 times across components with nothing choosing
+    // between them. Retained deliberately rather than migrated onto the paired
+    // tokens above: repointing them would touch every wrapping text rule in the
+    // app, which is a different change from re-pointing the scales.
+
+    // Applied to WRAPPING text only: chrome is single-line and sits in px-exact
+    // rows where extra leading pushes glyphs off-centre, which is why the
+    // schedule grid must never take the prose step.
     --leading-tight: 1.25;   // chrome: labels, chips, table cells, buttons
     --leading-prose: 1.5;    // anything that wraps: paragraphs, hints, empty states
     --leading-loose: 1.75;   // the landing surface's airier measure, Persuade only
 
     // Deliberately NOT a step: `line-height: 1` on an icon or a logo glyph means
     // "no leading at all" rather than a tighter text role, and folding it into
-    // `--leading-tight` would start centring icons 25% off. Same treatment the
-    // 40px empty-state padding gets: a value with no scale match stays a
-    // literal and says why.
+    // `--leading-tight` would start centring icons 25% off.
 
-    // Display step for the public landing surface only. Added deliberately
-    // rather than hardcoding a literal in a landing component: the app screens
-    // are dense by design and top out at 32px, but a marketing hero read at
-    // arm's length needs one step above that. Nothing inside /manage or
-    // /schedule should reach for it.
-    --font-size-3xl: 44px;
+    // Border radius: Tailwind's ladder. `xl` was 10px, which is not a value on
+    // it; snapped UP to 12px (Tailwind rounded-xl) rather than down to 8px,
+    // because 8px is already `--radius-lg` and two tokens holding one value is
+    // the fault this file's own history is a record of. The stray 9px inner
+    // corner stays a derivation, `calc(var(--radius-xl) - 1px)`, which is now
+    // 11px and is exactly the design system's nested-radius formula
+    // (inner = outer - gap) for a 1px gap.
+    --radius-sm: 4px;    // Tailwind rounded
+    --radius-md: 6px;    // Tailwind rounded-md
+    --radius-lg: 8px;    // Tailwind rounded-lg
+    --radius-xl: 12px;   // Tailwind rounded-xl
+    --radius-2xl: 16px;  // Tailwind rounded-2xl. landing cards
 
-    // The hero headline, and the only thing that may use it. 3xl is now the
-    // step BELOW the headline rather than the headline itself: it still sets
-    // the hero on a tablet, and the technical band's measured figure. Split out
-    // because 44px was the largest thing on a 1040px page and still read as a
-    // section title with ambition rather than as a first impression, which is
-    // the one job the top of a marketing page has.
-    // 52 and not 64: the headline is 41 characters, and the hero gives its copy
-    // about 650px. At 64px that wraps to three lines, and a three-line hero
-    // headline is a font-size mistake every time. 52px is the largest step that
-    // still breaks it cleanly in two.
-    --font-size-4xl: 52px;
+    // Spacing: every step is on the design system's table (0, 2, 4, 8, 12, 16,
+    // 24, 32, 40, 48, 64, 80, 96).
 
-    // Border radius: 4 steps. The stray 9px was an inner corner and stays a
-    // derivation: calc(var(--radius-xl) - 1px).
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
-    --radius-xl: 10px;
-
-    // Spacing: 8 steps. Outliers (5, 7, 9, 10, 14, 20) snap to a neighbour;
-    // reducing the choices is the point of a scale.
+    // `--space-3` WAS 6px, which the table does not contain, and it is the
+    // second most used token in the app (224 call sites). Snapped UP to 8px,
+    // not down to 4px, for a reason worth stating: the type scale above just
+    // grew every font size, and tightening 224 gaps while enlarging the text
+    // they separate would have made the dense surfaces read as broken rather
+    // than as denser. Growing it collides with `--space-4`, so the two are
+    // now one value under two names; call sites migrate to `--space-4` as
+    // they are next touched, and then this token goes away.
     --space-1: 2px;
     --space-2: 4px;
-    --space-3: 6px;
+    --space-3: 8px;   // was 6px, off-table. Deprecated alias of --space-4.
     --space-4: 8px;
     --space-5: 12px;
     --space-6: 16px;
     --space-7: 24px;
     --space-8: 32px;
 
-    // Section rhythm, same reasoning as --font-size-3xl: the app's largest gap
-    // is 32px because its screens are dense, and a public page's vertical
-    // rhythm genuinely is larger than any gap inside a toolbar. Three steps,
-    // added deliberately, so the landing components hold no spacing literals.
-    --space-9: 48px;
-    --space-10: 64px;
-    --space-11: 96px;
+    // The two steps the table has and this file did not, added because the
+    // landing surface's rhythm needs them and a literal is not allowed.
+    --space-9: 40px;
+    --space-10: 48px;
+    --space-11: 64px;
+    --space-12: 80px;
+    --space-13: 96px;
 }
 
 /*
