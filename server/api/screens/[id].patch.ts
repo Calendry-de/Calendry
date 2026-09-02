@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SCREEN_MODES } from '../../../shared/screenKey';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -24,7 +25,11 @@ const BODY = z.object({
      * is `Array.isArray` rather than a truthiness check: `[]` is a real value
      * here and a falsy one.
      */
+    /** Which board it draws (issue #31). Absent or null leaves it alone. */
+    mode: z.enum(SCREEN_MODES).nullish(),
     roomIds: z.array(z.string().min(1)).nullish(),
+    /** The second scope axis, with the identical three-state reading. */
+    groupIds: z.array(z.string().min(1)).nullish(),
     isActive: z.boolean().nullish(),
 });
 
@@ -53,6 +58,7 @@ export default defineEventHandler(async (event) => {
                 where: { id },
                 data: {
                     ...(body.name == null ? {} : { name: body.name }),
+                    ...(body.mode == null ? {} : { mode: body.mode }),
                     ...(body.isActive == null ? {} : { isActive: body.isActive }),
                 },
             });
@@ -74,7 +80,24 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            return { id: screen.id, name: screen.name, isActive: screen.isActive };
+            // The group axis is a PUT-set on exactly the same three-state
+            // terms: absent/null unchanged, an array is the whole new set, and
+            // an empty array clears it, which means every group.
+            if (Array.isArray(body.groupIds)) {
+                await tx.screenGroup.deleteMany({ where: { screenId: id } });
+
+                if (body.groupIds.length) {
+                    await tx.screenGroup.createMany({
+                        data: body.groupIds.map((groupId) => ({
+                            screenId: id,
+                            groupId,
+                            tenantId: identity.tenantId,
+                        })),
+                    });
+                }
+            }
+
+            return { id: screen.id, name: screen.name, mode: screen.mode, isActive: screen.isActive };
         });
     });
 });

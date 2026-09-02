@@ -756,7 +756,19 @@ export const RESOURCES: Record<string, ResourceConfig> = {
              * purpose; `assembleSolverInput` clamps and reports instead.
              */
             requiredLecturerCount: z.number().int().min(1).nullish(),
-            allowOnline: z.boolean().optional(),
+            /*
+             * '' IS THE DEFAULT HERE, the same `z.preprocess` the
+             * `schedulingPattern` select needs and for the same reason: a
+             * `<select>` cannot send "absent", it sends the empty string.
+             * FORBIDDEN rather than null, because unlike `schedulingPattern`
+             * this column is NOT NULL: there is no "undecided" online mode, and
+             * the conservative reading of a blank control is the one the
+             * boolean it replaced defaulted to.
+             */
+            onlineMode: z.preprocess(
+                (value) => (value === '' ? 'FORBIDDEN' : value),
+                z.enum(['FORBIDDEN', 'ALLOWED', 'REQUIRED']).optional(),
+            ),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
             /*
@@ -803,7 +815,19 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             // See `create` above: no upper bound, clamped and reported at
             // solve-assembly time instead.
             requiredLecturerCount: z.number().int().min(1).nullish(),
-            allowOnline: z.boolean().optional(),
+            /*
+             * '' IS THE DEFAULT HERE, the same `z.preprocess` the
+             * `schedulingPattern` select needs and for the same reason: a
+             * `<select>` cannot send "absent", it sends the empty string.
+             * FORBIDDEN rather than null, because unlike `schedulingPattern`
+             * this column is NOT NULL: there is no "undecided" online mode, and
+             * the conservative reading of a blank control is the one the
+             * boolean it replaced defaulted to.
+             */
+            onlineMode: z.preprocess(
+                (value) => (value === '' ? 'FORBIDDEN' : value),
+                z.enum(['FORBIDDEN', 'ALLOWED', 'REQUIRED']).optional(),
+            ),
             isActive: z.boolean().optional(),
             notes: z.string().nullish(),
         }),
@@ -849,7 +873,13 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             requiredCapacity: z.number().int().nonnegative().nullish(),
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
             requiredLecturerCount: z.number().int().min(1).nullish(),
-            allowOnline: z.boolean().nullish(),
+            // NULLISH, unlike the Offering's: on a template, "not set" is a
+            // real answer meaning "this shape does not fix the online mode",
+            // so '' maps to null rather than to FORBIDDEN.
+            onlineMode: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['FORBIDDEN', 'ALLOWED', 'REQUIRED']).nullish(),
+            ),
             notes: z.string().nullish(),
         }),
         update: z.object({
@@ -868,7 +898,13 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             requiredCapacity: z.number().int().nonnegative().nullish(),
             requiredRoomCount: z.number().int().min(1).max(MAX_ROOMS_PER_SESSION).nullish(),
             requiredLecturerCount: z.number().int().min(1).nullish(),
-            allowOnline: z.boolean().nullish(),
+            // NULLISH, unlike the Offering's: on a template, "not set" is a
+            // real answer meaning "this shape does not fix the online mode",
+            // so '' maps to null rather than to FORBIDDEN.
+            onlineMode: z.preprocess(
+                (value) => (value === '' ? null : value),
+                z.enum(['FORBIDDEN', 'ALLOWED', 'REQUIRED']).nullish(),
+            ),
             notes: z.string().nullish(),
         }),
         filters: z.object({

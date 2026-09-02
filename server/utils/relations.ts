@@ -299,6 +299,35 @@ export const RELATIONS: Record<string, RelationConfig> = {
         select: { equipmentId: true, quantity: true },
     },
 
+    /**
+     * The ROOM PIN (issue #123): "only these Rooms may host this Offering".
+     *
+     * AN ALLOW-LIST, NOT A PREFERENCE, and an EMPTY SET IS THE DEFAULT MEANING
+     * "any eligible Room" — verbatim what the wire's empty `allowed_room_ids`
+     * has always meant, so clearing this control restores today's behaviour
+     * exactly rather than pinning the Offering to nothing.
+     *
+     * NO `tenantColumnNullable`, unlike `rooms/equipment`: the row belongs to
+     * the OFFERING's tenant, not the Room's, so it always has one even when the
+     * Room it names is federation-owned (which is allowed, and is the case a
+     * consortium's shared lecture hall is).
+     *
+     * NOTHING IS REFUSED HERE. A pin can make an Offering structurally
+     * unplaceable (too few Rooms for `requiredRoomCount`, none big enough, none
+     * left after `onlineMode = REQUIRED` intersects it), but capacity, features
+     * and activity are edited elsewhere, by someone else, later. The
+     * impossibilities are reported by `assembleSolverInput`'s `AssemblyReport`,
+     * the same way `unsatisfiableEquipmentQuantities` is.
+     */
+    'offerings/rooms': {
+        parent: 'offerings',
+        parentModel: 'offering',
+        model: 'offeringRoom',
+        parentKey: 'offeringId',
+        item: z.object({ roomId: id }),
+        select: { roomId: true },
+    },
+
     'rooms/equipment': {
         parent: 'rooms',
         parentModel: 'room',

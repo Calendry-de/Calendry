@@ -118,6 +118,34 @@ export interface ReviewPreview {
             sessionReferences: number;
         };
     };
+    /**
+     * The `MaxOnlineShare` breaches in `violations.proposed` that no placement
+     * could have avoided: a group whose forced-online teaching alone exceeds
+     * its cap.
+     *
+     * The solver reports that cap as a HARD violation with no Session and no
+     * Offering attached, so it reaches this page only as a number in the type
+     * breakdown, indistinguishable from a breach somebody could fix by moving
+     * a Session on site. These name the groups and the Offerings that make it
+     * unreachable.
+     *
+     * NULL means the run predates the check, which is not the same as an empty
+     * list: absent must never read as "checked, and the cap is reachable".
+     * Optional on top of that, because a client payload from before the field
+     * existed has neither.
+     */
+    forcedOnlineOverCap?: {
+        constraintId: string;
+        groupId: string;
+        groupName: string;
+        window: 'PER_TERM' | 'PER_WEEK';
+        /** 0.0-1.0, as the solver received it. */
+        maxRatio: number;
+        forcedOnline: number;
+        total: number;
+        allowance: number;
+        offerings: { id: string; title: string; sessions: number }[];
+    }[] | null;
     weekSummary: { termWeek: number; created: number; moved: number; unchanged: number; deleted: number }[];
     /** Names for the placements' offerings, served under this route's own gate. */
     offerings: { id: string; title: string; code: string | null }[];

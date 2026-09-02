@@ -50,6 +50,72 @@ import type { Translate } from '~/composables/i18n';
 export const CONTACT_EMAIL = 'noah@calendry.de';
 
 /**
+ * Where the page's ONE call to action goes.
+ *
+ * The design system allows a landing page exactly one primary action, and this
+ * page's is "book a walkthrough". Paste the scheduling link here and every CTA
+ * on the page points at it, because they all resolve through
+ * `landingCtaTarget()` rather than writing a URL of their own.
+ *
+ * NULL IS A SUPPORTED STATE, not a placeholder waiting to be filled in, and it
+ * is the reason this is a resolver rather than a bare constant. A button
+ * pointing at `#` is forbidden (a dead link is worse than a different link), so
+ * with no scheduling link configured the action degrades to the enquiry mailbox
+ * and the LABEL changes with it: `landingCtaTarget()` reports which target it
+ * returned, and the caller picks the message key to match. A page that says
+ * "book a walkthrough" and opens a blank email has lied about what the click
+ * does, which is the one thing a call to action may never do.
+ *
+ * NOT COPY, so not in the message catalogue: a URL is the same string in every
+ * language, for the same reason `CONTACT_EMAIL` is not a message.
+ */
+export const BOOKING_URL: string | null = null;
+
+/**
+ * The public repository, as one string.
+ *
+ * The page claims a reader can go and check it, so the claim needs somewhere to
+ * point. Written without a scheme because it is rendered as label text as well
+ * as used as a link, and "https://" in the middle of a sentence is noise;
+ * `REPO_HREF` is the navigable form.
+ *
+ * READABLE, NOT OPEN SOURCE, and the page says so. There is no licence file on
+ * this repository, which means all rights are reserved and a visitor may read
+ * the code without being permitted to reuse it. Calling it open source here
+ * would be the one kind of overclaim this page exists to avoid.
+ */
+export const REPO_LABEL = 'github.com/Calendry-de/Calendry';
+
+/** The same repository, navigable. */
+export const REPO_HREF = `https://${ REPO_LABEL }`;
+
+/** Where the primary action points, and which of the two it turned out to be. */
+export interface LandingCtaTarget {
+    href: string;
+    /**
+     * `true` when a real scheduling link is configured. Discriminates the
+     * LABEL as well as the destination: the caller must not assume it can
+     * promise a booking.
+     */
+    booking: boolean;
+}
+
+/**
+ * Resolve the primary action's destination.
+ *
+ * The one place that decides between the scheduling link and the mailbox, so
+ * the hero CTA, the closing CTA and the nav capsule cannot disagree about where
+ * the page's single action goes.
+ */
+export function landingCtaTarget(): LandingCtaTarget {
+    if (BOOKING_URL === null) {
+        return { href: `mailto:${ CONTACT_EMAIL }`, booking: false };
+    }
+
+    return { href: BOOKING_URL, booking: true };
+}
+
+/**
  * A titled explanation.
  *
  * NO ICON FIELD, deliberately. These were twelve `material-symbols` glyphs at
@@ -150,28 +216,163 @@ export function builtClusterTitle(cluster: BuiltCluster, t: Translate): string {
     return t(BUILT_CLUSTER_TITLES[cluster]);
 }
 
-/** An entry's identity and its two message keys, in the order the page renders them. */
-const FEATURE_KEYS = [
-    { id: 'model', figure: 'model', title: 'landing.feature.model.title', body: 'landing.feature.model.body' },
-    { id: 'editing', figure: 'editing', title: 'landing.feature.editing.title', body: 'landing.feature.editing.body' },
-    { id: 'solver', figure: 'solver', title: 'landing.feature.solver.title', body: 'landing.feature.solver.body' },
-    { id: 'people', figure: 'people', title: 'landing.feature.people.title', body: 'landing.feature.people.body' },
-] as const;
+/**
+ * An entry's identity and its two message keys, in the order the page renders
+ * them.
+ *
+ * BENEFITS, NOT FEATURES, and the rename is the point rather than tidying. The
+ * four entries here were `landing.feature.*` and were titled by what the
+ * software HAS ("One place for what a timetable is made of"). A landing page
+ * has to be titled by what the reader GETS, so every title is now an outcome
+ * and the mechanism moved into the body, where somebody who wants it will
+ * still find it.
+ *
+ * FIVE, AND ONLY FOUR CARRY A FIGURE. `TimetableVariant` has exactly four
+ * scripts because there are four things a small timetable can act out, and
+ * isolation is not one of them: a drawing of two institutions not seeing each
+ * other's data is a drawing of nothing happening. It runs as prose, which is
+ * also why `figure` is optional on `LandingFeature`.
+ *
+ * ORDER IS THE ARGUMENT. Speed first, because it is the only claim with a
+ * measurement attached and the one a sceptical reader tests everything else
+ * against; isolation last, because it is the question an evaluator asks after
+ * they already want the product.
+ */
+const BENEFIT_KEYS = [
+    { id: 'solver', figure: 'solver', title: 'landing.benefit.solver.title', body: 'landing.benefit.solver.body' },
+    { id: 'editing', figure: 'editing', title: 'landing.benefit.editing.title', body: 'landing.benefit.editing.body' },
+    { id: 'model', figure: 'model', title: 'landing.benefit.model.title', body: 'landing.benefit.model.body' },
+    { id: 'people', figure: 'people', title: 'landing.benefit.people.title', body: 'landing.benefit.people.body' },
+    { id: 'isolation', title: 'landing.benefit.isolation.title', body: 'landing.benefit.isolation.body' },
+] as const satisfies readonly { id: string; figure?: TimetableVariant; title: string; body: string }[];
 
 /**
- * WHAT IT DOES: deliberately non-technical.
+ * WHAT THE READER GETS: deliberately non-technical in the title, specific in
+ * the body.
  *
  * Written for a registrar or timetabling officer, so no wire formats, no
  * "hybrid constructive + local search", no entity names that only mean
  * something inside the schema. The technical framing is a separate section
  * (`landingTechnicalNotes()`) rather than mixed in here.
  */
-export function landingFeatures(t: Translate): LandingFeature[] {
-    return FEATURE_KEYS.map((entry): LandingFeature => ({
+export function landingBenefits(t: Translate): LandingFeature[] {
+    return BENEFIT_KEYS.map((entry): LandingFeature => ({
         id: entry.id,
-        figure: entry.figure,
+        ...('figure' in entry ? { figure: entry.figure } : {}),
         title: t(entry.title),
         body: t(entry.body),
+    }));
+}
+
+/** The two halves of the problem-to-solution contrast, in reading order. */
+export function landingProblem(t: Translate): LandingFeature[] {
+    return [
+        {
+            id: 'before',
+            title: t('landing.problem.before.title'),
+            body: t('landing.problem.before.body'),
+        },
+        {
+            id: 'after',
+            title: t('landing.problem.after.title'),
+            body: t('landing.problem.after.body'),
+        },
+    ];
+}
+
+/**
+ * The tagline reveal's two lines.
+ *
+ * TWO MESSAGES RATHER THAN ONE WITH A BREAK IN IT, for the same reason the hero
+ * headline is two: the design system requires the break to be authored at a
+ * meaningful point rather than left to the browser, and a translator has to be
+ * able to move it. German puts its verb somewhere English does not, so a break
+ * position that works in one language is arbitrary in the other.
+ *
+ * The section animates this a WORD at a time, so the component splits these
+ * strings. That is safe to do to a translated sentence in a way that splitting
+ * on characters would not be.
+ */
+export function landingTagline(t: Translate): { lineOne: string; lineTwo: string } {
+    return {
+        lineOne: t('landing.tagline.lineOne'),
+        lineTwo: t('landing.tagline.lineTwo'),
+    };
+}
+
+/** One numbered step of "how it works". */
+export interface LandingStep {
+    id: string;
+    title: string;
+    body: string;
+}
+
+const STEP_KEYS = [
+    { id: 'describe', title: 'landing.step.describe.title', body: 'landing.step.describe.body' },
+    { id: 'ask', title: 'landing.step.ask.title', body: 'landing.step.ask.body' },
+    { id: 'judge', title: 'landing.step.judge.title', body: 'landing.step.judge.body' },
+] as const;
+
+/**
+ * HOW IT WORKS: three steps, and the third is the reader's.
+ *
+ * Three because the design system asks for three, and because the process
+ * genuinely has three parts. The number is NOT rendered from this list's index
+ * by the component doing arithmetic on it: the component numbers them from
+ * their position, so adding a fourth step cannot leave a "3" beside the fourth
+ * item.
+ */
+export function landingSteps(t: Translate): LandingStep[] {
+    return STEP_KEYS.map((entry): LandingStep => ({
+        id: entry.id,
+        title: t(entry.title),
+        body: t(entry.body),
+    }));
+}
+
+/** One question and its answer. */
+export interface LandingFaqEntry {
+    id: string;
+    question: string;
+    answer: string;
+}
+
+/**
+ * THE OBJECTION LIST, in the order a sceptical reader raises it.
+ *
+ * These are objections, not features restated as questions, which is what an
+ * FAQ becomes when it is written by the people who built the thing. The first
+ * two are the ones that lose the sale ("can it run our term", "can it take our
+ * spreadsheets") and both are answered with a no or a partial no, because the
+ * page's whole credibility rests on the roadmap section being believed.
+ *
+ * EVERY ANSWER TRACES TO A FACT, the same rule the built list follows: to
+ * something in `CLAUDE.md`, in the built list below, or on the pricing page.
+ * An FAQ is the easiest place on a marketing page to write a reassuring
+ * sentence nobody checked, and it is read by exactly the people who will check.
+ *
+ * The section renders these into FAQ structured data as well as into the page,
+ * from this one list, so the two cannot drift.
+ */
+const FAQ_KEYS = [
+    { id: 'runTerm', q: 'landing.faq.runTerm.q', a: 'landing.faq.runTerm.a' },
+    { id: 'import', q: 'landing.faq.import.q', a: 'landing.faq.import.a' },
+    { id: 'decides', q: 'landing.faq.decides.q', a: 'landing.faq.decides.a' },
+    { id: 'breaks', q: 'landing.faq.breaks.q', a: 'landing.faq.breaks.a' },
+    { id: 'week', q: 'landing.faq.week.q', a: 'landing.faq.week.a' },
+    { id: 'federation', q: 'landing.faq.federation.q', a: 'landing.faq.federation.a' },
+    { id: 'permissions', q: 'landing.faq.permissions.q', a: 'landing.faq.permissions.a' },
+    { id: 'reproducible', q: 'landing.faq.reproducible.q', a: 'landing.faq.reproducible.a' },
+    { id: 'cost', q: 'landing.faq.cost.q', a: 'landing.faq.cost.a' },
+    { id: 'accounts', q: 'landing.faq.accounts.q', a: 'landing.faq.accounts.a' },
+    { id: 'code', q: 'landing.faq.code.q', a: 'landing.faq.code.a' },
+] as const;
+
+export function landingFaq(t: Translate): LandingFaqEntry[] {
+    return FAQ_KEYS.map((entry): LandingFaqEntry => ({
+        id: entry.id,
+        question: t(entry.q),
+        answer: t(entry.a),
     }));
 }
 
@@ -184,7 +385,7 @@ export function landingFeatures(t: Translate): LandingFeature[] {
  * project board includes editing this file in the same change.
  *
  * ORDER IS EDITORIAL. It was the old checklist's order, which
- * opened on "Multi-tenant data model and API" and buried "Schedule view and
+ * opened on the multi-institution data model and buried "Schedule view and
  * editor" third, answering an architecture question first for a reader whose
  * first question is "can it hold my week". The list now runs from what a
  * timetabling officer touches daily to what an evaluator asks about last.

@@ -47,6 +47,36 @@ enum SchedulingPattern {
   @@map("scheduling_pattern")
 }
 
+/// Whether a placement of this Offering may, must not, or MUST sit in a
+/// virtual Room (TAXONOMY.md §2 models online delivery AS a Room).
+///
+/// REPLACED `Offering.allowOnline Boolean`, which could only say "permitted"
+/// and had no value meaning "required". The obvious alternative — keeping the
+/// boolean and adding a `requireOnline` beside it — admits the illegal state
+/// `require && !allow`, so the two questions are one column with three answers
+/// instead of two columns with four.
+///
+/// NOTHING HERE IS PERSISTED AS A ROOM LIST. `REQUIRED` reaches the solver as
+/// `Offering.allowed_room_ids` derived from `Room.isVirtual` AT ASSEMBLY TIME,
+/// every run (`server/utils/offeringRooms.ts`). Persisting the derived list
+/// would silently exclude a virtual Room created next week from every Offering
+/// that had already asked for "online", which is unobservable until somebody
+/// counts placements.
+enum OnlineMode {
+  /// Virtual Rooms are excluded. What every Offering with `allow_online =
+  /// false` migrated to, and the default for a new one.
+  FORBIDDEN
+  /// Virtual Rooms are eligible ALONGSIDE physical ones: permission for the
+  /// solver to choose one, never an instruction. What `allow_online = true`
+  /// migrated to.
+  ALLOWED
+  /// ONLY virtual Rooms are eligible. Expressed on the wire as an allow-list,
+  /// not a wire flag: see the enum comment above.
+  REQUIRED
+
+  @@map("online_mode")
+}
+
 enum CalendarPeriodKind {
   HOLIDAY
   BREAK
@@ -365,6 +395,7 @@ model Tenant {
   icsLinks                     IcsLink[]
   icsLinkGroups                IcsLinkGroup[]
   screenRooms                  ScreenRoom[]
+  screenGroups                 ScreenGroup[]
   memberships                  Membership[]
   personRoles                  PersonRole[]
   rooms                        Room[]
@@ -380,6 +411,7 @@ model Tenant {
   offeringGroups               OfferingGroup[]
   offeringLecturers            OfferingLecturer[]
   offeringEquipment            OfferingEquipment[]
+  offeringRooms                OfferingRoom[]
   offeringTemplates            OfferingTemplate[]
   offeringPlans                OfferingPlan[]
   offeringPlanItems            OfferingPlanItem[]
@@ -785,6 +817,8 @@ model Group {
   ancestorClosures   GroupClosure[] @relation("ClosureAncestor")
   descendantClosures GroupClosure[] @relation("ClosureDescendant")
 
+  screens ScreenGroup[]
+
   @@index([tenantId])
   @@index([parentGroupId])
   @@index([curriculumPlanId])
@@ -875,6 +909,7 @@ model Room {
   roomEquipment RoomEquipment[]
   sessionRooms  SessionRoom[]
   screenRooms   ScreenRoom[]
+  offeringPins  OfferingRoom[]
 
   @@index([tenantId])
   @@index([federationId])
@@ -1144,12 +1179,36 @@ model GroupTermAvailability {
 /// `calendry_internal.screen_identity()`, parameterised by the secret alone
 /// exactly like `session_identity()`; every read after that is an ordinary
 /// `withTenant()` transaction. See the migration for the full reasoning.
+/// What a Screen DRAWS. A second display mode (issue #31) rather than a second
+/// device model: the credential, its revocation and its liveness stamp are
+/// identical, and only the question the board answers differs.
+///
+/// EACH MODE READS EXACTLY ONE SCOPE AXIS, and both axes are fail-open:
+/// `ROOM_BOARD` reads `ScreenRoom` (empty = every room), `SUBSTITUTION_PLAN`
+/// reads `ScreenGroup` (empty = every group). Deliberately not an intersection
+/// of the two: "which rooms are around me" and "which classes am I looking
+/// for" are different questions, and a screen answering one has no use for the
+/// other's filter.
+enum ScreenMode {
+  /// Live room occupancy: `GET /api/screens/board`, drawn at `/screen`.
+  ROOM_BOARD
+  /// Today's and tomorrow's substitutions, cancellations and moves:
+  /// `GET /api/screens/substitutions`, drawn at `/screen/substitutions`.
+  SUBSTITUTION_PLAN
+
+  @@map("screen_mode")
+}
+
 model Screen {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
   /// What a human calls it when revoking the right one.
   name String
+
+  /// Which board this display draws. Defaults to the only mode that existed
+  /// before issue #31, so every screen already on a wall keeps working.
+  mode ScreenMode @default(ROOM_BOARD)
 
   /// SHA-256 of the presented key, never the key itself, same treatment
   /// `auth_session` gives its token, and unique GLOBALLY because the lookup
@@ -1167,8 +1226,9 @@ model Screen {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  tenant Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rooms  ScreenRoom[]
+  groups ScreenGroup[]
 
   @@unique([tokenHash])
   @@index([tenantId])
@@ -1193,6 +1253,35 @@ model ScreenRoom {
   @@index([roomId])
   @@index([tenantId])
   @@map("screen_room")
+}
+
+/// Which Groups a `SUBSTITUTION_PLAN` Screen shows. NO ROWS MEANS EVERY GROUP.
+///
+/// THE SECOND SCOPE AXIS (issue #31), and fail-open for exactly the reason
+/// `ScreenRoom` and `GroupTerm` are: the commonest configuration is "the whole
+/// school", and reading an empty set as "nothing" would render a blank wall
+/// indistinguishable from a broken display.
+///
+/// NESTED GROUPS PROPAGATE DOWNWARD here, and only downward. Scoping a screen
+/// to "Jahrgang 7" must show every class beneath it, so the endpoint expands
+/// the set through `descendantGroupIds()` (attendance flows DOWN, TAXONOMY.md
+/// §6). Using `conflictGroupIds()` would additionally pull in every ancestor
+/// and put the whole school's substitutions on a year-group's board.
+model ScreenGroup {
+  screenId String @map("screen_id")
+  groupId  String @map("group_id")
+  tenantId String @map("tenant_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  screen Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  group  Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([screenId, groupId])
+  @@index([groupId])
+  @@index([tenantId])
+  @@map("screen_group")
 }
 
 /// Holidays, break weeks and exam periods as structured data.
@@ -1360,11 +1449,14 @@ model Offering {
   /// migration and `Offering.required_room_count` in the proto.
   requiredRoomCount Int @default(1) @map("required_room_count")
 
-  /// May the solver place this Offering in a VIRTUAL Room? Not "is this
-  /// online": online delivery is a virtual Room, not a Session flag
-  /// (TAXONOMY.md §2). This is permission for the solver to choose one.
-  /// False by default: opting into online delivery is a tenant decision.
-  allowOnline Boolean @default(false) @map("allow_online")
+  /// May — or MUST — the solver place this Offering in a VIRTUAL Room? Not "is
+  /// this online": online delivery is a virtual Room, not a Session flag
+  /// (TAXONOMY.md §2).
+  ///
+  /// `FORBIDDEN` by default: opting into online delivery is a tenant decision,
+  /// the same conservative direction the boolean this replaced defaulted to.
+  /// See `OnlineMode` for why `REQUIRED` is never stored as a room list.
+  onlineMode OnlineMode @default(FORBIDDEN) @map("online_mode")
 
   /// Issue #8. PROVENANCE ONLY: which OfferingTemplate this was seeded from,
   /// for UI convenience ("created from Maths (4x/week)") and analytics.
@@ -1392,6 +1484,7 @@ model Offering {
   groups                        OfferingGroup[]
   lecturers                     OfferingLecturer[]
   equipment                     OfferingEquipment[]
+  pinnedRooms                   OfferingRoom[]
   sessions                      Session[]
   constraintScopes              ConstraintScope[]
   violations                    ConstraintViolation[]
@@ -1527,6 +1620,47 @@ model OfferingEquipment {
   @@map("offering_equipment")
 }
 
+/// Offering ↔ Room: "only these Rooms may host it" (issue #123).
+///
+/// AN ALLOW-LIST, NOT A PREFERENCE. There is no soft reading: the set is
+/// intersected with every other eligibility filter the solver applies
+/// (`convert.rs`'s `individually_eligible`), so pinning is the easiest way in
+/// the product to make an Offering structurally unplaceable while every form
+/// still validates. `assembleSolverInput` reports the impossibilities it can
+/// see (`AssemblyReport.offeringsWithUnsatisfiableRoomRestriction` and
+/// friends) rather than refusing the write: which Rooms exist, how big they
+/// are and what they carry is edited elsewhere, by someone else, later.
+///
+/// AN EMPTY SET MEANS "ANY ELIGIBLE ROOM", verbatim what the wire's empty
+/// `allowed_room_ids` has always meant and exactly the behaviour of every
+/// Offering that predates this table. Which is also the trap: a NON-empty set
+/// that shrinks to nothing on the way to the wire must never be sent as
+/// empty — see `server/utils/offeringRooms.ts`.
+///
+/// A SET, NOT A NULLABLE `Offering.fixedRoomId`. "One of these two lecture
+/// halls" is the common request, and `requiredRoomCount` goes up to 4, so a
+/// Session needing two Rooms at once cannot state its pin as one FK at all:
+/// the allow-list has to hold the POOL the combination is drawn from.
+///
+/// `roomId` may name a FEDERATION-owned Room: RLS on `room` already widens
+/// reads to the caller's own federation (CLAUDE.md exception 1), and a
+/// consortium's shared lecture hall is exactly the Room a tenant most wants to
+/// pin. `tenantId` here is the OFFERING's tenant, never the Room's.
+model OfferingRoom {
+  offeringId String @map("offering_id")
+  roomId     String @map("room_id")
+  tenantId   String @map("tenant_id")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  offering Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([offeringId, roomId])
+  @@index([roomId])
+  @@index([tenantId])
+  @@map("offering_room")
+}
+
 /// Issue #8. A REUSABLE SHAPE, not a live link: creating an Offering "from" a
 /// template COPIES these field values onto the new row once, at creation time.
 /// Nothing may resolve an Offering's current fields through this table; see
@@ -1575,7 +1709,16 @@ model OfferingTemplate {
 
   requiredCapacity  Int?     @map("required_capacity")
   requiredRoomCount Int?     @map("required_room_count")
-  allowOnline       Boolean? @map("allow_online")
+
+  /// Moved with `Offering.onlineMode`, which it seeds: a template holding a
+  /// boolean the Offering no longer has would be a shape that cannot be
+  /// copied. NULL still means "the template does not fix this", unchanged.
+  ///
+  /// A template does NOT carry a room PIN (`offering_room`), deliberately and
+  /// for now: issue #123 scoped that out, because a pin names specific Rooms
+  /// while a template is a reusable shape, and the two only compose once
+  /// somebody decides what applying a plan to a second building should do.
+  onlineMode        OnlineMode? @map("online_mode")
   notes             String?
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)

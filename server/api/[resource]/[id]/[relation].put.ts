@@ -11,7 +11,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Resources'],
         summary: 'Replace a relation membership set',
-        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
+        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
         parameters: [
             { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -134,6 +134,18 @@ defineRouteMeta({
                                             type: 'integer',
                                             minimum: 1,
                                             nullable: true,
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'offerings/rooms',
+                                    type: 'object',
+                                    required: ['roomId'],
+                                    description: 'ONLY these rooms may host the offering. An empty array means any eligible room, which is the default and what every offering did before this relation existed; it is not a preference and there is no soft reading of it.',
+                                    properties: {
+                                        roomId: {
+                                            type: 'string',
+                                            description: 'May name a federation-owned room the offering’s tenant can read.',
                                         },
                                     },
                                 },

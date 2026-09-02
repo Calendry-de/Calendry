@@ -10,9 +10,15 @@
             "email": "Email"
         },
         "field": {
-            "givenName": { "label": "Given name" },
-            "familyName": { "label": "Family name" },
-            "email": { "label": "Email" },
+            "givenName": {
+                "label": "Given name"
+            },
+            "familyName": {
+                "label": "Family name"
+            },
+            "email": {
+                "label": "Email"
+            },
             "externalRef": {
                 "label": "External reference",
                 "help": "Stable id from an external SIS or LDAP, used to reconcile imports."
@@ -74,12 +80,16 @@
                 "label": "Exam capacity",
                 "help": "Seats available for an exam sitting, if fewer than the normal capacity: exam spacing and invigilation often use more room per person. Leave unset to fall back to this room's normal capacity."
             },
-            "location": { "label": "Location" },
+            "location": {
+                "label": "Location"
+            },
             "ranking": {
                 "label": "Ranking",
                 "help": "Desirability, HIGHER = more premium. The \"Steer room choice by rank\" constraint reads this to bias placement toward one end of the scale."
             },
-            "isVirtual": { "label": "Virtual" }
+            "isVirtual": {
+                "label": "Virtual"
+            }
         },
         "relation": {
             "equipment": {
@@ -148,14 +158,30 @@
             "isDefault": "Default"
         },
         "field": {
-            "blockLengthMinutes": { "label": "Block length (minutes)" },
-            "blocksPerDay": { "label": "Blocks per day" },
-            "startHour": { "label": "Start hour" },
-            "startMinute": { "label": "Start minute" },
-            "breakMinutes": { "label": "Default gap between blocks (minutes)" },
-            "breaks": { "label": "Named breaks" },
-            "activeDays": { "label": "Teaching days" },
-            "isDefault": { "label": "Default grid" }
+            "blockLengthMinutes": {
+                "label": "Block length (minutes)"
+            },
+            "blocksPerDay": {
+                "label": "Blocks per day"
+            },
+            "startHour": {
+                "label": "Start hour"
+            },
+            "startMinute": {
+                "label": "Start minute"
+            },
+            "breakMinutes": {
+                "label": "Default gap between blocks (minutes)"
+            },
+            "breaks": {
+                "label": "Named breaks"
+            },
+            "activeDays": {
+                "label": "Teaching days"
+            },
+            "isDefault": {
+                "label": "Default grid"
+            }
         }
     },
     "sessionKind": {
@@ -200,7 +226,9 @@
             "durationBlocks": "Blocks"
         },
         "field": {
-            "title": { "label": "Title" },
+            "title": {
+                "label": "Title"
+            },
             "color": {
                 "help": "Tints every session of this offering. Leave it empty to inherit the session kind's colour: empty means inherit, not grey."
             },
@@ -254,12 +282,21 @@
                     "warning": "Warning: only {capacity} of an expected {estimate} are enrolled, so this may be incomplete."
                 }
             },
-            "allowOnline": {
-                "label": "May be scheduled online",
-                "help": "Lets the solver place this in a virtual room. Online delivery is a virtual room, not a session flag."
+            "onlineMode": {
+                "label": "Online delivery",
+                "help": "Online delivery is a virtual room, not a flag on the session. “Online only” restricts placement to the virtual rooms and is intersected with the room list below if one is set; it also makes the online-related rules (online/on-site same day, maximum online share, concurrent online sessions) materially harder to satisfy.",
+                "option": {
+                    "forbidden": "In person only",
+                    "allowed": "May be online",
+                    "required": "Online only"
+                }
             },
-            "notes": { "label": "Notes" },
-            "createdFromTemplateId": { "label": "Started from template" }
+            "notes": {
+                "label": "Notes"
+            },
+            "createdFromTemplateId": {
+                "label": "Started from template"
+            }
         },
         "relation": {
             "groups": {
@@ -278,6 +315,11 @@
                 "help": "Restricts placement to rooms providing all of it. A count means at least that many units, so only rooms that state enough qualify.",
                 "quantity": "Count",
                 "emptyHint": "No equipment defined yet."
+            },
+            "rooms": {
+                "label": "Only these rooms",
+                "help": "Restricts placement to exactly these rooms; leave empty for any eligible room. This is not a preference: it is combined with the capacity, equipment and online requirements, so too narrow a list leaves the offering with nowhere to go.",
+                "emptyHint": "No rooms defined yet."
             }
         }
     },
@@ -304,8 +346,12 @@
                 "label": "Kind",
                 "emptyHint": "Create a session kind first: lecture, lesson, whatever you call them."
             },
-            "frequency": { "label": "Sessions per term" },
-            "durationBlocks": { "label": "Length in blocks" },
+            "frequency": {
+                "label": "Sessions per term"
+            },
+            "durationBlocks": {
+                "label": "Length in blocks"
+            },
             "schedulingPattern": {
                 "label": "How the sessions spread",
                 "option": {
@@ -319,11 +365,27 @@
                 "help": "The \"lecturer pool\" hint. A specific person is named on the offering itself, not here.",
                 "emptyHint": "No roles defined yet."
             },
-            "requiredCapacity": { "label": "Required room capacity" },
-            "requiredRoomCount": { "label": "Rooms needed at once" },
-            "requiredLecturerCount": { "label": "Lecturers needed at once" },
-            "allowOnline": { "label": "May be scheduled online" },
-            "notes": { "label": "Notes" }
+            "requiredCapacity": {
+                "label": "Required room capacity"
+            },
+            "requiredRoomCount": {
+                "label": "Rooms needed at once"
+            },
+            "requiredLecturerCount": {
+                "label": "Lecturers needed at once"
+            },
+            "onlineMode": {
+                "label": "Online delivery",
+                "option": {
+                    "notSet": "Not set",
+                    "forbidden": "In person only",
+                    "allowed": "May be online",
+                    "required": "Online only"
+                }
+            },
+            "notes": {
+                "label": "Notes"
+            }
         }
     },
     "offeringPlan": {
@@ -350,20 +412,34 @@
             "isEnabled": "Enabled"
         },
         "field": {
-            "type": { "label": "Rule" },
-            "severity": { "label": "Severity" },
-            "weight": { "label": "Penalty weight" },
-            "params": { "label": "Parameters" },
-            "scopes": { "label": "Applies to kinds" },
-            "members": { "label": "Related offerings" },
-            "isEnabled": { "label": "Enabled" }
+            "type": {
+                "label": "Rule"
+            },
+            "severity": {
+                "label": "Severity"
+            },
+            "weight": {
+                "label": "Penalty weight"
+            },
+            "params": {
+                "label": "Parameters"
+            },
+            "scopes": {
+                "label": "Applies to kinds"
+            },
+            "members": {
+                "label": "Related offerings"
+            },
+            "isEnabled": {
+                "label": "Enabled"
+            }
         }
     },
     "screen": {
         "label": "Screen",
         "plural": "Screens",
-        "description": "Lobby and corridor displays showing live room occupancy.",
-        "keywords": "screen, screens, display, displays, lobby, kiosk, signage, board, monitor, tv, corridor, occupancy",
+        "description": "Lobby and corridor displays showing live room occupancy or today's substitutions.",
+        "keywords": "screen, screens, display, displays, lobby, kiosk, signage, board, monitor, tv, corridor, occupancy, substitution, substitutions, cover, vertretung, vertretungsplan",
         "column": {
             "roomSummary": "Shows",
             "lastSeenAt": "Last seen"
@@ -379,7 +455,21 @@
                 "label": "Rooms shown",
                 "emptyHint": "No rooms defined yet."
             },
-            "key": { "label": "Display address" }
+            "key": {
+                "label": "Display address"
+            },
+            "mode": {
+                "label": "Board",
+                "help": "Which board this display draws. A room board shows live occupancy; a substitution plan shows today's and tomorrow's cover, cancellations and moves.",
+                "option": {
+                    "roomBoard": "Room board",
+                    "substitutionPlan": "Substitution plan"
+                }
+            },
+            "groupIds": {
+                "label": "Groups shown",
+                "emptyHint": "No groups defined yet."
+            }
         }
     },
     "term": {
@@ -392,8 +482,12 @@
             "endDate": "Ends"
         },
         "field": {
-            "startDate": { "label": "Start date" },
-            "endDate": { "label": "End date" },
+            "startDate": {
+                "label": "Start date"
+            },
+            "endDate": {
+                "label": "End date"
+            },
             "timeGridId": {
                 "label": "Time grid",
                 "help": "Which grid this term is scheduled on. Falls back to the tenant default when unset.",
@@ -426,9 +520,15 @@
                     "holiday": "Holiday"
                 }
             },
-            "startDate": { "label": "Start date" },
-            "endDate": { "label": "End date" },
-            "weekPreview": { "label": "Weeks this reclassifies" }
+            "startDate": {
+                "label": "Start date"
+            },
+            "endDate": {
+                "label": "End date"
+            },
+            "weekPreview": {
+                "label": "Weeks this reclassifies"
+            }
         }
     },
     "account": {
@@ -447,9 +547,15 @@
                 "label": "Email",
                 "help": "The sign-in address, and unique across the whole deployment: one credential can act in several institutions."
             },
-            "personId": { "label": "Acts as" },
-            "password": { "label": "Initial password" },
-            "attachExisting": { "label": "Attach the existing login" },
+            "personId": {
+                "label": "Acts as"
+            },
+            "password": {
+                "label": "Initial password"
+            },
+            "attachExisting": {
+                "label": "Attach the existing login"
+            },
             "mustChangePassword": {
                 "label": "Must choose a new password at first sign-in",
                 "help": "A password an administrator knows is a shared secret. This is what makes that temporary: sign-in succeeds but issues no session until it is changed."
@@ -472,7 +578,9 @@
                 "label": "Key",
                 "help": "Stable identifier. `create:account --role <key>` and any import address the role by it, so it cannot be changed later."
             },
-            "permissions": { "label": "Permissions" }
+            "permissions": {
+                "label": "Permissions"
+            }
         }
     }
 }

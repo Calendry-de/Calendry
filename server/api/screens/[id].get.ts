@@ -14,7 +14,10 @@ export default defineEventHandler(async (event) => {
 
         const screen = await tx.screen.findFirst({
             where: { id },
-            include: { rooms: { include: { room: { select: { id: true, name: true } } } } },
+            include: {
+                rooms: { include: { room: { select: { id: true, name: true } } } },
+                groups: { include: { group: { select: { id: true, name: true } } } },
+            },
         });
 
         if (!screen) {
@@ -24,11 +27,14 @@ export default defineEventHandler(async (event) => {
         return {
             id: screen.id,
             name: screen.name,
+            mode: screen.mode,
             isActive: screen.isActive,
             lastSeenAt: screen.lastSeenAt,
             createdAt: screen.createdAt,
             roomIds: screen.rooms.map((link) => link.roomId),
             roomNames: screen.rooms.map((link) => link.room.name).sort(),
+            groupIds: screen.groups.map((link) => link.groupId),
+            groupNames: screen.groups.map((link) => link.group.name).sort(),
         };
     });
 });

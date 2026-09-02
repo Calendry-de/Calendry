@@ -69,6 +69,48 @@ are whoever was put in it directly.
 - **`Equipment` / `Feature`** [OPEN, tenant-defined]: tags on a Room (projector, PC lab, lab bench, etc.), referenced by Offerings that require them.
 - Online delivery is modeled as a **virtual Room** (per prototype's `raum_online` pattern), not a separate boolean flag, which keeps room-assignment logic uniform.
 
+#### Which Rooms an Offering may use: amendment (decided 2026-09-02, issue #123)
+
+Two asks, one question, and they resolve to the same wire field
+(`Offering.allowed_room_ids`), so they are one amendment.
+
+- **`offering_room`** [FIXED relation]: Offering ↔ Room, "**only** these Rooms
+  may host it". Structurally identical to `offering_equipment` (composite PK,
+  own `tenant_id`, RLS, PUT-set relation verb). **An empty set means any
+  eligible Room**, verbatim what an absent restriction has always meant, so the
+  table starting empty changes nothing about any existing timetable.
+
+  A SET, not a nullable `Offering.fixed_room_id`. "One of these two lecture
+  halls" is the common real request, and `required_room_count` goes up to 4, so
+  a Session needing two Rooms at once cannot state its pin as one FK at all: the
+  allow-list has to hold the POOL the combination is drawn from.
+
+  `room_id` may name a **Federation-owned** Room (§2's first isolation
+  exception): a consortium's shared lecture hall is precisely the Room a member
+  tenant wants to pin. The join row carries the OFFERING's tenant, never the
+  Room's.
+
+- **`Offering.online_mode`** [FIXED] `FORBIDDEN | ALLOWED | REQUIRED`, replacing
+  the boolean `allow_online`. The boolean could only ever say *permitted*; there
+  was no value meaning *must*, and a tenant wanting a purely online lecture had
+  to hope the solver picked the virtual Room, which `MinimizeOnline` actively
+  prices against. Replacing rather than adding a `require_online` beside it:
+  two booleans admit the illegal `require && !allow`. `OfferingTemplate` carries
+  the same field, nullable, and moved with it.
+
+  This does **not** change the rule above that online delivery is a virtual
+  Room, not a Session flag. `REQUIRED` has no wire representation of its own: it
+  is expressed as an allow-list of the tenant's virtual Rooms, **derived from
+  `Room.is_virtual` at assembly time on every run and never persisted**. A
+  stored list would silently exclude a virtual Room created next week from every
+  Offering that had already asked for "online".
+
+  A pin and `REQUIRED` **intersect** — not "pin wins", not "online wins" — and
+  an intersection that comes out empty is a reported error, never an empty wire
+  list, because empty means *any* Room. Both rules live in exactly one function
+  (`server/utils/offeringRooms.ts`), which the solver assembly and the
+  manual-edit evaluator both call.
+
 ### Federation-shared events: amendment (decided later, see solver decision record §10)
 
 `Session` is now a **third federation-shareable entity**, alongside `Room`

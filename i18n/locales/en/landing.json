@@ -1,17 +1,20 @@
 {
     "meta": {
-        "title": "Timetabling for schools and universities",
-        "description": "Calendry is a multi-tenant timetabling platform for schools and universities: a calendar management application plus a solver service that proposes schedules for a person to review. In active development."
+        "title": "Timetabling software for schools and universities",
+        "description": "Calendry places a whole term in about 350 milliseconds and hands you the proposal to judge. Rooms, cohorts, staff and courses in one place, for schools and universities."
     },
     "action": {
         "getInTouch": "Get in touch",
-        "signIn": "Sign in"
+        "signIn": "Sign in",
+        "bookWalkthrough": "Book a 30 minute walkthrough",
+        "askForWalkthrough": "Ask for a walkthrough"
     },
     "hero": {
         "statusLabel": "In active development",
-        "title": "Timetabling for schools and universities.",
-        "lead": "A term's rooms, cohorts, staff and courses in one place, and a solver that proposes the timetable you judge.",
-        "secondaryAction": "See what works today"
+        "lead": "Calendry holds every room, cohort, lecturer and course your term is made of, then proposes placements for all of it in about 350 milliseconds. Nothing reaches the live schedule until somebody applies it.",
+        "titleLineOne": "A solver builds your term.",
+        "titleLineTwo": "A person still signs it off.",
+        "proof": "The code is public. Every capability on this page is covered by this repository's integration suite."
     },
     "topbar": {
         "navLabel": "Landing page",
@@ -20,17 +23,18 @@
             "whatWorks": "What works",
             "roadmap": "Roadmap",
             "technical": "Technical",
-            "pricing": "Pricing"
-        }
+            "pricing": "Pricing",
+            "benefits": "Benefits",
+            "how": "How it works",
+            "built": "Built",
+            "faq": "FAQ"
+        },
+        "menuLabel": "Menu"
     },
     "audience": {
         "line": "For the people who actually build the timetable: registrars, timetabling officers and department heads, plus the lecturers who have to live in the result."
     },
     "section": {
-        "what": {
-            "title": "A timetable you can hold, and one you can ask for",
-            "lead": "Two halves. This application stores and presents the schedule and everything it is made of; a separate solver service builds candidate placements from your rules and hands them back for a person to accept or reject."
-        },
         "built": {
             "title": "What works today",
             "lead": "Not a demo reel. Everything below is implemented, in use against a real database, and covered by this repository's integration suite."
@@ -49,27 +53,26 @@
         },
         "underTheHood": {
             "title": "For the technically curious"
-        }
-    },
-    "callout": {
-        "builtText": "If that already covers most of what your week needs, the useful next step is a conversation about your institution."
-    },
-    "feature": {
-        "model": {
-            "title": "One place for what a timetable is made of",
-            "body": "Rooms, classes and cohorts, staff and students, courses, terms, and your own daily block structure. Your vocabulary stays yours: role names, session types and room equipment are things you define, not a fixed list you have to translate into. You mark which of your session types are exams, so exam rules find them by that rather than by what you happened to call them."
         },
-        "editing": {
-            "title": "Change a schedule without breaking it quietly",
-            "body": "Move a session, swap two, or lock one so nothing may touch it. If a change clashes with something (a double-booked room, a class in two places at once), Calendry lets you make it and records the clash as state you can look up afterwards. It does not block you, and it does not forget."
+        "problem": {
+            "title": "A term is a hundred constraints in a spreadsheet nobody dares open",
+            "lead": "Timetabling software fails in specific, recognisable ways, and so does having none. Both failures have the same shape: the schedule knows less than the person holding it."
         },
-        "solver": {
-            "title": "Ask for a timetable, then judge it",
-            "body": "Start a run and watch it work; cancel it if you change your mind. When it finishes you get a proposal shown against the schedule you already have, with what it would change and what it could not satisfy. Nothing is applied until you apply it."
+        "benefits": {
+            "title": "What you get",
+            "lead": "Five things this does for the person who owns the week. Each one is a capability that exists today, not a direction of travel."
         },
-        "people": {
-            "title": "Everyone sees their own slice",
-            "body": "You compose the permission roles for your institution, so who can read the schedule, who can move a session and who can run the solver are separate questions. Lecturers can enter their own unavailability and preferred teaching days; staff review what they declare."
+        "how": {
+            "title": "How it works",
+            "lead": "Three steps, and the third one is yours."
+        },
+        "faq": {
+            "title": "Questions we get asked",
+            "lead": "The first two are the ones that lose the sale. They are answered with a partial no and a no."
+        },
+        "finalCta": {
+            "title": "Bring us your hardest week",
+            "lead": "The useful conversation is about your institution: how many rooms and cohorts, what your week actually looks like, and what breaks today."
         }
     },
     "roadmap": {
@@ -89,19 +92,19 @@
         },
         "manage": {
             "title": "Management screens for the core entities",
-            "note": "Rooms, groups, people, courses, terms, the daily block grid and its breaks, plus a Ctrl+K palette that jumps to any of them. A course can state that one session needs several rooms at once, for a cohort too large for any single hall, and the scheduler places the combination. A class can be assembled from other classes, for a track two cohorts take together."
+            "note": "Rooms, groups, people, courses, terms, the daily block grid and its breaks, plus a Ctrl+K palette that jumps to any of them. A course can state that one session needs several rooms at once, for a cohort too large for any single hall, and the scheduler places the combination. A class can be assembled from other classes, for a track two cohorts take together. A course can be restricted to particular rooms, or required to run online, and the two are combined rather than one quietly overruling the other."
         },
         "calendar": {
             "title": "Academic calendar periods",
             "note": "Holidays, breaks and exam weeks, with a preview of exactly which weeks change classification before you save. Two dates do not obviously imply four exam weeks, and sometimes they do."
         },
         "events": {
-            "title": "One-off events alongside recurring courses",
+            "title": "Single events alongside recurring courses",
             "note": "Create a session that belongs to no course, such as an open day or a guest lecture, with its own room, groups and people."
         },
         "icalExport": {
             "title": "Download your schedule as a calendar file",
-            "note": "An .ics of your own sessions for a term, opened in whatever calendar app you already use. Real UTC times, converted from the institution’s own clock rather than sent as its wall-clock hours."
+            "note": "An .ics of your own sessions for a term, opened in whatever calendar app you already use. Real UTC times, converted from the institution’s own clock rather than sent as its own local clock hours."
         },
         "personSearch": {
             "title": "Finding a person by name",
@@ -112,7 +115,7 @@
             "note": "Request an exam on a module you lead, and see where the request got to. It reaches no timetable until somebody approves it, because an exam is a room and an hour the schedule has to find."
         },
         "availability": {
-            "title": "Self-service availability",
+            "title": "Availability the lecturer enters",
             "note": "A lecturer declares when they cannot teach, and which days, times and kinds of room they would rather have; staff approve or reject each declaration. Reaching only your own data is the point of that section."
         },
         "solverIntegration": {
@@ -121,7 +124,7 @@
         },
         "constraints": {
             "title": "Rules each institution configures for itself",
-            "note": "Thirty rule types, switched on and weighted per institution: double-booking, session counts, unavailability, online share, room rank and exam periods, plus the shape of a day: idle gaps, teaching without a break, how long it runs, and whether it crosses buildings. Rooms can be reserved institution-wide, sized to the group actually attending, and kept consistent for a class across the week."
+            "note": "Thirty rule types, switched on and weighted per institution: double booking, session counts, unavailability, online share, room rank and exam periods, plus the shape of a day: idle gaps, teaching without a break, how long it runs, and whether it crosses buildings. Rooms can be reserved across the institution, sized to the group actually attending, and kept consistent for a class across the week."
         },
         "federation": {
             "title": "Shared rooms across a federation",
@@ -129,14 +132,14 @@
         },
         "determinism": {
             "title": "Reproducible runs",
-            "note": "The same inputs and the same seed produce a byte-identical timetable, as long as the run ended on its move budget rather than on a clock, which the run itself reports."
+            "note": "The same inputs and the same seed produce a timetable identical byte for byte, as long as the run ended on its move budget rather than on a clock, which the run itself reports."
         },
         "auth": {
-            "title": "Sign-in and per-institution permission roles",
-            "note": "One account can act in several institutions and picks which at sign-in. Roles are composed from a fixed catalogue of permissions, per institution, in the UI."
+            "title": "Signing in, and permission roles per institution",
+            "note": "One account can act in several institutions and picks which one when signing in. Roles are composed from a fixed catalogue of permissions, per institution, in the UI."
         },
         "tenancy": {
-            "title": "Multi-tenant data model and API",
+            "title": "A data model and API built for many institutions",
             "note": "Institutions are isolated in the database itself, not only in application code. A query issued without institution context returns nothing rather than everything."
         }
     },
@@ -147,14 +150,14 @@
         },
         "export": {
             "title": "A live calendar subscription, not just a download",
-            "note": "The one-off .ics download is built. A stable URL your calendar app polls on its own is a different, harder question. A feed link is itself a credential, and it needs the same answer as letting a student view a schedule with no account."
+            "note": "The single .ics download is built. A stable URL your calendar app polls on its own is a different, harder question. A feed link is itself a credential, and it needs the same answer as letting a student view a schedule with no account."
         },
         "notifications": {
             "title": "Notification delivery",
             "note": "Calendry already works out who an edit affects. Nothing sends anything yet, so the answer currently goes to a screen instead of an inbox."
         },
         "eventEdit": {
-            "title": "Editing a one-off event after creating it",
+            "title": "Editing a single event after creating it",
             "note": "Its time can be moved, but its room, groups and people cannot be changed. Correcting a mistake means deleting and recreating it."
         },
         "candidates": {
@@ -163,7 +166,7 @@
         },
         "i18n": {
             "title": "A translated interface",
-            "note": "Under way now, German first, on the mechanism that made it safe to start: the locale is resolved once on the server and the interface is extracted a section at a time, so no page is ever half-translated in the browser."
+            "note": "Under way now, German first, on the mechanism that made it safe to start: the locale is resolved once on the server and the interface is extracted a section at a time, so no page is ever half translated in the browser."
         }
     },
     "principle": {
@@ -173,15 +176,15 @@
         },
         "groups": {
             "title": "Nested groups really do clash",
-            "body": "Booking a programme blocks its cohorts, and booking a cohort blocks the programme. Clash detection walks the whole ancestor-and-descendant relationship through a maintained closure, rather than comparing the two names it was handed."
+            "body": "Booking a programme blocks its cohorts, and booking a cohort blocks the programme. Clash detection walks the whole ancestor and descendant relationship through a maintained closure, rather than comparing the two names it was handed."
         },
         "isolation": {
             "title": "Isolation in the database, not in the code",
-            "body": "Every institution-scoped table is guarded by row-level security, and the application connects as a role that owns nothing. The failure mode of a mistake is seeing no rows, which is loud, rather than seeing someone else's, which is not."
+            "body": "Every institution scoped table is guarded by row level security, and the application connects as a role that owns nothing. The failure mode of a mistake is seeing no rows, which is loud, rather than seeing someone else's, which is not."
         },
         "time": {
             "title": "Nothing about time is hardcoded",
-            "body": "Days per week, blocks per day, block length and the uneven breaks between blocks come from each institution's own grid. There is no assumed Monday-to-Friday and no fallback shape anywhere. An institution without a grid gets an empty state, not a guess."
+            "body": "Days per week, blocks per day, block length and the uneven breaks between blocks come from each institution's own grid. There is no assumed Monday to Friday and no fallback shape anywhere. An institution without a grid gets an empty state, not a guess."
         },
         "events": {
             "title": "Every edit is an event",
@@ -190,16 +193,16 @@
     },
     "techLead": {
         "figure": "27,000 sessions, placed in about 350 milliseconds.",
-        "note": "That is a synthetic large-university instance. The development database's own term runs all the way to convergence in about four seconds. Both numbers came off a benchmark rather than a pitch deck, and both will move as the constraint set grows."
+        "note": "That is a synthetic instance the size of a large university. The development database's own term runs all the way to convergence in about four seconds. Both numbers came off a benchmark rather than a pitch deck, and both will move as the constraint set grows."
     },
     "technical": {
         "app": {
             "title": "The application",
-            "body": "Nuxt and TypeScript over PostgreSQL. Tenant isolation is enforced by row-level security policies; the schedule's history is an append-only event log applied on top of a versioned snapshot."
+            "body": "Nuxt and TypeScript over PostgreSQL. Tenant isolation is enforced by row level security policies; the schedule's history is an append only event log applied on top of a versioned snapshot."
         },
         "solver": {
             "title": "The solver",
-            "body": "A separate stateless Rust service, reached over gRPC against a shared schema. Hybrid constructive placement followed by large-neighbourhood local search with simulated annealing, over thirty constraint types. It holds no database: every run is a complete snapshot the application sends it."
+            "body": "A separate stateless Rust service, reached over gRPC against a shared schema. Hybrid constructive placement followed by large neighbourhood local search with simulated annealing, over thirty constraint types. It holds no database: every run is a complete snapshot the application sends it."
         }
     },
     "contact": {
@@ -213,8 +216,8 @@
         "messageCount": "{used} / {max}",
         "submit": "Open an email to us",
         "opened": "A draft should have opened in your email app, addressed to {email}. If nothing happened, your browser has no mail app configured. Write to us directly instead.",
-        "asideTitle": "Why this is an email and not a sign-up form",
-        "asideBody": "There is no self-service sign-up, and Calendry cannot send mail yet: notification delivery is on the list above, not behind us. A form that showed you a tick and filed your message nowhere would be worse than saying so, so this button composes a message in your own email app and you send it from your own account.",
+        "asideTitle": "Why this is an email and not a form",
+        "asideBody": "There is no sign up you can do yourself, and Calendry cannot send mail yet: notification delivery is on the list above, not behind us. A form that showed you a tick and filed your message nowhere would be worse than saying so, so this button composes a message in your own email app and you send it from your own account.",
         "asideContact": "Or write to {link}. Accounts for an existing institution are created by its administrator.",
         "error": {
             "name": "Tell us who you are, so a reply has somewhere to go.",
@@ -227,7 +230,7 @@
         "mailBodyInstitution": "Institution: {institution}"
     },
     "footer": {
-        "note": "Multi-tenant timetabling for schools and universities. Built in the open, one verified phase at a time.",
+        "note": "Multi tenant timetabling for schools and universities. Built in the open, one verified phase at a time.",
         "navLabel": "Footer"
     },
     "rateTable": {
@@ -251,8 +254,114 @@
         "federationLabel": "Federation",
         "standalone": "Standalone",
         "federationMember": "Federation member",
-        "totalLabel": "Total a year",
+        "totalLabel": "Net total a year",
         "tierLine": "Complexity {score}, tier {tier}, {multiplier}x on the lecturer subtotal",
+        "netLabel": "Net",
+        "vatLabel": "VAT {rate}",
+        "grossLabel": "Gross a year",
         "examplesLabel": "Load an example"
+    },
+    "problem": {
+        "before": {
+            "title": "What breaks today",
+            "body": "The term lives in a file one person can safely edit. A double booked room is found by the lecturer who walks into it. A cohort's clash is invisible because the cohort is spread over four tabs, and moving one session means checking the other ninety by hand."
+        },
+        "after": {
+            "title": "What changes",
+            "body": "The term lives in one model that already knows a programme and its cohorts are the same people. A clash is recorded the moment you create it and is still findable next week. Move one session and you are told what it broke; ask for the whole week back and it returns in about four seconds."
+        }
+    },
+    "tagline": {
+        "lineOne": "A timetable is a hundred small judgements.",
+        "lineTwo": "Calendry makes the easy ninety and hands you the ten that matter."
+    },
+    "benefit": {
+        "solver": {
+            "title": "A term placed while you wait",
+            "body": "27,000 sessions in about 350 milliseconds on a synthetic large university instance; the development term runs to convergence in about four seconds. What comes back is a proposal drawn against the schedule you already have, listing what it would change and what it could not satisfy. Nothing is applied until you apply it."
+        },
+        "editing": {
+            "title": "An edit that breaks a rule is still allowed",
+            "body": "Move a session, swap two, or lock one so nothing may touch it. If the change clashes with something, Calendry lets you make it and records the breach as state you can look up afterwards. A person editing a timetable usually knows something the rules do not, so it does not block you, and it does not forget."
+        },
+        "model": {
+            "title": "Your vocabulary stays yours",
+            "body": "Role names, session types and room equipment are things you define, not a fixed list you translate into. Days per week, blocks per day, block length and the uneven breaks between them come from your own grid. There is no assumed Monday to Friday and no fallback week shape anywhere."
+        },
+        "people": {
+            "title": "Everyone sees their own slice",
+            "body": "You compose the permission roles for your institution, so who may read the schedule, who may move a session and who may run the solver are separate questions. Lecturers declare when they cannot teach and which days they would rather have; staff approve or reject each declaration."
+        },
+        "isolation": {
+            "title": "One institution cannot read another",
+            "body": "Isolation is enforced by row level security in Postgres itself, and the application connects as a database role that owns nothing. The failure mode of a mistake is seeing no rows, which is loud, rather than seeing someone else's, which is not."
+        }
+    },
+    "step": {
+        "describe": {
+            "title": "Describe your institution once",
+            "body": "Rooms, cohorts, staff, courses, terms and your own daily block structure, plus which of thirty rule types you want enforced and how much each one matters."
+        },
+        "ask": {
+            "title": "Ask for a timetable",
+            "body": "Start a run, watch it work, and cancel it if you change your mind. The same inputs and the same seed return the same timetable, and the run itself reports whether it ended on its move budget or on the clock."
+        },
+        "judge": {
+            "title": "Judge the proposal",
+            "body": "Read what it would change and what it could not satisfy, then apply it or throw it away. Every edit afterwards is appended to a log with the person who made it."
+        }
+    },
+    "proof": {
+        "repoTitle": "You can read all of it",
+        "repoBody": "The application, the solver and the shared schema are public at {link}. There is no licence on the repository yet, so you may read the code without being free to reuse it, and which licence to use is a decision still to be made."
+    },
+    "faq": {
+        "runTerm": {
+            "q": "Can Calendry run our term today?",
+            "a": "Partly, and the honest answer is a list rather than a yes. The schedule editor, the management screens, the solver end to end, the academic calendar, permission roles and institution isolation are built and covered by tests. Importing your existing spreadsheets is not, and nothing sends email yet. If your week has to arrive from a file this term, that is the gap to talk about first."
+        },
+        "import": {
+            "q": "Can we import our existing spreadsheets?",
+            "a": "Not yet, and it is the first thing a new institution needs. The reason it is not built is that the design is undecided: whether the column mapping is guided or a fixed template changes what the import is able to accept, and getting that wrong is worse than waiting. Until it exists, an institution's data is entered through the management screens."
+        },
+        "decides": {
+            "q": "Does the solver decide our timetable for us?",
+            "a": "No. It returns a proposal shown against the schedule you already have, and nothing reaches the live timetable until a person applies it. A run that finishes with rules still broken is still offered to you, with the breaches listed, rather than thrown away as a failure."
+        },
+        "breaks": {
+            "q": "What happens if a proposal breaks one of our rules?",
+            "a": "You are warned, never blocked. The breach becomes queryable state attached to the schedule, so it is findable next week rather than a message somebody dismissed. That applies to your own edits as much as to the solver's."
+        },
+        "week": {
+            "q": "Does it assume a Monday to Friday week and fixed period lengths?",
+            "a": "No, and this is the one we would rather not be asked, because most timetabling tools do. Days per week, blocks per day, block length and the uneven breaks between blocks all come from your institution's own grid. There is no fallback shape anywhere: an institution without a grid gets an empty state rather than a guess."
+        },
+        "federation": {
+            "q": "Can two institutions share a lecture hall without seeing each other's schedules?",
+            "a": "Yes. Institutions in a consortium can share a room and see each other's occupancy of it, and nothing else. The shared resource is owned by the federation rather than by either institution, and read access widens to exactly that."
+        },
+        "permissions": {
+            "q": "Who can see what?",
+            "a": "You decide, per institution. Roles are composed in the interface from a fixed catalogue of permissions, so reading the schedule, moving a session and running the solver are separate grants. A lecturer reaches their own sessions and their own declarations and nothing else. One account can act in several institutions and picks which at sign in."
+        },
+        "reproducible": {
+            "q": "Will the same request produce the same timetable twice?",
+            "a": "Yes, as long as the run ended on its move budget rather than on the clock, and the run reports which of the two it was. Given the same inputs and the same seed the result is byte identical. A run that stopped because it hit a time limit is not a comparable measurement, and Calendry will not present it as one."
+        },
+        "cost": {
+            "q": "What does it cost?",
+            "a": "The base tier follows your student count, lecturers are charged by teaching load with a multiplier for how complex your week is, and admin seats are counted separately for the few people who actually edit. Students are never billed. The pricing page has the rates and a calculator you can put your own numbers into."
+        },
+        "accounts": {
+            "q": "How do we get accounts?",
+            "a": "There is no self service sign up. An institution's administrator creates its accounts, which is why the action on this page is a conversation rather than a form. One account can belong to several institutions and chooses which one it is acting in when it signs in."
+        },
+        "code": {
+            "q": "Can we read the code before we commit to anything?",
+            "a": "Yes. The application, the solver and the schema they share are public repositories. There is no licence on them yet, so you may read the code but not yet reuse it, and choosing a licence is on the list of decisions still open."
+        }
+    },
+    "risk": {
+        "line": "No sign up, nothing to install, and no obligation. A walkthrough is half an hour on a call, and it opens with what Calendry cannot do yet."
     }
 }

@@ -64,7 +64,7 @@ const props = defineProps<{
 
 const { t } = useT();
 
-const DONE_ICON = 'material-symbols:check-circle';
+const DONE_ICON = 'ph:check-circle-fill';
 
 // `cluster` is the id a row is matched on and `title` is the heading a reader
 // sees. They were one string before issue #19, which is exactly the shape that

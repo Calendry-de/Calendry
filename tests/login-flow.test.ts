@@ -65,7 +65,7 @@ describe('unauthenticated routing', () => {
         expect(res.status).toBe(200);
         expect(res.html).toContain('Sign in to continue');
         // No self-service signup exists by design; the page says so.
-        expect(res.html).toContain('no self-service sign-up');
+        expect(res.html).toContain('no sign up you can do yourself');
     });
 });
 

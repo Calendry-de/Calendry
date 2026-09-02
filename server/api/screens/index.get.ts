@@ -34,20 +34,28 @@ export default defineEventHandler(async (event) => {
             orderBy: { name: 'asc' },
             take: query.limit,
             skip: query.offset,
-            include: { rooms: { include: { room: { select: { id: true, name: true } } } } },
+            include: {
+                rooms: { include: { room: { select: { id: true, name: true } } } },
+                groups: { include: { group: { select: { id: true, name: true } } } },
+            },
         });
 
         const mapped = rows.map((screen) => ({
             id: screen.id,
             name: screen.name,
+            mode: screen.mode,
             isActive: screen.isActive,
             lastSeenAt: screen.lastSeenAt,
             createdAt: screen.createdAt,
             // The scope, named rather than as ids, because "shows nothing" and
             // "shows everything" are the same empty list and only the words tell
-            // them apart.
+            // them apart. BOTH axes travel on every row regardless of mode: the
+            // management form has to render the one that applies, and switching
+            // a screen's mode must not silently discard the other's set.
             roomIds: screen.rooms.map((link) => link.roomId),
             roomNames: screen.rooms.map((link) => link.room.name).sort(),
+            groupIds: screen.groups.map((link) => link.groupId),
+            groupNames: screen.groups.map((link) => link.group.name).sort(),
             // `tokenHash` is deliberately absent. It is not a secret a client
             // needs, and returning it would put a credential-shaped string into
             // a payload somebody will eventually log.

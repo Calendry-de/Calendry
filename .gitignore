@@ -28,6 +28,7 @@ logs
 /db/
 
 # Agent / skill tooling artifacts
+/.claude/
 /.impeccable/
 /skills-lock.json
 bunfig.toml

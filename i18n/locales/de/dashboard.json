@@ -18,7 +18,33 @@
         "noManageAccess": "Sie haben in dieser Institution auf keinen Verwaltungsbereich Lesezugriff. Die Administration kann ihn über Ihre Berechtigungsrolle erteilen."
     },
     "counts": {
+        "heading": "Ihre Institution",
         "unavailable": "Nicht abrufbar"
+    },
+    "reviewQueues": {
+        "heading": "Wartet auf Sie",
+        "proposals": {
+            "label": "Planvorschläge",
+            "sentence": "Keine Planvorschläge warten auf eine Entscheidung | Ein Planvorschlag wartet auf eine Entscheidung | {count} Planvorschläge warten auf eine Entscheidung",
+            "unavailable": "Die Planvorschläge konnten nicht gelesen werden."
+        },
+        "vetoes": {
+            "label": "Sperrzeitanträge",
+            "sentence": "Keine Sperrzeitanträge warten auf eine Entscheidung | Ein Sperrzeitantrag wartet auf eine Entscheidung | {count} Sperrzeitanträge warten auf eine Entscheidung",
+            "unavailable": "Die Sperrzeitanträge konnten nicht gelesen werden."
+        },
+        "exams": {
+            "label": "Klausuranträge",
+            "sentence": "Keine Klausuranträge warten auf eine Entscheidung | Ein Klausurantrag wartet auf eine Entscheidung | {count} Klausuranträge warten auf eine Entscheidung",
+            "unavailable": "Die Klausuranträge konnten nicht gelesen werden."
+        }
+    },
+    "term": {
+        "during": "{name} · Woche {week} von {total}",
+        "before": "{name} · noch nicht begonnen",
+        "after": "{name} · beendet",
+        "none": "Noch kein Semester angelegt",
+        "unavailable": "Das aktuelle Semester konnte nicht gelesen werden."
     },
     "permissions": {
         "summary": "{count} Berechtigung in dieser Institution | {count} Berechtigungen in dieser Institution",

@@ -41,14 +41,31 @@ defineProps<{
 <style scoped lang="scss">
 .tech {
     &_figure {
+        /*
+         * The page's second moment of scale, so it gets a card's travel rather
+         * than a heading's: this line is the section, and it should arrive as
+         * an object.
+         */
+        @include landingReveal($shift: 24px);
+
         max-width: 26ch;
         margin: 0;
 
         font-size: $fontSize2Xl;
         font-weight: 700;
         font-variant-numeric: tabular-nums;
-        line-height: 1.15;
-        color: $surface0;
+        // Paired leading for this step, replacing a 1.15 literal.
+        line-height: $lineHeight2Xl;
+
+        /*
+         * PAGE-GROUND INK, not the inverse ramp's. This band used to be
+         * rendered with `tone="inverse"` and its ink was `$surface*`, which is
+         * correct on a dark ground and effectively invisible on a light one.
+         * The page rebuild left the hero and the closing action as the only two
+         * inverse bands, so this section is now painted on the page's own
+         * ground and takes `content*` like every other section body.
+         */
+        color: $content2;
         text-wrap: balance;
         letter-spacing: -0.02em;
 
@@ -58,12 +75,14 @@ defineProps<{
     }
 
     &_note {
+        @include landingReveal($shift: 16px, $order: 1);
+
         max-width: 60ch;
         margin: $space6 0 0;
 
         font-size: $fontSizeMd;
-        line-height: 1.75;
-        color: $surface4;
+        line-height: var(--leading-loose);
+        color: $content6;
     }
 
     &_notes {
@@ -83,17 +102,31 @@ defineProps<{
     }
 
     &_item {
+        @include landingReveal($shift: 14px);
+
         padding-top: $space5;
         // Ink-side hairline: `surface6` reads as a rule against `content1` the
         // way `surface5` does against the page ground.
-        border-top: 1px solid $surface6;
+        border-top: 1px solid $surface4;
+    }
+
+    /*
+     * Two columns, so every pair shares a scroll position: without this the
+     * five notes land as two rows of two and a straggler, all four of the
+     * paired ones on the same frame. The right-hand column trails the left by
+     * one step, which is the reading order. Collapses to a single column below
+     * the desktop band, where the offset is invisible because the items no
+     * longer share a row.
+     */
+    &_item:nth-child(even) {
+        @include landingReveal($shift: 14px, $order: 1);
     }
 
     &_title {
         margin: 0 0 $space4;
         font-size: $fontSizeMd;
         font-weight: 700;
-        color: $surface1;
+        color: $content2;
     }
 
     &_body {
@@ -101,8 +134,8 @@ defineProps<{
         margin: 0;
 
         font-size: $fontSizeSm;
-        line-height: 1.75;
-        color: $surface4;
+        line-height: var(--leading-loose);
+        color: $content6;
     }
 }
 </style>

@@ -46,7 +46,9 @@
             v-model:term-id="filters.termId.value"
             :terms="data.terms.value"
             :active-filter-count="activeFilterCount"
-            :violation-count="data.violations.value.length"
+            :hard-violation-count="hardViolationCount"
+            :soft-violation-count="softViolationCount"
+            :scope="data.scope.value"
             :can-read-violations="data.canReadViolations.value"
             :can-trigger-solver="canTriggerSolver"
             :can-review-proposals="canReviewProposals"
@@ -120,6 +122,15 @@
             Dismisses itself (see `feedbackTimer`) rather than carrying a close
             button: an outcome is transient by nature, and a control to
             acknowledge an acknowledgement is chrome.
+
+            OUT OF FLOW, unlike the placing strip it is otherwise twinned with.
+            In flow it appeared directly after a successful move, above a grid
+            the pointer was still over and about to act on again, and pushed
+            every remaining drop target ~84px down the page at exactly that
+            moment. A mode the reader entered deliberately may cost layout; an
+            acknowledgement of something they have already done may not. The
+            live region above is what actually announces this, so nothing is
+            lost by taking it out of the document's order.
         -->
         <p
             v-if="feedback"
@@ -919,6 +930,24 @@ const activeFilterCount = computed(() => [
 ].filter(Boolean).length);
 
 /*
+ * SPLIT BY SEVERITY, because one total answered neither question anybody has.
+ * The toolbar reported `violations.length`, but the only action the page offers
+ * against a violation is the panel's Repair, and that is gated on the HARD
+ * count alone (`ScheduleViolationsPanel`: offering a repair against a soft
+ * preference breach "would promise something it does not do"). So the number
+ * that decided the action was reachable only by opening the panel, and the
+ * number on permanent display merged a legality failure with a preference
+ * charge into a quantity nobody can act on. Under warn-and-allow that
+ * distinction IS the reading.
+ */
+const hardViolationCount = computed(
+    () => data.violations.value.filter((violation) => violation.severity === 'HARD').length,
+);
+const softViolationCount = computed(
+    () => data.violations.value.length - hardViolationCount.value,
+);
+
+/*
  * `plural(count, noun)` used to live here, with a comment naming i18n as its
  * eventual owner. i18n has landed, so it is gone: the two sentences it served
  * are whole plural messages now (`schedule.page.hardViolationCount` /
@@ -1282,10 +1311,23 @@ watch(
      * acknowledgement is not an offer.
      */
     &_done {
+        /*
+         * FLOATS, so a finished edit costs no layout. It keeps the placing
+         * strip's shape and tint and gives up only its place in the flow.
+         *
+         * Above `.bar` (z-index 4) and `ScheduleGrid`'s sticky corner (3): it
+         * is the newest thing on the screen and briefly outranks all of them.
+         */
+        position: fixed;
+        z-index: 5;
+        right: var(--space-7);
+        bottom: var(--space-7);
+
         display: flex;
         gap: var(--space-4);
         align-items: center;
 
+        max-width: min(42ch, calc(100vw - var(--space-8)));
         margin: 0;
         padding: var(--space-5) var(--space-6);
         border-radius: var(--radius-lg);
@@ -1293,13 +1335,43 @@ watch(
         font-size: var(--font-size-md);
         color: $content4;
 
-        background: varToRgba('success600', 0.14);
+        /*
+         * OPAQUE, unlike the in-flow strips: those tint a known page
+         * background, this one sits over session chips. The tint is composited
+         * onto `$surface1` as a flat gradient layer rather than weakened,
+         * so the colour is exactly the one the flow version was designed with.
+         */
+        background:
+            linear-gradient(varToRgba('success600', 0.14), varToRgba('success600', 0.14)),
+            $surface1;
+
+        /* DESIGN.md's popover lift: in flow it was flat, and it is not in flow
+           any more. The Floats-Or-Flat rule has no middle. */
+        box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
+
+        @include mobile() {
+            right: var(--space-5);
+            bottom: var(--space-5);
+            left: var(--space-5);
+            max-width: none;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            animation: schedule-done-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
 
         svg {
             flex: none;
             width: var(--space-6);
             height: var(--space-6);
             color: $success700;
+        }
+    }
+
+    @keyframes schedule-done-in {
+        from {
+            transform: translateY(var(--space-4));
+            opacity: 0;
         }
     }
 
@@ -1310,12 +1382,27 @@ watch(
 
         margin: 0;
         padding: var(--space-4) var(--space-6);
-        border-radius: var(--radius-lg);
+
+        /*
+         * OUTRANKS THE PLACING STRIP IT CAN STACK WITH. A failed move leaves
+         * `mode` on 'place' (`scheduleEditing.move`), so the guidance line and
+         * the failure render together, and they were the same box in two
+         * tints: same padding, same radius, same weight, two different
+         * urgencies. The edge is what separates them now.
+         */
+        border-left: 3px solid $error700;
+        border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-sm);
 
         font-size: var(--font-size-md);
         color: $error700;
 
-        background: rgb(169, 45, 70, 0.16);
+        /*
+         * `rgb(169, 45, 70)` until now: a literal where the system requires a
+         * token, and not even this system's red (`$error700` is #9E2B36). The
+         * text beside it followed the tenant's theme and its own background
+         * could not.
+         */
+        background: varToRgba('error700', 0.16);
 
         span { flex: 1; }
 
@@ -1341,7 +1428,7 @@ watch(
 
             transition: background-color 140ms cubic-bezier(0.16, 1, 0.3, 1);
 
-            &:hover { background: rgb(169, 45, 70, 0.16); }
+            &:hover { background: varToRgba('error700', 0.16); }
 
             &:focus-visible {
                 outline: 2px solid $error700;

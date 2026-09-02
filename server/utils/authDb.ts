@@ -66,8 +66,22 @@ export interface ScreenIdentityRow {
     federation_id: string | null;
     name: string;
     is_active: boolean;
+    /**
+     * `screen_mode`, returned as raw TEXT by the function: `$queryRaw` applies
+     * no Prisma enum mapping, so this is deliberately the widest honest type
+     * and is narrowed by `asScreenMode()` at the one place it is read. A value
+     * this version does not recognise must stay itself rather than be coerced
+     * into a mode, or a credential from a newer schema would silently draw the
+     * wrong board.
+     */
+    mode: string;
     /** Rooms this screen may show. EMPTY MEANS EVERY ROOM in its tenant. */
     room_ids: string[];
+    /**
+     * Groups a `SUBSTITUTION_PLAN` screen may show, before closure expansion.
+     * EMPTY MEANS EVERY GROUP, the same fail-open reading as `room_ids`.
+     */
+    group_ids: string[];
 }
 
 /**
@@ -78,10 +92,12 @@ export interface ScreenIdentityRow {
  * tenant is not known until the key has been resolved. The privileged step is
  * `calendry_internal.screen_identity()`, parameterised by the secret alone.
  *
- * The room scope is read here, in the same privileged step, rather than in the
- * caller's tenant transaction. It could be read either way, but doing it here
+ * BOTH scopes are read here, in the same privileged step, rather than in the
+ * caller's tenant transaction. They could be read either way, but doing it here
  * keeps "what is this credential" one question with one answer, so a handler
- * cannot accidentally act on a screen whose scope it has not loaded.
+ * cannot accidentally act on a screen whose scope it has not loaded. Issue #31
+ * added the second axis (`group_ids`) and the `mode` that decides which axis
+ * applies to the same call, for the same reason.
  *
  * Returns the row even when `is_active` is false. The caller decides: the
  * resolver treats it as no identity, while the board route reports "revoked", so

@@ -26,6 +26,8 @@
                     />
                 </div>
 
+                <p class="pricing_vat">{{ vatNote }}</p>
+
                 <p class="pricing_caveat">{{ t('pricing.caveat.text') }}</p>
             </LandingSection>
 
@@ -36,6 +38,8 @@
                 :lead="t('pricing.page.extras.lead')"
             >
                 <LandingPrincipleList :items="FLAT_ITEMS"/>
+
+                <p class="pricing_vat">{{ vatNote }}</p>
             </LandingSection>
 
             <LandingSection
@@ -53,6 +57,8 @@
                 :lead="t('pricing.page.examples.lead')"
             >
                 <LandingScenarioGrid :items="SCENARIO_ITEMS"/>
+
+                <p class="pricing_vat">{{ vatNote }}</p>
             </LandingSection>
 
             <LandingSection
@@ -78,6 +84,7 @@ import { openGraphLocale } from '#shared/language';
 import type { LandingFeature } from '~/utils/landingContent';
 import { CONTACT_EMAIL } from '~/utils/landingContent';
 import { flatRates, pricingBasis, pricingScenarios, rateTables } from '~/utils/pricingContent';
+import { VAT_RATE, formatPercent } from '~/utils/pricingModel';
 
 /**
  * The public pricing page.
@@ -143,6 +150,31 @@ const FLAT_ITEMS = computed<LandingFeature[]>(() => flatRates(t, locale.value).m
 
 const SCENARIO_ITEMS = computed(() => pricingScenarios(t, locale.value));
 
+/**
+ * EVERY PUBLISHED FIGURE IS NET, said next to the figures rather than once at
+ * the top.
+ *
+ * It is rendered THREE TIMES, from ONE key, under each of the page's three
+ * blocks of printed prices: the rate tables, the flat rates and the worked
+ * examples. They sit screens apart and any of them can be deep-linked to
+ * directly (`#rates`, `#extras`, `#examples`), so a single statement in the
+ * first is a statement the reader of the third never saw. This is a required
+ * qualifier sitting with the figures it qualifies, not editorial repetition,
+ * which is the one case where saying a thing once is the wrong rule.
+ *
+ * The calculator, the fourth block, states it structurally instead: its ledger
+ * closes with a net, a VAT and a gross line, so there the arithmetic is on the
+ * page rather than asserted beside it.
+ *
+ * The rate itself is interpolated from `VAT_RATE` rather than typed into the
+ * sentence, in both languages. A statutory rate that moves is exactly the kind
+ * of number that gets changed in the model and left standing in the copy, and
+ * `19 %` inside a translated string is invisible to every check this repo has.
+ */
+const vatNote = computed(() => t('pricing.vat.note', {
+    rate: formatPercent(VAT_RATE, locale.value),
+}));
+
 // A getter, not a plain object: `useHead` re-evaluates it, so the tab title and
 // the social-card text follow a language change instead of freezing at whatever
 // was active when this page first rendered.
@@ -183,6 +215,15 @@ useHead(() => {
         display: flex;
         flex-direction: column;
         gap: $space10;
+    }
+
+    // Quiet, and directly under the prices it qualifies: it is a fact about
+    // every figure above it, not a warning.
+    &_vat {
+        margin: $space7 0 0;
+        font-size: $fontSizeSm;
+        line-height: $lineHeightSm;
+        color: $content7;
     }
 
     &_caveat {

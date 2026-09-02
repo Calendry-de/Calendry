@@ -7,6 +7,7 @@ import type { MaterializationPlan, PlannedDelete } from '../../../utils/generati
 import { GENERATION_SELECT, runSummaryFor } from '../../../utils/generationRead';
 import { requirePermission } from '../../../utils/requirePermission';
 import { demandLedgerFrom } from '../../../utils/solverDemand';
+import { forcedOnlineOverCapFrom } from '../../../utils/onlineShareFloor';
 import { withRequestTenant } from '../../../utils/tenantDb';
 import type { Tx } from '../../../utils/tenantDb';
 
@@ -88,6 +89,13 @@ export default defineEventHandler(async (event) => {
                         current: await summarizeCurrentViolations(tx, identity.tenantId, stored?.termId),
                         proposed: { hard: 0, byType: {}, unmappable: 0, sessionReferences: 0 },
                     },
+                    /*
+                     * A manual baseline asked the solver nothing, so no cap was
+                     * evaluated and there is nothing to explain: EMPTY, not
+                     * `null`. Null is reserved for a solver run that predates
+                     * the check, where the honest reading is "unknown".
+                     */
+                    forcedOnlineOverCap: [],
                     weekSummary: [],
                     offerings: [],
                     placements: query.include === 'placements' ? [] : undefined,
@@ -160,6 +168,25 @@ export default defineEventHandler(async (event) => {
                     current: await summarizeCurrentViolations(tx, identity.tenantId, stored.termId),
                     proposed: summarizeProposedViolations(output.hardViolations),
                 },
+                /**
+                 * WHY SOME OF THOSE HARD VIOLATIONS CANNOT BE ACTED ON.
+                 *
+                 * A `MaxOnlineShare` breach names no Session and no Offering
+                 * (see `materializeViolations`), so it writes no violation row
+                 * and reaches the reviewer only as a number in the type
+                 * breakdown. When the group's forced-online teaching alone
+                 * exceeds the cap, that number is not a placement anybody can
+                 * fix, and the assembly said so at the time the run was made.
+                 * Read back rather than recomputed: the Offerings' online
+                 * modes may have changed since, and the question is what THIS
+                 * run was asked.
+                 *
+                 * NULL WHEN THE RUN PREDATES THE CHECK, never flattened to
+                 * `[]`: "nothing was recorded" and "recorded, and the cap is
+                 * reachable" are different answers, and only the second is a
+                 * reassurance.
+                 */
+                forcedOnlineOverCap: forcedOnlineOverCapFrom(stored.meta),
                 // Where the changes are, so a nineteen-week term does not have
                 // to be clicked through week by week to find the three that moved.
                 weekSummary: summarizePlanByWeek(plan),

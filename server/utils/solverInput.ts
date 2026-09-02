@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { CompactnessScope, SchedulingPattern, SolverInput } from '@calendry-de/calendry-proto';
+import { CompactnessScope, SchedulingPattern, ShareWindow, SolverInput } from '@calendry-de/calendry-proto';
 import type {
     ConstraintConfig, ExternalOccupancy, Offering, OfferingRelation, Person, Room, SlotRef,
 } from '@calendry-de/calendry-proto';
@@ -18,6 +18,10 @@ import { blackedOutWeeks } from '../../shared/academicCalendar';
 import { approvedBlackoutsFor, statedPreferencesFor } from './availability';
 import { deriveCapacity } from '../../shared/groupCapacity';
 import { splitsIntoSeries, wireOfferingId } from './offeringSplit';
+import { resolveRoomRestriction } from './offeringRooms';
+import type { RoomRestrictionFailure } from './offeringRooms';
+import { forcedOnlineAboveShareCap } from './onlineShareFloor';
+import type { ForcedOnlineOverCap, ShareCapOffering, ShareCapRule } from './onlineShareFloor';
 import type { DemandEntry } from './solverDemand';
 import type { SessionKindType } from '../../shared/sessionKindType';
 import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
@@ -117,6 +121,98 @@ export interface AssemblyReport {
         feature: string;
         required: number;
         bestAvailable: number | null;
+    }[];
+    /**
+     * ROOM PINS AND REQUIRED-ONLINE THAT NOTHING CAN SATISFY (issue #123).
+     *
+     * THE SHARPEST TRAP IN THIS FILE, which is why it is a report entry and not
+     * a narrowing. `Offering.allowed_room_ids` is EMPTY = ANY ROOM on the wire,
+     * so a restriction that shrinks to nothing on the way out reads as its own
+     * opposite: "must be online" becomes "anywhere at all" and every Session
+     * lands in a physical room with nobody told. `resolveRoomRestriction`
+     * (`server/utils/offeringRooms.ts`) therefore sends `NO_ELIGIBLE_ROOM_ID`
+     * rather than `[]`, the Offering comes back unplaced, and this names why.
+     *
+     * The three reasons have three different fixes and the solver's output
+     * names none of them: create a virtual Room, reactivate (or re-share) the
+     * pinned Room, or stop asking for two contradictory things at once.
+     */
+    offeringsWithUnsatisfiableRoomRestriction: {
+        id: string;
+        title: string;
+        reason: RoomRestrictionFailure;
+        /** Rooms named by `offering_room`, present in the snapshot or not. */
+        pinnedStored: number;
+        /** How many of those the snapshot actually holds. */
+        pinnedInSnapshot: number;
+        virtualInSnapshot: number;
+    }[];
+    /**
+     * Offerings whose Room restriction leaves fewer Rooms than ONE Session must
+     * occupy simultaneously.
+     *
+     * A DEFINITE impossibility, the same class as
+     * `offeringsNeedingMoreRoomsThanExist` — which compares against the whole
+     * snapshot and would keep quietly passing an Offering pinned to one Room
+     * but needing two. Both entries stay: they answer different questions
+     * ("the institution has too few Rooms" vs "you narrowed it too far"), and
+     * the second is the one somebody can act on today.
+     */
+    offeringsWithRestrictionBelowRoomCount: { id: string; title: string; available: number; needs: number }[];
+    /**
+     * GROUPS WHOSE ONLINE-SHARE CAP IS UNREACHABLE BECAUSE THE TEACHING IS
+     * FORCED ONLINE.
+     *
+     * `max_online_ratio_per_group` is HARD, so a group over its cap comes back
+     * as a residual `MaxOnlineShare` violation. That reads as a placement
+     * somebody can fix, and for these groups it is not one: an Offering whose
+     * Room restriction permits virtual Rooms only has no on-site placement to
+     * be moved to, so once its demand alone exceeds the cap no arrangement of
+     * anything can satisfy the rule.
+     *
+     * REPORTED, NOT NARROWED: the rule still crosses the wire as configured and
+     * the run still comes back with its violation. This says WHY, naming the
+     * groups and the Offerings, so the reviewer reads "these lessons must be
+     * placed online" rather than "the solver broke a hard rule". The
+     * distinction cannot be drawn on the solver's side — `MaxOnlineShare`
+     * reaches it as a ratio and a window, and its violation names neither a
+     * Session nor an Offering. See `onlineShareFloor.ts`.
+     */
+    groupsWithForcedOnlineAboveShareCap: ForcedOnlineOverCap[];
+    /**
+     * A pinned Room that never reaches the wire: inactive, or not visible in
+     * this snapshot at all (deleted, or federation-owned and out of reach).
+     *
+     * Reported per Room rather than per Offering because the fix is per Room,
+     * and reported even when other pinned Rooms survive: silently shrinking an
+     * allow-list is how a pin that was a real choice becomes a narrower one
+     * nobody made. When it shrinks to ZERO,
+     * `offeringsWithUnsatisfiableRoomRestriction` says so as well.
+     */
+    pinnedRoomsNotSent: { id: string; title: string; roomId: string; reason: 'inactive' | 'absent' }[];
+    /**
+     * A Room restriction that survives, but whose Rooms cannot meet the
+     * Offering's OWN capacity or feature requirements.
+     *
+     * The combination that makes this likely is not one person's mistake:
+     * somebody pins the room, somebody else later raises `requiredCapacity` or
+     * attaches equipment, and no screen shows the two together. Capacity is
+     * SUMMED across `requiredRoomCount` Rooms, matching `convert.rs`; features
+     * are required of EACH Room, also matching it.
+     *
+     * Reported per SERIES (the wire id), not per Offering: a split Offering
+     * derives its capacity per Group, so one series can be too big for the
+     * pinned room while its siblings fit.
+     */
+    offeringsWithNoSuitablePinnedRoom: {
+        id: string;
+        title: string;
+        reason: 'capacity' | 'features';
+        /** Rooms the restriction leaves. */
+        available: number;
+        minCapacity: number;
+        /** Best capacity reachable from the restricted set, summed over `requiredRoomCount`. */
+        bestCapacity: number;
     }[];
     /**
      * Offerings with no establishable capacity requirement. Sent with
@@ -731,6 +827,11 @@ export async function assembleSolverInput(
             groups: true,
             lecturers: true,
             equipment: { include: { equipment: true } },
+            // The ROOM PIN (issue #123). Ids only: everything the resolution
+            // needs about a Room comes from `roomRows`, which is the set
+            // actually being sent, so joining the Room here would invite a
+            // check against a Room the solver never sees.
+            pinnedRooms: { select: { roomId: true } },
         },
     });
     const sessionRows = await tx.session.findMany({
@@ -767,6 +868,36 @@ export async function assembleSolverInput(
     const federationOfferings = await tx.offering.count({
         where: { federationId: { not: null }, tenantId: null, termId: term.id, isActive: true },
     });
+
+    /**
+     * PINNED ROOMS THAT WILL NOT BE SENT, classified.
+     *
+     * `roomRows` differs from this query by exactly one clause (`isActive`), so
+     * a pinned Room this finds and `roomRows` does not is INACTIVE, and one
+     * neither finds is ABSENT: deleted, or federation-owned and out of this
+     * tenant's reach. Two states with two different fixes, which is why they
+     * are distinguished rather than both reported as "gone".
+     *
+     * Run once for the whole assembly rather than per Offering: pins overlap
+     * heavily (a department pins the same three halls on twenty Offerings).
+     */
+    const pinnedRoomIdsInUse = [...new Set(
+        offeringRows.flatMap((offering) => offering.pinnedRooms.map((link) => link.roomId)),
+    )];
+    const pinnedRoomsAnyState = pinnedRoomIdsInUse.length
+        ? await tx.room.findMany({
+            where: {
+                id: { in: pinnedRoomIdsInUse },
+                OR: [
+                    { tenantId: options.tenantId },
+                    { tenantId: null, federationId: { not: null } },
+                ],
+            },
+            select: { id: true },
+        })
+        : [];
+    /** Pinned Rooms that EXIST and are visible here, active or not. */
+    const visiblePinnedRoomIds = new Set(pinnedRoomsAnyState.map((room) => room.id));
 
     /*
      * NO `as Room` HERE, deliberately. This literal used to end `} as Room`,
@@ -826,6 +957,31 @@ export async function assembleSolverInput(
          * `MinimizeSpecializedRoomUse` constraint exists to read it.
          */
         isSpecialized: false,
+        /*
+         * SHARED PHYSICAL FOOTPRINTS, which this app cannot express yet.
+         *
+         * The field (proto 0.17.0, solver ADR-0022's second half) says that two
+         * Room IDENTITIES occupy one physical space: a divisible hall listed as
+         * "A", "B" and "A+B" carries a tag shared between the parts and the
+         * whole, and the solver then refuses to place Sessions in both at once.
+         * Membership is a shared tag rather than a directed reference, so
+         * "A blocks B" and "B blocks A" cannot drift apart.
+         *
+         * EMPTY IS BEHAVIOUR-PRESERVING, NOT A GUESS, which is the only reason
+         * it is acceptable here: the proto states that "a tag only one Room
+         * carries is naturally inert", so no tags at all means no footprint
+         * blocking, exactly what the solver did before the field existed. This
+         * is the `site`/`isSpecialized` treatment above, for the same reason.
+         *
+         * A TRACKED GAP, not a finished field. There is no column, relation or
+         * UI for it: a tenant with a divisible hall cannot say so, and the
+         * solver will happily book both halves at once. Landing it means a
+         * Room-side model first, and note the proto REFUSES a tag on a virtual
+         * Room at conversion (a virtual room has no physical footprint), so the
+         * write boundary has to enforce that rather than the assembler
+         * discovering it as a run failure.
+         */
+        footprintTags: [],
     }));
 
     /**
@@ -849,6 +1005,43 @@ export async function assembleSolverInput(
             bestRoomQuantity.set(key, Math.max(bestRoomQuantity.get(key) ?? 0, link.quantity));
         }
     }
+
+    /**
+     * The Rooms this run is actually about, reduced to what a Room RESTRICTION
+     * depends on (issue #123). Built from `roomRows`, never from the tenant's
+     * whole estate: an allow-list resolved against Rooms the solver will not
+     * see is an answer to a different question, and the one way to get this
+     * wrong.
+     */
+    const roomFacts = roomRows.map((room) => ({ id: room.id, isVirtual: room.isVirtual }));
+    const sentRoomIds = new Set(roomFacts.map((room) => room.id));
+
+    /**
+     * DERIVED EVERY RUN FROM `Room.isVirtual`, never persisted and never a
+     * well-known id: nothing restricts a tenant to one virtual Room, and one
+     * created next week must count for an Offering that already asked to be
+     * online. The same flag `resolveRoomRestriction` and `violations.ts` key on.
+     */
+    const virtualRoomIds = new Set(roomFacts.filter((room) => room.isVirtual).map((room) => room.id));
+
+    /**
+     * Per-Room capacity and features, for judging whether a surviving
+     * restriction can meet the Offering's own requirements.
+     *
+     * `UNBOUNDED_ROOM_CAPACITY` applied here for the same reason the wire
+     * applies it: a Room measured at 0 is unmeasured, not tiny, and comparing
+     * against the raw column would report every virtual Room as too small for
+     * everything.
+     */
+    const roomProfile = new Map(roomRows.map((room) => [room.id, {
+        capacity: room.capacity === 0 ? UNBOUNDED_ROOM_CAPACITY : room.capacity,
+        features: new Set(room.roomEquipment.map((link) => link.equipment.key)),
+        quantities: new Map(
+            room.roomEquipment
+                .filter((link) => link.quantity !== null)
+                .map((link) => [link.equipment.key, link.quantity!]),
+        ),
+    }]));
 
     /**
      * Only the Groups this Term's problem can involve: what the Offerings and
@@ -1073,6 +1266,10 @@ export async function assembleSolverInput(
         id: string; title: string; members: number; expected: number;
     }[] = [];
     const offeringsWithInsufficientLecturers: AssemblyReport['offeringsWithInsufficientLecturers'] = [];
+    const offeringsWithUnsatisfiableRoomRestriction: AssemblyReport['offeringsWithUnsatisfiableRoomRestriction'] = [];
+    const offeringsWithRestrictionBelowRoomCount: AssemblyReport['offeringsWithRestrictionBelowRoomCount'] = [];
+    const pinnedRoomsNotSent: AssemblyReport['pinnedRoomsNotSent'] = [];
+    const offeringsWithNoSuitablePinnedRoom: AssemblyReport['offeringsWithNoSuitablePinnedRoom'] = [];
 
     /**
      * Fetched ONCE for the whole assembly: every Offering's closure is walked
@@ -1103,6 +1300,17 @@ export async function assembleSolverInput(
 
     /** Wire id -> the real Offering id, for the scope the app keeps. */
     const realOfferingIdOf = new Map<string, string>();
+
+    /**
+     * Wire id -> what the online-share floor needs and the wire Offering does
+     * not carry: a human-readable title, and whether every placement of this
+     * series is forced online.
+     *
+     * Populated in the same loop that builds `offerings`, so a series can never
+     * exist in one and not the other. See `onlineShareFloor.ts` for what it is
+     * for; the check itself runs below, once the constraints are assembled.
+     */
+    const wireOfferingFacts = new Map<string, { title: string; forcedOnline: boolean }>();
 
     /**
      * BANKED SESSIONS, GROUPED BY OFFERING (issue #22). A banked Session
@@ -1147,6 +1355,93 @@ export async function assembleSolverInput(
                     bestAvailable: best,
                 });
             }
+        }
+
+        /**
+         * WHICH ROOMS THIS OFFERING MAY USE — the ONE call site (issue #123).
+         *
+         * A ROOM PIN (`offering_room`) and `onlineMode = REQUIRED` write the
+         * SAME wire field, so composing them at two call sites is how they come
+         * to disagree. Both rules — REQUIRED plus a pin INTERSECT, and an empty
+         * result is an ERROR rather than an empty wire list — live in
+         * `resolveRoomRestriction` (`server/utils/offeringRooms.ts`), which
+         * `violations.ts` calls for a single manual placement, so a move the UI
+         * warns about and a placement the solver refuses can never be different
+         * questions.
+         *
+         * PER OFFERING, NOT PER SERIES, and deliberately outside the
+         * `seriesGroups.map` below: the pin and the online mode are properties
+         * of the Offering, so a split would resolve the identical restriction
+         * once per Group and report it that many times.
+         */
+        const restriction = resolveRoomRestriction(
+            {
+                onlineMode: offering.onlineMode,
+                pinnedRoomIds: offering.pinnedRooms.map((link) => link.roomId),
+            },
+            roomFacts,
+        );
+
+        /**
+         * NO ON-SITE PLACEMENT EXISTS FOR THIS OFFERING.
+         *
+         * Read off `permittedRoomIds`, the composed answer, rather than off
+         * `onlineMode`: an Offering pinned to virtual Rooms alone is forced
+         * online just as surely as one marked `REQUIRED`, and asking the field
+         * instead of the composition is how the pin and the mode come to
+         * disagree — the whole reason `resolveRoomRestriction` exists.
+         *
+         * A `failure` is excluded deliberately: that Offering ships
+         * `NO_ELIGIBLE_ROOM_ID` and comes back unplaced, so it contributes no
+         * online session to count, and `offeringsWithUnsatisfiableRoomRestriction`
+         * already names it with the fix it actually needs.
+         */
+        const forcedOnline = restriction.failure === null
+            && restriction.permittedRoomIds !== null
+            && restriction.permittedRoomIds.length > 0
+            && restriction.permittedRoomIds.every((roomId) => virtualRoomIds.has(roomId));
+
+        for (const link of offering.pinnedRooms) {
+            if (sentRoomIds.has(link.roomId)) {
+                continue;
+            }
+
+            pinnedRoomsNotSent.push({
+                id: offering.id,
+                title: offering.title,
+                roomId: link.roomId,
+                // Two states, two fixes: reactivate the Room, or work out where
+                // it went. See `visiblePinnedRoomIds`.
+                reason: visiblePinnedRoomIds.has(link.roomId) ? 'inactive' : 'absent',
+            });
+        }
+
+        if (restriction.failure) {
+            offeringsWithUnsatisfiableRoomRestriction.push({
+                id: offering.id,
+                title: offering.title,
+                reason: restriction.failure.reason,
+                pinnedStored: restriction.failure.pinnedStored,
+                pinnedInSnapshot: restriction.failure.pinnedInSnapshot,
+                virtualInSnapshot: restriction.failure.virtualInSnapshot,
+            });
+        } else if (
+            restriction.permittedRoomIds !== null
+            && restriction.allowedRoomIds.length > 0
+            && restriction.allowedRoomIds.length < offering.requiredRoomCount
+        ) {
+            /*
+             * Only when a restriction was actually STATED
+             * (`allowedRoomIds` non-empty): with no pin and no required-online
+             * the honest comparison is against the whole snapshot, which
+             * `offeringsNeedingMoreRoomsThanExist` already makes.
+             */
+            offeringsWithRestrictionBelowRoomCount.push({
+                id: offering.id,
+                title: offering.title,
+                available: restriction.allowedRoomIds.length,
+                needs: offering.requiredRoomCount,
+            });
         }
 
         const groupIds = offering.groups.map((link) => link.groupId);
@@ -1203,6 +1498,7 @@ export async function assembleSolverInput(
                 : wireOfferingId(offering.id, seriesGroupId);
 
             realOfferingIdOf.set(wireId, offering.id);
+            wireOfferingFacts.set(wireId, { title: offering.title, forcedOnline });
 
             // Reported per SERIES, since each has its own requirement and one
             // series can be underivable while its siblings are fine.
@@ -1226,6 +1522,62 @@ export async function assembleSolverInput(
                     required: offering.requiredLecturerCount,
                     available: offering.lecturers.length,
                 });
+            }
+
+            const minCapacity = offering.requiredCapacity ?? derived?.capacity ?? 0;
+
+            /*
+             * CAN THE SURVIVING RESTRICTION ACTUALLY HOST THIS SERIES?
+             *
+             * Only asked when a restriction was stated and survived: with no
+             * pin and no required-online, "no Room is big enough" is a fact
+             * about the institution, not about a narrowing somebody typed, and
+             * the run's own hard violations say it just as well.
+             *
+             * MIRRORS `individually_eligible` in `convert.rs`, both halves:
+             * features (presence AND quantity) are required of EACH Room, while
+             * capacity is SUMMED across `requiredRoomCount` of them. Getting
+             * either the other way round would report a healthy pin as broken,
+             * which is worse than not reporting: a false alarm here trains
+             * people to ignore the whole report.
+             */
+            if (restriction.failure === null && restriction.allowedRoomIds.length > 0) {
+                const profiles = restriction.allowedRoomIds
+                    .map((roomId) => roomProfile.get(roomId))
+                    .filter((profile): profile is NonNullable<typeof profile> => profile !== undefined);
+
+                const featureEligible = profiles.filter((profile) => (
+                    offering.equipment.every((link) => (
+                        profile.features.has(link.equipment.key)
+                        && (link.quantity === null || (profile.quantities.get(link.equipment.key) ?? 0) >= link.quantity)
+                    ))
+                ));
+
+                const bestCapacity = featureEligible
+                    .map((profile) => profile.capacity)
+                    .sort((a, b) => b - a)
+                    .slice(0, offering.requiredRoomCount)
+                    .reduce((sum, capacity) => sum + capacity, 0);
+
+                if (featureEligible.length === 0) {
+                    offeringsWithNoSuitablePinnedRoom.push({
+                        id: wireId,
+                        title: offering.title,
+                        reason: 'features',
+                        available: restriction.allowedRoomIds.length,
+                        minCapacity,
+                        bestCapacity: 0,
+                    });
+                } else if (bestCapacity < minCapacity) {
+                    offeringsWithNoSuitablePinnedRoom.push({
+                        id: wireId,
+                        title: offering.title,
+                        reason: 'capacity',
+                        available: restriction.allowedRoomIds.length,
+                        minCapacity,
+                        bestCapacity,
+                    });
+                }
             }
 
             return {
@@ -1257,10 +1609,21 @@ export async function assembleSolverInput(
             requiredRoomFeatures: offering.equipment.map((link) => link.equipment.key),
             // 0 only when genuinely underivable, and that case is reported
             // above rather than passing as "no requirement".
-            minCapacity: offering.requiredCapacity ?? derived?.capacity ?? 0,
-            // Empty = any eligible Room. The app has no allow-list.
-            allowedRoomIds: [],
-            allowOnline: offering.allowOnline,
+            minCapacity,
+            /*
+             * THE ALLOW-LIST, at last (issue #123). This was `[]` with the
+             * comment "the app has no allow-list" for as long as the capability
+             * was live in the solver and unreachable from here.
+             *
+             * EMPTY STILL MEANS "ANY ELIGIBLE ROOM", which is why neither value
+             * here is computed inline: an Offering that STATED a restriction and
+             * whose restriction resolves to nothing must never send `[]`, or
+             * "must be online" ships as "anywhere at all". `resolveRoomRestriction`
+             * owns that distinction; both fields come from the same call so the
+             * pair cannot disagree.
+             */
+            allowedRoomIds: restriction.allowedRoomIds,
+            allowOnline: restriction.allowOnline,
             /*
              * The DEMAND side of equipment counts, and only the links that state
              * one. A link with a NULL quantity is already fully expressed by
@@ -1499,6 +1862,52 @@ export async function assembleSolverInput(
         constraints.push(mapped.config);
     }
 
+    /**
+     * THE ONLINE-SHARE FLOOR, read off what was actually SENT.
+     *
+     * `constraints` and `offerings`, not `constraintRows` and `offeringRows`:
+     * the answer has to be about the input the solver will evaluate, so a rule
+     * skipped above (scoped to another grid, missing a parameter) must not be
+     * checked here, and a split Offering must be counted per series exactly as
+     * the solver counts it. Deriving either from the source rows would produce
+     * a warning about a run that was never made.
+     *
+     * `groups` carries the wire's `''`-for-no-parent convention, and the
+     * downward expansion happens inside: the solver derives the closure from
+     * `parent_id` too, so both sides answer from the same tree.
+     */
+    const shareCapRules: ShareCapRule[] = constraints
+        .filter((config) => config.maxOnlineShare !== undefined)
+        .map((config) => ({
+            constraintId: config.id,
+            maxRatio: config.maxOnlineShare!.maxRatio,
+            perWeek: config.maxOnlineShare!.window === ShareWindow.SHARE_WINDOW_PER_WEEK,
+            appliesToKinds: config.appliesToKinds,
+        }));
+
+    const shareCapOfferings: ShareCapOffering[] = offerings.map((offering) => {
+        // Present for every wire id by construction: written in the loop that
+        // built `offerings`. The fallback keeps a series countable rather than
+        // dropping it, which would under-state the denominator — the direction
+        // that invents a breach.
+        const facts = wireOfferingFacts.get(offering.id);
+
+        return {
+            id: offering.id,
+            title: facts?.title ?? offering.id,
+            kind: offering.kind,
+            groupIds: offering.groupIds,
+            requiredSessionCount: offering.requiredSessionCount,
+            forcedOnline: facts?.forcedOnline ?? false,
+        };
+    });
+
+    const groupsWithForcedOnlineAboveShareCap = forcedOnlineAboveShareCap(
+        shareCapRules,
+        shareCapOfferings,
+        groups,
+    );
+
     const calendar = buildAcademicCalendar(
         term.id,
         term.startDate,
@@ -1686,6 +2095,11 @@ export async function assembleSolverInput(
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
             offeringsWithInsufficientLecturers,
+            offeringsWithUnsatisfiableRoomRestriction,
+            offeringsWithRestrictionBelowRoomCount,
+            groupsWithForcedOnlineAboveShareCap,
+            pinnedRoomsNotSent,
+            offeringsWithNoSuitablePinnedRoom,
             personsWithHeavyVetoLoad,
             offeringsSplitByGroup,
             legacyCombinedSessionsOmitted,

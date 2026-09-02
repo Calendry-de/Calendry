@@ -220,6 +220,24 @@ export function supportTiers(t: Translate): SupportTierCopy[] {
 
 export const ADMIN_SEAT_FEE = 350;
 
+/**
+ * German statutory VAT, as a fraction.
+ *
+ * EVERY OTHER NUMBER IN THIS MODULE IS OURS AND THIS ONE IS NOT: it is set by
+ * the legislature, not by a pricing decision, which is why it sits alone here
+ * rather than in a band table and why changing it is never a judgement call.
+ * Software licensed to an institution is standard-rated; the reduced rate and
+ * the teaching exemption in section 4 no. 21 UStG both cover teaching
+ * SERVICES, which is not what is sold here.
+ *
+ * DOMESTIC ONLY, deliberately. A customer with a VAT id outside Germany would
+ * be invoiced under the reverse-charge procedure with no VAT at all, and the
+ * calculator does not ask where the institution is, so it cannot know. It is a
+ * planning tool for a German buyer and the page says so; an invoice is a
+ * different artefact and is not generated from this module.
+ */
+export const VAT_RATE = 0.19;
+
 /** Everything the calculator lets a visitor set. */
 export interface PriceInput {
     students: number;
@@ -265,6 +283,25 @@ export interface PriceResult {
      */
     subtotal: number;
     total: number;
+    /**
+     * VAT on `total`, rounded to the euro.
+     *
+     * ROUNDED ONCE, HERE, for the same reason `lecturerTotal` is: the printed
+     * net, the printed VAT and the printed gross have to add up on screen, and
+     * a fraction of a cent surviving into `gross` is a price that looks like it
+     * cannot do arithmetic.
+     */
+    vat: number;
+    /**
+     * `total` plus `vat`: what a German institution is actually invoiced.
+     *
+     * A SEPARATE FIELD RATHER THAN A REPLACEMENT FOR `total`. `total` is the
+     * net annual price and stays the headline figure, because that is the
+     * number an institution budgets with and the number every published rate
+     * table states; a page whose calculator answered gross while its tables
+     * answered net would be two different prices under one argument.
+     */
+    gross: number;
 }
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
@@ -348,6 +385,8 @@ export function resolveSupportTier(id: SupportTierId): SupportTier {
  * The one-time onboarding fee is deliberately absent: it is billed separately
  * and folding it into an annual figure would overstate year one and understate
  * every year after.
+ *
+ * VAT IS COMPUTED BUT NOT ADDED TO `total`, which stays net. See `gross`.
  */
 export function computePrice(input: PriceInput): PriceResult {
     const baseTier = resolveBaseTier(input.students);
@@ -382,6 +421,8 @@ export function computePrice(input: PriceInput): PriceResult {
 
     const subtotal = lines.reduce((sum, line) => sum + line.amount, 0);
 
+    const vat = Math.round(subtotal * VAT_RATE);
+
     return {
         baseTier,
         complexityScore: score,
@@ -392,6 +433,8 @@ export function computePrice(input: PriceInput): PriceResult {
         lines,
         subtotal,
         total: subtotal,
+        vat,
+        gross: subtotal + vat,
     };
 }
 
@@ -534,6 +577,23 @@ export function formatEuro(amount: number, locale: string): string {
     return formatNumber(Math.round(amount), locale, {
         style: 'currency',
         currency: 'EUR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+    });
+}
+
+/**
+ * `19%` for an English reader, `19 %` for a German one.
+ *
+ * `Intl` again, and for the same reason `formatEuro` is: the space before the
+ * sign is not optional in German typography and is not present in English, and
+ * a `${ rate * 100 }%` template gets one of the two readers wrong. Takes the
+ * fraction, not the percentage, so the call site cannot drift from `VAT_RATE`
+ * by multiplying it twice.
+ */
+export function formatPercent(fraction: number, locale: string): string {
+    return formatNumber(fraction, locale, {
+        style: 'percent',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     });

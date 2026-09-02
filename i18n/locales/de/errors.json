@@ -31,5 +31,17 @@
     },
     "schedule": {
         "denied": "Sie haben keine Berechtigung, den Stundenplan zu sehen. Erforderlich ist session.read (alle Termine) oder session.read_own (nur die eigenen)."
+    },
+    "page": {
+        "notFound": {
+            "title": "Diese Seite gibt es hier nicht",
+            "detail": "Der Link ist vielleicht veraltet, oder die Seite hat nie existiert. Auf Ihrer Seite ist nichts kaputt."
+        },
+        "unexpected": {
+            "title": "Bei uns ist etwas schiefgegangen",
+            "detail": "Die Seite konnte nicht dargestellt werden. An dem, was Sie gerade getan haben, wurde nichts verändert."
+        },
+        "action": "Zurück zum Anfang",
+        "code": "Fehler {code}"
     }
 }

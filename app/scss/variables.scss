@@ -156,31 +156,60 @@ $landingBarClearance: 96px;
  * Keyframes live in tokens-root.scss; see the note there for why they are not
  * in this mixin.
  */
-@mixin landingReveal($shift: 12px) {
+@mixin landingReveal($shift: 64px, $blur: 12px, $order: 0) {
+    /*
+     * `$order` STAGGERS SIBLINGS THAT SHARE A SCROLL POSITION. Two panels side
+     * by side cross `entry 0%` on the same frame, so they arrive together,
+     * which reads as one block appearing rather than as a sequence. There is
+     * no `animation-delay` to reach for: a view() timeline is driven by scroll
+     * position, not by time, so the offset has to be expressed in the range
+     * itself. Each step pushes BOTH ends of the range 6% further into the
+     * scroll, so a later sibling starts later and still travels exactly the
+     * same distance over exactly the same span; moving only the start would
+     * make it travel faster to catch up.
+     *
+     * 6% of the scrollport is the smallest offset that reads as a sequence
+     * rather than as a timing bug at ordinary scroll speeds. Siblings that
+     * enter at DIFFERENT scroll positions (rows in a list) need none of this:
+     * their own geometry already staggers them, which is why every existing
+     * caller leaves this at 0.
+     */
+    $revealStart: $order * 6%;
+
     @media (prefers-reduced-motion: no-preference) {
         @supports (animation-timeline: view()) {
             --reveal-shift: #{$shift};
+            --reveal-blur: #{$blur};
 
             animation: landingReveal 1ms linear both;
             animation-timeline: view();
 
-            // Finishes well before the element reaches the middle of the screen:
-            // a reveal still running under the reader's eye is a distraction, not
-            // an entrance.
-            animation-range: entry 5% cover 20%;
+            /*
+             * Finishes well before the element reaches the middle of the
+             * screen: a reveal still running under the reader's eye is a
+             * distraction, not an entrance.
+             *
+             * Widened from `entry 5% cover 20%` when the travel went from 12px
+             * to the system's 64px and gained a blur. The old range was tuned
+             * to a nudge; the same range applied to eight times the distance
+             * makes the element arrive at speed, which reads as a jump rather
+             * than as mass.
+             */
+            animation-range: entry $revealStart cover (30% + $revealStart);
         }
     }
 
     /*
      * PRINT HAS NO SCROLLPORT, so a view() timeline has nothing to resolve
      * against and the element can print at its 0%-opacity start state. Everything
-     * below the first page would come out blank. This is not hypothetical for
+     * below the first page would come out blank, and now also blurred. This is not hypothetical for
      * this page in particular: it is the page somebody prints to PDF for a
      * procurement pack.
      */
     @media print {
         transform: none;
         opacity: 1;
+        filter: none;
         animation: none;
     }
 }

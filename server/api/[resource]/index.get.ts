@@ -46,13 +46,30 @@ defineRouteMeta({
     openAPI: {
         tags: ['Resources'],
         summary: 'List rows of a core entity',
-        description: 'Generic list route for the core entities (permission <resource>.read). THE RESPONSE SHAPE SWITCHES ON limit: without it the body is a bare array of rows; with it the body is { rows, total }. Each resource additionally accepts its own equality filters (e.g. offerings takes termId, persons takes isActive and email); an unsupported parameter is a 400, never silently ignored. Federation-ownable resources (rooms, equipment, offerings) also surface rows shared into the federation.',
+        description: 'Generic list route for the core entities (permission <resource>.read). THE RESPONSE SHAPE SWITCHES ON limit: without it the body is a bare array of rows; with it the body is { rows, total }. Each resource additionally accepts only the filters listed below whose description names it; an unsupported parameter is a 400, never silently ignored. Two of them are not equality: rooms/minCapacity is a lower bound, and groups/termId returns the groups scoped to that term AND every group carrying no scope at all. Federation-ownable resources (rooms, equipment, offerings) also surface rows shared into the federation.',
         parameters: [
             { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 200 }, description: 'Presence switches the response shape to { rows, total }.' },
             { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
             { name: 'q', in: 'query', schema: { type: 'string' }, description: 'Case-insensitive text search over the resource declared search fields. 400 on a resource without any.' },
             { name: 'ids', in: 'query', schema: { type: 'string' }, description: 'Comma-separated ids to resolve exactly these rows (max 200). An empty value is a 400, never a full dump.' },
+
+            // Per-resource equality filters. Each one is accepted ONLY by the
+            // resources named in its description: sending it to any other
+            // resource is a 400, not a silently ignored parameter.
+            { name: 'isActive', in: 'query', schema: { type: 'boolean' }, description: 'persons, rooms, offerings.' },
+            { name: 'email', in: 'query', schema: { type: 'string' }, description: 'persons.' },
+            { name: 'key', in: 'query', schema: { type: 'string' }, description: 'roles, equipment, session-kinds, access-roles.' },
+            { name: 'parentGroupId', in: 'query', schema: { type: 'string' }, description: 'groups.' },
+            { name: 'termId', in: 'query', schema: { type: 'string' }, description: 'groups (SCOPED-OR-UNIVERSAL: returns the groups scoped to this term AND every group carrying no scope at all, because no group_term row means every term), offerings and calendar-periods (equality).' },
+            { name: 'isVirtual', in: 'query', schema: { type: 'boolean' }, description: 'rooms.' },
+            { name: 'minCapacity', in: 'query', schema: { type: 'integer' }, description: 'rooms; capacity >= this value, not equality.' },
+            { name: 'kindId', in: 'query', schema: { type: 'string' }, description: 'offerings, offering-templates.' },
+            { name: 'isDefault', in: 'query', schema: { type: 'boolean' }, description: 'time-grids.' },
+            { name: 'kind', in: 'query', schema: { type: 'string', enum: ['HOLIDAY', 'BREAK', 'EXAM'] }, description: 'calendar-periods.' },
+            { name: 'type', in: 'query', schema: { type: 'string' }, description: 'constraints; a key from the constraint-type catalogue.' },
+            { name: 'severity', in: 'query', schema: { type: 'string', enum: ['HARD', 'SOFT'] }, description: 'constraints.' },
+            { name: 'isEnabled', in: 'query', schema: { type: 'boolean' }, description: 'constraints.' },
         ],
         responses: {
             200: { description: 'Without limit: a bare array of rows. With limit: { rows: [...], total: number }.' },

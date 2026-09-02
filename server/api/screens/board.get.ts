@@ -1,3 +1,4 @@
+import { SCREEN_MODE_PATHS } from '../../../shared/screenKey';
 import { blockSpan } from '../../../shared/timeGrid';
 import { isoWeekday, weekIndexOf } from '../../../shared/academicCalendar';
 import { isPlacedSession } from '../../../shared/sessionPlacement';
@@ -57,6 +58,23 @@ export default defineEventHandler(async (event) => {
             // than `=== 'account'` so a principal added later is gated here by
             // default instead of slipping through unchecked.
             await requirePermission(event, tx, 'session.read');
+        }
+
+        if (identity.kind === 'screen' && identity.mode !== 'ROOM_BOARD') {
+            /*
+             * THE MODE IS ENFORCED, not merely stored (issue #31). A key
+             * belonging to a substitution-plan screen is refused BY NAME, with
+             * the address that would work, rather than being served a room
+             * board it was never meant to draw: a wall showing the wrong board
+             * confidently is the failure nobody walking past can diagnose.
+             * `mode: null` (a stored value this version does not recognise)
+             * lands here too, rather than defaulting into this board.
+             */
+            throw createError({
+                statusCode: 409,
+                message: `This screen is not configured as a room board. Open it at ${SCREEN_MODE_PATHS.SUBSTITUTION_PLAN} instead.`,
+                data: { mode: identity.mode, openAt: SCREEN_MODE_PATHS.SUBSTITUTION_PLAN },
+            });
         }
 
         const now = new Date();

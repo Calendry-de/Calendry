@@ -50,6 +50,47 @@
             </ul>
 
             <!--
+                THE PART OF THAT COUNT NOBODY CAN ACT ON.
+
+                A group whose forced-online teaching alone exceeds its online
+                share cap breaches the rule whatever the solver does: there is
+                no on-site placement for those sessions to move to. Said HERE,
+                inside the risk block, rather than as a fact of its own, because
+                it is not a separate problem: it explains a line of the list
+                directly above it.
+            -->
+            <div
+                v-if="forcedOnlineCaps.length > 0"
+                class="rev_forced"
+            >
+                <p class="rev_forced-head">{{ t('schedule.reviewSummary.forcedOnlineHead', {
+                    count: forcedOnlineCaps.length,
+                }, forcedOnlineCaps.length) }}</p>
+
+                <ul class="rev_forced-list">
+                    <li
+                        v-for="cap in forcedOnlineCaps"
+                        :key="`${cap.constraintId}:${cap.groupId}`"
+                    >
+                        {{ t('schedule.reviewSummary.forcedOnlineGroup', {
+                            group: cap.groupName,
+                            forced: cap.forcedOnline,
+                            total: cap.total,
+                            percent: Math.round(cap.maxRatio * 100),
+                        }) }}
+                        <span class="rev_forced-why">{{ t(
+                            cap.window === 'PER_WEEK'
+                                ? 'schedule.reviewSummary.forcedOnlineWeek'
+                                : 'schedule.reviewSummary.forcedOnlineTerm',
+                            { offerings: cap.offerings.map((o) => o.title).join(', ') },
+                        ) }}</span>
+                    </li>
+                </ul>
+
+                <p>{{ t('schedule.reviewSummary.forcedOnlineFix') }}</p>
+            </div>
+
+            <!--
                 Reported, never netted out: these name Sessions the solver
                 invented under a synthetic key that appears nowhere in the
                 placements, so no row can be pointed at.
@@ -253,6 +294,13 @@ const props = defineProps<{
     run: ReviewPreview['run'];
     /** What the run asked for against what it answered. Absent on an older payload. */
     demand?: ReviewPreview['demand'];
+    /**
+     * Groups whose online-share cap this run could not have met, whatever it
+     * placed. `null` is a run from before the check existed, `[]` a run that
+     * was checked and found nothing: both render nothing, but only the second
+     * is a statement.
+     */
+    forcedOnlineOverCap?: ReviewPreview['forcedOnlineOverCap'];
     /** READY, so "they re-run after applying" is a true statement about a future. */
     decidable: boolean;
 }>();
@@ -302,6 +350,14 @@ const toRows = (byType: Record<string, number>) => Object.entries(byType)
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 
 const proposedTypes = computed(() => toRows(props.violations.proposed.byType));
+
+/**
+ * `null` (unchecked) and `[]` (checked, nothing found) both collapse to an
+ * empty list HERE and nowhere earlier: the payload keeps them apart so a future
+ * "this run predates the check" note has the state it needs, while this
+ * component has one thing to render and one condition to render it under.
+ */
+const forcedOnlineCaps = computed(() => props.forcedOnlineOverCap ?? []);
 
 const locatable = computed(() => (
     props.violations.proposed.sessionReferences - props.violations.proposed.unmappable
@@ -461,6 +517,44 @@ const locatable = computed(() => (
         border-top: 1px solid $surface5;
         font-size: var(--font-size-sm);
         color: $content6;
+    }
+
+    /*
+     * ONE RULE ABOVE THE WHOLE EXPLANATION, not one per paragraph. `_note`
+     * carries its own top border, so reusing it for the head and the fix line
+     * drew two rules through a single argument and split it into three
+     * unrelated remarks.
+     */
+    &_forced {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+
+        padding-top: var(--space-4);
+        border-top: 1px solid $surface5;
+
+        font-size: var(--font-size-sm);
+        line-height: var(--leading-prose);
+        color: $content6;
+    }
+
+    &_forced-head {
+        color: $content1;
+    }
+
+    &_forced-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2);
+
+        font-variant-numeric: tabular-nums;
+        list-style: none;
+    }
+
+    // The offerings, named: "which lessons" is the only part of this a human
+    // can go and change.
+    &_forced-why {
+        color: $content2;
     }
 
     &_compare {

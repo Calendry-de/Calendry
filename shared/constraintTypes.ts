@@ -38,6 +38,7 @@ export type StructuralConstraintType = (typeof STRUCTURAL_CONSTRAINT_TYPES)[numb
 export const PER_SESSION_CONSTRAINT_TYPES = [
     'no_session_spanning_break',
     'no_unplaced_session',
+    'no_session_outside_allowed_room',
 ] as const;
 
 export type PerSessionConstraintType = (typeof PER_SESSION_CONSTRAINT_TYPES)[number];
@@ -546,6 +547,38 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * `refreshViolations()`'s per-session pass still knows this type, so
          * `move.post.ts` re-placing the Session (the only restore path) clears
          * the row the same way it clears any other structural violation.
+         */
+        severity: 'HARD',
+        params: [],
+    },
+
+    {
+        key: 'no_session_outside_allowed_room',
+        category: 'structure',
+        label: 'Sessions must use a room the offering allows',
+        description:
+            'An offering can restrict which rooms may host it: a room PIN ("only these '
+            + 'two lecture halls") and an online mode (forbidden, allowed, or online '
+            + 'only). The solver honours both; a person dragging a session on the grid '
+            + 'can break either. This reports it — warn, never block — so the breach is '
+            + 'listed and counted rather than living only in whoever happened to be '
+            + 'looking.',
+        evaluator: 'app',
+        /*
+         * HARD, like `no_unplaced_session` and unlike `no_session_spanning_break`:
+         * a room outside the allow-list is not a preference the tenant expressed
+         * about where teaching happens, it is teaching happening somewhere the
+         * Offering says it cannot. The solver treats the same restriction as an
+         * absolute eligibility filter (`individually_eligible` in `convert.rs`),
+         * so a SOFT reading here would have the two halves of the product
+         * disagreeing about what the tenant asked for.
+         *
+         * NO WIRE FIELD, deliberately, and this is not the `no_session_spanning_break`
+         * situation where the solver side is simply unbuilt. The restriction ALREADY
+         * crosses the wire, as `Offering.allowed_room_ids` and `Offering.allow_online`
+         * — Offering DATA, not tenant policy — so a constraint carrying it again
+         * would be the same requirement twice, from two sources that can drift.
+         * This type exists only for the half the solver cannot see: a manual edit.
          */
         severity: 'HARD',
         params: [],

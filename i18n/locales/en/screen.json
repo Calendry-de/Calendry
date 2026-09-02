@@ -11,5 +11,24 @@
         "freeLabel": "Free",
         "next": "Next {time} · {title}",
         "nothingElse": "Nothing else today"
+    },
+    "plan": {
+        "fallbackName": "Substitution plan",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "noTerm": "No term is running.",
+        "noSubstitutions": "No substitutions.",
+        "notTeachingDay": "No lessons are scheduled.",
+        "nowLabel": "Now",
+        "change": {
+            "covered": "Covered",
+            "cancelled": "Cancelled",
+            "movedIn": "Moved",
+            "movedAway": "Moved away"
+        },
+        "coveredBy": "Covered by {name}",
+        "insteadOf": "instead of {names}",
+        "wasAt": "was {time}",
+        "movesTo": "now {day}, {time}"
     }
 }

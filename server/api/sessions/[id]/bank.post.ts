@@ -26,10 +26,16 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
  *
  * ONE ROW SURVIVES THE CLEAR: `no_unplaced_session` (shared/constraintTypes.ts)
  * is the exact opposite shape (a fact about the ABSENCE of a placement), so
- * it is written directly here rather than through `refreshViolations()`, which
- * never sees a banked Session at all. `move.post.ts` clears it again the
- * moment this Session is re-placed, the same way it clears any other
- * structural violation.
+ * it is written directly here rather than through `refreshViolations()`.
+ * `move.post.ts` clears it again the moment this Session is re-placed, the
+ * same way it clears any other structural violation.
+ *
+ * That function is not, however, blind to banked Sessions: `apply.post.ts`
+ * rebases every unlocked Offering-linked Session in the term onto the new
+ * Generation and then refreshes all of them, which is exactly the set banking
+ * produces. It detects the SAME `no_unplaced_session` row this route writes,
+ * so an apply neither loses it nor duplicates it. See `SessionRow` in
+ * `server/utils/violations.ts`.
  *
  * WHY LOCKED IS REFUSED RATHER THAN SILENTLY UNLOCKED. `Move…` and `Swap…`
  * both require an unlock first (TAXONOMY.md §3: a lock is the tenant's own

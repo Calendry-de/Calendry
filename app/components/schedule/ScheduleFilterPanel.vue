@@ -1,7 +1,35 @@
 <template>
     <Teleport to="body">
+        <!--
+            `v-show`, NOT `v-if`, and both halves of that matter.
+
+            THE ACCESSIBILITY HALF: the toolbar's toggle carries
+            `aria-controls="schedule-filters-panel"` alongside its
+            `aria-expanded`. Under `v-if` that id referred to nothing at all
+            until the panel was first opened, so a collapsed disclosure
+            announced that it controlled a region that did not exist. A
+            disclosure's controlled region has to BE there, hidden; that is
+            what `aria-expanded="false"` means.
+
+            THE HONESTY HALF: the filters' gating rule ("a filter exists when
+            it has more than one option, never because of a permission") is
+            only observable if the options are in the rendered document.
+            Under `v-if` the panel's markup was absent from server-rendered
+            HTML for EVERY caller, which made "this page does not offer a room
+            filter" true of a page that offers nothing to anybody: exactly the
+            "no data and broken render look identical" failure this codebase
+            keeps re-learning. `tests/schedule-scope.test.ts` reads those
+            options out of the SSR'd page and pairs every absence with the
+            admin's copy; that pairing only means something while the markup
+            is really there.
+
+            Cost is one hidden select group per schedule render; the fields
+            themselves are still gated by `showGroupFilter` and friends, so a
+            caller with nothing to narrow still ships nothing to narrow it
+            with.
+        -->
         <div
-            v-if="open"
+            v-show="open"
             class="fpanel"
             @click.self="close"
         >
@@ -50,11 +78,15 @@
                             class="fpanel_select"
                             :title="selectedName(groups, groupIdModel, t('schedule.filters.allGroups'))"
                         >
-                            <option value="">{{ t('schedule.filters.allGroups') }}</option>
+                            <option
+                                value=""
+                                :selected="!groupIdModel"
+                            >{{ t('schedule.filters.allGroups') }}</option>
                             <option
                                 v-for="group in groups"
                                 :key="group.id"
                                 :value="group.id"
+                                :selected="group.id === groupIdModel"
                             >{{ group.name }}</option>
                         </select>
                     </label>
@@ -80,11 +112,15 @@
                             class="fpanel_select"
                             :title="selectedName(rooms, roomIdModel, t('schedule.filters.allRooms'))"
                         >
-                            <option value="">{{ t('schedule.filters.allRooms') }}</option>
+                            <option
+                                value=""
+                                :selected="!roomIdModel"
+                            >{{ t('schedule.filters.allRooms') }}</option>
                             <option
                                 v-for="room in rooms"
                                 :key="room.id"
                                 :value="room.id"
+                                :selected="room.id === roomIdModel"
                             >{{ room.name }}</option>
                         </select>
                     </label>
@@ -99,11 +135,15 @@
                             class="fpanel_select"
                             :title="selectedName(people, personIdModel, t('schedule.filters.anyone'))"
                         >
-                            <option value="">{{ t('schedule.filters.anyone') }}</option>
+                            <option
+                                value=""
+                                :selected="!personIdModel"
+                            >{{ t('schedule.filters.anyone') }}</option>
                             <option
                                 v-for="person in people"
                                 :key="person.id"
                                 :value="person.id"
+                                :selected="person.id === personIdModel"
                             >{{ person.name }}</option>
                         </select>
                     </label>

@@ -49,6 +49,18 @@ export const PRICING_ROUTE = '/pricing';
 export const SCREEN_ROUTE = '/screen';
 
 /**
+ * The substitution plan, the second display mode (issue #31).
+ *
+ * A SECOND PAGE RATHER THAN A SWITCH INSIDE `/screen`, because the two draw
+ * genuinely different things and a screen's mode is fixed when its key is
+ * issued: the management form hands out the address for the mode that was
+ * chosen, once, in the same panel that shows the key once. A display opened at
+ * the wrong one of these is told so by name, with the other address, rather
+ * than being served a board it was never configured to draw.
+ */
+export const SCREEN_SUBSTITUTIONS_ROUTE = '/screen/substitutions';
+
+/**
  * Calendry staff's own area (issue #76): a StaffAccount session, not a
  * tenant Account one, so `auth.global.ts`'s tenant-session guard must treat
  * both routes below as anonymous (no tenant session needed, and nobody

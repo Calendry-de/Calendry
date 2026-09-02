@@ -33,6 +33,7 @@
       "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@iconify-json/material-symbols": "^1.2.90",
+        "@iconify-json/ph": "^1.2.2",
         "@nuxt/devtools": "^4.0.0-alpha.15",
         "@nuxt/eslint": "^1.17.0",
         "@nuxtjs/stylelint-module": "^5.2.1",
@@ -286,6 +287,8 @@
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
     "@iconify-json/material-symbols": ["@iconify-json/material-symbols@1.2.90", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-gCOGFOIhK4QFsmUBsxtp6q7EPghSP11txPFfvb5Dj4nDYZ9qO88xpTQGtIzEQJ4mTPdXfzE9OWR2G4KUif4nXg=="],
+
+    "@iconify-json/ph": ["@iconify-json/ph@1.2.2", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-PgkEZNtqa8hBGjHXQa4pMwZa93hmfu8FUSjs/nv4oUU6yLsgv+gh9nu28Kqi8Fz9CCVu4hj1MZs9/60J57IzFw=="],
 
     "@iconify/collections": ["@iconify/collections@1.0.729", "", { "dependencies": { "@iconify/types": "*" } }, "sha512-eGNUVgmRnYddRutbrE/raedbnqVEdTQv4R9L/nmEHNCoEKQnTj4obNWOmH/38+J25F2svv8AQiZBNRGwPYtoyQ=="],
 

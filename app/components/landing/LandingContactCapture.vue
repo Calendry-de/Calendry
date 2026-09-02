@@ -22,7 +22,7 @@
             >
                 <Icon
                     class="contact_errorIcon"
-                    name="material-symbols:error"
+                    name="ph:warning-circle-fill"
                     aria-hidden="true"
                 />
                 <span>{{ errors.name }}</span>
@@ -45,7 +45,7 @@
             >
                 <Icon
                     class="contact_errorIcon"
-                    name="material-symbols:error"
+                    name="ph:warning-circle-fill"
                     aria-hidden="true"
                 />
                 <span>{{ errors.institution }}</span>
@@ -82,7 +82,7 @@
             >
                 <Icon
                     class="contact_errorIcon"
-                    name="material-symbols:error"
+                    name="ph:warning-circle-fill"
                     aria-hidden="true"
                 />
                 <span>{{ errors.message }}</span>
@@ -100,7 +100,7 @@
             >
                 <Icon
                     class="contact_statusIcon"
-                    name="material-symbols:check-circle"
+                    name="ph:check-circle-fill"
                     aria-hidden="true"
                 />
                 <span>

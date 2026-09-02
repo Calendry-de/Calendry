@@ -11,5 +11,24 @@
         "freeLabel": "Frei",
         "next": "Als Nächstes {time} · {title}",
         "nothingElse": "Heute nichts mehr"
+    },
+    "plan": {
+        "fallbackName": "Vertretungsplan",
+        "today": "Heute",
+        "tomorrow": "Morgen",
+        "noTerm": "Es läuft kein Semester.",
+        "noSubstitutions": "Keine Vertretungen.",
+        "notTeachingDay": "Es ist kein Unterricht geplant.",
+        "nowLabel": "Jetzt",
+        "change": {
+            "covered": "Vertretung",
+            "cancelled": "Entfällt",
+            "movedIn": "Verlegt",
+            "movedAway": "Verlegt weg"
+        },
+        "coveredBy": "Vertreten durch {name}",
+        "insteadOf": "statt {names}",
+        "wasAt": "war {time}",
+        "movesTo": "jetzt {day}, {time}"
     }
 }

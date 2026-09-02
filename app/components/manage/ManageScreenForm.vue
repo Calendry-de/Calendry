@@ -50,15 +50,26 @@
                 >{{ t('manageUi.screenForm.copied') }}</p>
             </section>
 
+            <!--
+                ONE AXIS AT A TIME, and which one is decided by the `mode`
+                select the generic field list renders above. Showing both would
+                offer a filter the chosen board never reads, which is the
+                clearest way to make somebody believe they have narrowed a
+                display that is in fact showing everything.
+
+                The hidden axis is NOT cleared: `groupIds`/`roomIds` are both
+                declared registry fields, so both travel on every save and a
+                screen switched back to its old mode finds its old scope intact.
+            -->
             <div class="scope">
-                <p class="scope_label">{{ t('manageUi.screenForm.scopeLabel') }}</p>
+                <p class="scope_label">{{ t(axis.labelKey) }}</p>
 
                 <!--
-                    "EMPTY MEANS EVERY ROOM" is stated, not implied. A blank
-                    multi-select reads as "nothing selected, so nothing shown",
-                    which is the opposite of what the table does, the same
-                    fail-open reading `group_term` has, and the same reason its
-                    picker spells it out.
+                    "EMPTY MEANS EVERYTHING" is stated, not implied, on BOTH
+                    axes. A blank multi-select reads as "nothing selected, so
+                    nothing shown", which is the opposite of what these tables
+                    do, the same fail-open reading `group_term` has, and the
+                    same reason its picker spells it out.
                 -->
                 <!--
                     `<i18n-t>` so the emphasis stays markup inside one
@@ -67,44 +78,49 @@
                 -->
                 <i18n-t
                     class="scope_help"
-                    keypath="manageUi.screenForm.scopeHelp"
+                    :keypath="axis.helpKey"
                     scope="global"
                     tag="p"
                 >
                     <template #everyRoom>
                         <strong>{{ t('manageUi.screenForm.everyRoomEmphasis') }}</strong>
                     </template>
+                    <template #everyGroup>
+                        <strong>{{ t('manageUi.screenForm.everyGroupEmphasis') }}</strong>
+                    </template>
                 </i18n-t>
 
                 <p
                     v-if="readonly"
                     class="scope_static"
-                >{{ selected.length ? selectedNames : t('manageUi.screenForm.everyRoom') }}</p>
+                >{{ selected.length ? selectedNames : t(axis.everyKey) }}</p>
 
                 <fieldset
                     v-else
                     class="scope_set"
                 >
-                    <legend class="scope_legend">{{ t('manageUi.screenForm.roomsLegend') }}</legend>
+                    <legend class="scope_legend">{{ t(axis.legendKey) }}</legend>
 
                     <label
-                        v-for="room in rooms"
-                        :key="room.id"
+                        v-for="option in options"
+                        :key="option.id"
                         class="scope_item"
                     >
                         <input
-                            :checked="selected.includes(room.id)"
+                            :checked="selected.includes(option.id)"
                             type="checkbox"
-                            @change="toggle(room.id)"
+                            @change="toggle(option.id)"
                         >
-                        <span>{{ room.name }}</span>
+                        <span>{{ option.name }}</span>
                     </label>
 
                     <p
-                        v-if="!rooms.length"
+                        v-if="!options.length"
                         class="scope_help"
-                    >{{ t('manageUi.screenForm.noRooms') }}</p>
+                    >{{ t(axis.emptyKey) }}</p>
                 </fieldset>
+
+                <p class="scope_help">{{ t('manageUi.screenForm.modeNote') }}</p>
             </div>
         </template>
     </ManageEntityForm>
@@ -112,7 +128,9 @@
 
 <script setup lang="ts">
 import type { useEntityForm } from '~/composables/entityForm';
-import { randomScreenKey } from '#shared/screenKey';
+import type { MessageKey } from '~~/i18n/keys';
+import type { ScreenMode } from '#shared/screenKey';
+import { SCREEN_MODE_PATHS, asScreenMode, randomScreenKey } from '#shared/screenKey';
 import CommonButton from '~/components/common/CommonButton.vue';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import { useT } from '~/composables/i18n';
@@ -141,19 +159,64 @@ const { t } = useT();
 
 const copied = ref(false);
 
-/** Rooms to choose from, fetched by the form composable via the field's reference. */
-const rooms = computed(() => (props.form.references.value.rooms ?? [])
+/**
+ * WHICH SCOPE AXIS THIS SCREEN ACTUALLY USES (issue #31), derived from the
+ * mode rather than shown alongside it. `ROOM_BOARD` reads `screen_room`,
+ * `SUBSTITUTION_PLAN` reads `screen_group`, and neither reads the other's;
+ * see the `ScreenMode` enum's own comment on why they are not intersected.
+ *
+ * An unrecognised stored mode falls back to the room axis HERE and only here,
+ * so an operator can still see and edit the row. The BOARD routes do the
+ * opposite and refuse it by name: a form that cannot be opened is a dead end,
+ * a wall drawing the wrong board silently is a wrong answer.
+ */
+const AXES = {
+    ROOM_BOARD: {
+        field: 'roomIds',
+        resource: 'rooms',
+        labelKey: 'manageUi.screenForm.scopeLabel',
+        helpKey: 'manageUi.screenForm.scopeHelp',
+        everyKey: 'manageUi.screenForm.everyRoom',
+        legendKey: 'manageUi.screenForm.roomsLegend',
+        emptyKey: 'manageUi.screenForm.noRooms',
+    },
+    SUBSTITUTION_PLAN: {
+        field: 'groupIds',
+        resource: 'groups',
+        labelKey: 'manageUi.screenForm.groupScopeLabel',
+        helpKey: 'manageUi.screenForm.groupScopeHelp',
+        everyKey: 'manageUi.screenForm.everyGroup',
+        legendKey: 'manageUi.screenForm.groupsLegend',
+        emptyKey: 'manageUi.screenForm.noGroups',
+    },
+} as const satisfies Record<ScreenMode, {
+    field: string;
+    resource: string;
+    labelKey: MessageKey;
+    helpKey: MessageKey;
+    everyKey: MessageKey;
+    legendKey: MessageKey;
+    emptyKey: MessageKey;
+}>;
+
+/* `screenMode`, not `mode`: the component already has a `mode` prop
+ * (create/edit), and a computed of the same name shadows it in the template. */
+const screenMode = computed<ScreenMode>(() => asScreenMode(draft.value.mode) ?? 'ROOM_BOARD');
+const axis = computed(() => AXES[screenMode.value]);
+
+/** Rows to choose from, fetched by the form composable via the field's reference. */
+const options = computed(() => (props.form.references.value[axis.value.resource] ?? [])
     .map((row) => ({ id: String(row.id), name: String(row.name ?? row.code ?? row.id) })));
 
 const selected = computed<string[]>(() => {
-    const value = draft.value.roomIds;
+    const value = draft.value[axis.value.field];
 
     return Array.isArray(value) ? value.map(String) : [];
 });
 
-const selectedNames = computed(() => rooms.value
-    .filter((room) => selected.value.includes(room.id))
-    .map((room) => room.name)
+const selectedNames = computed(() => options.value
+    .filter((option) => selected.value.includes(option.id))
+    .map((option) => option.name)
     .join(', '));
 
 /**
@@ -177,7 +240,11 @@ const issued = computed(() => {
 
     const origin = import.meta.client ? window.location.origin : '';
 
-    return `${origin}/screen?key=${key}`;
+    // THE ADDRESS FOR THE MODE THAT WAS CHOSEN. The two boards are two pages
+    // and each data route refuses the other's key by name, so handing out
+    // `/screen` for a substitution plan would issue an address that is wrong
+    // from the moment it is copied.
+    return `${origin}${SCREEN_MODE_PATHS[screenMode.value]}?key=${key}`;
 });
 
 /*
@@ -188,16 +255,27 @@ const issued = computed(() => {
  */
 onMounted(() => {
     if (props.mode === 'create' && !draft.value.key) {
-        draft.value = { ...draft.value, key: randomScreenKey() };
+        /*
+         * `screenMode` seeded alongside the key so the draft SAYS what the
+         * select already shows. A `select` with a null model renders its first
+         * option, and the create route defaults the same way, so the two
+         * agreed; stating it makes the issued address below derive from a real
+         * value rather than from the fallback.
+         */
+        draft.value = {
+            ...draft.value,
+            key: randomScreenKey(),
+            mode: draft.value.mode ?? 'ROOM_BOARD',
+        };
     }
 });
 
-function toggle(roomId: string): void {
-    const next = selected.value.includes(roomId)
-        ? selected.value.filter((id) => id !== roomId)
-        : [...selected.value, roomId];
+function toggle(id: string): void {
+    const next = selected.value.includes(id)
+        ? selected.value.filter((current) => current !== id)
+        : [...selected.value, id];
 
-    draft.value = { ...draft.value, roomIds: next };
+    draft.value = { ...draft.value, [axis.value.field]: next };
 }
 
 async function copy(): Promise<void> {

@@ -163,6 +163,21 @@
                     </dt>
                     <dd class="calc_lineAmount">{{ formatEuro(line.amount, locale) }}</dd>
                 </div>
+
+                <div class="calc_line calc_line--rule">
+                    <dt class="calc_lineLabel">{{ t('landing.calculator.netLabel') }}</dt>
+                    <dd class="calc_lineAmount">{{ formatEuro(result.total, locale) }}</dd>
+                </div>
+
+                <div class="calc_line">
+                    <dt class="calc_lineLabel">{{ t('landing.calculator.vatLabel', { rate: vatRate }) }}</dt>
+                    <dd class="calc_lineAmount">{{ formatEuro(result.vat, locale) }}</dd>
+                </div>
+
+                <div class="calc_line calc_line--gross">
+                    <dt class="calc_lineLabel">{{ t('landing.calculator.grossLabel') }}</dt>
+                    <dd class="calc_lineAmount">{{ formatEuro(result.gross, locale) }}</dd>
+                </div>
             </dl>
 
             <div class="calc_examples">
@@ -186,8 +201,9 @@ import { pricingScenarios } from '~/utils/pricingContent';
 import { useLanguage, useT } from '~/composables/i18n';
 import type { PriceInput } from '~/utils/pricingModel';
 import {
+    VAT_RATE,
     complexityFactors, computePrice, describePriceLines,
-    formatCount, formatEuro, loadBands, supportTiers,
+    formatCount, formatEuro, formatPercent, loadBands, supportTiers,
 } from '~/utils/pricingModel';
 
 /**
@@ -219,6 +235,14 @@ import {
  *
  * STATE IS A PLAIN REACTIVE OBJECT and the price is a `computed` over it, so
  * there is exactly one derivation of the number and nothing to keep in sync.
+ *
+ * THE HEADLINE IS NET, and the ledger closes with net, VAT and gross. That
+ * order is the choice: a German institution budgets and tenders in net figures,
+ * and every rate table on this page publishes net, so a calculator answering
+ * gross would be a second price under the same argument. The gross line is
+ * there because "net" only answers half of what a buyer needs to know, and
+ * making them reach for a calculator of their own is the kind of small
+ * withholding this page exists not to do.
  *
  * The reduced-motion path is inside `useTweenedNumber` and in the CSS below:
  * both collapse to instant, and the readout is correct at every frame either
@@ -260,6 +284,16 @@ function load(next: PriceInput): void {
 const result = computed(() => computePrice(input));
 
 const shownTotal = useTweenedNumber(() => result.value.total);
+
+/*
+ * VAT AND GROSS ARE NOT TWEENED, and neither are the breakdown lines. The
+ * easing exists so a reader dragging a slider can see the headline's direction
+ * and magnitude; a ledger underneath it whose every row was mid-flight would be
+ * a set of figures that do not add up for the length of the animation, on the
+ * page whose argument is that its arithmetic is checkable. The headline eases,
+ * the ledger is exact.
+ */
+const vatRate = computed(() => formatPercent(VAT_RATE, locale.value));
 
 /**
  * The same lines the price is made of, with their labels.
@@ -545,6 +579,31 @@ const segments = computed(() => {
         // exists and that they have not bought it.
         &--zero {
             opacity: 0.45;
+        }
+
+        /*
+         * WHERE THE BREAKDOWN STOPS AND THE INVOICE STARTS. The rule sits on
+         * the net row rather than between rows, because net is both the sum of
+         * everything above it and the base the two rows below are computed
+         * from, which is what a subtotal is.
+         */
+        &--rule {
+            margin-top: $space2;
+            padding-top: $space5;
+            border-top: 1px solid $surface5;
+        }
+
+        /*
+         * The one figure here that is not part of the argument: it is what the
+         * invoice will say. Set apart by SIZE rather than by the accent, which
+         * on this surface means "where a session may land" and is already spent
+         * on the headline.
+         */
+        &--gross {
+            .calc_lineLabel,
+            .calc_lineAmount {
+                font-size: $fontSizeLg;
+            }
         }
     }
 

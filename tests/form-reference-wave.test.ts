@@ -9,7 +9,7 @@ import { api, login } from './helpers/client';
  * single `Promise.all`. Those list endpoints carry permissions the page's own gate
  * does not imply: `offerings` fetches `/api/terms`, `/api/session-kinds` and
  * `/api/roles`; `terms` fetches `/api/time-grids`; `screens` fetches
- * `/api/rooms`. One 403 rejects the whole wave, and because the page awaits the
+ * `/api/rooms` and `/api/groups`. One 403 rejects the whole wave, and because the page awaits the
  * useAsyncData HANDLE (which resolves rather than rejects) it does not blank:
  * `row` stays null and `seed()` fills every control with an empty value.
  *

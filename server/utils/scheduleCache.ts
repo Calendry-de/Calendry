@@ -121,6 +121,35 @@ export function boardCacheKey(options: { tenantId: string; roomIds: string[] }):
 }
 
 /**
+ * `GET /api/screens/substitutions` (issue #31): keyed per tenant + GROUP
+ * scope, the axis that mode reads, and bucketed under `all` for the same
+ * reason the room board is — the route resolves its own Terms from the wall
+ * clock rather than taking one as input.
+ *
+ * THE TENANT-LOCAL DATE IS PART OF THE KEY, and the room board's omission of
+ * it is not a precedent to copy. This payload's whole subject is "today and
+ * tomorrow", so a key without the date would let a payload built before local
+ * midnight serve after it: a board captioned Tuesday, listing Monday's
+ * cancellations, for up to a full TTL. Including it makes the rollover a
+ * guaranteed miss rather than a race, and costs one dead key per tenant per
+ * day, which the TTL reaps anyway.
+ *
+ * Deliberately excludes `screenName` and `generatedAt`, exactly as
+ * `boardCacheKey` does: two screens can share a group scope while having
+ * different names, and serving one screen's identity to another is the same
+ * wrong-data-rendered-as-correct failure this file exists to avoid.
+ */
+export function substitutionBoardCacheKey(options: {
+    tenantId: string;
+    groupIds: string[];
+    localDate: string;
+}): string {
+    const groupScope = options.groupIds.length ? [...options.groupIds].sort().join(',') : 'allgroups';
+
+    return scheduleCacheKey(options.tenantId, 'all', `substitutions:${options.localDate}:${groupScope}`);
+}
+
+/**
  * `ResourceConfig.afterWrite` for any entity a cached schedule/board/ics
  * response embeds BY VALUE rather than by id: a Room's `name`/`code`, a
  * Person's name, a Group's `name`/`parentGroupId`, an Offering's

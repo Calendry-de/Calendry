@@ -209,6 +209,9 @@
     "caveat": {
         "text": "Das sind die Sätze, wie sie heute stehen, und sie sind Planungszahlen und kein unterschriebener Tarif: Sie sind noch nicht an einem vollen Jahr echter Durchführung überprüft. Sie werden sich verschieben, sobald diese Daten vorliegen. Wenn wir Ihnen ein Angebot machen, gilt das Angebot – und wir sagen Ihnen das lieber hier als erst, nachdem Sie ein Budget darauf gebaut haben."
     },
+    "vat": {
+        "note": "Alle Angaben auf dieser Seite sind Nettopreise und verstehen sich zzgl. {rate} USt."
+    },
     "format": {
         "rangeClosed": "{from} bis {to}",
         "rangeOpen": "{from} oder mehr",

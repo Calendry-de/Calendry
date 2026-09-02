@@ -2,8 +2,10 @@
 
 // This file holds ALIASES ONLY and is prepended to every SCSS file via
 // nuxt.config's additionalData, so it must emit no CSS. The :root declaration
-// that defines these properties lives once in layout.scss; putting it here
-// would duplicate the whole block into every component stylesheet.
+// that defines these properties lives once in tokens-root.scss (it was moved
+// out of layout.scss, which both layouts @use, so the block was landing in two
+// CSS chunks); putting it here would duplicate the whole block into every
+// component stylesheet instead.
 
 // EMISSION: static, unlike color. Colors are written per-request by
 // `useLayout()` because they genuinely change with the active theme; these do
@@ -13,9 +15,14 @@
 // per theme, the same useHead path layers over these defaults with no change
 // to any consumer.
 
-// SCALE: derived from what the codebase actually used, not invented. Font sizes
-// spanned 14 distinct values, radii 5, spacing 14: the signature of no scale
-// at all. Each token below states the values it replaces.
+// SCALE: every step now resolves through the project's landing-page design
+// system rather than through this codebase's own history. Font sizes are
+// Tailwind's default type scale and carry that scale's PAIRED line heights;
+// spacing is the system's spacing table; radii are Tailwind's ladder. See
+// tokens-root.scss for the per-step mapping and for what re-pointing them
+// gave up. The scale these replaced was derived from what the codebase used
+// (14 distinct font sizes, 5 radii, 14 spacings: the signature of no scale at
+// all), which is how it came to contain values no system contains.
 
 
 // SCSS aliases resolve to the same custom properties rather than duplicating
@@ -29,11 +36,29 @@ $fontSizeXl: var(--font-size-xl);
 $fontSize2Xl: var(--font-size-2xl);
 $fontSize3Xl: var(--font-size-3xl);
 $fontSize4Xl: var(--font-size-4xl);
+$fontSize5Xl: var(--font-size-5xl);
+
+// The line height Tailwind pairs with each font size. Pick the sibling of the
+// size you picked: the design system forbids snapping a size onto the scale and
+// then setting a line height elsewhere that fights it. The three ROLE-based
+// steps still cover everything written before this pairing existed, and they
+// have deliberately never had aliases: they are used as
+// `line-height: var(--leading-prose)`, the way layout.scss does it.
+$lineHeightXs: var(--line-height-xs);
+$lineHeightSm: var(--line-height-sm);
+$lineHeightMd: var(--line-height-md);
+$lineHeightLg: var(--line-height-lg);
+$lineHeightXl: var(--line-height-xl);
+$lineHeight2Xl: var(--line-height-2xl);
+$lineHeight3Xl: var(--line-height-3xl);
+$lineHeight4Xl: var(--line-height-4xl);
+$lineHeight5Xl: var(--line-height-5xl);
 
 $radiusSm: var(--radius-sm);
 $radiusMd: var(--radius-md);
 $radiusLg: var(--radius-lg);
 $radiusXl: var(--radius-xl);
+$radius2Xl: var(--radius-2xl);
 
 $space1: var(--space-1);
 $space2: var(--space-2);
@@ -46,3 +71,5 @@ $space8: var(--space-8);
 $space9: var(--space-9);
 $space10: var(--space-10);
 $space11: var(--space-11);
+$space12: var(--space-12);
+$space13: var(--space-13);

@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
     CONTACT_EMAIL,
+    REPO_LABEL,
+    landingBenefits,
     landingBuilt,
-    landingFeatures,
+    landingCtaTarget,
+    landingFaq,
     landingNext,
     landingPrinciples,
+    landingProblem,
+    landingSteps,
+    landingTagline,
     landingTechLead,
     landingTechnicalNotes,
 } from '../app/utils/landingContent';
@@ -30,6 +36,13 @@ import { englishT } from './helpers/landingMessages';
  *    guarantees now and what it stopped guaranteeing when `BACKLOG.md` was
  *    retired. The honest answer is "less", and it is written down there rather
  *    than left for somebody to assume.
+ *
+ * A THIRD KIND ARRIVED WITH THE REBUILD: the page is now built to a design
+ * system with rules a test can actually hold it to. "Exactly one primary
+ * action", "the closing action is the same as the hero's", "the FAQ's
+ * structured data describes the questions the page renders" are all mechanical,
+ * and all three are the kind of rule that decays silently the moment somebody
+ * adds a section. They are asserted below rather than left in a comment.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
@@ -55,12 +68,30 @@ const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
  * asserts rendered HTML, and HTML contains sentences, not key names. See
  * `tests/helpers/landingMessages.ts`.
  */
-const FEATURES = landingFeatures(englishT);
+const PROBLEM = landingProblem(englishT);
+const BENEFITS = landingBenefits(englishT);
+const STEPS = landingSteps(englishT);
 const BUILT = landingBuilt(englishT);
 const NEXT = landingNext(englishT);
 const PRINCIPLES = landingPrinciples(englishT);
 const TECHNICAL_NOTES = landingTechnicalNotes(englishT);
 const TECH_LEAD = landingTechLead(englishT);
+const FAQ = landingFaq(englishT);
+const TAGLINE = landingTagline(englishT);
+
+/**
+ * The label the page's single action actually carries.
+ *
+ * Derived rather than written out, because it FLIPS: with no scheduling link
+ * configured `landingCtaTarget()` degrades to the mailbox and the button says
+ * "ask for a walkthrough" instead of "book" one. A hardcoded string here would
+ * turn configuring `BOOKING_URL` into a test failure, which is exactly
+ * backwards.
+ */
+const CTA_TARGET = landingCtaTarget();
+const CTA_LABEL = CTA_TARGET.booking
+    ? englishT('landing.action.bookWalkthrough')
+    : englishT('landing.action.askForWalkthrough');
 
 async function page(path: string) {
     const res = await fetch(`${BASE}${path}`, { redirect: 'manual' });
@@ -99,13 +130,16 @@ describe('reachability without a session', () => {
 });
 
 describe('the page states what it is', () => {
-    it('carries the hero, the status badge and both calls to action', async () => {
+    it('carries the hero: badge, both authored headline lines, the lead and the proof line', async () => {
         const { html } = await page('/');
 
-        expect(html).toContain('Timetabling for schools and universities.');
         expect(html).toContain('In active development');
-        expect(html).toContain('Get in touch');
-        expect(html).toContain('See what works today');
+        // BOTH lines. The headline's break is authored, so asserting one half
+        // passes over a hero that lost the other.
+        expect(html).toContain(englishT('landing.hero.titleLineOne'));
+        expect(html).toContain(englishT('landing.hero.titleLineTwo'));
+        expect(html).toContain(englishT('landing.hero.lead'));
+        expect(html).toContain(englishT('landing.hero.proof'));
     });
 
     it('renders a title and description a search engine can read', async () => {
@@ -114,11 +148,20 @@ describe('the page states what it is', () => {
         // The whole tag, not a fragment: the layout's titleTemplate appends the
         // product name, and asserting only the page's half is how a page ends up
         // titled "Calendry: … | Calendry" with a green test.
-        expect(html).toContain('<title>Timetabling for schools and universities | Calendry</title>');
+        expect(html).toContain(`<title>${englishT('landing.meta.title')} | Calendry</title>`);
         // The CONTENT, not just the attribute: useLayout() registers a
         // description of its own with an empty string, so "a description tag
         // exists" would pass over an empty one.
-        expect(html).toContain('content="Calendry is a multi-tenant timetabling platform');
+        expect(html).toContain(`content="${englishT('landing.meta.description')}"`);
+    });
+
+    it('asks to be indexed, because this page is an evergreen offer', async () => {
+        const { html } = await page('/');
+
+        // Stated rather than left to the default, so that a campaign page added
+        // later has to make the opposite decision on purpose.
+        expect(html).toContain('name="robots"');
+        expect(html).toContain('content="index, follow"');
     });
 
     it('wraps its content in a main landmark', async () => {
@@ -147,7 +190,7 @@ describe('the page states what it is', () => {
         expect(html).toContain('class="version"');
     });
 
-    it('renders the hero figure, the one place the product is visible', async () => {
+    it('renders the hero figure, the one place the product is visible above the fold', async () => {
         const { html } = await page('/');
 
         // A timetabling page with no timetable on it was the critique's first
@@ -164,26 +207,6 @@ describe('the page states what it is', () => {
         expect(html).toContain(TECH_LEAD.figure);
     });
 
-    it('puts the form BEFORE the section that tells a registrar to skip it', async () => {
-        const { html } = await page('/');
-
-        // Reading order is the argument. "Under the hood" opens by telling a
-        // timetabling officer to skip it, and it used to sit between her and
-        // the form, so the last thing she read before the CTA was addressed to
-        // somebody else, followed by "Calendry cannot send mail yet".
-        expect(html.indexOf('id="contact"')).toBeLessThan(html.indexOf('id="under-the-hood"'));
-        expect(html.indexOf('id="contact"')).toBeGreaterThan(-1);
-    });
-
-    it('offers a way to act without scrolling back to the top', async () => {
-        const { html } = await page('/');
-
-        // There were two conversion affordances in 1,500 words, both in the
-        // hero. The sticky bar and the mid-page callout are the other two.
-        expect(html).toContain('topbar');
-        expect(html).toContain('callout_text');
-    });
-
     it('carries link-preview metadata, because that is how the page gets forwarded', async () => {
         const { html } = await page('/');
 
@@ -195,13 +218,20 @@ describe('the page states what it is', () => {
     it('renders every section', async () => {
         const { html } = await page('/');
 
-        for (const id of ['what', 'built', 'next', 'why', 'under-the-hood', 'contact']) {
+        const ids = [
+            'problem', 'benefits', 'how', 'built',
+            'roadmap', 'why', 'technical', 'faq', 'talk', 'contact',
+        ];
+
+        for (const id of ids) {
             expect(html, `section #${id} is missing`).toContain(`id="${id}"`);
         }
     });
 
     it.each([
-        ['what it does', FEATURES],
+        ['problem and solution', PROBLEM],
+        ['benefit', BENEFITS],
+        ['how it works step', STEPS],
         ['built so far', BUILT],
         ['what is next', NEXT],
         ['why it works this way', PRINCIPLES],
@@ -222,6 +252,152 @@ describe('the page states what it is', () => {
     });
 });
 
+/**
+ * The design system's structural rules, as assertions.
+ *
+ * These are the ones that decay silently. A second primary button, a closing
+ * action that drifted from the hero's, an FAQ whose structured data still
+ * describes a question somebody deleted: every one of them looks fine in a
+ * diff and is only visible from the rendered page.
+ */
+describe('one offer, one audience, one action', () => {
+    it('renders the primary action exactly twice, in the hero and at the close', async () => {
+        const { html } = await page('/');
+
+        // The element, counted. `LandingCta` is one component rendered in two
+        // places by rule, so three occurrences means somebody added a third
+        // call to action and two means one of them stopped rendering.
+        expect(html.split('class="cta"').length - 1).toBe(2);
+    });
+
+    it('points every call to action at the same place', async () => {
+        const { html } = await page('/');
+
+        expect(html).toContain(CTA_LABEL);
+        expect(html).toContain(CTA_TARGET.href);
+    });
+
+    it('offers no competing action above the fold', async () => {
+        const { html } = await page('/');
+
+        // The hero's old second button. A landing page gets one primary action,
+        // and the section this pointed at is still reachable from the nav.
+        expect(html).not.toContain('See what works today');
+    });
+
+    it('carries no dead links', async () => {
+        const { html } = await page('/');
+
+        // A button or anchor pointing at `#` is either unlinked or a visually
+        // disabled control pretending to be live. Neither belongs on the page.
+        expect(html).not.toContain('href="#"');
+    });
+
+    it('states what the reader is not risking, under both actions', async () => {
+        const { html } = await page('/');
+
+        expect(html).toContain(englishT('landing.risk.line'));
+    });
+
+    it('renders the tagline reveal as words, fully lit before any script runs', async () => {
+        const { html } = await page('/');
+
+        // Every word of both lines, and the whole sentence on the section's
+        // label. The reveal mutes the words only once it has mounted and
+        // decided it can animate, so the SERVED html must be legible: a
+        // JavaScript failure must not leave the page's largest sentence at 30%
+        // contrast. That is what the absent `--armed` class below proves.
+        for (const word of `${TAGLINE.lineOne} ${TAGLINE.lineTwo}`.split(/\s+/u)) {
+            expect(html, `tagline word "${word}" did not render`).toContain(word);
+        }
+
+        expect(html).toContain('tagline_word');
+        expect(html).not.toContain('tagline_measure--armed');
+    });
+});
+
+describe('the FAQ answers objections and says so to a search engine', () => {
+    it('renders every question and every answer', async () => {
+        const { html } = await page('/');
+
+        for (const entry of FAQ) {
+            expect(html, `question ${entry.id} did not render`).toContain(entry.question);
+            expect(html, `answer ${entry.id} did not render`).toContain(entry.answer);
+        }
+    });
+
+    it('has enough of them to be an objection list rather than a gesture', () => {
+        // The guard must not pass by finding nothing: an emptied export would
+        // make the assertions above iterate over an empty array and succeed.
+        expect(FAQ.length).toBeGreaterThanOrEqual(6);
+    });
+
+    it('opens on the two objections that lose the sale, not on the easy ones', () => {
+        // Order is editorial and load bearing. "Can it run our term" and "can
+        // it take our spreadsheets" are the questions a reader actually arrives
+        // with, and both are answered with a no or a partial no.
+        expect(FAQ[0]?.id).toBe('runTerm');
+        expect(FAQ[1]?.id).toBe('import');
+    });
+
+    it('publishes structured data describing exactly the questions it renders', async () => {
+        const { html } = await page('/');
+
+        expect(html).toContain('application/ld+json');
+        expect(html).toContain('FAQPage');
+
+        // The schema is built from the same array as the markup, so this
+        // catches the case the two were ever allowed to diverge.
+        for (const entry of FAQ) {
+            const escaped = JSON.stringify(entry.question).slice(1, -1);
+
+            expect(html, `question ${entry.id} is missing from the FAQ schema`).toContain(escaped);
+        }
+    });
+
+    it('starts with every row closed', async () => {
+        const { html } = await page('/');
+
+        // An FAQ with a row already open is a paragraph pretending to be a
+        // list, and it pushes the rest of the rows out of the section.
+        expect(html).not.toContain('<details open');
+        expect(html).not.toContain('open=""');
+    });
+});
+
+describe('reading order is the argument', () => {
+    it('proves the product before admitting the gaps', async () => {
+        const { html } = await page('/');
+
+        // A roadmap read before the evidence is a list of things that do not
+        // work. `built` has to come first.
+        expect(html.indexOf('id="built"')).toBeGreaterThan(-1);
+        expect(html.indexOf('id="built"')).toBeLessThan(html.indexOf('id="roadmap"'));
+    });
+
+    it('earns the solution before describing it, and ties it together after', async () => {
+        const { html } = await page('/');
+
+        expect(html.indexOf('id="problem"')).toBeLessThan(html.indexOf('id="benefits"'));
+        expect(html.indexOf('id="benefits"')).toBeLessThan(html.indexOf('id="how"'));
+    });
+
+    it('handles the objections before it asks for the click', async () => {
+        const { html } = await page('/');
+
+        expect(html.indexOf('id="faq"')).toBeLessThan(html.indexOf('id="talk"'));
+    });
+
+    it('offers a way to act without scrolling back to the top', async () => {
+        const { html } = await page('/');
+
+        // The floating bar carries the action on every screen, which on a phone
+        // is the only navigation the page has.
+        expect(html).toContain('topbar');
+        expect(html).toContain('topbar_toggle');
+    });
+});
+
 describe('the contact capture is wired to something real', () => {
     it('renders the form and the address as text, not a dead Sign up button', async () => {
         const { html } = await page('/');
@@ -237,16 +413,45 @@ describe('the contact capture is wired to something real', () => {
     it('says why it is an email rather than implying delivery it cannot do', async () => {
         const { html } = await page('/');
 
-        expect(html).toContain('no self-service sign-up');
+        expect(html).toContain('no sign up you can do yourself');
     });
 });
 
-describe('no fabricated social proof', () => {
+describe('no fabricated content', () => {
     it('claims no customers, quotes or user counts', async () => {
         const { html } = await page('/');
 
         for (const phrase of ['Trusted by', 'trusted by', 'testimonial', 'Loved by', 'customers worldwide']) {
             expect(html, `found fabricated social proof: ${phrase}`).not.toContain(phrase);
+        }
+    });
+
+    it('says the code is readable without calling an unlicensed repository open source', async () => {
+        const { html } = await page('/');
+
+        // The repository is public and carries no licence, so every right is
+        // reserved: a reader may read it and may not reuse it. "Open source" is
+        // the one overclaim this page's whole argument cannot afford.
+        expect(html).toContain(REPO_LABEL);
+        expect(html).not.toContain('open source');
+        expect(html).not.toContain('Open source');
+    });
+
+    it('carries none of the filler that marks a page as generated rather than written', async () => {
+        const { html } = await page('/');
+
+        // Placeholder copy, invented brands and the stock intensifiers. Each of
+        // these is a tell, and each has a way of arriving in a hurry.
+        const tells = [
+            'Lorem ipsum', 'lorem ipsum', 'John Doe', 'Jane Doe',
+            'Acme', 'Nexus', 'SmartFlow',
+            'Elevate', 'Seamless', 'seamless', 'Unleash',
+            'Next Gen', 'next-gen', 'game changer', 'game-changer',
+            'Delve', 'tapestry', 'In the world of',
+        ];
+
+        for (const tell of tells) {
+            expect(html, `found generated-page filler: ${tell}`).not.toContain(tell);
         }
     });
 });
@@ -302,5 +507,23 @@ describe('the roadmap is internally consistent', () => {
         const ids = [...BUILT, ...NEXT].map((item) => item.id);
 
         expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('pairs a figure with every benefit that describes behaviour, and none that does not', () => {
+        // Four of the five benefits describe something a schedule DOES, and a
+        // moving timetable states those better than a sentence can. Isolation
+        // is a drawing of nothing happening, so it runs as prose. This is the
+        // rule `index.vue` states; without it, adding a benefit silently either
+        // loses its figure or gives one to a claim that cannot be drawn.
+        const withFigure = BENEFITS.filter((item) => item.figure !== undefined);
+
+        expect(withFigure.length).toBe(4);
+        expect(new Set(withFigure.map((item) => item.figure)).size).toBe(4);
+        expect(BENEFITS.find((item) => item.id === 'isolation')?.figure).toBeUndefined();
+    });
+
+    it('numbers the how-it-works steps from their position, so there are exactly three', () => {
+        expect(STEPS.length).toBe(3);
+        expect(new Set(STEPS.map((step) => step.id)).size).toBe(3);
     });
 });

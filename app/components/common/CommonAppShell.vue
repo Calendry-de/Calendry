@@ -94,6 +94,17 @@
                     </NuxtLink>
                     <h1>{{ title }}</h1>
                     <p v-if="description">{{ description }}</p>
+                    <!--
+                        For the page's own SUBJECT, not more prose: the term and
+                        week `/dashboard` states here scope every number below
+                        them, so they belong in the heading block rather than
+                        floating above the content as a fourth strip. A slot
+                        rather than another string prop because what goes in it
+                        carries its own states (a term that has not started, a
+                        tenant with none, a failed read) and a page that has no
+                        subject line renders nothing at all.
+                    -->
+                    <slot name="meta"/>
                 </div>
 
                 <div
@@ -140,7 +151,12 @@ defineProps<{
     backLabel?: string;
 }>();
 
-defineSlots<{ default: () => unknown; actions?: () => unknown }>();
+/**
+ * `meta` is the heading block's own subject line (`/dashboard`'s term and
+ * week), optional like `actions`: a page that has none passes nothing and the
+ * slot renders nothing, with no wrapper element left behind to space around.
+ */
+defineSlots<{ default: () => unknown; actions?: () => unknown; meta?: () => unknown }>();
 
 const sections = useAppSections();
 const { t } = useT();

@@ -384,6 +384,7 @@
                 :violations="preview.violations"
                 :run="preview.run"
                 :demand="preview.demand"
+                :forced-online-over-cap="preview.forcedOnlineOverCap"
                 :decidable="isDecidable"
             />
 

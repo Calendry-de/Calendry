@@ -7,9 +7,26 @@ html, body {
     margin: 0;
     padding: 0;
 
-    font-family: "Noto Sans", sans-serif;
-    font-variation-settings:
-    "wdth" 100;
+    /*
+     * Geist, app wide. The design system names four permitted faces (Geist,
+     * Manrope, Geist Mono, Poppins) and bans Inter, Roboto, Arial, Open Sans
+     * and Helvetica; "Noto Sans", which this was, is on neither list, so it was
+     * simply outside the system. Geist over the other three because this app's
+     * densest surfaces are tables and a px-exact week grid: it holds up at the
+     * small steps, and it has a matching monospace for the places that need
+     * one, which the system allows as a functional exception.
+     *
+     * `font-variation-settings: "wdth" 100` was dropped rather than carried
+     * over: Geist has no width axis, so it named an axis that does not exist.
+     * Weight is set per element; `font-optical-sizing` is kept because Geist
+     * does expose an optical size.
+     *
+     * @nuxt/fonts resolves this by scanning the declaration, so there is no
+     * provider config to keep in agreement with it. The stack below it is a
+     * real fallback and not decoration: it has to render before the webfont
+     * arrives, which on the landing page is the first paint a stranger sees.
+     */
+    font-family: Geist, "Noto Sans", system-ui, sans-serif;
     font-optical-sizing: auto;
     font-weight: 400;
     font-style: normal;
@@ -81,6 +98,22 @@ html, body {
 
 .theme-dark {
     color-scheme: dark;
+}
+
+/*
+ * THE LANDING PAGE'S MENU OVERLAY LOCKS THE DOCUMENT SCROLL.
+ *
+ * Set as a body class by `LandingTopBar` through `useHead`, rather than by the
+ * component writing `document.body.style` itself: the rule then lives in the
+ * stylesheet with every other rule, and there is nothing to undo by hand if the
+ * component unmounts while the menu is open.
+ *
+ * Global because a scoped stylesheet cannot reach `body`. It is keyed on a
+ * class the landing bar is the only thing that sets, so it reaches that one
+ * surface and nowhere else.
+ */
+.landing-menu-open {
+    overflow: hidden;
 }
 
 /*
