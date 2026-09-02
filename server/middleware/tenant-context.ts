@@ -33,6 +33,15 @@ const PUBLIC_API_PATHS = [
      */
     '/api/screens/board',
     /*
+     * The substitution plan (issue #31) is the same credential answering the
+     * same way, so it needs the same line: without it a deactivated screen
+     * reaches the wall as a bare 401 indistinguishable from a mistyped URL,
+     * which is exactly the distinction the board exemption above exists to
+     * preserve. Its handler calls `requireIdentity` too, so a request with no
+     * key and no cookie still gets 401.
+     */
+    '/api/screens/substitutions',
+    /*
      * The ics_link stream is reachable with no cookie for the same reason the
      * board is: the `token` query parameter IS its credential, verified by
      * the handler itself via `icsLinkResolver`, deliberately NOT through

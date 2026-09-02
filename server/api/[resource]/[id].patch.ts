@@ -188,8 +188,16 @@ defineRouteMeta({
                                         maximum: 4,
                                         description: 'Hard-capped at 4; above it the solver refuses the whole input.',
                                     },
-                                    allowOnline: {
-                                        type: 'boolean',
+                                    requiredLecturerCount: {
+                                        type: 'integer',
+                                        minimum: 1,
+                                        nullable: true,
+                                        description: 'How many of the attached lecturer pool (PUT /api/offerings/{id}/lecturers) ONE Session needs; the pool itself says who is eligible. Null derives to min(1, pool size), so attaching several eligible lecturers means the solver picks one, never that all of them are forced onto every Session together. Deliberately unbounded here: assembleSolverInput clamps it to the pool size and reports the mismatch rather than refusing the save.',
+                                    },
+                                    onlineMode: {
+                                        type: 'string',
+                                        enum: ['FORBIDDEN', 'ALLOWED', 'REQUIRED'],
+                                        description: 'FORBIDDEN excludes virtual rooms, ALLOWED admits them alongside physical ones, REQUIRED admits ONLY virtual rooms. REQUIRED reaches the solver as an allow-list derived from Room.isVirtual at assembly time, intersected with the offerings/rooms pin if one is set. Replaced the allowOnline boolean.',
                                     },
                                     isActive: {
                                         type: 'boolean',
@@ -258,9 +266,17 @@ defineRouteMeta({
                                         nullable: true,
                                         description: 'Hard-capped at 4; above it the solver refuses the whole input.',
                                     },
-                                    allowOnline: {
-                                        type: 'boolean',
+                                    requiredLecturerCount: {
+                                        type: 'integer',
+                                        minimum: 1,
                                         nullable: true,
+                                        description: 'Seeds Offering.requiredLecturerCount. Null means the template does not fix it.',
+                                    },
+                                    onlineMode: {
+                                        type: 'string',
+                                        enum: ['FORBIDDEN', 'ALLOWED', 'REQUIRED'],
+                                        nullable: true,
+                                        description: 'Seeds Offering.onlineMode. Null means the template does not fix it. Replaced the allowOnline boolean.',
                                     },
                                     notes: {
                                         type: 'string',

@@ -47,7 +47,7 @@ const SCHOOL_DEEMPHASISED_OFFERING_FIELDS: ReadonlySet<string> = new Set([
     'requiredRoleId',
     'requiredCapacity',
     'requiredRoomCount',
-    'allowOnline',
+    'onlineMode',
 ]);
 
 export function offeringFieldsToDeemphasize(mode: TenantMode): ReadonlySet<string> {

@@ -209,6 +209,9 @@
     "caveat": {
         "text": "These are the rates as they stand today, and they are planning figures rather than a signed tariff: they have not yet been tested against a full year of real delivery. They will move as that data arrives. If we quote you, the quote is what holds, and we would rather tell you this here than after you have built a budget on it."
     },
+    "vat": {
+        "note": "Every figure on this page is net and excludes {rate} VAT."
+    },
     "format": {
         "rangeClosed": "{from} to {to}",
         "rangeOpen": "{from} or more",

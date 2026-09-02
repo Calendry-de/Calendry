@@ -14,6 +14,30 @@
             manage-entities overview, the account actions, and the session's
             own permission list.
         -->
+        <!--
+            THE CALENDAR THE NUMBERS BELOW ARE ABOUT. Every count on this page
+            is implicitly scoped to a term and the page named none of them, so
+            "12 offerings" could equally describe a term halfway through or one
+            that starts in five months. Four states, kept apart on purpose (see
+            `~/utils/currentTerm`): no line at all when the caller has no
+            `term.read`, the term and week when there is one, a plain statement
+            when the tenant has authored no Term yet, and a DIFFERENT one when
+            the request failed.
+        -->
+        <template #meta>
+            <!--
+                The `v-if` is on the paragraph rather than on the `<template>`:
+                the shell renders `<slot name="meta"/>` bare, with no wrapper to
+                leave behind, so an empty slot costs nothing and this avoids
+                making slot PRESENCE conditional.
+            -->
+            <p
+                v-if="term"
+                class="dash_term"
+                :class="{ 'dash_term--unavailable': term.kind === 'unavailable' }"
+            >{{ termLine }}</p>
+        </template>
+
         <template #actions>
             <CommonButton
                 v-if="(session?.availableTenants.length ?? 0) > 1"
@@ -36,6 +60,18 @@
                 role="alert"
             >{{ actionError }}</p>
         </Transition>
+
+        <!--
+            ABOVE the shape strip, deliberately. Both are counts, but only one
+            of them is a request: "4 proposals waiting" is the answer to "what
+            should I do now", and the institution's shape is ambient. A reader
+            who holds none of the review permissions sees nothing here and
+            the page opens on the shape strip exactly as it did before.
+        -->
+        <DashboardReviewQueues
+            :queues="queues ?? []"
+            :pending="queuesStatus === 'pending'"
+        />
 
         <DashboardInstitutionCounts
             :counts="counts ?? []"
@@ -136,11 +172,14 @@
 <script setup lang="ts">
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import DashboardInstitutionCounts from '~/components/dashboard/InstitutionCounts.vue';
+import DashboardReviewQueues from '~/components/dashboard/ReviewQueues.vue';
 import DashboardPermissionSummary from '~/components/dashboard/PermissionSummary.vue';
 import { logout, useSession } from '~/composables/session';
 import { useManageSections } from '~/composables/navigation';
 import { groupNavEntries } from '~/utils/navGroups';
-import { useInstitutionCounts } from '~/composables/dashboardCounts';
+import { useInstitutionCounts, useReviewQueueCounts } from '~/composables/dashboardCounts';
+import { useCurrentTerm } from '~/composables/currentTerm';
+import { termContextKey } from '~/utils/currentTerm';
 import { useT } from '~/composables/i18n';
 
 const session = useSession();
@@ -164,12 +203,56 @@ const sections = useManageSections();
 const groups = computed(() => groupNavEntries(sections.value, t));
 
 /*
- * THE TOP-LEVEL AWAIT LIVES HERE, not in the composable: `useInstitutionCounts`
- * stays synchronous so it keeps its Nuxt instance, and this page is what waits
- * for the first render's data. Awaiting also means SSR ships real numbers
+ * THREE HANDLES, ALL CALLED BEFORE ANY AWAIT, then awaited in turn.
+ *
+ * SEPARATE because they answer three different questions from three different
+ * routes with three different gates: what the institution looks like, what is
+ * waiting for a decision, and which term and week it is. One `useAsyncData`
+ * key over three unrelated failure surfaces would let a slow term lookup hold
+ * the room count's first render, and give one skeleton to things that are not
+ * the same thing.
+ *
+ * CALLED FIRST, AWAITED SECOND, and the order matters twice over. `useAsyncData`
+ * starts its fetch when it is CALLED, so calling all three up front makes them
+ * one parallel wave; awaiting each in sequence at the point of call, as this
+ * page used to, serialised three round-trips into every server render for no
+ * reason. It also keeps all three composables on the synchronous side of the
+ * first `await`, where the Nuxt instance is unambiguously theirs, rather than
+ * relying on it surviving an await to reach the second and third.
+ *
+ * THE TOP-LEVEL AWAIT LIVES HERE, not in the composables: each one stays
+ * synchronous so it keeps that instance (CLAUDE.md), and this page is what
+ * waits for the first render's data. Awaiting also means SSR ships real numbers
  * rather than a skeleton the client has to replace.
  */
-const { data: counts, status: countsStatus } = await useInstitutionCounts();
+const countsHandle = useInstitutionCounts();
+const queuesHandle = useReviewQueueCounts();
+const termHandle = useCurrentTerm();
+
+const { data: counts, status: countsStatus } = await countsHandle;
+const { data: queues, status: queuesStatus } = await queuesHandle;
+const { data: term } = await termHandle;
+
+/**
+ * The header's calendar line.
+ *
+ * The phase→key mapping is `termContextKey()`'s, not written here, so the four
+ * states have one definition a test can read. Only the interpolation is this
+ * page's, and it is passed unconditionally: a message that ignores `week` and
+ * `total` (the "no term configured" one) simply does not use them, which is
+ * cheaper than branching the call.
+ */
+const termLine = computed(() => {
+    const context = term.value;
+
+    if (!context) {
+        return '';
+    }
+
+    return t(termContextKey(context), context.kind === 'term'
+        ? { name: context.name, week: context.week, total: context.totalWeeks }
+        : {});
+});
 
 const greeting = computed(() => {
     const person = session.value?.activePerson;
@@ -420,6 +503,39 @@ async function signOut() {
         margin: 0;
         font-size: var(--font-size-md);
         color: $error600;
+    }
+
+    /*
+     * The 11px uppercase register the two strips' headings and the sidebar's
+     * group headings use, so the page's calendar scope reads as a LABEL on the
+     * heading block rather than as a third line of prose under the greeting.
+     * `tabular-nums` because the week number changes in place every Monday.
+     */
+    &_term {
+        margin: 0;
+
+        font-size: var(--font-size-xs);
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        color: $content7;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+
+        /*
+         * A FAILED READ IS NOT A CALENDAR FACT, so it does not get the label
+         * register: sentence case at the body size, in `$warning800` (the ramp's
+         * own text step, DESIGN.md's Measured-Contrast Rule: `warning700` fails
+         * AA at 3.73:1). Not `$error600`, which this page spends on an action
+         * that failed in front of the reader; a header line that could not be
+         * read is a degraded page, not a rejected click.
+         */
+        &--unavailable {
+            font-size: var(--font-size-sm);
+            font-weight: 400;
+            color: $warning800;
+            text-transform: none;
+            letter-spacing: normal;
+        }
     }
 }
 

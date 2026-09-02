@@ -100,7 +100,7 @@ export async function applyOfferingPlanItems(
                 requiredRoleId: t.requiredRoleId,
                 requiredCapacity: t.requiredCapacity,
                 requiredRoomCount: t.requiredRoomCount ?? undefined,
-                allowOnline: t.allowOnline ?? undefined,
+                onlineMode: t.onlineMode ?? undefined,
                 notes: t.notes,
                 createdFromTemplateId: t.id,
                 groups: { create: { tenantId, groupId } },

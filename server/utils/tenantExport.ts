@@ -100,6 +100,20 @@ export async function buildTenantExportBundle(tx: Tx, tenantId: string): Promise
         where: { tenantId },
         select: {
             id: true, code: true, title: true, frequency: true,
+            /*
+             * The ROOM RESTRICTION, both halves (issue #123). An Offering's
+             * online mode and its room pin are choices somebody made about
+             * where their teaching may happen: an export that dropped them
+             * would hand a departing tenant a catalogue that silently means
+             * "anywhere", which is the same trap the wire's empty
+             * `allowed_room_ids` is.
+             *
+             * Room CODES, not ids, unlike the id columns kept elsewhere in this
+             * bundle: the Rooms sheet is keyed by id too, but a pin is only
+             * legible next to the Offering if it says "A101, B204".
+             */
+            onlineMode: true,
+            pinnedRooms: { select: { room: { select: { code: true } } } },
             term: { select: { name: true } }, kind: { select: { name: true } },
         },
         orderBy: { title: 'asc' },
@@ -156,7 +170,18 @@ export async function buildTenantExportBundle(tx: Tx, tenantId: string): Promise
         terms,
         timeGrids,
         offerings: offerings.map((o) => ({
-            id: o.id, code: o.code, title: o.title, frequency: o.frequency, termName: o.term.name, kindName: o.kind.name,
+            id: o.id,
+            code: o.code,
+            title: o.title,
+            frequency: o.frequency,
+            termName: o.term.name,
+            kindName: o.kind.name,
+            onlineMode: o.onlineMode,
+            // Empty means "any eligible room", which is what the column header
+            // cannot say on its own, so the empty cell says it instead.
+            pinnedRooms: o.pinnedRooms.length > 0
+                ? o.pinnedRooms.map((link) => link.room.code).sort().join(', ')
+                : 'Any eligible room',
         })),
         sessions: sessions.map((s) => ({
             id: s.id,

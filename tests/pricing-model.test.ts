@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { SCENARIOS } from '../app/utils/pricingContent';
 import type { PriceInput } from '../app/utils/pricingModel';
 import {
-    ADMIN_SEAT_FEE, BASE_TIERS, COMPLEXITY_TIERS, LOAD_BANDS,
-    complexityScore, computePrice, resolveBaseTier, resolveComplexityTier, rollUpScore,
+    ADMIN_SEAT_FEE, BASE_TIERS, COMPLEXITY_TIERS, LOAD_BANDS, VAT_RATE,
+    complexityScore, computePrice, formatPercent, resolveBaseTier, resolveComplexityTier,
+    rollUpScore,
 } from '../app/utils/pricingModel';
 
 /**
@@ -176,6 +177,79 @@ describe('the price', () => {
             expect(result.total).toBe(result.subtotal);
             expect(Number.isInteger(result.total)).toBe(true);
         }
+    });
+
+    /*
+     * VAT IS ON TOP OF THE PRICE, NEVER INSIDE IT. The page publishes net
+     * figures in three rate tables and a flat-rate list, and the calculator's
+     * headline is the same net number; the single way this can go wrong and
+     * still look right is `total` quietly becoming gross, at which point every
+     * printed table disagrees with the calculator by 19% and each of them looks
+     * plausible on its own. So `total` is pinned to the sum of the lines here,
+     * and gross is pinned as a separate figure derived from it.
+     */
+    it('leaves the headline total net and adds VAT on top of it', () => {
+        const result = computePrice(base({
+            students: 7000,
+            lecturers: { light: 33, standard: 67, heavy: 13 },
+            complexity: { entanglement: 0.8, nesting: 0.8, variance: 0.8, constraints: 0.8 },
+            adminSeats: 3,
+            support: 'priority',
+        }));
+
+        const summed = result.lines.reduce((sum, line) => sum + line.amount, 0);
+        expect(result.total).toBe(summed);
+        expect(result.vat).toBe(Math.round(summed * VAT_RATE));
+        expect(result.gross).toBe(result.total + result.vat);
+        expect(result.gross).toBeGreaterThan(result.total);
+    });
+
+    /*
+     * The three printed figures must add up on screen. `vat` is rounded to the
+     * euro because everything else on this page is, and an unrounded one would
+     * make net + VAT differ from the printed gross by a fraction of a cent that
+     * renders as a euro: a price that cannot do its own arithmetic.
+     */
+    it('keeps net, VAT and gross whole euros that sum, at every complexity tier', () => {
+        for (const tier of COMPLEXITY_TIERS) {
+            const result = computePrice(base({
+                students: 7000,
+                lecturers: { light: 33, standard: 67, heavy: 13 },
+                complexity: {
+                    entanglement: tier.from + 0.01,
+                    nesting: tier.from + 0.01,
+                    variance: tier.from + 0.01,
+                    constraints: tier.from + 0.01,
+                },
+                adminSeats: 3,
+                support: 'priority',
+            }));
+
+            expect(Number.isInteger(result.vat)).toBe(true);
+            expect(Number.isInteger(result.gross)).toBe(true);
+            expect(result.total + result.vat).toBe(result.gross);
+        }
+    });
+
+    it('charges no VAT on a price of zero', () => {
+        const result = computePrice(base({ students: 0, adminSeats: 0 }));
+        // The S band's base fee is never zero, so this pins the arithmetic
+        // rather than the input: VAT of a positive net is positive.
+        expect(result.vat).toBeGreaterThan(0);
+        expect(computePrice({ ...base({ students: 0, adminSeats: 0 }), support: 'standard' }).vat)
+            .toBe(Math.round(BASE_TIERS[0]!.fee * VAT_RATE));
+    });
+
+    /*
+     * The rate reaches the page through `formatPercent(VAT_RATE)`, not through
+     * a `19` typed into two translated sentences, so the sentence follows the
+     * constant. Both locales are pinned because the space before the sign is
+     * German typography and its absence is English, and getting that from
+     * `Intl` rather than a template is the whole reason the helper exists.
+     */
+    it('formats the VAT rate for the reader rather than templating it', () => {
+        expect(formatPercent(VAT_RATE, 'en-GB')).toBe('19%');
+        expect(formatPercent(VAT_RATE, 'de-DE')).toBe('19\u00a0%');
     });
 
     it('prices every load band at its published rate', () => {

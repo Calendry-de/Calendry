@@ -41,7 +41,10 @@
         "regionLabel": "Filters and schedule actions",
         "term": "Term",
         "filters": "Filters",
-        "violationCount": "{count} violation | {count} violations",
+        "violationsHard": "{count} hard",
+        "violationsSoft": "{count} soft",
+        "violationsNone": "No violations",
+        "violationsLabel": "Violations in this term: {hard} hard, {soft} soft",
         "addEvent": "Add event",
         "cancelEvent": "Cancel event",
         "proposals": "Proposals"
@@ -378,6 +381,11 @@
     "reviewSummary": {
         "hardSurviving": "{count} hard-rule issue survives in this proposal | {count} hard-rule issues survive in this proposal",
         "unmappable": "{locatable} of {total} session references can be located; {unmappable} name sessions the solver created and cannot be pinned to a slot.",
+        "forcedOnlineHead": "{count} of those breaches cannot be fixed by moving anything: the group's own teaching has to be online. | {count} of those breaches cannot be fixed by moving anything: those groups' own teaching has to be online.",
+        "forcedOnlineGroup": "{group}: {forced} of {total} sessions must be online, above the {percent}% cap.",
+        "forcedOnlineTerm": "Forced online by: {offerings}.",
+        "forcedOnlineWeek": "Forced online by: {offerings}. The cap is measured per week, so at least one week must exceed it however the term is spread.",
+        "forcedOnlineFix": "Raise the cap, or allow these offerings on site. Until then the solver reports the breach on every run, and no arrangement of sessions will clear it.",
         "clear": "Every hard rule the solver checks is satisfied.",
         "compare": "Separately, Calendry's own {rules} structural checks find {count} issue on the live schedule (a different rule set), so the two counts are not a like-for-like difference. | Separately, Calendry's own {rules} structural checks find {count} issues on the live schedule (a different rule set), so the two counts are not a like-for-like difference.",
         "recheckNote": "They re-run after applying.",

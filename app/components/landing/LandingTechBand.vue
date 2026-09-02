@@ -41,6 +41,13 @@ defineProps<{
 <style scoped lang="scss">
 .tech {
     &_figure {
+        /*
+         * The page's second moment of scale, so it gets a card's travel rather
+         * than a heading's: this line is the section, and it should arrive as
+         * an object.
+         */
+        @include landingReveal($shift: 24px);
+
         max-width: 26ch;
         margin: 0;
 
@@ -68,6 +75,8 @@ defineProps<{
     }
 
     &_note {
+        @include landingReveal($shift: 16px, $order: 1);
+
         max-width: 60ch;
         margin: $space6 0 0;
 
@@ -93,10 +102,24 @@ defineProps<{
     }
 
     &_item {
+        @include landingReveal($shift: 14px);
+
         padding-top: $space5;
         // Ink-side hairline: `surface6` reads as a rule against `content1` the
         // way `surface5` does against the page ground.
         border-top: 1px solid $surface4;
+    }
+
+    /*
+     * Two columns, so every pair shares a scroll position: without this the
+     * five notes land as two rows of two and a straggler, all four of the
+     * paired ones on the same frame. The right-hand column trails the left by
+     * one step, which is the reading order. Collapses to a single column below
+     * the desktop band, where the offset is invisible because the items no
+     * longer share a row.
+     */
+    &_item:nth-child(even) {
+        @include landingReveal($shift: 14px, $order: 1);
     }
 
     &_title {

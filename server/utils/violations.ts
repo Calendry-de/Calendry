@@ -2,9 +2,11 @@ import type { Prisma } from '@prisma/client';
 import { PER_SESSION_CONSTRAINT_TYPES, RELATION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
 import type { StructuralConstraintType } from '../../shared/constraintTypes';
 import { gapsWithinSpan } from '../../shared/timeGrid';
-import { isBankedSession } from '../../shared/sessionPlacement';
+import { isBankedSession, isPlacedSession } from '../../shared/sessionPlacement';
+import type { Placed, SessionPlacementFields } from '../../shared/sessionPlacement';
 import type { Tx } from './tenantDb';
 import { conflictGroupIds, descendantGroupIds } from './groupClosure';
+import { resolveRoomRestriction } from './offeringRooms';
 
 /**
  * Constraint evaluation for manual edits: the warn-and-allow half of
@@ -42,18 +44,40 @@ export type {
     StructuralConstraintType, PerSessionConstraintType, RelationConstraintType,
 } from '../../shared/constraintTypes';
 
-interface PlacedSession {
+/**
+ * A Session exactly as the queries below return it, placement INCLUDED AND
+ * NULLABLE.
+ *
+ * A BANKED SESSION (issue #22) REACHES THIS FUNCTION FOR REAL, whatever the
+ * editing routes suggest: `move`/`swap`/`lock`/`bank` each refuse one, but
+ * `apply.post.ts` does not go through them. Its rebase is an `updateMany` over
+ * `{ isLocked: false, termId, offeringId: { not: null } }`, which is EXACTLY
+ * the set a banked Session belongs to (banking refuses a locked Session and
+ * refuses an Event), so every banked Session in the term is stamped with the
+ * new `generationId` and then handed to this function in `affected`.
+ *
+ * This shape was declared non-null and the query results asserted into it with
+ * `as`, which made every pass below read those rows as though they sat at week
+ * `null`, day `null`, block `null`. Two things followed, on every apply: the
+ * candidate query degenerated to `term_week IS NULL` and pulled in every OTHER
+ * banked Session in the term, and `blocksOverlap`'s arithmetic coerced the
+ * nulls to 0 so all of them mutually "overlapped" — a HARD double-booking
+ * reported between Sessions that are not anywhere. Narrowed at the passes that
+ * need a slot, never asserted past.
+ */
+interface SessionRow extends SessionPlacementFields {
     id: string;
     /** Null for a Federation-shared Session: it belongs to no member tenant. */
     tenantId: string | null;
     termId: string;
     kindId: string;
-    offeringId: string;
-    termWeek: number;
-    dayOfWeek: number;
-    blockIndex: number;
+    /** Null for an EVENT: a placement with no recurring demand behind it. */
+    offeringId: string | null;
     durationBlocks: number;
 }
+
+/** A Session with a real slot: the only shape the collision arithmetic accepts. */
+type PlacedSession = Placed<SessionRow>;
 
 /**
  * A seed, additionally carrying its own TimeGrid: needed only by the
@@ -61,7 +85,7 @@ interface PlacedSession {
  * candidate is never checked for spanning a break, only for colliding with a
  * seed.
  */
-interface SeedSession extends PlacedSession {
+interface SeedSession extends SessionRow {
     timeGridId: string | null;
 }
 
@@ -150,38 +174,56 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         return 0;
     }
 
-    const seeds = (await tx.session.findMany({
+    const seeds: SeedSession[] = await tx.session.findMany({
         where: { OR: visibleToTenant, id: { in: sessionIds } },
         select: {
             id: true, tenantId: true, termId: true, kindId: true, offeringId: true,
             termWeek: true, dayOfWeek: true, blockIndex: true, durationBlocks: true,
             timeGridId: true,
         },
-    })) as SeedSession[];
+    });
 
     if (seeds.length === 0) {
         return 0;
     }
 
-    // Candidate collision set: every Session sharing a term/week/day with a seed.
-    // Narrowing by week and day first keeps this bounded; the alternative is
-    // scanning the term.
-    const candidates = (await tx.session.findMany({
-        where: {
-            OR: visibleToTenant,
-            AND: [{
-                OR: seeds.map((s) => ({
-                    termId: s.termId,
-                    termWeek: s.termWeek,
-                    dayOfWeek: s.dayOfWeek,
-                })),
-            }],
-        },
-        select: {
-            id: true, tenantId: true, termId: true, kindId: true, offeringId: true,
-            termWeek: true, dayOfWeek: true, blockIndex: true, durationBlocks: true,
-        },
-    })) as PlacedSession[];
+    /**
+     * The seeds that have a slot, which is every pass below except
+     * `no_unplaced_session`. A banked seed is NOT dropped from `seeds`: it is
+     * exactly what that rule reports on, and its own stale rows still have to
+     * be cleared at the end, so it stays in `involvedIds` too.
+     */
+    const placedSeeds = seeds.filter(isPlacedSession);
+
+    // Candidate collision set: every Session sharing a term/week/day with a
+    // PLACED seed. Narrowing by week and day first keeps this bounded; the
+    // alternative is scanning the term. Not issued AT ALL when every seed is
+    // banked: what an empty `OR` means is a Prisma detail this does not want
+    // to depend on, and a banked seed has nothing to collide with regardless.
+    const candidateRows = placedSeeds.length
+        ? await tx.session.findMany({
+            where: {
+                OR: visibleToTenant,
+                AND: [{
+                    OR: placedSeeds.map((s) => ({
+                        termId: s.termId,
+                        termWeek: s.termWeek,
+                        dayOfWeek: s.dayOfWeek,
+                    })),
+                }],
+            },
+            select: {
+                id: true, tenantId: true, termId: true, kindId: true, offeringId: true,
+                termWeek: true, dayOfWeek: true, blockIndex: true, durationBlocks: true,
+            },
+        })
+        : [];
+
+    // A row matched on a concrete `termWeek`/`dayOfWeek` above cannot be
+    // banked: the three placement columns are null together or not at all
+    // (`session_placement_sane`). Narrowed rather than asserted past, the same
+    // way `substituteCandidates.ts` narrows its own same-day query.
+    const candidates = candidateRows.filter(isPlacedSession);
 
     const involvedIds = [...new Set([...seeds.map((s) => s.id), ...candidates.map((c) => c.id)])];
 
@@ -212,6 +254,19 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     );
     const byPerson = groupBy(people, 'sessionId', 'personId');
     const byGroup = groupBy(groups, 'sessionId', 'groupId');
+
+    /**
+     * Every Room a Session occupies, VIRTUAL ONES INCLUDED — the deliberate
+     * counterpart to `byRoom` above, which drops them because two Sessions in
+     * one virtual Room do not collide.
+     *
+     * `no_session_outside_allowed_room` asks the opposite question: not "who
+     * else is in this room" but "may this Session be in this room at all", and
+     * a virtual Room is exactly the answer an Offering with `onlineMode =
+     * FORBIDDEN` must not get. Reusing `byRoom` here would have made that one
+     * breach structurally invisible.
+     */
+    const occupiedRoomsBySession = groupBy(rooms, 'sessionId', 'roomId');
 
     /**
      * Who actually ATTENDS each Session: direct participants plus the members of
@@ -290,7 +345,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     );
 
     for (const constraint of pairwiseEnabled) {
-        for (const seed of seeds) {
+        for (const seed of placedSeeds) {
             for (const other of candidates) {
                 if (other.id === seed.id || !blocksOverlap(seed, other)) {
                     continue;
@@ -333,7 +388,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
      * had no case to avoid once a second per-session type existed.
      */
     if (perSessionEnabled.length > 0) {
-        const gridIds = [...new Set(seeds.map((s) => s.timeGridId).filter((id): id is string => id !== null))];
+        const gridIds = [...new Set(placedSeeds.map((s) => s.timeGridId).filter((id): id is string => id !== null))];
 
         const grids = gridIds.length
             ? await tx.timeGrid.findMany({
@@ -348,18 +403,73 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
 
         const gridById = new Map(grids.map((grid) => [grid.id, grid]));
 
+        /**
+         * WHICH ROOMS EACH SEED'S OFFERING ALLOWS (issue #123).
+         *
+         * Resolved through `resolveRoomRestriction`, the SAME function
+         * `assembleSolverInput` composes the room pin and the online mode with,
+         * so a move this warns about and a placement the solver refuses can
+         * never be different questions. A `null` entry means the Offering
+         * states no restriction at all; `undefined` means the seed is an Event
+         * with no Offering behind it, and neither can be breached.
+         *
+         * Loaded ONLY when the type is enabled: a tenant without this rule pays
+         * two queries per refresh for nothing, and the room snapshot is not
+         * cheap on a large estate.
+         */
+        const roomRuleEnabled = perSessionEnabled.some((c) => c.type === 'no_session_outside_allowed_room');
+        const allowedRoomsByOffering = new Map<string, { allowed: Set<string> | null; onlineMode: string }>();
+
+        if (roomRuleEnabled) {
+            const seedOfferingIds = [...new Set(
+                seeds.map((seed) => seed.offeringId).filter((id): id is string => id !== null),
+            )];
+
+            // Sequential, like every other query in this function: `tx` is one
+            // shared connection.
+            const seedOfferings = seedOfferingIds.length
+                ? await tx.offering.findMany({
+                    where: { id: { in: seedOfferingIds } },
+                    select: { id: true, onlineMode: true, pinnedRooms: { select: { roomId: true } } },
+                })
+                : [];
+
+            /*
+             * ACTIVE ROOMS ONLY, matching the snapshot `assembleSolverInput`
+             * sends. RLS narrows this to the tenant's own Rooms plus the
+             * federation's, the same widening `roomRows` gets there, so the two
+             * resolutions see the same estate.
+             */
+            const placeableRooms = seedOfferingIds.length
+                ? await tx.room.findMany({ where: { isActive: true }, select: { id: true, isVirtual: true } })
+                : [];
+
+            for (const offering of seedOfferings) {
+                const { permittedRoomIds } = resolveRoomRestriction(
+                    {
+                        onlineMode: offering.onlineMode,
+                        pinnedRoomIds: offering.pinnedRooms.map((link) => link.roomId),
+                    },
+                    placeableRooms,
+                );
+
+                allowedRoomsByOffering.set(offering.id, {
+                    allowed: permittedRoomIds === null ? null : new Set(permittedRoomIds),
+                    onlineMode: offering.onlineMode,
+                });
+            }
+        }
+
+        /*
+         * `seeds`, not `placedSeeds`: this is the one pass a BANKED seed
+         * belongs in, because `no_unplaced_session` is a fact about the
+         * ABSENCE of a placement. `bank.post.ts` writes that violation itself
+         * rather than calling this function (see its file comment), but an
+         * apply hands one straight here (see `SessionRow`), and the row it
+         * detects is the same row, so the two agree.
+         */
         for (const constraint of perSessionEnabled) {
             for (const seed of seeds) {
-                /**
-                 * Only ever true when a caller hands this function a banked
-                 * seed; today, no caller does: `bank.post.ts` writes this
-                 * violation directly instead of calling this function (see its
-                 * file comment), and every other route only reaches this
-                 * function with a Session it just confirmed is placed. Handled
-                 * here anyway so the type means something the day a future
-                 * caller does pass one, rather than silently falling through to
-                 * the break-gap check below.
-                 */
                 if (constraint.type === 'no_unplaced_session') {
                     if (!isBankedSession(seed)) {
                         continue;
@@ -376,10 +486,66 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                     continue;
                 }
 
-                // no_session_spanning_break. No grid, nothing to check against,
-                // the same "named rather than filtered" reasoning `fitsGrid`
-                // callers already follow: a null timeGridId here means there is
-                // no rule to violate, not that the rule passed.
+                if (constraint.type === 'no_session_outside_allowed_room') {
+                    const restriction = seed.offeringId
+                        ? allowedRoomsByOffering.get(seed.offeringId)
+                        : undefined;
+
+                    // An Event (no Offering) has nothing to restrict it, and a
+                    // `null` allowed set is "any eligible Room": both are the
+                    // rule passing, not the rule being skipped.
+                    if (!restriction || restriction.allowed === null) {
+                        continue;
+                    }
+
+                    const { allowed } = restriction;
+                    /*
+                     * `occupiedRoomsBySession`, NOT `byRoom`: the latter drops
+                     * virtual Rooms, which would make the one breach this rule
+                     * exists to catch for `onlineMode = FORBIDDEN` invisible.
+                     *
+                     * NOT GUARDED BY `isPlacedSession`: which Rooms a Session
+                     * occupies is independent of whether it has a slot, so a
+                     * banked Session that kept its Room is still in the wrong
+                     * Room.
+                     */
+                    const outside = (occupiedRoomsBySession.get(seed.id) ?? [])
+                        .filter((roomId) => !allowed.has(roomId));
+
+                    if (outside.length === 0) {
+                        continue;
+                    }
+
+                    detected.push({
+                        constraintId: constraint.id,
+                        sessionId: seed.id,
+                        severity: constraint.severity as 'HARD' | 'SOFT',
+                        penalty: constraint.severity === 'SOFT' ? constraint.weight : null,
+                        detail: {
+                            reason: 'room_outside_allowed_set',
+                            // Both halves named, because the fix differs: a pin
+                            // is edited on the Offering's room list, an online
+                            // mode on the Offering's own field.
+                            onlineMode: restriction.onlineMode,
+                            roomIds: outside,
+                        },
+                    });
+
+                    continue;
+                }
+
+                // no_session_spanning_break, which asks what a span crosses:
+                // a banked seed has no span, so there is nothing to ask. Left
+                // to `no_unplaced_session` above, the rule that is actually
+                // about it.
+                if (!isPlacedSession(seed)) {
+                    continue;
+                }
+
+                // No grid, nothing to check against, the same "named rather
+                // than filtered" reasoning `fitsGrid` callers already follow: a
+                // null timeGridId here means there is no rule to violate, not
+                // that the rule passed.
                 const grid = seed.timeGridId ? gridById.get(seed.timeGridId) : undefined;
 
                 if (!grid) {
@@ -449,14 +615,16 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                 continue;
             }
 
-            for (const seed of seeds) {
-                if (!memberOfferingIds.has(seed.offeringId)) {
+            for (const seed of placedSeeds) {
+                // An EVENT carries no Offering, so no relation can name it.
+                if (seed.offeringId === null || !memberOfferingIds.has(seed.offeringId)) {
                     continue;
                 }
 
                 for (const other of candidates) {
                     if (
                         other.id === seed.id
+                        || other.offeringId === null
                         || other.offeringId === seed.offeringId
                         || !memberOfferingIds.has(other.offeringId)
                         || !blocksOverlap(seed, other)

@@ -74,13 +74,27 @@ defineProps<{ items: LandingFeature[] }>();
          * anyway is how a card ends up with three unrelated corner sizes.
          */
         &--before {
+            @include landingReveal($shift: 14px);
+
             background: $surface1;
         }
 
         // The answer side is not accented. The accent on this page means "where
         // a session may land", and spending it here would leave the figure and
         // the primary action competing with a paragraph.
+
+        /*
+         * THE ANSWER ARRIVES SECOND, one stagger step behind the problem. The
+         * two panels are the same shape at the same height, so on a single
+         * timeline they cross the viewport edge on the same frame and land
+         * together, and the page's one piece of sequencing ("here is what you
+         * have, here is what you get instead") is lost to simultaneity. The
+         * order is keyed to the MODIFIERS rather than to `nth-child`, so it
+         * follows the argument even if the markup order ever changes.
+         */
         &--after {
+            @include landingReveal($shift: 14px, $order: 1);
+
             background: $surface0;
         }
     }

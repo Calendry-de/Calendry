@@ -5,6 +5,38 @@
     >
         <div class="bar_group">
             <!--
+                THE SCOPE, SAID OUT LOUD. With `session.read_own` this bar
+                frames one person's timetable, not a sparse version of the
+                institution's, and until now the only thing that said so was
+                the page's visually-hidden `<h1>`: a sighted lecturer got the
+                institution's frame and three chips, which reads as a tenant
+                with almost nothing in it. That was the exact misreading the
+                heading's own comment was written to prevent, solved for one
+                audience only.
+
+                Renders ONLY for 'own'. On the institution's schedule the
+                statement is what everybody already assumes, and this bar's
+                height is measured (DECISIONS.md § "The schedule toolbar"):
+                a permanent chip would spend that budget saying nothing.
+
+                Reuses the heading's key rather than a second string, so the
+                two cannot drift, and is `aria-hidden` for the same reason the
+                page's outcome strip is: the heading already says it, and one
+                sentence should be announced once.
+            -->
+            <p
+                v-if="scope === 'own'"
+                class="bar_scope"
+                aria-hidden="true"
+            >
+                <Icon
+                    name="material-symbols:person-outline"
+                    aria-hidden="true"
+                />
+                {{ t('schedule.page.headingOwn') }}
+            </p>
+
+            <!--
                 Term lives HERE, not in `ScheduleFilterPanel` with Group/Room/
                 Person: it is not a filter; it does not narrow what a caller
                 who can already see the data sees, it decides WHICH schedule
@@ -64,19 +96,47 @@
         <div class="bar_group bar_group--view">
             <!-- Hidden without violation.read: no affordance for data the API
                  would refuse anyway. -->
+            <!--
+                TWO NUMBERS, NOT A TOTAL. This reported `violations.length`,
+                which is a quantity nobody can act on: the only action the page
+                offers against a violation is the panel's Repair, and that is
+                gated on the HARD count alone, because a repair exists to make
+                the timetable legal and offering one against a soft preference
+                breach would promise something it does not do
+                (`ScheduleViolationsPanel`). So the deciding number was
+                reachable only by opening the panel, while the one on permanent
+                display merged an illegal placement with a weighted wish.
+
+                Both halves render whenever either is non-zero, including a
+                zero: the position of each figure has to be stable, or reading
+                the bar means reading it word by word. Only "none at all"
+                collapses to a sentence.
+            -->
             <button
                 v-if="canReadViolations"
                 type="button"
                 class="bar_violations-toggle"
                 :class="{ 'bar_violations-toggle--active': showViolationsModel }"
                 :aria-pressed="showViolationsModel"
+                :aria-label="violationsLabel"
                 @click="showViolationsModel = !showViolationsModel"
             >
                 <Icon
                     name="material-symbols:error-outline"
                     aria-hidden="true"
                 />
-                {{ t('schedule.toolbar.violationCount', { count: violationCount }, violationCount) }}
+                <span v-if="!hardViolationCount && !softViolationCount">
+                    {{ t('schedule.toolbar.violationsNone') }}
+                </span>
+                <template v-else>
+                    <span
+                        class="bar_violations-hard"
+                        :class="{ 'is-zero': !hardViolationCount }"
+                    >{{ t('schedule.toolbar.violationsHard', { count: hardViolationCount }) }}</span>
+                    <span class="bar_violations-soft">{{
+                        t('schedule.toolbar.violationsSoft', { count: softViolationCount })
+                    }}</span>
+                </template>
             </button>
         </div>
         <!-- ACTIONS: the only controls here that change anything, which is why
@@ -150,7 +210,12 @@ const props = defineProps<{
     slotDateOf?: (week: number, dayOfWeek: number) => Date | null;
     /** How many of Group/Room/Person are currently narrowing the view. */
     activeFilterCount: number;
-    violationCount: number;
+    /** Split, not totalled: only the hard count has an action behind it. */
+    hardViolationCount: number;
+    softViolationCount: number;
+    /** Whose schedule this is, from the server's answer, never from a
+        permission: `'own'` is one person's timetable. */
+    scope: 'any' | 'own';
     canReadViolations: boolean;
     canTriggerSolver: boolean;
     /** `session.read`, deliberately not `solver.trigger`; see the link's note. */
@@ -167,6 +232,20 @@ defineEmits<{ 'toggle-create': [] }>();
 const { t } = useT();
 
 const termIdModel = defineModel<string>('termId', { required: true });
+
+/*
+ * THE COMPACT LABELS ARE FOR THE EYE ONLY. "3 hart · 12 weich" is legible in a
+ * bar whose width is already spoken for, and unintelligible read aloud, so the
+ * accessible name is the whole sentence instead of the sum of the parts.
+ */
+const violationsLabel = computed(() => (
+    !props.hardViolationCount && !props.softViolationCount
+        ? t('schedule.toolbar.violationsNone')
+        : t('schedule.toolbar.violationsLabel', {
+            hard: props.hardViolationCount,
+            soft: props.softViolationCount,
+        })
+));
 
 const selectedTermName = computed(
     () => props.terms.find((term) => term.id === (termIdModel.value || props.terms[0]?.id))?.name ?? '',
@@ -299,6 +378,34 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         &--end { grid-area: actions; }
     }
 
+    /*
+     * A STATEMENT, NOT A CONTROL. No fill, no border, no hover: it names what
+     * the bar is looking at, and anything that looks pressable in this group
+     * is pressable. The transparent border is there so its box height matches
+     * the toggles beside it exactly and `align-items: flex-end` puts all three
+     * on one optical line.
+     */
+    &_scope {
+        display: flex;
+        gap: var(--space-3);
+        align-items: center;
+
+        margin: 0;
+        padding: var(--space-4) 0;
+        border: 1px solid transparent;
+
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: $content6;
+
+        svg {
+            flex: none;
+            width: 15px;
+            height: 15px;
+            color: $content7;
+        }
+    }
+
     &_field {
         display: flex;
         flex-direction: column;
@@ -388,6 +495,34 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
             border-color: $primary500;
             color: $content2;
             background: varToRgba('primary500', 0.16);
+        }
+    }
+
+    &_violations-hard {
+        font-weight: 650;
+        color: $error700;
+
+        /*
+         * A ZERO IS DRAWN, AND QUIETLY. The figure's position is what makes
+         * the pair readable without being read, so it may not disappear; a red
+         * 0 would claim a problem that is not there.
+         */
+        &.is-zero {
+            font-weight: inherit;
+            color: $content7;
+        }
+    }
+
+    &_violations-soft {
+        color: $content7;
+
+        /* Decoration, so it is drawn rather than written into the message:
+           the accessible name is built from `violationsLabel` and never
+           inherits a punctuation mark from the visible label. */
+        &::before {
+            content: '·';
+            margin-right: var(--space-3);
+            color: $surface6;
         }
     }
 

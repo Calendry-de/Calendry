@@ -10,9 +10,15 @@
             "email": "E-Mail"
         },
         "field": {
-            "givenName": { "label": "Vorname" },
-            "familyName": { "label": "Nachname" },
-            "email": { "label": "E-Mail" },
+            "givenName": {
+                "label": "Vorname"
+            },
+            "familyName": {
+                "label": "Nachname"
+            },
+            "email": {
+                "label": "E-Mail"
+            },
             "externalRef": {
                 "label": "Externe Referenz",
                 "help": "Stabile Kennung aus einem externen Verwaltungssystem (SIS) oder LDAP, über die Importe abgeglichen werden."
@@ -74,12 +80,16 @@
                 "label": "Prüfungskapazität",
                 "help": "Sitzplätze, die für eine Prüfung zur Verfügung stehen, falls es weniger als die normale Kapazität sind: Abstände und Aufsicht brauchen bei Prüfungen oft mehr Platz pro Person. Ohne Angabe gilt die normale Kapazität dieses Raums."
             },
-            "location": { "label": "Ort" },
+            "location": {
+                "label": "Ort"
+            },
             "ranking": {
                 "label": "Rang",
                 "help": "Attraktivität, HÖHER = hochwertiger. Die Regel „Raumwahl nach Rang steuern“ liest diesen Wert und verschiebt die Platzierung damit an ein Ende der Skala."
             },
-            "isVirtual": { "label": "Virtuell" }
+            "isVirtual": {
+                "label": "Virtuell"
+            }
         },
         "relation": {
             "equipment": {
@@ -148,14 +158,30 @@
             "isDefault": "Standard"
         },
         "field": {
-            "blockLengthMinutes": { "label": "Blocklänge (Minuten)" },
-            "blocksPerDay": { "label": "Blöcke pro Tag" },
-            "startHour": { "label": "Startstunde" },
-            "startMinute": { "label": "Startminute" },
-            "breakMinutes": { "label": "Standardabstand zwischen Blöcken (Minuten)" },
-            "breaks": { "label": "Benannte Pausen" },
-            "activeDays": { "label": "Unterrichtstage" },
-            "isDefault": { "label": "Standardraster" }
+            "blockLengthMinutes": {
+                "label": "Blocklänge (Minuten)"
+            },
+            "blocksPerDay": {
+                "label": "Blöcke pro Tag"
+            },
+            "startHour": {
+                "label": "Startstunde"
+            },
+            "startMinute": {
+                "label": "Startminute"
+            },
+            "breakMinutes": {
+                "label": "Standardabstand zwischen Blöcken (Minuten)"
+            },
+            "breaks": {
+                "label": "Benannte Pausen"
+            },
+            "activeDays": {
+                "label": "Unterrichtstage"
+            },
+            "isDefault": {
+                "label": "Standardraster"
+            }
         }
     },
     "sessionKind": {
@@ -200,7 +226,9 @@
             "durationBlocks": "Blöcke"
         },
         "field": {
-            "title": { "label": "Titel" },
+            "title": {
+                "label": "Titel"
+            },
             "color": {
                 "help": "Färbt jeden Termin dieser Lehrveranstaltung ein. Leer lassen, um die Farbe der Terminart zu übernehmen: leer bedeutet übernehmen, nicht grau."
             },
@@ -254,12 +282,21 @@
                     "warning": "Warnung: Es sind nur {capacity} von erwarteten {estimate} eingeschrieben, dieser Wert kann also unvollständig sein."
                 }
             },
-            "allowOnline": {
-                "label": "Darf online stattfinden",
-                "help": "Erlaubt dem Solver, diese Veranstaltung in einen virtuellen Raum zu legen. Online-Lehre ist ein virtueller Raum, kein Merkmal am Termin."
+            "onlineMode": {
+                "label": "Online-Durchführung",
+                "help": "Online-Lehre ist ein virtueller Raum, kein Merkmal am Termin. „Nur online“ beschränkt die Platzierung auf die virtuellen Räume und wird mit der Raumliste unten geschnitten, falls eine gesetzt ist; außerdem werden die Online-Regeln (Online/Präsenz am selben Tag, maximaler Online-Anteil, gleichzeitige Online-Termine) dadurch deutlich schwerer erfüllbar.",
+                "option": {
+                    "forbidden": "Nur in Präsenz",
+                    "allowed": "Darf online stattfinden",
+                    "required": "Nur online"
+                }
             },
-            "notes": { "label": "Notizen" },
-            "createdFromTemplateId": { "label": "Aus Vorlage erstellt" }
+            "notes": {
+                "label": "Notizen"
+            },
+            "createdFromTemplateId": {
+                "label": "Aus Vorlage erstellt"
+            }
         },
         "relation": {
             "groups": {
@@ -278,6 +315,11 @@
                 "help": "Beschränkt die Platzierung auf Räume, die alles davon bieten. Eine Stückzahl bedeutet mindestens so viele Einheiten, sodass nur Räume infrage kommen, die genug davon angeben.",
                 "quantity": "Anzahl",
                 "emptyHint": "Es ist noch keine Ausstattung definiert."
+            },
+            "rooms": {
+                "label": "Nur diese Räume",
+                "help": "Beschränkt die Platzierung auf genau diese Räume; leer lassen für jeden geeigneten Raum. Das ist keine Präferenz: die Liste wird mit den Anforderungen an Kapazität, Ausstattung und Online-Durchführung kombiniert, eine zu enge Auswahl lässt der Lehrveranstaltung also keinen Platz mehr.",
+                "emptyHint": "Es sind noch keine Räume definiert."
             }
         }
     },
@@ -304,8 +346,12 @@
                 "label": "Art",
                 "emptyHint": "Legen Sie zuerst eine Terminart an: Vorlesung, Unterrichtsstunde – wie auch immer Sie sie nennen."
             },
-            "frequency": { "label": "Termine pro Semester" },
-            "durationBlocks": { "label": "Länge in Blöcken" },
+            "frequency": {
+                "label": "Termine pro Semester"
+            },
+            "durationBlocks": {
+                "label": "Länge in Blöcken"
+            },
             "schedulingPattern": {
                 "label": "Wie sich die Termine verteilen",
                 "option": {
@@ -319,11 +365,27 @@
                 "help": "Der Hinweis auf den Pool möglicher Lehrkräfte. Eine bestimmte Person wird an der Lehrveranstaltung selbst benannt, nicht hier.",
                 "emptyHint": "Es sind noch keine Rollen definiert."
             },
-            "requiredCapacity": { "label": "Erforderliche Raumkapazität" },
-            "requiredRoomCount": { "label": "Gleichzeitig benötigte Räume" },
-            "requiredLecturerCount": { "label": "Gleichzeitig benötigte Lehrkräfte" },
-            "allowOnline": { "label": "Darf online stattfinden" },
-            "notes": { "label": "Notizen" }
+            "requiredCapacity": {
+                "label": "Erforderliche Raumkapazität"
+            },
+            "requiredRoomCount": {
+                "label": "Gleichzeitig benötigte Räume"
+            },
+            "requiredLecturerCount": {
+                "label": "Gleichzeitig benötigte Lehrkräfte"
+            },
+            "onlineMode": {
+                "label": "Online-Durchführung",
+                "option": {
+                    "notSet": "Nicht festgelegt",
+                    "forbidden": "Nur in Präsenz",
+                    "allowed": "Darf online stattfinden",
+                    "required": "Nur online"
+                }
+            },
+            "notes": {
+                "label": "Notizen"
+            }
         }
     },
     "offeringPlan": {
@@ -350,20 +412,34 @@
             "isEnabled": "Aktiviert"
         },
         "field": {
-            "type": { "label": "Regel" },
-            "severity": { "label": "Härte" },
-            "weight": { "label": "Strafgewicht" },
-            "params": { "label": "Parameter" },
-            "scopes": { "label": "Gilt für Terminarten" },
-            "members": { "label": "Beteiligte Lehrveranstaltungen" },
-            "isEnabled": { "label": "Aktiviert" }
+            "type": {
+                "label": "Regel"
+            },
+            "severity": {
+                "label": "Härte"
+            },
+            "weight": {
+                "label": "Strafgewicht"
+            },
+            "params": {
+                "label": "Parameter"
+            },
+            "scopes": {
+                "label": "Gilt für Terminarten"
+            },
+            "members": {
+                "label": "Beteiligte Lehrveranstaltungen"
+            },
+            "isEnabled": {
+                "label": "Aktiviert"
+            }
         }
     },
     "screen": {
         "label": "Anzeigetafel",
         "plural": "Anzeigetafeln",
-        "description": "Anzeigen im Foyer und auf den Gängen, die die aktuelle Raumbelegung zeigen.",
-        "keywords": "Anzeigetafel, Anzeigetafeln, Anzeige, Bildschirm, Monitor, Foyer, Eingangshalle, Flur, Aushang, Belegung",
+        "description": "Anzeigetafeln in Foyer und Fluren, die die aktuelle Raumbelegung oder die Vertretungen des Tages zeigen.",
+        "keywords": "anzeigetafel, anzeigetafeln, display, foyer, kiosk, beschilderung, tafel, monitor, tv, flur, belegung, vertretung, vertretungen, vertretungsplan",
         "column": {
             "roomSummary": "Zeigt",
             "lastSeenAt": "Zuletzt gesehen"
@@ -379,7 +455,21 @@
                 "label": "Angezeigte Räume",
                 "emptyHint": "Es sind noch keine Räume definiert."
             },
-            "key": { "label": "Anzeige-Adresse" }
+            "key": {
+                "label": "Anzeige-Adresse"
+            },
+            "mode": {
+                "label": "Tafel",
+                "help": "Welche Tafel diese Anzeige zeichnet. Eine Raumbelegung zeigt die aktuelle Belegung; ein Vertretungsplan zeigt Vertretungen, Ausfälle und Verlegungen für heute und morgen.",
+                "option": {
+                    "roomBoard": "Raumbelegung",
+                    "substitutionPlan": "Vertretungsplan"
+                }
+            },
+            "groupIds": {
+                "label": "Angezeigte Gruppen",
+                "emptyHint": "Noch keine Gruppen festgelegt."
+            }
         }
     },
     "term": {
@@ -392,8 +482,12 @@
             "endDate": "Endet"
         },
         "field": {
-            "startDate": { "label": "Startdatum" },
-            "endDate": { "label": "Enddatum" },
+            "startDate": {
+                "label": "Startdatum"
+            },
+            "endDate": {
+                "label": "Enddatum"
+            },
             "timeGridId": {
                 "label": "Zeitraster",
                 "help": "Auf welchem Raster dieses Semester geplant wird. Ohne Angabe gilt der Standard der Institution.",
@@ -426,9 +520,15 @@
                     "holiday": "Feiertag"
                 }
             },
-            "startDate": { "label": "Startdatum" },
-            "endDate": { "label": "Enddatum" },
-            "weekPreview": { "label": "Wochen, die dies neu einordnet" }
+            "startDate": {
+                "label": "Startdatum"
+            },
+            "endDate": {
+                "label": "Enddatum"
+            },
+            "weekPreview": {
+                "label": "Wochen, die dies neu einordnet"
+            }
         }
     },
     "account": {
@@ -447,9 +547,15 @@
                 "label": "E-Mail",
                 "help": "Die Adresse für die Anmeldung, eindeutig über die gesamte Installation: ein Zugang kann in mehreren Institutionen handeln."
             },
-            "personId": { "label": "Handelt als" },
-            "password": { "label": "Initiales Passwort" },
-            "attachExisting": { "label": "Bestehenden Zugang verknüpfen" },
+            "personId": {
+                "label": "Handelt als"
+            },
+            "password": {
+                "label": "Initiales Passwort"
+            },
+            "attachExisting": {
+                "label": "Bestehenden Zugang verknüpfen"
+            },
             "mustChangePassword": {
                 "label": "Muss bei der ersten Anmeldung ein neues Passwort wählen",
                 "help": "Ein Passwort, das die Administration kennt, ist ein geteiltes Geheimnis. Genau das macht es vorübergehend: die Anmeldung gelingt, erzeugt aber erst dann eine Sitzung, wenn das Passwort geändert wurde."
@@ -472,7 +578,9 @@
                 "label": "Schlüssel",
                 "help": "Stabile Kennung. `create:account --role <key>` und jeder Import sprechen die Rolle darüber an, sie kann daher später nicht geändert werden."
             },
-            "permissions": { "label": "Berechtigungen" }
+            "permissions": {
+                "label": "Berechtigungen"
+            }
         }
     }
 }

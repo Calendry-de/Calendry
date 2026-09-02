@@ -41,7 +41,10 @@
         "regionLabel": "Filter und Aktionen zum Stundenplan",
         "term": "Semester",
         "filters": "Filter",
-        "violationCount": "{count} Regelverstoß | {count} Regelverstöße",
+        "violationsHard": "{count} hart",
+        "violationsSoft": "{count} weich",
+        "violationsNone": "Keine Regelverstöße",
+        "violationsLabel": "Regelverstöße in diesem Semester: {hard} hart, {soft} weich",
         "addEvent": "Einzeltermin hinzufügen",
         "cancelEvent": "Anlegen abbrechen",
         "proposals": "Planvorschläge"
@@ -378,6 +381,11 @@
     "reviewSummary": {
         "hardSurviving": "{count} Verstoß gegen eine harte Regel besteht in diesem Planvorschlag weiterhin | {count} Verstöße gegen harte Regeln bestehen in diesem Planvorschlag weiterhin",
         "unmappable": "{locatable} von {total} Terminverweisen lassen sich zuordnen; {unmappable} verweisen auf Termine, die der Solver selbst erzeugt hat und die keinem Zeitfenster zugeordnet werden können.",
+        "forcedOnlineHead": "{count} dieser Verstöße lässt sich durch Umplanen nicht beheben: Der Unterricht der Gruppe muss online stattfinden. | {count} dieser Verstöße lassen sich durch Umplanen nicht beheben: Der Unterricht dieser Gruppen muss online stattfinden.",
+        "forcedOnlineGroup": "{group}: {forced} von {total} Terminen müssen online sein, mehr als die zulässigen {percent} %.",
+        "forcedOnlineTerm": "Zwingend online durch: {offerings}.",
+        "forcedOnlineWeek": "Zwingend online durch: {offerings}. Die Obergrenze gilt je Woche, daher wird sie in mindestens einer Woche überschritten, wie das Semester auch verteilt wird.",
+        "forcedOnlineFix": "Erhöhen Sie die Obergrenze oder lassen Sie diese Lehrveranstaltungen in Präsenz zu. Bis dahin meldet der Solver den Verstoß bei jedem Lauf, und keine Terminverteilung behebt ihn.",
         "clear": "Jede harte Regel, die der Solver prüft, ist erfüllt.",
         "compare": "Unabhängig davon finden Calendrys eigene {rules} strukturelle Prüfungen {count} Problem im aktiven Stundenplan (ein anderer Regelsatz); die beiden Zahlen sind also kein direkter Vergleich. | Unabhängig davon finden Calendrys eigene {rules} strukturelle Prüfungen {count} Probleme im aktiven Stundenplan (ein anderer Regelsatz); die beiden Zahlen sind also kein direkter Vergleich.",
         "recheckNote": "Sie laufen nach dem Übernehmen erneut.",

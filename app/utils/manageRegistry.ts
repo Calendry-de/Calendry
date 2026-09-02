@@ -421,7 +421,7 @@ export interface ManageEntity {
 const OFFERING_TEMPLATE_SHAPE_FIELDS = [
     'title', 'kindId', 'code', 'color', 'frequency', 'durationBlocks',
     'schedulingPattern', 'requiredRoleId', 'requiredCapacity',
-    'requiredRoomCount', 'requiredLecturerCount', 'allowOnline', 'notes',
+    'requiredRoomCount', 'requiredLecturerCount', 'onlineMode', 'notes',
 ] as const;
 
 export function offeringEntity(t: Translate): ManageEntity {
@@ -665,10 +665,28 @@ export function offeringEntity(t: Translate): ManageEntity {
                 },
             },
             {
-                key: 'allowOnline',
-                label: t('manage.offering.field.allowOnline.label'),
-                type: 'boolean',
-                help: t('manage.offering.field.allowOnline.help'),
+                key: 'onlineMode',
+                label: t('manage.offering.field.onlineMode.label'),
+                type: 'select',
+                /*
+                 * THREE ANSWERS, AND THE THIRD IS NOT A STRONGER SECOND. The
+                 * boolean this replaced could only say "permitted"; "Online
+                 * only" is a different claim, and the copy has to keep them
+                 * apart, because a timetabler reading the required option as
+                 * "online allowed" gets a term of physical placements and no
+                 * indication anything was ignored.
+                 *
+                 * NO BLANK OPTION, unlike `schedulingPattern` above: the column
+                 * is NOT NULL and there is no "undecided" here. Every offering
+                 * that predates this field is FORBIDDEN, which is a real answer
+                 * rather than an absence.
+                 */
+                options: [
+                    { value: 'FORBIDDEN', label: t('manage.offering.field.onlineMode.option.forbidden') },
+                    { value: 'ALLOWED', label: t('manage.offering.field.onlineMode.option.allowed') },
+                    { value: 'REQUIRED', label: t('manage.offering.field.onlineMode.option.required') },
+                ],
+                help: t('manage.offering.field.onlineMode.help'),
             },
             { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
             { key: 'notes', label: t('manage.offering.field.notes.label'), type: 'textarea' },
@@ -733,6 +751,32 @@ export function offeringEntity(t: Translate): ManageEntity {
                 optionLabel: (row) => String(row.name ?? row.key),
                 quantity: { key: 'quantity', label: t('manage.offering.relation.equipment.quantity') },
                 emptyHint: t('manage.offering.relation.equipment.emptyHint'),
+            },
+            {
+                /*
+                 * THE ROOM PIN (issue #123): "only these rooms", never
+                 * "preferred rooms". There is no soft reading of this control:
+                 * the set is ANDed with every other eligibility filter, so an
+                 * over-narrow pin is an offering that cannot be placed at all.
+                 * The label and help text carry that, because nothing else in
+                 * the form can.
+                 *
+                 * `searchable`: a university's room inventory is one of the two
+                 * lists here that plausibly runs to thousands (persons is the
+                 * other), and `rooms` declares `searchFields`, which the flag
+                 * requires.
+                 */
+                key: 'rooms',
+                label: t('manage.offering.relation.rooms.label'),
+                help: t('manage.offering.relation.rooms.help'),
+                resource: 'rooms',
+                valueKey: 'roomId',
+                searchable: true,
+                // `code — name`, the way a timetabler names a room out loud:
+                // "A101" identifies it and "Lecture Hall" says which one that
+                // is. Same order the solver's own room label uses.
+                optionLabel: (row) => [row.code, row.name].filter(Boolean).join(' — '),
+                emptyHint: t('manage.offering.relation.rooms.emptyHint'),
             },
         ],
     };
@@ -852,7 +896,20 @@ export function offeringTemplateEntity(t: Translate): ManageEntity {
                 type: 'number',
                 min: 1,
             },
-            { key: 'allowOnline', label: t('manage.offeringTemplate.field.allowOnline.label'), type: 'boolean' },
+            {
+                key: 'onlineMode',
+                label: t('manage.offeringTemplate.field.onlineMode.label'),
+                type: 'select',
+                // A BLANK OPTION HERE, unlike the Offering's: on a template
+                // "not set" means the shape does not fix this field, which is
+                // every template column's own third state.
+                options: [
+                    { value: '', label: t('manage.offeringTemplate.field.onlineMode.option.notSet') },
+                    { value: 'FORBIDDEN', label: t('manage.offeringTemplate.field.onlineMode.option.forbidden') },
+                    { value: 'ALLOWED', label: t('manage.offeringTemplate.field.onlineMode.option.allowed') },
+                    { value: 'REQUIRED', label: t('manage.offeringTemplate.field.onlineMode.option.required') },
+                ],
+            },
             { key: 'notes', label: t('manage.offeringTemplate.field.notes.label'), type: 'textarea' },
         ],
     };
@@ -1504,6 +1561,7 @@ export function manageEntities(t: Translate): ManageEntity[] {
             keywords: searchKeywords(t, 'manage.screen.keywords', [
                 'screen', 'screens', 'display', 'displays', 'lobby', 'kiosk',
                 'signage', 'board', 'monitor', 'tv', 'corridor', 'occupancy',
+                'substitution', 'substitutions', 'cover', 'vertretung', 'vertretungsplan',
             ]),
             title: (row) => String(row.name ?? t('manage.screen.label')),
             detailComponent: 'ScreenForm',
@@ -1520,6 +1578,28 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     type: 'text',
                     required: true,
                     help: t('manage.screen.field.name.help'),
+                },
+                /*
+                 * WHICH BOARD IT DRAWS (issue #31). A plain select, rendered by
+                 * the generic field list rather than the bespoke component,
+                 * because it is an ordinary two-option column; what is bespoke
+                 * is only which SCOPE picker it makes relevant, and
+                 * `ScreenForm` reads the draft to decide that.
+                 *
+                 * NOT `createOnly`: the PATCH route accepts it, and a screen
+                 * repurposed from occupancy to a Vertretungsplan should not
+                 * mean re-issuing a key somebody has to walk to the wall to
+                 * retype.
+                 */
+                {
+                    key: 'mode',
+                    label: t('manage.screen.field.mode.label'),
+                    type: 'select',
+                    help: t('manage.screen.field.mode.help'),
+                    options: [
+                        { value: 'ROOM_BOARD', label: t('manage.screen.field.mode.option.roomBoard') },
+                        { value: 'SUBSTITUTION_PLAN', label: t('manage.screen.field.mode.option.substitutionPlan') },
+                    ],
                 },
                 {
                     key: 'isActive',
@@ -1563,6 +1643,31 @@ export function manageEntities(t: Translate): ManageEntity[] {
                  * secret would be gone before it could be read. `custom` because the
                  * control is the display URL with a copy button, not a text input.
                  */
+                /*
+                 * The SECOND scope axis, read by `SUBSTITUTION_PLAN`. Declared
+                 * whatever the mode, and that is deliberate: `useEntityForm`
+                 * only serialises fields it knows about, so leaving it out
+                 * while the room board is selected would silently drop a group
+                 * scope every time somebody saved an occupancy screen.
+                 *
+                 * `reference` for the same reason `roomIds` is: the form's
+                 * fetch wave is built from fields carrying one, and a field
+                 * without it renders "No groups defined yet." in a tenant full
+                 * of groups. `custom`, because the EMPTY state means "every
+                 * group" and no generic control can say that.
+                 */
+                {
+                    key: 'groupIds',
+                    label: t('manage.screen.field.groupIds.label'),
+                    type: 'reference',
+                    custom: true,
+                    reference: {
+                        resource: 'groups',
+                        label: (row) => String(row.name ?? row.id),
+                        nullable: true,
+                        emptyHint: t('manage.screen.field.groupIds.emptyHint'),
+                    },
+                },
                 { key: 'key', label: t('manage.screen.field.key.label'), type: 'text', custom: true },
             ],
         },

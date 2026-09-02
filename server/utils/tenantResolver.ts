@@ -1,4 +1,6 @@
 import type { H3Event } from 'h3';
+import type { ScreenMode } from '../../shared/screenKey';
+import { asScreenMode } from '../../shared/screenKey';
 import { SESSION_COOKIE, STAFF_SESSION_COOKIE } from './auth';
 import {
     resolveApiToken, resolveIcsLink, resolveScreenKey, resolveSessionToken, resolveStaffSessionToken,
@@ -43,8 +45,25 @@ export interface ScreenIdentity extends IdentityBase {
     actorPersonId: null;
     screenId: string;
     screenName: string;
-    /** Rooms this screen may show. EMPTY MEANS EVERY ROOM in the tenant. */
+    /**
+     * Which board this display draws (issue #31), and therefore which of the
+     * two scope axes below is its authority. `null` when the stored value is
+     * one this version does not recognise: refused by name at the routes
+     * rather than coerced into a mode, since a display drawing the wrong board
+     * confidently is worse than one saying it cannot.
+     */
+    mode: ScreenMode | null;
+    /**
+     * Rooms this screen may show. EMPTY MEANS EVERY ROOM in the tenant.
+     * The `ROOM_BOARD` axis, read by `GET /api/screens/board`.
+     */
     roomIds: string[];
+    /**
+     * Groups this screen may show. EMPTY MEANS EVERY GROUP in the tenant.
+     * The `SUBSTITUTION_PLAN` axis, read by `GET /api/screens/substitutions`,
+     * which expands it DOWN the nesting closure before filtering.
+     */
+    groupIds: string[];
 }
 
 /**
@@ -268,7 +287,12 @@ const screenKeyResolver: TenantResolver = async (event) => {
         actorPersonId: null,
         screenId: screen.screen_id,
         screenName: screen.name,
+        // Narrowed here, once, at the boundary the raw text crosses: a value
+        // this version does not know becomes `null` rather than a default, and
+        // every board route refuses it by name.
+        mode: asScreenMode(screen.mode),
         roomIds: screen.room_ids,
+        groupIds: screen.group_ids,
     };
 };
 

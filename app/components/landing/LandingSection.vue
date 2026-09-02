@@ -144,6 +144,25 @@ withDefaults(defineProps<{
     }
 
     &_title {
+        /*
+         * THE HEAD REVEALS WITH ITS BODY, and this is the reason the whole
+         * page needed a pass: eight section bodies arrived on a scroll
+         * timeline while the eight headings above them were simply already
+         * there, so every section announced itself before it had anything to
+         * say. Title then lead, one stagger step apart, in reading order.
+         *
+         * Applied to the two text elements rather than to `.section_head`,
+         * which is `position: sticky` in the aside layout: a view() timeline
+         * stops advancing once an element sticks, so the wrapper is the one
+         * element on this page whose reveal could freeze half-finished.
+         *
+         * 16px of travel, not the mixin's 64px default. That default is tuned
+         * for a card entering as an object; a heading that slides a card's
+         * distance reads as the page settling rather than as the section
+         * arriving.
+         */
+        @include landingReveal($shift: 16px);
+
         max-width: 30ch;
         margin: 0;
 
@@ -157,6 +176,8 @@ withDefaults(defineProps<{
     }
 
     &_lead {
+        @include landingReveal($shift: 16px, $order: 1);
+
         max-width: 66ch;
         margin: $space6 0 0;
 

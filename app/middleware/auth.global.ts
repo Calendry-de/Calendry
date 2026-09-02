@@ -1,8 +1,8 @@
 import { fetchSession, isSignedIn, useSession } from '~/composables/session';
 import { useStore } from '~/store';
 import {
-    HOME_ROUTE, LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, STAFF_CHANGE_PASSWORD_ROUTE, STAFF_LOGIN_ROUTE,
-    STAFF_ROUTE, isInternalPath, resolveHomeRoute,
+    HOME_ROUTE, LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, SCREEN_SUBSTITUTIONS_ROUTE,
+    STAFF_CHANGE_PASSWORD_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, isInternalPath, resolveHomeRoute,
 } from '~/utils/routes';
 
 /**
@@ -36,6 +36,11 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  * route enforces the key; this list only keeps the client-side guard from
  * intercepting a page that answers to a different credential.
  *
+ * `/screen/substitutions` (issue #31) is the SAME credential and the same
+ * reason, listed separately because this guard matches paths EXACTLY: a
+ * display mounted on the second board would otherwise be bounced to a login
+ * form, and it is a wall, so nobody would be there to notice.
+ *
  * `/staff`, `/staff/login` and `/staff/change-password` (issue #76, #106) are
  * the third reason: a Calendry STAFF session is a completely separate
  * credential (`STAFF_SESSION_COOKIE`/`StaffIdentity`, never a tenant Account
@@ -45,7 +50,8 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  * its own staff session itself.
  */
 const ANONYMOUS_ROUTES = [
-    LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, STAFF_LOGIN_ROUTE, STAFF_ROUTE, STAFF_CHANGE_PASSWORD_ROUTE,
+    LANDING_ROUTE, PRICING_ROUTE, SCREEN_ROUTE, SCREEN_SUBSTITUTIONS_ROUTE,
+    STAFF_LOGIN_ROUTE, STAFF_ROUTE, STAFF_CHANGE_PASSWORD_ROUTE,
 ];
 
 export default defineNuxtRouteMiddleware(async (to) => {

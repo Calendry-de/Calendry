@@ -126,6 +126,55 @@ export function weekIndexOf(termStart: Date, date: Date): number {
     return Math.floor((target - first) / (7 * MS_PER_DAY));
 }
 
+/** Where a date falls relative to a Term. See `termPosition`. */
+export type TermPhase = 'BEFORE' | 'DURING' | 'AFTER';
+
+export interface TermPosition {
+    phase: TermPhase;
+    /**
+     * 1-based term week of the date, CLAMPED into the term: week 1 before it
+     * begins, the last week after it ends. Read it only alongside `phase`,
+     * which is what says whether the number describes now or a boundary.
+     */
+    week: number;
+    totalWeeks: number;
+}
+
+/**
+ * Which week of a term a date is in, and whether the term is running at all.
+ *
+ * MONDAY-ANCHORED, NOT DATE-COMPARED, and that is the whole decision in here.
+ * A term beginning Thursday 2026-10-01 has its week 1 start on Monday
+ * 09-28, because `weekIndexOf` anchors every week to the Monday on or before
+ * `termStart` (the rule that lets a date's index and a Session's stored
+ * `termWeek` agree by construction). So on Wednesday 09-30 this reports
+ * `DURING`, week 1, even though the term's own start date is tomorrow.
+ *
+ * That is deliberate: `/schedule`'s Today button resolves today the same way
+ * (`weekIndexOf` + clamp, in `jumpToToday`), so it already draws that Wednesday
+ * inside week 1 with a live now-indicator. Comparing dates here instead would
+ * make the dashboard say "the term has not started" about a week the schedule
+ * is already showing you, which is two definitions of "now" rather than one.
+ *
+ * `date` must be TENANT-LOCAL (`localNow(now, tenant.timezone).date`), never a
+ * raw `new Date()`: CLAUDE.md's timezone rule is that grid resolution is always
+ * tenant-local and a viewer's own zone is display-only.
+ */
+export function termPosition(termStart: Date, termEnd: Date, date: Date): TermPosition {
+    const totalWeeks = weekCountOf(termStart, termEnd);
+    const index = weekIndexOf(termStart, date);
+
+    if (index < 0) {
+        return { phase: 'BEFORE', week: 1, totalWeeks };
+    }
+
+    if (index >= totalWeeks) {
+        return { phase: 'AFTER', week: totalWeeks, totalWeeks };
+    }
+
+    return { phase: 'DURING', week: index + 1, totalWeeks };
+}
+
 /**
  * Classify every week of a term.
  *

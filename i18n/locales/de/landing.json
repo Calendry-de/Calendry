@@ -254,8 +254,11 @@
         "federationLabel": "Verbund",
         "standalone": "Eigenständig",
         "federationMember": "Verbundmitglied",
-        "totalLabel": "Gesamt pro Jahr",
+        "totalLabel": "Netto gesamt pro Jahr",
         "tierLine": "Komplexität {score}, Stufe {tier}, Faktor {multiplier}x auf die Zwischensumme der Lehrkräfte",
+        "netLabel": "Netto",
+        "vatLabel": "USt. {rate}",
+        "grossLabel": "Brutto pro Jahr",
         "examplesLabel": "Beispiel laden"
     },
     "problem": {

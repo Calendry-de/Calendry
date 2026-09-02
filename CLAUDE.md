@@ -120,11 +120,16 @@ values. **Never hardcode an open value into logic**: never assume a Role called
 - **The helper schema is `calendry_internal`, never `calendry`**: naming it
   after the owner role lets Postgres's default `search_path` capture Prisma's own
   `_prisma_migrations` table and silently misplace every table.
-- **History is event-sourced.** Manual edits are append-only events
-  (`create`/`move`/`swap`/`delete`/`lock`) on a versioned Generation snapshot;
-  never mutate a Session without emitting the event. The trigger permits one
-  exception: an UPDATE nulling `session_id`/`counterpart_session_id` and nothing
-  else, so a Session can be deleted without destroying its audit trail.
+- **History is event-sourced.** Edits are append-only events on a versioned
+  Generation snapshot; never mutate a Session without emitting the event.
+  **The kinds are `SessionEventType` in `schema.prisma`, mirrored by `EventType`
+  in `server/utils/sessionEvents.ts`, and nowhere else.** This rule used to name
+  five of them inline and there are ELEVEN; a reader written against the list
+  rather than the enum handles `create`/`move`/`swap`/`delete`/`lock` and
+  silently drops the other six, which is why the list is gone rather than
+  corrected. The trigger permits one exception: an UPDATE nulling
+  `session_id`/`counterpart_session_id` and nothing else, so a Session can be
+  deleted without destroying its audit trail.
 - **Nested Groups propagate conflicts both directions** (ancestor ↔ descendant).
   Read TAXONOMY.md §6 before touching conflict-check code, and never walk the
   tree live in a hot path: use the precomputed closure.
@@ -292,10 +297,18 @@ Each of these has bitten more than once, in a different disguise each time.
   family (`server/api/[resource]/*.ts`), that means the resource's `oneOf`
   variant in `index.post.ts` (create) and `[id].patch.ts` (update); a bespoke
   route (e.g. `offering-plan-apply/[id].post.ts`) documents itself the same
-  way, inline. **`defineRouteMeta`'s argument must be a pure object literal**:
-  no variables, spreads, or function calls. Nitro silently drops anything
-  computed rather than erroring, so a schema built that way looks correct in
-  the diff and is simply absent from the generated docs.
+  way, inline. **For the generic family this is now a test, not only a rule**:
+  `tests/openapi-route-meta.test.ts` imports those route modules with Nitro's
+  macros stubbed and asserts each `oneOf` variant's properties and `required`
+  list equal the `RESOURCES`/`RELATIONS` zod schema exactly, plus that every
+  per-resource list filter is a documented query parameter. It exists because
+  the rule alone drifted: `requiredLecturerCount` shipped on Offering and
+  OfferingTemplate, create and update, and was in none of the four schemas.
+  A bespoke route is still checked by nobody. **`defineRouteMeta`'s argument
+  must be a pure object literal**: no variables, spreads, or function calls.
+  Nitro silently drops anything computed rather than erroring, so a schema
+  built that way looks correct in the diff and is simply absent from the
+  generated docs.
 
 ### Components and styling
 
@@ -410,6 +423,37 @@ solver has no way to detect.
   a per-role normalisation rule first, because a Session's attendee set is the
   whole descendant closure. Solver ADR-0026; §§ "Per-person preferences",
   "`PersonPreferenceFit.roles`".
+- **A room PIN and `onlineMode = REQUIRED` write the SAME wire field, and
+  compose in ONE place.** `resolveRoomRestriction()`
+  (`server/utils/offeringRooms.ts`) is the only statement of both rules:
+  REQUIRED plus an explicit pin INTERSECT (not "pin wins", not "online wins"),
+  and an empty result is a REPORTED ERROR, never an empty `allowedRoomIds`.
+  Empty means ANY ROOM on the wire, so the naive mapping turns "must be online"
+  into "anywhere at all" and places every Session in a physical room with nobody
+  told; the unsatisfiable case ships `NO_ELIGIBLE_ROOM_ID` instead and
+  `AssemblyReport.offeringsWithUnsatisfiableRoomRestriction` names which of the
+  three causes it was. The virtual-Room list is DERIVED from `Room.isVirtual`
+  every run and NEVER persisted: a virtual Room created next week must not be
+  silently excluded from every Offering that already asked for "online".
+  `violations.ts` calls the same function for a manual edit, so "the solver
+  would not place it here" and "the UI warns about it here" cannot become
+  different questions. § "Room pins and online mode".
+- **A `MaxOnlineShare` breach that forced-online teaching makes unavoidable is
+  EXPLAINED, never suppressed.** The cap is HARD and the solver's violation
+  names no Session and no Offering, so it writes no `constraint_violation` row
+  and reaches a reviewer only as a number. `forcedOnlineAboveShareCap()`
+  (`server/utils/onlineShareFloor.ts`) is the ONE place that separates "over the
+  cap because of where things were placed" from "over the cap before anything
+  was placed", reporting the second in
+  `AssemblyReport.groupsWithForcedOnlineAboveShareCap`. The rule still crosses
+  the wire exactly as configured: narrowing it for those groups would discard
+  the tenant's instruction with nobody told, the same failure as sending an
+  empty `allowed_room_ids` for "must be online". "Forced online" is read off
+  `resolveRoomRestriction`'s `permittedRoomIds`, never off `onlineMode`, and the
+  arithmetic mirrors `ShareInstance::allowance` — `floor`, strict `>`, empty
+  `applies_to_kinds` meaning EVERY kind — because a warning that disagrees with
+  the violation it explains is worse than none. § "The online-share cap against
+  teaching that must be online".
 - **A lecturer candidate pool is not a co-teaching roster.**
   `Offering.requiredLecturerCount` decouples "who CAN lead it"
   (`OfferingLecturer`, the pool sent as `candidateLecturerIds`) from how many
@@ -458,6 +502,7 @@ The rest are area-specific: read the section before working in that area.
 | Accounts | `accounts` is NOT in `CRUD_RESOURCES` (no `tenant_id`, no RLS). Visibility IS the join; `assertSoleTenant` / `assertDetachable` are exact complements. | § "Accounts in the management area" |
 | `/manage` | Entity routes (`/manage/<entity>[/…]`) are one scaffold from `manageRegistry.ts`, which is also the nav source. Bespoke means one slot, never a page. `custom: true` or the field is dropped from saves silently. `/manage` itself is a redirect stub to `/dashboard`, which now renders the overview cards and carries `CommonAppShell` (the renamed, broadened former `ManageShell`): the sidebar it backs is not manage-only, it's `useAppSections()`'s full reachable set. | § "Management area" |
 | Display settings | Singleton keyed by `tenant_id`, absent row = defaults. Colour is RESOLVED and may be **null**, never a fallback accent. | § "Schedule display" |
+| Room restriction | `resolveRoomRestriction()` is the ONE composition of the `offering_room` pin and `Offering.onlineMode`; empty pin = any Room, empty RESULT = reported error, never an empty wire list. Nothing is refused at the write. | § "Room pins and online mode" |
 | TimeGrid breaks | Never reach the solver: a multi-block Session spanning one is LEGAL, drawn honestly, never sent. `blockTime()`/`blockOfMinute()`/`gapsWithinSpan()` are the single definition of block boundaries and of what a span does not teach. | §§ "TimeGrid breaks", "A Session that spans a break" |
 | Calendar periods | `classifyWeeks` is the one classifier; `EXAM` touches the week, `BREAK`/`HOLIDAY` cover it. | § "Academic calendar periods" |
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
@@ -514,7 +559,11 @@ Owed by any tenant provisioned before them: `account.read`, `account.manage`,
 `tenant.read`, `tenant.update`, `generation.read`, `session.read_own`,
 `screen.read`, `screen.manage`, `exam.request_own`, `exam.review`,
 `session.assign_lecturer`, `api_token.manage_own`, the `member` role, and a
-`group_veto` constraint row.
+`group_veto` constraint row. Issue #123 adds a second constraint row,
+**`no_session_outside_allowed_room`** (`backfill:constraints -- --all-missing`):
+without it a manual move into a Room the Offering's pin or online mode forbids
+warns about nothing at all, and that silence is indistinguishable from "no
+problem".
 
 **`exam.request_own` is the one that wants granting to LECTURERS, not just to
 `tenant-admin`.** `grant:permissions --all-missing` repairs the admin role only,

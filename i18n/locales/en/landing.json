@@ -254,8 +254,11 @@
         "federationLabel": "Federation",
         "standalone": "Standalone",
         "federationMember": "Federation member",
-        "totalLabel": "Total a year",
+        "totalLabel": "Net total a year",
         "tierLine": "Complexity {score}, tier {tier}, {multiplier}x on the lecturer subtotal",
+        "netLabel": "Net",
+        "vatLabel": "VAT {rate}",
+        "grossLabel": "Gross a year",
         "examplesLabel": "Load an example"
     },
     "problem": {

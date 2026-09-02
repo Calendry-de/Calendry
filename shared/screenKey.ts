@@ -32,3 +32,34 @@ export function randomScreenKey(): string {
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 }
+
+/**
+ * What a Screen draws (issue #31). Mirrors the `screen_mode` Postgres enum.
+ *
+ * IN `shared/`, not derived from Prisma's generated `$Enums`, because three
+ * places need the same list and only one of them can import Prisma: the write
+ * routes' Zod schemas (server), the management form's select options (client),
+ * and `resolveScreenKey()`, which reads the column through `$queryRaw` as raw
+ * text and therefore has no generated mapping to lean on.
+ */
+export const SCREEN_MODES = ['ROOM_BOARD', 'SUBSTITUTION_PLAN'] as const;
+
+export type ScreenMode = (typeof SCREEN_MODES)[number];
+
+/**
+ * The mode a value names, or `null` when it names none.
+ *
+ * A GUARD THAT FAILS LOUDLY rather than defaulting to `ROOM_BOARD`: the value
+ * arrives from `$queryRaw` as unmapped text, and coercing an unrecognised one
+ * to the room board would draw a confident, wrong display instead of saying
+ * that the credential is not one this version understands.
+ */
+export function asScreenMode(value: unknown): ScreenMode | null {
+    return SCREEN_MODES.includes(value as ScreenMode) ? (value as ScreenMode) : null;
+}
+
+/** Where a screen of each mode is drawn. The address issued at creation time. */
+export const SCREEN_MODE_PATHS: Record<ScreenMode, string> = {
+    ROOM_BOARD: '/screen',
+    SUBSTITUTION_PLAN: '/screen/substitutions',
+};

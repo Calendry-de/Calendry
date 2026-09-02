@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { generateSessionToken, hashToken } from '../../utils/auth';
-import { SCREEN_KEY_MIN_LENGTH } from '../../../shared/screenKey';
+import { SCREEN_KEY_MIN_LENGTH, SCREEN_MODES } from '../../../shared/screenKey';
 import { mapDbErrors } from '../../utils/dbErrors';
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
@@ -39,7 +39,20 @@ const BODY = z.object({
      * ordinary way to create a screen answered "Validation Error". Null and
      * absent both mean "no scope stated", which is what the empty case is.
      */
+    /*
+     * Which board this screen draws (issue #31). `nullish` and defaulted here
+     * rather than `.default()` in the schema, for the same reason `roomIds` is
+     * nullish: the shared form sends `null` for anything untouched, and the
+     * column's own default is the mode that existed before there were two.
+     */
+    mode: z.enum(SCREEN_MODES).nullish(),
     roomIds: z.array(z.string().min(1)).nullish(),
+    /*
+     * The SECOND scope axis, read only by `SUBSTITUTION_PLAN`. Same fail-open
+     * reading and the same `nullish` treatment as `roomIds`: EMPTY MEANS EVERY
+     * GROUP, and a form where nobody ticked a group sends `null`.
+     */
+    groupIds: z.array(z.string().min(1)).nullish(),
     isActive: z.boolean().nullish(),
 });
 
@@ -57,6 +70,7 @@ export default defineEventHandler(async (event) => {
                     tenantId: identity.tenantId,
                     name: body.name,
                     tokenHash: hashToken(key),
+                    mode: body.mode ?? 'ROOM_BOARD',
                     isActive: body.isActive ?? true,
                 },
             });
@@ -77,13 +91,27 @@ export default defineEventHandler(async (event) => {
                 });
             }
 
+            // Same treatment, same reasoning: RLS decides whether these Groups
+            // are ours.
+            if (body.groupIds?.length) {
+                await tx.screenGroup.createMany({
+                    data: body.groupIds.map((groupId) => ({
+                        screenId: screen.id,
+                        groupId,
+                        tenantId: identity.tenantId,
+                    })),
+                });
+            }
+
             setResponseStatus(event, 201);
 
             return {
                 id: screen.id,
                 name: screen.name,
+                mode: screen.mode,
                 isActive: screen.isActive,
                 roomIds: body.roomIds ?? [],
+                groupIds: body.groupIds ?? [],
                 /** SHOWN ONCE. Never stored, never recoverable. */
                 key,
             };

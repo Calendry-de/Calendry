@@ -85,13 +85,16 @@ try {
 
             await prisma.offering.update({
                 where: { id: offering.id },
-                // Alternating, so allowOnline is exercised in both states rather
-                // than being uniformly false and therefore untested.
-                data: { frequency: 6, allowOnline: index % 2 === 0 },
+                // Alternating, so the online mode is exercised in more than one
+                // state rather than being uniformly FORBIDDEN and therefore
+                // untested. Not REQUIRED: that one narrows `allowedRoomIds` to
+                // the virtual rooms and would make half the demand unplaceable
+                // in a tenant that has none, which is a different check.
+                data: { frequency: 6, onlineMode: index % 2 === 0 ? 'ALLOWED' : 'FORBIDDEN' },
             });
         }
 
-        line(`  ${offerings.length} offerings: 1 lecturer + 1 group each, frequency 6, alternating allowOnline`);
+        line(`  ${offerings.length} offerings: 1 lecturer + 1 group each, frequency 6, alternating onlineMode`);
     }
 
     // -- Assembly -----------------------------------------------------------
@@ -127,6 +130,7 @@ try {
     line(`  groups              ${report.counts.groups}`);
     line(`  offerings           ${report.counts.offerings}`
         + `  (${input.offerings.filter((o) => o.allowOnline).length} allow online,`
+        + ` ${input.offerings.filter((o) => o.allowedRoomIds.length > 0).length} room-restricted,`
         + ` ${input.offerings.reduce((sum, o) => sum + o.requiredSessionCount, 0)} sessions demanded)`);
     line(`  existingSessions    ${report.counts.existingSessions}`);
     line(`  externalOccupancy   ${input.externalOccupancy.length}  (empty by scope decision)`);
@@ -138,6 +142,14 @@ try {
     line(`  multi-room sessions flattened   ${report.multiRoomSessions.length}`);
     line(`  equipment quantities dropped    ${report.droppedEquipmentQuantities}`);
     line(`  constraints skipped             ${report.skippedConstraints.length}`);
+    // Issue #123: the entry whose absence would be indistinguishable from
+    // "the restriction was honoured", since an empty allow-list means ANY room.
+    line(`  room restrictions impossible    ${report.offeringsWithUnsatisfiableRoomRestriction.length}`);
+
+    for (const impossible of report.offeringsWithUnsatisfiableRoomRestriction) {
+        line(`      ${impossible.title.padEnd(30)} ${impossible.reason}`);
+    }
+
 
     for (const skipped of report.skippedConstraints) {
         line(`      ${skipped.type.padEnd(30)} ${skipped.reason}`);
@@ -246,7 +258,7 @@ try {
             return room?.isVirtual;
         });
 
-        line(`  placed in a virtual room  ${online.length}  (allowOnline actually exercised)`);
+        line(`  placed in a virtual room  ${online.length}  (onlineMode actually exercised)`);
 
         for (const placed of result.sessions.slice(0, 6)) {
             line(`      ${placed.offeringId.slice(0, 14)}…  week=${placed.startSlot?.week}`

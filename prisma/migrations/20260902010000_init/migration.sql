@@ -3466,7 +3466,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "screen_room" TO calendry_app;
 -- "no such screen". A display showing "this screen has been turned off" is
 -- fixable by whoever walks past it; one showing nothing is a hardware call.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION calendry_internal.screen_identity(p_token_hash text)
+-- DROPPED FIRST, for the same reason `federation_room_occupancy()` above is:
+-- `prisma migrate reset` drops `public` and leaves `calendry_internal`
+-- standing, so on a replay this function still exists. CREATE OR REPLACE was
+-- enough while the signature never changed; issue #31 changes it further down
+-- this file (adding `mode` and `group_ids`), and Postgres refuses to REPLACE a
+-- function whose OUT columns differ, which made `db-reset` fail here on the
+-- second run rather than on the change that caused it.
+DROP FUNCTION IF EXISTS calendry_internal.screen_identity(text);
+
+CREATE FUNCTION calendry_internal.screen_identity(p_token_hash text)
 RETURNS TABLE (
     screen_id     text,
     tenant_id     text,
@@ -6424,3 +6433,263 @@ ALTER TABLE "group"
 
 CREATE INDEX "group_curriculum_plan_id_idx" ON "group" ("curriculum_plan_id");
 
+
+-- ===========================================================================
+-- from 20260902020000_offering_room_pin_and_online_mode
+-- ===========================================================================
+-- ---------------------------------------------------------------------------
+-- Issue #123. Two halves of ONE question — who narrows the set of Rooms a
+-- placement may use — because both write the same wire field
+-- (`Offering.allowed_room_ids`).
+--
+--   A. `offering_room`: "only these Rooms may host this Offering."
+--   B. `offering.online_mode`: FORBIDDEN | ALLOWED | REQUIRED, replacing the
+--      boolean `allow_online`, which could only ever say "permitted".
+--
+-- They ship together because REQUIRED has no wire representation of its own:
+-- it is expressed as an allow-list of the tenant's virtual Rooms, DERIVED AT
+-- ASSEMBLY TIME and never stored (see `server/utils/offeringRooms.ts`).
+-- ---------------------------------------------------------------------------
+
+SET search_path = public;
+
+-- ---------------------------------------------------------------------------
+-- A. offering_room — structurally identical to `offering_equipment`: composite
+--    PK, own `tenant_id`, the same two indexes, the same PUT-set relation verb.
+--
+--    NO CHECK AGAINST THE ROOM'S OWNER. `room_id` may name a FEDERATION-owned
+--    Room: RLS on `room` already widens reads to the caller's own federation
+--    (CLAUDE.md exception 1), and a consortium's shared lecture hall is
+--    precisely the Room a tenant wants to pin. `tenant_id` is the OFFERING's
+--    tenant either way, which is what the isolation policy below tests.
+--
+--    AN EMPTY SET MEANS "ANY ELIGIBLE ROOM", identical to today's behaviour
+--    for every Offering, so this table starting empty changes nothing.
+-- ---------------------------------------------------------------------------
+CREATE TABLE "offering_room" (
+    "offering_id" TEXT NOT NULL,
+    "room_id"     TEXT NOT NULL,
+    "tenant_id"   TEXT NOT NULL,
+
+    CONSTRAINT "offering_room_pkey" PRIMARY KEY ("offering_id","room_id")
+);
+
+ALTER TABLE "offering_room" ADD CONSTRAINT "offering_room_tenant_id_fkey"
+    FOREIGN KEY ("tenant_id") REFERENCES "tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "offering_room" ADD CONSTRAINT "offering_room_offering_id_fkey"
+    FOREIGN KEY ("offering_id") REFERENCES "offering"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CASCADE, matching `offering_equipment`'s equipment FK: deleting a Room
+-- removes the pins naming it, which WIDENS the surviving Offerings back toward
+-- "any eligible Room" rather than leaving them pointing at nothing. The
+-- alternative, RESTRICT, would make an Offering nobody remembers block the
+-- deletion of a room that no longer exists in the building.
+ALTER TABLE "offering_room" ADD CONSTRAINT "offering_room_room_id_fkey"
+    FOREIGN KEY ("room_id") REFERENCES "room"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE INDEX "offering_room_room_id_idx"   ON "offering_room"("room_id");
+CREATE INDEX "offering_room_tenant_id_idx" ON "offering_room"("tenant_id");
+
+-- Plain tenant-scoped isolation, the same policy every row in section 3a
+-- carries, written out here rather than added to that array because this
+-- migration runs long after that DO block. FORCE so the owner obeys too.
+ALTER TABLE "offering_room" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "offering_room" FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON "offering_room"
+    USING (tenant_id = calendry_internal.current_tenant_id())
+    WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "offering_room" TO calendry_app;
+
+-- ---------------------------------------------------------------------------
+-- B. online_mode — three answers where there were two.
+--
+--    REPLACING the boolean rather than adding a `require_online` beside it:
+--    two booleans admit the illegal `require AND NOT allow`, a state no read
+--    site could resolve and every write site would have to guard.
+--
+--    The backfill is exact and lossless in the direction that matters:
+--    false -> FORBIDDEN, true -> ALLOWED. Nothing migrates to REQUIRED,
+--    because no existing row ever expressed it: a tenant wanting purely online
+--    delivery today can only set the boolean and hope the solver picks the
+--    virtual Room, which `MinimizeOnline` actively prices against.
+-- ---------------------------------------------------------------------------
+CREATE TYPE "online_mode" AS ENUM ('FORBIDDEN', 'ALLOWED', 'REQUIRED');
+
+ALTER TABLE "offering"
+    ADD COLUMN "online_mode" "online_mode" NOT NULL DEFAULT 'FORBIDDEN';
+
+UPDATE "offering" SET "online_mode" = 'ALLOWED' WHERE "allow_online";
+
+ALTER TABLE "offering" DROP COLUMN "allow_online";
+
+-- The template carries the same field and moves with it: a template holding a
+-- boolean the Offering it seeds no longer has is a shape that cannot be
+-- copied. NULLABLE, like every other template column: "this template does not
+-- fix this field" stays a distinct answer from "this template says FORBIDDEN".
+ALTER TABLE "offering_template"
+    ADD COLUMN "online_mode" "online_mode";
+
+UPDATE "offering_template"
+    SET "online_mode" = CASE WHEN "allow_online" THEN 'ALLOWED'::"online_mode"
+                             ELSE 'FORBIDDEN'::"online_mode" END
+    WHERE "allow_online" IS NOT NULL;
+
+ALTER TABLE "offering_template" DROP COLUMN "allow_online";
+
+-- ===========================================================================
+-- from 20260902020000_screen_substitution_plan
+-- ===========================================================================
+-- ---------------------------------------------------------------------------
+-- Screen mode + the second scope axis: the substitution plan (issue #31)
+-- ---------------------------------------------------------------------------
+--
+-- A SECOND DISPLAY MODE, NOT A SECOND DEVICE MODEL. Everything that makes a
+-- Screen safe is unchanged: the key is still resolved by secret alone through
+-- `calendry_internal.screen_identity()`, the identity still carries no acting
+-- Person, and every read after resolution is still an ordinary `withTenant()`
+-- transaction. What changes is only which question the board answers, so this
+-- is a column on `screen` rather than a new credential.
+--
+-- WHY A SECOND SCOPE AXIS RATHER THAN REUSING `screen_room`. A room board is
+-- read by somebody standing in a corridor asking "what is happening around
+-- me"; a Vertretungsplan is read by somebody looking for THEIR class. Those
+-- select different rows and there is no reading of `screen_room` that answers
+-- the second: a cancelled lesson's room is the least useful thing about it.
+-- So the plan is scoped by GROUP, which in this taxonomy is also how a "year"
+-- or a "Jahrgang" is expressed (Groups nest; there is no separate year
+-- entity), and the endpoint expands the set DOWNWARD through `group_closure`,
+-- so scoping to a year group shows every class beneath it.
+--
+-- "EMPTY MEANS EVERYTHING" IS PRESERVED ON BOTH AXES, which is the load-bearing
+-- half: `screen_room` with no rows is every room, `screen_group` with no rows
+-- is every group, the same fail-open reading `group_term` has. Nothing here
+-- narrows the existing axis, and no existing row changes meaning: `mode`
+-- defaults to the only behaviour that existed before this migration.
+--
+-- EACH MODE READS EXACTLY ONE AXIS, deliberately not their intersection. Two
+-- fail-open axes ANDed together would give an operator a way to produce an
+-- empty board out of two settings that each individually say "everything",
+-- which is precisely the blank-wall failure the fail-open rule exists to
+-- prevent.
+-- ---------------------------------------------------------------------------
+CREATE TYPE "screen_mode" AS ENUM ('ROOM_BOARD', 'SUBSTITUTION_PLAN');
+
+-- DEFAULT, not backfilled from anything: every screen that exists predates the
+-- second mode and draws the room board, so the default IS the correct value
+-- for all of them and stays the correct value for a screen created without
+-- stating a mode.
+ALTER TABLE "screen"
+    ADD COLUMN "mode" "screen_mode" NOT NULL DEFAULT 'ROOM_BOARD';
+
+CREATE TABLE "screen_group" (
+    "screen_id" TEXT NOT NULL,
+    "group_id"  TEXT NOT NULL,
+    "tenant_id" TEXT NOT NULL,
+
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+
+    CONSTRAINT "screen_group_pkey" PRIMARY KEY ("screen_id", "group_id")
+);
+
+ALTER TABLE "screen_group"
+    ADD CONSTRAINT "screen_group_screen_id_fkey"
+    FOREIGN KEY ("screen_id") REFERENCES "screen"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "screen_group"
+    ADD CONSTRAINT "screen_group_group_id_fkey"
+    FOREIGN KEY ("group_id") REFERENCES "group"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE "screen_group"
+    ADD CONSTRAINT "screen_group_tenant_id_fkey"
+    FOREIGN KEY ("tenant_id") REFERENCES "tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+CREATE INDEX "screen_group_group_id_idx" ON "screen_group" ("group_id");
+CREATE INDEX "screen_group_tenant_id_idx" ON "screen_group" ("tenant_id");
+
+-- Tenant-scoped and isolated at the DB layer, exactly like `screen_room`. The
+-- scope narrows what a screen may see WITHIN its tenant; the tenant boundary
+-- is RLS, as always.
+ALTER TABLE "screen_group" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "screen_group" FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON "screen_group"
+    USING (tenant_id = calendry_internal.current_tenant_id())
+    WITH CHECK (tenant_id = calendry_internal.current_tenant_id());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "screen_group" TO calendry_app;
+
+-- Substitution boards are read by day, so the covered Sessions for a day are
+-- looked up by their placement. `session` already carries the composite index
+-- the room board uses; what this adds is the reverse lookup the plan needs:
+-- "which of today's Sessions are covered at all", which would otherwise scan
+-- every substitution in the tenant per poll.
+CREATE INDEX "session_substitution_session_id_tenant_id_idx"
+    ON "session_substitution" ("tenant_id", "session_id");
+
+-- A cancelled or moved lesson exists ONLY in the event log: `bank.post.ts`
+-- nulls the placement and records where it was, `move.post.ts` records both
+-- ends. The plan therefore reads `session_event` by (tenant, type), which had
+-- no index of its own — `session_event_tenant_id_seq_idx` leads with `seq`,
+-- so it cannot serve a type filter.
+CREATE INDEX "session_event_tenant_id_type_idx"
+    ON "session_event" ("tenant_id", "type");
+
+-- ---------------------------------------------------------------------------
+-- `screen_identity()` gains the mode and the group scope
+-- ---------------------------------------------------------------------------
+--
+-- DROP and recreate rather than CREATE OR REPLACE: the return type changes,
+-- and Postgres refuses to replace a function whose OUT columns differ. Nothing
+-- about the security shape changes — still SECURITY DEFINER, still STABLE,
+-- still parameterised by the SECRET ALONE and never by a tenant id.
+--
+-- BOTH SCOPE AXES COME BACK IN THE SAME PRIVILEGED CALL, for the reason the
+-- room scope already did: "what is this credential" stays one question with
+-- one answer, and a handler cannot act on a screen whose scope it forgot to
+-- load, because there is no way to obtain the screen without it.
+-- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS calendry_internal.screen_identity(text);
+
+CREATE FUNCTION calendry_internal.screen_identity(p_token_hash text)
+RETURNS TABLE (
+    screen_id     text,
+    tenant_id     text,
+    federation_id text,
+    name          text,
+    is_active     boolean,
+    mode          text,
+    room_ids      text[],
+    group_ids     text[]
+)
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public, pg_temp
+AS $fn$
+    SELECT
+        s.id, s.tenant_id, t.federation_id, s.name, s.is_active,
+        -- Returned as TEXT rather than the enum: `resolveScreenKey()` reads
+        -- this through `$queryRaw`, which has no Prisma enum mapping to apply,
+        -- and a value the TypeScript union does not recognise must reach the
+        -- app as itself so it can be refused by name rather than coerced.
+        s.mode::text,
+        COALESCE(
+            (SELECT array_agg(r.room_id ORDER BY r.room_id)
+             FROM screen_room r WHERE r.screen_id = s.id),
+            ARRAY[]::text[]
+        ),
+        COALESCE(
+            (SELECT array_agg(g.group_id ORDER BY g.group_id)
+             FROM screen_group g WHERE g.screen_id = s.id),
+            ARRAY[]::text[]
+        )
+    FROM screen s
+    JOIN tenant t ON t.id = s.tenant_id
+    WHERE s.token_hash = p_token_hash
+$fn$;
+
+REVOKE EXECUTE ON FUNCTION calendry_internal.screen_identity(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION calendry_internal.screen_identity(text) TO calendry_app;

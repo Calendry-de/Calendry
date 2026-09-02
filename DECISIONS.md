@@ -2838,3 +2838,384 @@ renamed it has spoken and their vocabulary wins. Making the column nullable was
 considered and rejected for being a migration where none is required.
 
 ---
+
+---
+
+# Room pins and online mode (issue #123)
+
+Two asks arrived together on 2026-09-02 — *fix an Offering to a Room* and
+*require a Session be online* — and they turned out to be the same question
+wearing two hats: **who narrows the set of Rooms a placement may use, and how
+does the narrowing reach the wire.** Both write `Offering.allowed_room_ids`,
+proto field 13, which the solver has enforced since the initial model
+(`individually_eligible`, `convert.rs:595-597`) and which this app hardcoded as
+`[]` with the comment *"the app has no allow-list"*. So this was app-only work
+against a capability that had been live and unreachable for months, exactly the
+`requiredRoomCount` situation.
+
+## The shape: a join table, not a `fixedRoomId` FK
+
+The one-line version is a nullable `Offering.fixedRoomId`, and it is wrong on
+two counts that surface immediately:
+
+1. **"One of these two lecture halls" is the common real request.** A single FK
+   forces the administrator to over-constrain, and an over-constrained Offering
+   is an unplaced one.
+2. **`requiredRoomCount` goes up to 4.** A Session needing two Rooms at once
+   cannot state its pin as one FK at all; the allow-list has to hold the POOL
+   the combination is drawn from.
+
+So `offering_room` (`offering_id`, `room_id`, `tenant_id`), structurally
+identical to `offering_equipment`. `room_id` may name a Federation-owned Room:
+a consortium's shared lecture hall is precisely the Room a member tenant wants
+to pin, RLS on `room` already widens reads to the caller's own federation, and
+the join row carries the OFFERING's tenant either way, which is what the
+isolation policy tests.
+
+## The enum, and why it REPLACED the boolean
+
+`Offering.allowOnline` meant PERMISSION, never requirement — its own schema
+comment said so out loud — so a tenant wanting a purely online lecture could
+only set it true and hope, and `MinimizeOnline` actively prices against the
+hope. `FORBIDDEN | ALLOWED | REQUIRED` replaces it rather than gaining a
+`requireOnline` beside it, because two booleans admit the illegal
+`require && !allow`: a state no read site can resolve and every write site has
+to guard. Backfill is exact: `false → FORBIDDEN`, `true → ALLOWED`. Nothing
+migrates to REQUIRED, because no existing row ever expressed it.
+
+**No proto change.** "Must be online" is already expressible as the pin:
+`allow_online = true` plus `allowed_room_ids` = the tenant's virtual Rooms.
+A tri-state `OnlineMode` on the wire is a cleaner schema and buys nothing
+behaviourally; it would also be a cross-repo tag dependency for a feature that
+needs none.
+
+## The two composition rules, and the one place they live
+
+This is the whole correctness risk of the ticket, and it is the reason
+`server/utils/offeringRooms.ts` exists at all rather than the logic sitting
+inline in `assembleSolverInput`:
+
+1. **REQUIRED plus an explicit pin INTERSECT.** Not "pin wins", not "online
+   wins". An Offering pinned to two lecture halls and marked online-only is a
+   contradiction the administrator typed, and the honest answer is an empty
+   intersection, not a silent choice between the two things they said.
+2. **An empty result is a REPORTED ERROR, never an empty wire list.** Empty
+   means *any eligible Room* on the wire. The naive mapping therefore turns
+   "must be online" into "anywhere at all": every Session lands in a physical
+   room, the run reports no violation, and nothing says the instruction was
+   discarded. This is the "no data and fetch-failed render identically" shape
+   the root `CLAUDE.md` keeps naming, in its most expensive form yet, because
+   the wrong answer is not blank — it is a complete, plausible timetable.
+
+The unsatisfiable case ships `NO_ELIGIBLE_ROOM_ID`, a sentinel that matches no
+Room. `convert.rs` does not resolve the ids in `allowed_room_ids` against the
+sent Rooms (unlike `group_ids`, which it refuses the whole input over), so an
+unknown id simply never matches: the Offering comes back with an empty eligible
+set and hard violations, which is exactly what "no Room qualifies" should look
+like. Room ids are UUIDv7, so the sentinel can never collide.
+
+`resolveRoomRestriction()` is in its own module rather than in `solverInput.ts`
+because `violations.ts` must answer the same question about one manual
+placement and must not be able to answer it differently — and importing
+`solverInput.ts` from there would drag the proto encoder into every route that
+edits a Session. `assembleSolverInput` calls it from exactly one place.
+
+## Why `permittedRoomIds` and `allowedRoomIds` are different fields
+
+They differ in one case, deliberately: `FORBIDDEN` with no pin restricts a
+manual placement (a virtual Room is not allowed) while carrying nothing in the
+wire's allow-list, because the wire says that with `allow_online = false`
+instead. Collapsing them would mean either sending a physical-Room allow-list
+for every Offering in the product — re-scoping every existing timetable and
+changing every input hash — or letting `violations.ts` conclude that an
+in-person-only Offering may be dragged into the virtual room. The second is the
+breach an all-in-person Offering most obviously commits.
+
+## Four new report entries, none of them a refusal
+
+Pinning is the easiest way in the product to make an Offering structurally
+unplaceable while every form still validates, and none of the failures may be
+refused at the write: which Rooms exist, how big they are and what they carry is
+edited elsewhere, by someone else, later. So they follow
+`unsatisfiableEquipmentQuantities`: assemble, report, let the run come back with
+hard violations.
+
+- `offeringsWithUnsatisfiableRoomRestriction` — rule 2, with three reasons
+  (`no_virtual_rooms`, `pinned_rooms_absent`, `empty_intersection`) because they
+  have three different fixes and the solver's output names none of them.
+- `offeringsWithRestrictionBelowRoomCount` — the pin leaves fewer Rooms than one
+  Session must occupy at once. A definite impossibility that
+  `offeringsNeedingMoreRoomsThanExist` cannot see: it compares against the whole
+  snapshot, so a tenant with forty rooms and an Offering pinned to one but
+  needing two keeps passing it.
+- `pinnedRoomsNotSent` — a pinned Room that is inactive, or absent from the
+  snapshot entirely. Reported even when other pinned Rooms survive: silently
+  shrinking an allow-list turns a choice somebody made into a narrower one
+  nobody did, and shrinking it to zero means "any Room".
+- `offeringsWithNoSuitablePinnedRoom` — the restriction survives but its Rooms
+  cannot meet the Offering's own capacity or features. Mirrors
+  `individually_eligible` in both directions: features are required of EACH
+  Room, capacity is SUMMED across `requiredRoomCount`. Getting either backwards
+  would report a healthy pin as broken, which is worse than not reporting at
+  all — a false alarm trains people to ignore the whole report.
+
+The first three are per-Offering (the real id); the last is per SERIES (the wire
+id), because a split Offering derives capacity per Group and one series can be
+too big for the pinned room while its siblings fit.
+
+`planMaterialization`'s demand ledger already covers the downstream half: an
+Offering that comes back SHORT because its pin is unsatisfiable has its live
+Sessions moved to `withheldDeletes` rather than destroyed. Nothing was needed
+there; it is stated so nobody "fixes" it.
+
+## The manual-edit half needed a constraint type after all
+
+The ticket said the constraint catalogue was untouched, on the grounds that a
+pin is Offering DATA rather than tenant policy — the same status
+`requiredRoomCount` and `requiredCapacity` have. That is right about the WIRE,
+and it is why nothing new crosses it. It is not right about the warn-and-allow
+half: `constraint_violation.constraint_id` is a NOT NULL FK, so there is no way
+to record "this manual move broke the room restriction" without a Constraint row
+to record it against.
+
+So `no_session_outside_allowed_room` joins `PER_SESSION_CONSTRAINT_TYPES`: HARD,
+app-evaluated, no params, **no `wireField`**. Unlike
+`no_session_spanning_break`, whose solver half is simply unbuilt, this one has
+no wire field on purpose — the restriction already crosses as
+`Offering.allowed_room_ids` and `Offering.allow_online`, and a constraint
+carrying it again would be the same requirement from two sources that can drift.
+
+Consequences, both named in `CLAUDE.md`: new tenants get the row enabled
+(`defaultConstraintRow` enables every per-session type), and every existing
+tenant is owed `backfill:constraints -- --all-missing`.
+
+## Deliberately out of scope
+
+`OfferingTemplate` carrying a room PIN, so a curriculum plan could seed one
+(`offeringPlans.ts` is where the copy would go). A template is a reusable
+shape; a pin names specific Rooms, and the two only compose once somebody
+decides what applying a plan to a second building should do. The template's
+`allowOnline → onlineMode` move was NOT optional and shipped here: a template
+holding a boolean the Offering no longer has is a shape that cannot be copied.
+
+# The online-share cap against teaching that must be online
+
+`max_online_ratio_per_group` is HARD. A tenant marks a lecture
+`onlineMode = REQUIRED`, that lecture's Sessions can only land in a virtual
+Room, and once enough of a group's teaching is forced online the cap is over by
+arithmetic. The run then comes back `SUCCEEDED` with a residual
+`MaxOnlineShare` violation, on every run, for ever, and the reviewer is told a
+hard rule was broken by a proposal that could not have done anything else.
+
+## The violation carries no join key, so it could not be explained where it lands
+
+`constraints::aggregates` in calendry-solver builds a `MaxOnlineShare`
+violation with `session_ids: Vec::new()` and `offering_ids: Vec::new()`: the
+group is named only inside a prose `detail` string, because a share breach is a
+property of a group's ratio and not of any one placement (ADR-0025 says the
+same thing about why it cannot be a construction filter). `materializeViolations`
+therefore writes NO `constraint_violation` row for it — both its loops are over
+those empty lists — and the breach reaches a human only as a number in the
+review screen's type breakdown, indistinguishable from a double-booking
+somebody could go and fix.
+
+So there was no row to downgrade and no group id to key an exemption on. Three
+places could have held the fix:
+
+* **The catalogue, severity `HARD` → `SOFT`.** Rejected: `convert.rs` says
+  "hard-vs-soft is a property of the TYPE", `ShareInstance` has no weight
+  field, and `summarizeProposedViolations` counts every returned violation as
+  hard regardless of the catalogue. The label would have changed and nothing
+  else — including the number the reviewer actually reads.
+* **The solver.** Correct locus for a real exemption (drop forced-online
+  Sessions from the numerator, or carry a structured `group_id` on the
+  violation) and out of scope here: solver logic belongs in that repo, and
+  either change needs an ADR and probably a proto field.
+* **The assembly.** Where this landed. `assembleSolverInput` holds every
+  Offering's composed room restriction and every series' demand at the same
+  moment, which is the only place in this repo that can tell "over the cap
+  because of how it was placed" from "over the cap before anything was
+  placed".
+
+## Reported, never narrowed
+
+`server/utils/onlineShareFloor.ts` computes, per sent
+`max_online_ratio_per_group` rule and per group cell, how much of the demand
+CANNOT be anything but online, and reports the cells where that figure alone
+exceeds the cap (`AssemblyReport.groupsWithForcedOnlineAboveShareCap`, stored
+in `solver_run.meta.report` and read back by the review route).
+
+The rule still crosses the wire exactly as configured and the run still comes
+back with its violation. Suppressing the cap for these groups would be the same
+class of mistake as sending an empty `allowed_room_ids` for "must be online":
+the tenant's instruction discarded with nobody told.
+
+## Mirroring the solver's arithmetic, including the parts that look wrong
+
+A warning that disagreed with the violation it explains would be worse than no
+warning, so the module is written against `aggregates.rs` rather than against
+the idea of a percentage:
+
+* Cells are per GROUP, expanded DOWNWARD from each Offering's Groups —
+  `expand_subtree`, membership semantics. Getting that backwards is the bug
+  that looks right on any flat fixture, which is why the unit fixture is a
+  three-node tree.
+* `allowance(total) = floor(max_ratio × total)`, breached on a strict `>`. So
+  3 of 10 under a 30% cap is SATISFIED, and 1 of 3 is a breach — the solver's
+  own `allowance_floors_rather_than_rounds`. `max_ratio` is a proto `double`,
+  so `0.3 × 10` rounds to exactly 3 on both sides; a float32 hop anywhere in
+  that path would put the two answers one session apart on the commonest cap
+  there is.
+* An empty `applies_to_kinds` is EVERY kind, the wire's own convention.
+
+**Both windows use one comparison, and that is a result rather than a
+shortcut.** `PER_TERM` is the solver's exact test. `PER_WEEK` cannot be tested
+directly — demand carries no week until it is placed — but the pigeonhole
+holds: if the forced share exceeds the ratio over the term, no distribution
+across weeks keeps every week under it. For an integer count `forced > floor(x)`
+and `forced > x` are the same predicate, so the two derivations produce one
+line of code. The window still travels with the entry, because the SENTENCE
+differs: a per-week breach is in some week the reviewer cannot be shown.
+
+## What counts as "forced online"
+
+Read off `resolveRoomRestriction`'s `permittedRoomIds`, not off `onlineMode`:
+an Offering pinned to nothing but virtual Rooms has no on-site placement
+either, and asking the field instead of the composition is exactly how the pin
+and the mode come to disagree — the whole reason that function exists.
+
+A restriction with a `failure` is EXCLUDED. That Offering ships
+`NO_ELIGIBLE_ROOM_ID` and comes back unplaced, so it contributes no online
+Session to any cell, and `offeringsWithUnsatisfiableRoomRestriction` already
+names it with the fix it actually needs. Reporting it twice under two diagnoses
+would send somebody to change the wrong thing.
+
+## Deliberately out of scope
+
+Naming the specific weeks a `PER_WEEK` cap will breach: that needs the
+placement, which is the answer being explained. And any change to what the
+solver evaluates — the honest exemption (forced-online Sessions leaving the
+numerator) is a calendry-solver decision with a proto field behind it, and this
+repo must not pre-empt it by quietly sending a different cap than the tenant
+configured.
+
+# Screen mode: the substitution plan (issue #31)
+
+The second lobby-display mode: today's and tomorrow's Vertretungsplan, beside
+the room board that already existed. Four decisions were open in the ticket;
+this is what each was decided as, and why.
+
+## The window is TODAY AND TOMORROW, and both days are always present
+
+The ticket asked the question rather than answering it: "Today only, or today
+plus tomorrow? Schools usually post both, and 'tomorrow' is the half people
+actually stop to read."
+
+Decided: **both**, always, as two entries in `days` with `offset` 0 and 1.
+
+The argument is actionability, not custom. A pupil who learns at 08:05 that
+period 1 is cancelled has learned it too late to do anything; a lecturer who
+learns at 16:00 that they are covering period 2 tomorrow has learned it in
+time. Today alone also makes the board go quiet every afternoon, once the
+day's changes are spent, which is exactly when the corridor is busiest and the
+board is most looked at — and a quiet board is the failure mode this whole
+feature is written against.
+
+**Not configurable per screen**, deliberately. A third scope axis ("how many
+days") would be a setting whose wrong value produces a board that looks
+correct, and there is no institution for which "tomorrow" is the wrong answer.
+`SUBSTITUTION_WINDOW_DAYS` names it in one place if that ever stops being true.
+
+Both days are RETURNED even when both are empty, so "tomorrow is a Saturday"
+and "the fetch returned one day" cannot look alike.
+
+## The second scope axis is GROUP, and each mode reads exactly one axis
+
+The ticket: "A substitution plan is not room-scoped in the same way; it is more
+naturally scoped by day and possibly by group or year. So the scope model gets
+a second axis, and 'empty means everything' must keep meaning that."
+
+"Day" turned out to be the window above, not a scope. What remained is GROUP,
+which in this taxonomy is also how a "year" is expressed — Groups nest, and
+there is no separate year entity (TAXONOMY.md §6). So `screen_group` joins
+`screen_room`, with the identical fail-open reading: **no rows means every
+group**, matching `screen_room` and `group_term`.
+
+The scope is expanded DOWN the closure (`descendantGroupIds`), so a board
+scoped to "Jahrgang 7" shows every class beneath it. `conflictGroupIds()` would
+have been the wrong helper and is the easy mistake: it walks both directions
+and would put the whole school's substitutions on a year group's wall.
+
+**Each mode reads ONE axis, never their intersection.** `ROOM_BOARD` reads
+rooms, `SUBSTITUTION_PLAN` reads groups, and the other is kept but unused. ANDing
+two fail-open axes would give an operator a way to produce an empty board out of
+two settings that each individually say "everything", which is precisely the
+blank-wall failure the fail-open rule exists to prevent. The management form
+renders only the axis the selected mode uses, for the same reason: a filter that
+is displayed but not read is how somebody comes to believe a display is narrowed
+when it is showing the building.
+
+## The mode is ENFORCED at both boards, not merely stored
+
+`/screen` and `/screen/substitutions` are two pages, and each data route refuses
+the other mode's key with a 409 naming the address that would work. Serving a
+room board to a substitution key would be a silent mis-render: nothing on the
+wall would say anything was wrong, and the display would be confidently drawing
+the wrong institution-facing fact.
+
+A stored mode this version does not recognise (`asScreenMode()` returns null)
+is refused the same way rather than defaulting into either board. The
+management FORM does the opposite and falls back to the room axis, so an
+operator can still open and fix the row: a form that cannot be opened is a dead
+end, a wall drawing the wrong board silently is a wrong answer.
+
+## Three sources, because a substitution board is a DIFF
+
+Covered comes from `session_substitution` (issue #30) — never from edited
+lecturer assignments, which the ticket rules out explicitly: reading those would
+make the display the only place the distinction between "covered" and
+"reassigned" is visible. Cancelled comes from the `BANK` event (issue #22), and
+it has to: banking NULLS the placement, so the day the lesson was on survives
+only in the event payload and a query over `session` cannot see a cancellation
+at all. Moved comes from the `MOVE` event, which carries both ends.
+
+Reduced to the LATEST `MOVE`/`BANK` event per Session before interpreting: a
+lesson banked and then restored is not cancelled, and one moved twice is at its
+second destination. The log is append-only, so "what happened to this lesson" is
+the last entry, and a busy week would otherwise read as a hundred separate
+announcements.
+
+The day match is done in TypeScript over a term-bounded fetch, not as a JSON
+path filter in the `where`. A JSON filter would be cheaper and is the exact
+guard CLAUDE.md warns about — one that can both correctly find nothing and match
+nothing because of a bug. Here a payload shape that has drifted is a skipped
+entry, not a silently empty board.
+
+## Every empty day is NAMED
+
+Four states, and the three empty ones are kept apart because they are different
+facts a reader can act on: `no-substitutions` (a teaching day in a running term
+with nothing changed — the common case, and the whole point of walking up to the
+board), `not-a-teaching-day` (a weekend), and `no-term`. `entries: []` alone is
+what a failed fetch also produces, which is how the room board looked broken for
+two months of the year.
+
+## Caching, and why the DATE is in the key
+
+Keyed per tenant + group scope + **tenant-local date**, and the room board's
+omission of the date is not a precedent to copy: this payload's entire subject
+is which day it is, so a key without it would let a payload built before local
+midnight serve after it — a board captioned Tuesday listing Monday's
+cancellations, for a full TTL. Invalidation needs nothing new: every write this
+reads (`SUBSTITUTE`, `BANK`, `MOVE`) appends a SessionEvent, and `appendEvent()`
+already drops the cache.
+
+## `screen_identity()` had to be dropped, not replaced
+
+Adding `mode` and `group_ids` changes the function's OUT columns, which Postgres
+refuses to `CREATE OR REPLACE`. That surfaced a latent replay hazard rather than
+a new one: `prisma migrate reset` drops `public` and leaves `calendry_internal`
+standing, so the ORIGINAL definition earlier in the squashed migration now
+carries a `DROP FUNCTION IF EXISTS` too — the same treatment
+`federation_room_occupancy()` and `ics_link_identity()` already had, and for the
+same recorded reason.

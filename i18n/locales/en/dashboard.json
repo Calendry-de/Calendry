@@ -18,7 +18,33 @@
         "noManageAccess": "You do not have read access to any management section in this institution. An administrator can grant it through your access role."
     },
     "counts": {
+        "heading": "Your institution",
         "unavailable": "Unavailable"
+    },
+    "reviewQueues": {
+        "heading": "Waiting for you",
+        "proposals": {
+            "label": "Plan proposals",
+            "sentence": "No plan proposals are waiting for a decision | One plan proposal is waiting for a decision | {count} plan proposals are waiting for a decision",
+            "unavailable": "The plan proposal queue could not be read."
+        },
+        "vetoes": {
+            "label": "Unavailability requests",
+            "sentence": "No unavailability requests are waiting for a decision | One unavailability request is waiting for a decision | {count} unavailability requests are waiting for a decision",
+            "unavailable": "The unavailability queue could not be read."
+        },
+        "exams": {
+            "label": "Exam requests",
+            "sentence": "No exam requests are waiting for a decision | One exam request is waiting for a decision | {count} exam requests are waiting for a decision",
+            "unavailable": "The exam request queue could not be read."
+        }
+    },
+    "term": {
+        "during": "{name} · week {week} of {total}",
+        "before": "{name} · not started yet",
+        "after": "{name} · ended",
+        "none": "No term configured yet",
+        "unavailable": "The current term could not be read."
     },
     "permissions": {
         "summary": "{count} permission in this tenant | {count} permissions in this tenant",
