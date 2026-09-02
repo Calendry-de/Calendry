@@ -3,7 +3,7 @@
         <nav
             class="shell_nav"
             :class="{ 'shell_nav--rail': collapsed }"
-            aria-label="Sections"
+            :aria-label="t('nav.shell.sections')"
         >
             <!--
                 The rail toggle. `aria-expanded` on a button that controls the
@@ -15,14 +15,14 @@
                 class="shell_nav-toggle"
                 type="button"
                 :aria-expanded="!collapsed"
-                :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+                :title="collapsed ? t('nav.shell.expandSidebar') : t('nav.shell.collapseSidebar')"
                 @click="toggle"
             >
                 <Icon
                     :name="collapsed ? 'material-symbols:right-panel-close-outline' : 'material-symbols:left-panel-close-outline'"
                     aria-hidden="true"
                 />
-                <span class="shell_nav-text">{{ collapsed ? 'Expand sidebar' : 'Collapse sidebar' }}</span>
+                <span class="shell_nav-text">{{ collapsed ? t('nav.shell.expandSidebar') : t('nav.shell.collapseSidebar') }}</span>
             </button>
 
             <NuxtLink
@@ -48,10 +48,10 @@
             -->
             <details
                 v-for="group in navGroups"
-                :key="group.label"
+                :key="group.id"
                 class="shell_nav-group"
-                :open="collapsed || !isClosed(group.label)"
-                @toggle="onGroupToggle(group.label, $event)"
+                :open="collapsed || !isClosed(group.id)"
+                @toggle="onGroupToggle(group.id, $event)"
             >
                 <summary class="shell_nav-group-summary">
                     <Icon
@@ -113,6 +113,7 @@
 import { useAppSections, useNavEntries } from '~/composables/navigation';
 import { groupNavEntries } from '~/utils/navGroups';
 import { useNavGroupCollapse, useNavRail } from '~/composables/navRail';
+import { useT } from '~/composables/i18n';
 
 /**
  * The app's one signed-in frame: a persistent, grouped section list beside
@@ -142,6 +143,7 @@ defineProps<{
 defineSlots<{ default: () => unknown; actions?: () => unknown }>();
 
 const sections = useAppSections();
+const { t } = useT();
 
 const { collapsed, toggle } = useNavRail();
 const { isClosed, setOpen } = useNavGroupCollapse();
@@ -153,14 +155,14 @@ const { isClosed, setOpen } = useNavGroupCollapse();
  * changes nothing, which is what stops the `:open` binding from feeding its
  * own event back in a loop.
  */
-function onGroupToggle(label: string, event: Event) {
+function onGroupToggle(groupId: string, event: Event) {
     // Rail mode forces every topic open; recording that would wipe the
     // reader's real choice the moment they collapsed the sidebar.
     if (collapsed.value) {
         return;
     }
 
-    setOpen(label, (event.target as HTMLDetailsElement).open);
+    setOpen(groupId, (event.target as HTMLDetailsElement).open);
 }
 
 /*
@@ -188,7 +190,7 @@ const homeEntry = computed(() => navEntries.value.find((entry) => entry.id === '
  * route: the test is the only thing standing between a new destination and a
  * link that never appears.
  */
-const navGroups = computed(() => groupNavEntries(sections.value));
+const navGroups = computed(() => groupNavEntries(sections.value, t));
 </script>
 
 <style scoped lang="scss">

@@ -366,7 +366,7 @@ export function getRelation(parent: string | undefined, relation: string | undef
     if (!config) {
         throw createError({
             statusCode: 404,
-            statusMessage: `Unknown relation '${parent}/${relation}'.`,
+            message: `Unknown relation '${parent}/${relation}'.`,
         });
     }
 
@@ -378,7 +378,7 @@ export function relationDelegate(tx: Tx, model: string) {
     const d = (tx as unknown as Record<string, unknown>)[model];
 
     if (!d) {
-        throw createError({ statusCode: 500, statusMessage: `No Prisma delegate '${model}'.` });
+        throw createError({ statusCode: 500, message: `No Prisma delegate '${model}'.` });
     }
 
     return d as {

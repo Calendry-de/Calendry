@@ -32,13 +32,13 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!request) {
-            throw createError({ statusCode: 404, statusMessage: 'Exam request not found.' });
+            throw createError({ statusCode: 404, message: 'Exam request not found.' });
         }
 
         if (request.status !== 'PENDING') {
             throw createError({
                 statusCode: 409,
-                statusMessage: `This request was already ${request.status.toLowerCase()}.`,
+                message: `This request was already ${request.status.toLowerCase()}.`,
                 data: { status: request.status, sessionId: request.sessionId },
             });
         }

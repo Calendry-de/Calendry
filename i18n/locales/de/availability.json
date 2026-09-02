@@ -1,0 +1,68 @@
+{
+    "windowSummary": {
+        "daysBlocks": "{days}, Block {blocks}",
+        "daysBlocksWeeks": "{days}, Block {blocks}, Wochen {weeks}",
+        "daysWholeDay": "{days}, ganztägig",
+        "daysWholeDayWeeks": "{days}, ganztägig, Wochen {weeks}",
+        "everyDayBlocks": "Jeden Tag, Block {blocks}",
+        "everyDayBlocksWeeks": "Jeden Tag, Block {blocks}, Wochen {weeks}",
+        "everyDayWholeDay": "Jeden Tag, ganztägig",
+        "everyDayWholeDayWeeks": "Jeden Tag, ganztägig, Wochen {weeks}"
+    },
+    "preferenceSummary": {
+        "emptyHint": "Keine Wünsche angegeben",
+        "weight": "zählt {value}-fach"
+    },
+    "blockPicker": {
+        "anyBlock": "Beliebiger Block"
+    },
+    "roomFeaturePicker": {
+        "emptyHint": "Diese Institution hat noch keine Ausstattung definiert, daher gibt es keine Raumtypen zur Auswahl."
+    },
+    "weight": {
+        "usingDefault": "Es gilt die Standardgewichtung der Institution",
+        "startOverride": "Abweichenden Wert setzen",
+        "factorLabel": "Zählt",
+        "factorSuffix": "× den Standardwert",
+        "clearOverride": "Standard verwenden",
+        "overrideSummary": "Zählt {value} × den Standardwert",
+        "unparseable": "Geben Sie eine Zahl zwischen {min} und {max} ein, oder verwenden Sie den Standardwert.",
+        "outOfRange": "Ein Faktor muss zwischen {min} und {max} liegen. Alles darüber hinaus würde den Wunsch einer einzelnen Person schwerer wiegen lassen als die Regeln, mit denen er konkurriert."
+    },
+    "holidayForm": {
+        "firstDay": "Erster Abwesenheitstag",
+        "lastDay": "Letzter Abwesenheitstag",
+        "reason": "Grund (optional)",
+        "reasonPlaceholder": "Urlaub",
+        "previewHead": "{term} · {count} Woche gesperrt | {term} · {count} Wochen gesperrt",
+        "weekRow": "Woche {week} · {start} – {end}",
+        "weekPartial": "(Sie sind nur einen Teil davon abwesend, gesperrt wird dennoch die ganze Woche)",
+        "partialWarning": "Eine Woche wird vollständig gesperrt, obwohl Ihre Abwesenheit nur einen Teil davon abdeckt. Eine Woche wird gesperrt, sobald Ihre Abwesenheit sie überhaupt berührt: Ein einzelner Eintrag kann der Planung keinen Teil einer Woche mitteilen. | {count} Wochen werden vollständig gesperrt, obwohl Ihre Abwesenheit nur einen Teil davon abdeckt. Eine Woche wird gesperrt, sobald Ihre Abwesenheit sie überhaupt berührt: Ein einzelner Eintrag kann der Planung keinen Teil einer Woche mitteilen.",
+        "problemReversed": "Der letzte Tag liegt vor dem ersten Tag.",
+        "problemOutsideTerms": "Diese Daten liegen außerhalb aller Semester, es würde also nichts gesperrt. Semester: {terms}.",
+        "problemNoTerms": "Es sind noch keine Semester konfiguriert, daher lassen sich Daten keinen Unterrichtswochen zuordnen.",
+        "problemSpansTerms": "Dieser Zeitraum erstreckt sich über {terms}. Geben Sie eine Abwesenheit pro Semester ein. Ein einzelner Eintrag zählt nur die Wochen eines Semesters.",
+        "termRange": "{name} ({from} bis {to})",
+        "termListJoin": "{list} und {next}",
+        "submit": "Zur Genehmigung einreichen",
+        "submitBusy": "Wird eingereicht …"
+    },
+    "painter": {
+        "gridLabel": "Unterrichtswoche: {days} Unterrichtstage, {blocks} Blöcke",
+        "timeColumn": "Zeit",
+        "ownBreaks": "eigene Pausen",
+        "ownBreaksHint": "Die Blöcke dieses Tages folgen eigenen Pausenzeiten.",
+        "breakRow": "Pause",
+        "cellLabel": {
+            "free": "{day} Block {block}, {start} bis {end}, frei",
+            "inSelection": "{day} Block {block}, {start} bis {end}, in Ihrer Auswahl, zum Entfernen erneut wählen",
+            "approved": "{day} Block {block}, {start} bis {end}, bereits gesperrt, genehmigt",
+            "pending": "{day} Block {block}, {start} bis {end}, bereits gemeldet, wartet auf Prüfung"
+        },
+        "rectSpan": "{from}–{to}",
+        "rectSummary": "{span}, {start}–{end}",
+        "emptyHint": "Markieren Sie, wann Sie nicht unterrichten können: Wählen Sie eine Ecke der Woche und dann die gegenüberliegende. Wiederholen Sie das für so viele einzelne Zeiten, wie Sie brauchen.",
+        "saysOne": "Sperrt {blocked} von {total} Zeitfenstern · {rect}",
+        "saysMany": "Sperrt {blocked} von {total} Zeitfenstern · {count} einzelne Einträge: {rects}"
+    }
+}

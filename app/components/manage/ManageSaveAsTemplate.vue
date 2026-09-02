@@ -8,18 +8,18 @@
             icon="material-symbols:content-copy-outline"
             type="transparent"
             @click="open"
-        >Save as template</CommonButton>
+        >{{ t('manageUi.saveAsTemplate.action') }}</CommonButton>
 
         <div
             v-else
             class="satmpl_form"
         >
             <label class="satmpl_label">
-                <span>Template name</span>
+                <span>{{ t('manageUi.saveAsTemplate.nameLabel') }}</span>
                 <input
                     v-model="name"
                     :disabled="busy"
-                    placeholder="e.g. Maths, 4x/week"
+                    :placeholder="t('manageUi.saveAsTemplate.namePlaceholder')"
                     type="text"
                     @keydown.enter="save"
                     @keydown.esc="cancel"
@@ -31,12 +31,12 @@
                     :disabled="busy || !name.trim()"
                     type="primary"
                     @click="save"
-                >{{ busy ? 'Saving…' : 'Save' }}</CommonButton>
+                >{{ busy ? t('common.action.saving') : t('common.action.save') }}</CommonButton>
                 <CommonButton
                     :disabled="busy"
                     type="transparent"
                     @click="cancel"
-                >Cancel</CommonButton>
+                >{{ t('common.action.cancel') }}</CommonButton>
             </div>
 
             <p
@@ -48,13 +48,14 @@
             <p
                 v-if="justSaved"
                 class="satmpl_ok"
-            >Saved as a template: editing this offering later won't change it.</p>
+            >{{ t('manageUi.saveAsTemplate.saved') }}</p>
         </div>
     </section>
 </template>
 
 <script setup lang="ts">
 import type { ManageEntity, EntityRow } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 
 /**
  * The reverse of `ManageTemplateStarter`: capture THIS row's current shape
@@ -70,6 +71,8 @@ const props = defineProps<{
     config: NonNullable<ManageEntity['saveAsTemplate']>;
     row: EntityRow;
 }>();
+
+const { t } = useT();
 
 const canCreate = useHasPermission(props.config.createPermission);
 const request = useRequestFetch();
@@ -115,7 +118,8 @@ async function save() {
         name.value = '';
         justSaved.value = true;
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage ?? 'Could not save the template.';
+        error.value = serverErrorMessage(cause)
+            ?? t('manageUi.saveAsTemplate.error');
     } finally {
         busy.value = false;
     }

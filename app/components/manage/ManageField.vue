@@ -47,7 +47,7 @@
                 :checked="Boolean(model)"
                 @change="emitValue(($event.target as HTMLInputElement).checked)"
             >
-            <span>{{ model ? 'Yes' : 'No' }}</span>
+            <span>{{ model ? t('manageUi.shared.yes') : t('manageUi.shared.no') }}</span>
         </label>
 
         <!--
@@ -71,7 +71,7 @@
                 v-if="field.type === 'reference' && field.reference?.nullable"
                 :selected="model === null || model === undefined || model === ''"
                 value=""
-            >(None)</option>
+            >{{ t('manageUi.field.noneOption') }}</option>
             <option
                 v-for="option in options"
                 :key="String(option.value)"
@@ -107,7 +107,7 @@
         <p
             v-if="!readonly && field.type === 'reference' && !options.length"
             class="field_hint field_hint--warn"
-        >{{ field.reference?.emptyHint ?? 'Nothing to choose from yet.' }}</p>
+        >{{ field.reference?.emptyHint ?? t('manageUi.shared.nothingToChoose') }}</p>
 
         <p
             v-if="error"
@@ -133,6 +133,7 @@
 <script setup lang="ts">
 import ManageColorField from '~/components/manage/ManageColorField.vue';
 import type { EntityRow, FieldDef } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 
 /**
  * One field of a management form.
@@ -152,6 +153,8 @@ const props = defineProps<{
 }>();
 
 const model = defineModel<unknown>();
+
+const { t } = useT();
 
 const controlId = useId();
 
@@ -208,7 +211,7 @@ function isRenderablePrimitive(value: unknown): boolean {
 
 const staticText = computed(() => {
     if (props.field.type === 'boolean') {
-        return model.value ? 'Yes' : 'No';
+        return model.value ? t('manageUi.shared.yes') : t('manageUi.shared.no');
     }
 
     if (props.field.type === 'reference' || props.field.type === 'select') {

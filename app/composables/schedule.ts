@@ -6,6 +6,7 @@
  * is no fallback shape and no assumed Mon–Fri, because TAXONOMY.md §2 forbids
  * exactly that. A tenant with no TimeGrid renders an empty state, not a guess.
  */
+import type { Translate } from '~/composables/i18n';
 import type { TimeGridBreak } from '#shared/timeGrid';
 import { blockSpan } from '#shared/timeGrid';
 import { LECTURER_ROLE_KEY } from '#shared/roles';
@@ -259,12 +260,12 @@ export function isOnGrid(grid: TimeGrid, session: ScheduleSession): boolean {
     );
 }
 
-export function offGridReason(grid: TimeGrid, session: PlacedScheduleSession): string {
+export function offGridReason(grid: TimeGrid, session: PlacedScheduleSession, t: Translate): string {
     if (!grid.activeDays.includes(session.dayOfWeek)) {
-        return `${weekdayName(session.dayOfWeek)} is not a scheduled day on this grid`;
+        return t('schedule.offGrid.reasonNotScheduledDay', { day: weekdayName(session.dayOfWeek) });
     }
 
-    return `Runs past block ${grid.blocksPerDay}, the last block of the day`;
+    return t('schedule.offGrid.reasonPastLastBlock', { block: grid.blocksPerDay });
 }
 
 /** Sessions keyed by `${dayOfWeek}:${blockIndex}`, so a slot can hold several. */
@@ -310,7 +311,7 @@ export function describeViolation(violation: Violation, lookup: {
     room: (id: string) => string;
     person: (id: string) => string;
     group: (id: string) => string;
-}): string {
+}, t: Translate): string {
     const detail = violation.detail as {
         reason?: string;
         roomIds?: string[];
@@ -320,14 +321,35 @@ export function describeViolation(violation: Violation, lookup: {
 
     switch (detail.reason) {
         case 'room_double_booked':
-            return `Room already booked at this time: ${(detail.roomIds ?? []).map(lookup.room).join(', ')}`;
+            return t('schedule.violations.roomDoubleBooked', {
+                rooms: (detail.roomIds ?? []).map(lookup.room).join(', '),
+            });
         case 'person_double_booked':
-            return `Already teaching at this time: ${(detail.personIds ?? []).map(lookup.person).join(', ')}`;
+            return t('schedule.violations.personDoubleBooked', {
+                people: (detail.personIds ?? []).map(lookup.person).join(', '),
+            });
         case 'group_double_booked':
-            return `Group already has a session: ${(detail.groupIds ?? []).map(lookup.group).join(', ')}`;
+            return t('schedule.violations.groupDoubleBooked', {
+                groups: (detail.groupIds ?? []).map(lookup.group).join(', '),
+            });
         default:
+            // The Constraint's own NAME, which is tenant-entered open
+            // vocabulary and therefore never translated (CONVENTIONS.md).
             return violation.constraint.name;
     }
+}
+
+/**
+ * A translated list conjunction, so "group and room" survives becoming
+ * "Gruppe und Raum".
+ *
+ * The joiner is a KEY rather than a literal ` and `, and it is deliberately
+ * not `Intl.ListFormat`: that would render three items as "a, b, and c" where
+ * every existing call site renders "a and b and c", which would be a copy
+ * change smuggled in under an extraction.
+ */
+export function joinAnd(parts: readonly string[], t: Translate): string {
+    return parts.join(` ${t('schedule.text.and')} `);
 }
 
 /**

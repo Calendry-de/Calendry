@@ -149,7 +149,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!term) {
-            throw createError({ statusCode: 404, statusMessage: 'Term not found.' });
+            throw createError({ statusCode: 404, message: 'Term not found.' });
         }
 
         // Resolved rather than trusted: a kind from another tenant would be a
@@ -160,7 +160,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!kind) {
-            throw createError({ statusCode: 404, statusMessage: 'Session kind not found.' });
+            throw createError({ statusCode: 404, message: 'Session kind not found.' });
         }
 
         /**
@@ -181,7 +181,7 @@ export default defineEventHandler(async (event) => {
         if (body.offeringId && body.title) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'A Session belonging to an Offering takes its name from that '
+                message: 'A Session belonging to an Offering takes its name from that '
                     + 'Offering, so it cannot carry its own title. Omit `title`, or omit '
                     + '`offeringId` to create an Event.',
                 data: { field: 'title' },
@@ -196,7 +196,7 @@ export default defineEventHandler(async (event) => {
         if (!body.offeringId && !body.title) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'An event needs a name: there is no Offering to take one from.',
+                message: 'An event needs a name: there is no Offering to take one from.',
                 data: { field: 'title' },
             });
         }
@@ -210,7 +210,7 @@ export default defineEventHandler(async (event) => {
             if (!offering) {
                 throw createError({
                     statusCode: 404,
-                    statusMessage: 'Offering not found in this term.',
+                    message: 'Offering not found in this term.',
                 });
             }
         }
@@ -228,7 +228,7 @@ export default defineEventHandler(async (event) => {
         if (body.termWeek > weeks) {
             throw createError({
                 statusCode: 409,
-                statusMessage: `Week ${body.termWeek} is outside the term, which has ${weeks} weeks.`,
+                message: `Week ${body.termWeek} is outside the term, which has ${weeks} weeks.`,
                 data: { termWeek: body.termWeek, weeks },
             });
         }
@@ -252,7 +252,7 @@ export default defineEventHandler(async (event) => {
         if (grid && !fitsGrid(target, grid)) {
             throw createError({
                 statusCode: 409,
-                statusMessage: `Day ${target.dayOfWeek} block ${target.blockIndex}`
+                message: `Day ${target.dayOfWeek} block ${target.blockIndex}`
                     + `${target.durationBlocks > 1 ? ` (${target.durationBlocks} blocks)` : ''}`
                     + ` is not a slot in '${grid.name}', which has ${grid.blocksPerDay} blocks`
                     + ` on days ${grid.activeDays.join(', ')}.`,

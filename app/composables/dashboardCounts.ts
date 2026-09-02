@@ -1,6 +1,7 @@
 import type { EntityCount } from '~/utils/institutionCounts';
 import { countedEntities } from '~/utils/institutionCounts';
 import { useSession } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 
 /**
  * True row counts for the entities that describe an institution's shape.
@@ -43,9 +44,16 @@ export function useInstitutionCounts() {
      */
     const request = useRequestFetch();
     const session = useSession();
+    /*
+     * Resolved at SETUP, not inside the fetch below: `useT()` needs the Vue
+     * instance and the callback runs later, detached from it. The registry's
+     * own labels come back through it, so the tile and the `/manage` link in
+     * the sidebar cannot disagree on what an entity is called.
+     */
+    const { t } = useT();
 
     return useAsyncData<EntityCount[]>('dashboard:institution-counts', async () => {
-        const wanted = countedEntities(new Set(session.value?.permissions ?? []));
+        const wanted = countedEntities(new Set(session.value?.permissions ?? []), t);
 
         /*
          * `allSettled`, NOT `all`. One 403 or one slow resource inside a

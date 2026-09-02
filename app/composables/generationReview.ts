@@ -1,5 +1,8 @@
 import { statusCodeOf } from '~/composables/httpError';
 import { weekCountOf } from '#shared/academicCalendar';
+import { useT } from '~/composables/i18n';
+import type { Translate } from '~/composables/i18n';
+import type { MessageKey } from '~~/i18n/keys';
 import type { NamedRow, TimeGrid } from '~/composables/schedule';
 
 /**
@@ -148,7 +151,7 @@ export interface OfferingChange {
  * decision. `null` is its own case: runs captured before Stage 6a have no reason
  * recorded, and claiming reproducibility there would be a guess.
  */
-export function terminationSentence(reason: string | null): string {
+export function terminationSentence(reason: string | null, t: Translate): string {
     /**
      * NULL AND UNRECOGNISED ARE DIFFERENT SENTENCES, and merging them told the
      * reviewer a lie. Every unknown string fell into the `default` branch and
@@ -156,24 +159,30 @@ export function terminationSentence(reason: string | null): string {
      * `stagnated`, a run that GAVE UP without placing everything was described
      * as an old run from before the field existed. The one reason a reviewer
      * most needs to see was the one rendered as archaeology.
+     *
+     * KEYING IT DID NOT COLLAPSE THE ALLOW-LIST. Every recognised reason still
+     * has its own key and its own `case`, `null` still has a key of its own,
+     * and the default branch still NAMES the reason it does not recognise
+     * rather than explaining it away: a deny-list of one would be an
+     * allow-list of everything (CLAUDE.md).
      */
     if (!reason) {
-        return 'Unknown. This run predates termination capture.';
+        return t('schedule.termination.unknown');
     }
 
     switch (reason) {
         case 'converged':
-            return 'Found an optimal solution and stopped.';
+            return t('schedule.termination.converged');
         case 'move_budget':
-            return 'Ran out of move budget. A longer run may do better.';
+            return t('schedule.termination.moveBudget');
         case 'time_budget':
-            return 'Ran out of time. Not reproducible. A re-run may differ.';
+            return t('schedule.termination.timeBudget');
         case 'stagnated':
-            return 'Gave up before placing everything: some sessions have no slot in this proposal.';
+            return t('schedule.termination.stagnated');
         case 'cancelled':
-            return 'The run was cancelled.';
+            return t('schedule.termination.cancelled');
         default:
-            return `Ended for a reason this version does not recognise (${reason}).`;
+            return t('schedule.termination.unrecognised', { reason });
     }
 }
 
@@ -191,35 +200,34 @@ export interface ReviewLoadError {
     retryable: boolean;
 }
 
-function describeLoadError(error: unknown): ReviewLoadError {
+function describeLoadError(error: unknown, t: Translate): ReviewLoadError {
     switch (statusCodeOf(error)) {
         case 401:
             return {
                 kind: 'forbidden',
-                title: 'Your session has expired',
-                detail: 'Sign in again to review this proposal.',
+                title: t('schedule.loadFailure.expiredTitle'),
+                detail: t('schedule.loadFailure.expiredDetail'),
                 retryable: false,
             };
         case 403:
             return {
                 kind: 'forbidden',
-                title: 'You cannot review this proposal',
-                detail: 'Reviewing proposals needs the generation.read permission. '
-                    + 'Ask a tenant administrator to grant it.',
+                title: t('schedule.loadFailure.forbiddenTitle'),
+                detail: t('schedule.loadFailure.forbiddenDetail'),
                 retryable: false,
             };
         case 404:
             return {
                 kind: 'notFound',
-                title: 'No such proposal',
-                detail: 'It may have been removed, or the link may point at another institution.',
+                title: t('schedule.loadFailure.notFoundTitle'),
+                detail: t('schedule.loadFailure.notFoundDetail'),
                 retryable: false,
             };
         default:
             return {
                 kind: 'failed',
-                title: 'Could not load this proposal',
-                detail: 'The preview did not come back. Nothing has been changed. Try again.',
+                title: t('schedule.loadFailure.failedTitle'),
+                detail: t('schedule.loadFailure.failedDetail'),
                 retryable: true,
             };
     }
@@ -229,13 +237,22 @@ function describeLoadError(error: unknown): ReviewLoadError {
  * How each diff state is named and drawn. Here rather than in a component because
  * BOTH presentations render it, and a chip labelled "Added" in one and "Created"
  * in the other is what makes two views of one dataset look like two datasets.
+ *
+ * A FUNCTION rather than the `Record<DiffAction, string>` this used to be: a
+ * module-level constant is evaluated at import time, where there is no Vue
+ * instance and therefore no translator, so the map has to be built per caller
+ * from the `t` the caller already holds (CONVENTIONS.md, "thread `t`").
  */
-export const DIFF_TAG: Record<DiffAction, string> = {
-    create: 'Added',
-    move: 'Moved',
-    unchanged: 'Unchanged',
-    delete: 'Removed',
+const DIFF_TAG_KEY: Record<DiffAction, MessageKey> = {
+    create: 'schedule.diff.added',
+    move: 'schedule.diff.moved',
+    unchanged: 'schedule.diff.unchanged',
+    delete: 'schedule.diff.removed',
 };
+
+export function diffTag(action: DiffAction, t: Translate): string {
+    return t(DIFF_TAG_KEY[action]);
+}
 
 export const DIFF_ICON: Record<DiffAction, string> = {
     create: 'material-symbols:add-circle-outline',
@@ -259,8 +276,9 @@ export function describePlacement(
     slotLabel: (placement: Placement) => string,
     offeringName: (id: string) => string,
     roomName: (id: string) => string,
+    t: Translate,
 ): string {
-    const parts = [DIFF_TAG[item.action], offeringName(item.offeringId), slotLabel(shownAt(item))];
+    const parts = [diffTag(item.action, t), offeringName(item.offeringId), slotLabel(shownAt(item))];
 
     if (item.roomId) {
         parts.push(roomName(item.roomId));
@@ -268,8 +286,11 @@ export function describePlacement(
 
     if (item.action === 'move' && item.previous) {
         parts.push(item.previous.termWeek === item.placement.termWeek
-            ? `moved from ${slotLabel(item.previous)}`
-            : `moved from ${slotLabel(item.previous)} in week ${item.previous.termWeek}`);
+            ? t('schedule.diff.movedFrom', { slot: slotLabel(item.previous) })
+            : t('schedule.diff.movedFromWeek', {
+                slot: slotLabel(item.previous),
+                week: item.previous.termWeek,
+            }));
     }
 
     return parts.join(', ');
@@ -290,15 +311,16 @@ export function describePlacement(
 export function applyConsequence(
     plan: ReviewPreview['plan'],
     proposedHard: number,
+    t: Translate,
 ): string {
     const clauses: string[] = [];
 
     if (plan.deleted > 0) {
-        clauses.push(`${plan.deleted} session${plan.deleted === 1 ? '' : 's'} removed`);
+        clauses.push(t('schedule.applyConsequence.removed', { count: plan.deleted }, plan.deleted));
     }
 
     if (plan.created > 0) {
-        clauses.push(`${plan.created} added`);
+        clauses.push(t('schedule.applyConsequence.added', { count: plan.created }));
     }
 
     if (plan.moved > 0) {
@@ -316,22 +338,28 @@ export function applyConsequence(
         const collateral = plan.movedCollateral ?? 0;
 
         clauses.push(collateral > 0
-            ? `${plan.moved} moved, ${collateral} of them outside what you asked for`
-            : `${plan.moved} moved`);
+            ? t('schedule.applyConsequence.movedCollateral', { count: plan.moved, collateral })
+            : t('schedule.applyConsequence.moved', { count: plan.moved }));
     }
 
-    const changes = clauses.length ? clauses.join(', ') : 'no placement changes';
-    const parts = [`Replace this term's timetable: ${changes}.`];
+    /*
+     * The clause LIST is joined with a comma, which is punctuation rather than
+     * grammar; each clause is its own whole plural message, so a translator
+     * can reorder inside one without the joiner having to know anything.
+     */
+    const changes = clauses.length ? clauses.join(', ') : t('schedule.applyConsequence.noChanges');
+    const parts = [t('schedule.applyConsequence.replace', { changes })];
 
     if (proposedHard > 0) {
-        parts.push(
-            `${proposedHard} hard-rule issue${proposedHard === 1 ? '' : 's'} the solver could not resolve `
-            + 'will be recorded against the schedule.',
-        );
+        parts.push(t('schedule.applyConsequence.hardIssues', { count: proposedHard }, proposedHard));
     }
 
     if (plan.skippedLocked > 0) {
-        parts.push(`${plan.skippedLocked} locked session${plan.skippedLocked === 1 ? '' : 's'} stay as they are.`);
+        parts.push(t(
+            'schedule.applyConsequence.lockedStay',
+            { count: plan.skippedLocked },
+            plan.skippedLocked,
+        ));
     }
 
     return parts.join(' ');
@@ -339,6 +367,7 @@ export function applyConsequence(
 
 export function useGenerationReview(generationId: string) {
     const request = useRequestFetch();
+    const { t } = useT();
 
     const termWeek = ref(1);
     const groupId = ref('');
@@ -404,13 +433,15 @@ export function useGenerationReview(generationId: string) {
      * once the proposal has actually been read.
      */
     const loadError = computed<ReviewLoadError | null>(() => (
-        summary.error.value ? describeLoadError(summary.error.value) : null
+        summary.error.value ? describeLoadError(summary.error.value, t) : null
     ));
 
     const term = computed(() => {
         const termId = preview.value?.run?.termId;
 
-        return summary.data.value?.terms.find((t) => t.id === termId) ?? null;
+        // Not `(t) => …`: `t` is this composable's translator, and a
+        // parameter shadowing it here is a rename away from a real bug.
+        return summary.data.value?.terms.find((row) => row.id === termId) ?? null;
     });
 
     /**
@@ -562,14 +593,23 @@ export function useGenerationReview(generationId: string) {
      * schedule is unchanged would be a guess presented as a fact.
      */
     function describeWriteFailure(error: unknown, verb: 'apply' | 'discard'): string {
-        const stated = (error as { statusMessage?: string }).statusMessage;
+        const stated = serverErrorMessage(error);
 
         if (stated) {
+            // The server's own diagnostic detail, deferred by issue #19 and
+            // therefore still English (CONVENTIONS.md, "What is out of scope").
             return stated;
         }
 
-        return `Lost contact while trying to ${verb} this proposal, so it is not known `
-            + 'whether it went through. Refresh before trying again.';
+        /*
+         * TWO WHOLE SENTENCES, not one with the verb interpolated. "trying to
+         * {verb}" is exactly the half-word interpolation CONVENTIONS.md bans:
+         * German puts the infinitive at the end of the clause, so a translator
+         * given `{verb}` cannot move it there.
+         */
+        return verb === 'apply'
+            ? t('schedule.reviewAction.applyLostContact')
+            : t('schedule.reviewAction.discardLostContact');
     }
 
     async function apply() {
@@ -598,7 +638,7 @@ export function useGenerationReview(generationId: string) {
         try {
             await summary.refresh();
         } catch {
-            actionError.value = 'Applied. The view could not be refreshed. Reload to see it.';
+            actionError.value = t('schedule.reviewAction.appliedNoRefresh');
         } finally {
             applying.value = false;
         }
@@ -622,7 +662,7 @@ export function useGenerationReview(generationId: string) {
         try {
             await summary.refresh();
         } catch {
-            actionError.value = 'Discarded. The view could not be refreshed. Reload to see it.';
+            actionError.value = t('schedule.reviewAction.discardedNoRefresh');
         } finally {
             discarding.value = false;
         }

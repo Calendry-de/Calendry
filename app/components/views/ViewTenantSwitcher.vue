@@ -9,15 +9,15 @@
             :value="activeTenant.id"
             :disabled="switching"
             :title="activeTenant.name"
-            aria-label="Switch institution"
+            :aria-label="t('nav.shell.switchInstitution')"
             @change="onSelect(($event.target as HTMLSelectElement).value)"
         >
             <option
-                v-for="t in activeTenants"
-                :key="t.tenantId"
-                :value="t.tenantId"
-                :selected="t.tenantId === activeTenant.id"
-            >{{ t.name }}</option>
+                v-for="tenant in activeTenants"
+                :key="tenant.tenantId"
+                :value="tenant.tenantId"
+                :selected="tenant.tenantId === activeTenant.id"
+            >{{ tenant.name }}</option>
         </select>
 
         <span
@@ -34,8 +34,11 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { fetchSession, useSession } from '~/composables/session';
 import { resolveHomeRoute } from '~/utils/routes';
+
+const { t } = useT();
 
 /**
  * Which institution the signed-in Account is currently acting in, and (only
@@ -111,7 +114,7 @@ async function onSelect(tenantId: string) {
 
         window.location.href = resolveHomeRoute(fresh?.permissions ?? []);
     } catch {
-        switchError.value = 'Could not switch institution.';
+        switchError.value = t('nav.shell.switchFailed');
         switching.value = false;
     }
 }

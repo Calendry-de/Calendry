@@ -5,7 +5,7 @@
                 name="material-symbols:inventory-2-outline"
                 aria-hidden="true"
             />
-            {{ sessions.length }} session{{ sessions.length === 1 ? '' : 's' }} in the spare bank
+            {{ t('schedule.spareBank.heading', { count: sessions.length }, sessions.length) }}
         </h2>
 
         <ul>
@@ -17,7 +17,9 @@
                     type="button"
                     @click="$emit('select', session.id)"
                 >{{ sessionLabel(session) }}</button>
-                <span>still owed by {{ session.offering?.title ?? 'its offering' }}</span>
+                <span>{{ t('schedule.spareBank.owedBy', {
+                    offering: session.offering?.title ?? t('schedule.spareBank.owedByFallback'),
+                }) }}</span>
             </li>
         </ul>
     </section>
@@ -26,6 +28,7 @@
 <script setup lang="ts">
 import type { ScheduleSession } from '~/composables/schedule';
 import { sessionLabel } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 
 /**
  * Cancelled Sessions with nowhere to sit (issue #22): still counted toward
@@ -40,6 +43,8 @@ defineProps<{
 }>();
 
 defineEmits<{ select: [sessionId: string] }>();
+
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

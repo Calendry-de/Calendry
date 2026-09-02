@@ -103,7 +103,7 @@ export async function requireBaselineGeneration(tx: Tx, tenantId: string, sessio
     if (!current) {
         throw createError({
             statusCode: 409,
-            statusMessage: 'No current Generation to record this edit against. Apply a Generation first.',
+            message: 'No current Generation to record this edit against. Apply a Generation first.',
         });
     }
 

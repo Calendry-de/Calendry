@@ -1,4 +1,5 @@
 import { useStore } from '~/store/index';
+import { useLanguage } from '~/composables/i18n';
 
 /**
  * The store is resolved LAZILY, never at module scope.
@@ -57,6 +58,15 @@ export const useCalendryLayout = () => {
     // Reactive theme reference
     store.theme = themeCookie.value ?? 'default';
 
+    /**
+     * Read OUTSIDE the `useHead` callback, because `useLanguage()` calls
+     * `useState` by way of `useViewerLocale()` and that has to happen during
+     * setup, while the callback re-runs later on every reactive change. The
+     * `.value` read stays inside, so the attribute still tracks a language
+     * change without the composable being re-invoked.
+     */
+    const { language } = useLanguage();
+
     useHead(() => {
         const theme = store.theme ?? 'default';
 
@@ -97,7 +107,23 @@ export const useCalendryLayout = () => {
                 },
             ],
             htmlAttrs: {
-                lang: 'en',
+                /**
+                 * The MESSAGE LANGUAGE, not the viewer's full locale
+                 * (`de`, never `de-AT`): this attribute declares what
+                 * language the document is WRITTEN in, and the document is
+                 * written in whichever tree `t()` read from, while the full
+                 * tag only ever affected how its dates were drawn.
+                 *
+                 * Hardcoded `'en'` until issue #19, which was harmless while
+                 * every string was English and became a lie the moment they
+                 * were not. It is not a cosmetic attribute: a screen reader
+                 * picks its pronunciation rules from it, so German text
+                 * announced as `en` is read out in an English voice, and
+                 * browsers offer to translate a page whose declared language
+                 * differs from the reader's, so German content labelled `en`
+                 * gets offered to German readers as if foreign.
+                 */
+                lang: language.value,
                 class: [`theme-${ theme }`],
             },
             style: [{

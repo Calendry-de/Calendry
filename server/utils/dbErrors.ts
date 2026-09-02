@@ -74,11 +74,11 @@ export function toHttpError(error: unknown): never {
 
     // Prisma's own error codes, which survive when the SQLSTATE does not.
     if (e?.code === 'P2003') {
-        throw createError({ statusCode: 409, statusMessage: 'Still referenced by other records.' });
+        throw createError({ statusCode: 409, message: 'Still referenced by other records.' });
     }
 
     if (e?.code === 'P2002') {
-        throw createError({ statusCode: 409, statusMessage: 'Already exists.' });
+        throw createError({ statusCode: 409, message: 'Already exists.' });
     }
 
     switch (pgCode) {
@@ -86,25 +86,25 @@ export function toHttpError(error: unknown): never {
         // 404 rather than 403 so a caller cannot probe for existence of rows in
         // tenants it cannot see.
         case '42501':
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
 
         case '23505':
-            throw createError({ statusCode: 409, statusMessage: 'Already exists.' });
+            throw createError({ statusCode: 409, message: 'Already exists.' });
 
         // FK RESTRICT, e.g. deleting a Group that still has children.
         case '23503':
             throw createError({
                 statusCode: 409,
-                statusMessage: 'Still referenced by other records.',
+                message: 'Still referenced by other records.',
             });
 
         case '23514':
-            throw createError({ statusCode: 422, statusMessage: `Constraint violated: ${message}` });
+            throw createError({ statusCode: 422, message: `Constraint violated: ${message}` });
 
         // Raised by the group cycle guard and the append-only triggers.
         case '2BP01':
         case 'P0001':
-            throw createError({ statusCode: 409, statusMessage: message });
+            throw createError({ statusCode: 409, message: message });
 
         default:
             break;
@@ -112,30 +112,30 @@ export function toHttpError(error: unknown): never {
 
     // Prisma surfaces RLS-filtered updates as "record not found".
     if ((e as { code?: string })?.code === 'P2025') {
-        throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        throw createError({ statusCode: 404, message: 'Not found.' });
     }
 
     // Last resort: classify by message when neither a SQLSTATE nor a Prisma code
     // survived the adapter's wrapping. Message matching is fragile, so it runs
     // only after both structured paths have failed.
     if (/violates row-level security/i.test(allMessages)) {
-        throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        throw createError({ statusCode: 404, message: 'Not found.' });
     }
 
     if (/violates (foreign key|RESTRICT)|RESTRICT setting/i.test(allMessages)) {
-        throw createError({ statusCode: 409, statusMessage: 'Still referenced by other records.' });
+        throw createError({ statusCode: 409, message: 'Still referenced by other records.' });
     }
 
     if (/duplicate key value/i.test(allMessages)) {
-        throw createError({ statusCode: 409, statusMessage: 'Already exists.' });
+        throw createError({ statusCode: 409, message: 'Already exists.' });
     }
 
     if (/violates check constraint/i.test(allMessages)) {
-        throw createError({ statusCode: 422, statusMessage: message });
+        throw createError({ statusCode: 422, message: message });
     }
 
     if (/append-only|would create a cycle|is immutable/i.test(allMessages)) {
-        throw createError({ statusCode: 409, statusMessage: message });
+        throw createError({ statusCode: 409, message: message });
     }
 
     throw error;

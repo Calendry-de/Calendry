@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!run) {
-        throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        throw createError({ statusCode: 404, message: 'Not found.' });
     }
 
     // Idempotent rather than an error: "stop this" has already been achieved,
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
         if (error instanceof SolverUnavailableError) {
             throw createError({
                 statusCode: 502,
-                statusMessage: 'Could not reach the solver service to cancel the run.',
+                message: 'Could not reach the solver service to cancel the run.',
                 data: { detail: error.message },
             });
         }
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
         if (error instanceof SolverRejectedError) {
             throw createError({
                 statusCode: 422,
-                statusMessage: `The solver refused to cancel this run: ${error.message}`,
+                message: `The solver refused to cancel this run: ${error.message}`,
                 data: { grpcCode: error.code, detail: error.message },
             });
         }

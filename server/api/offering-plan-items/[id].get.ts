@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!plan) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const items = await tx.offeringPlanItem.findMany({

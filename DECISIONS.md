@@ -46,7 +46,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Database, schema, deploy | Database & migrations · The `calendry_internal` schema · A federation-shared Session · Bootstrap & deploy |
 | Recurring failure shapes | "Guards must fail loudly" · SSR/watcher bugs · `--fix` tooling · `weekCountOf` vs. `weeksInTerm` |
 | Landing page & routing | Landing page / routing |
-| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal: the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log: the fifth tenant-isolation exception · Calendar links gain a permission and a Group subject |
+| Permissions & accounts | `session.read_own` · `tenant.read` and `generation.read` · Accounts & roles · Accounts in the management area · Screens · Staff principal: the fourth tenant-isolation exception · Staff tenant creation: SECURITY DEFINER instead of owner-Prisma · The persisted audit log: the fifth tenant-isolation exception · Calendar links gain a permission and a Group subject · API tokens gain a permission |
 | Management area | Management area (Step 13) · Academic calendar periods · Group↔Term scoping · Group availability windows |
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` · The demand ledger, and why a short answer cannot authorise a delete |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
@@ -2383,6 +2383,75 @@ already has.
 ---
 
 
+# API tokens gain a permission
+
+`api_token.manage_own`. The second permission-less self-service page to gain
+a gate, and the reasoning is deliberately NOT the same as issue #115's
+(§ "Calendar links gain a permission and a Group subject", the direct
+precedent): there, the capability grew a new subject (a Group) and outgrew
+"authority over your own row". Here nothing about the capability changed at
+all. The product owner asked for it to be gateable, so an institution can
+decide who gets to automate.
+
+**Why a self-service route can want a permission even though it grants
+nothing new.** `POST /api/me/api-tokens` only ever narrows: it refuses any
+key the creator does not hold, and `heldPermissions()` re-intersects the
+stored ceiling with the Person's LIVE permissions on every later request, so
+a token can never outlive or exceed its Person's authority. That argument is
+still sound and it answers a different question from the one asked. It says
+the PERMISSIONS inside a token need no extra authority; it says nothing about
+the CREDENTIAL. A long-lived bearer secret sitting in somebody's CI config is
+an institutional risk in a way `/my/account`'s locale setting is not, and
+"who may hold one" is exactly the kind of policy an AccessRole exists to
+express.
+
+**Gate MANAGING a token, never USING one, and what that means mechanically.**
+The key is checked at exactly three places (`GET`/`POST /api/me/api-tokens`,
+`DELETE /api/me/api-tokens/:id`) and nowhere else, so it appears in neither
+half of the intersection `heldPermissions()` computes for any other route.
+Consequences, both of them intended:
+
+- A Person who loses the key stops being able to mint or revoke, and every
+  token they already hold keeps working unchanged. Tokens narrow only when
+  the permissions BEHIND them are revoked, which is the pre-existing
+  mechanism and the one integrations depend on. Revoking this key is
+  therefore not a way to disable somebody's scripts; taking away the
+  AccessRole carrying the permissions those scripts use is.
+- A token whose ceiling happens to contain the key still cannot mint or
+  revoke one. All three routes refuse `identity.kind !== 'account'` BEFORE
+  reading any permission, so the ordering is what preserves CLAUDE.md's
+  "a token can never mint or revoke tokens, or a leaked one could launder
+  itself into a permanent one". Putting the permission check first would
+  have quietly made the laundering path depend on which boxes somebody
+  ticked in the minting form. `ApiTokensPanel.vue` also filters the key out
+  of the offered checkboxes (`UNDELEGATABLE`), with a sentence saying so:
+  a box that grants nothing is a lie, and a box silently missing from a list
+  of everything you hold reads as a bug.
+
+**Why there is no backfill script.** `scripts/backfill-ics-link-generate-own.ts`
+and `scripts/backfill-dashboard-view.ts` both exist because minting those keys
+would otherwise have REMOVED a capability their holders already had, and
+neither issue meant to change who could do the thing. This one does mean to.
+Backfilling every AccessRole for which minting a token was ever meaningful
+would grant it to all of them, since any signed-in Person could mint one, and
+deliver precisely nothing. So it takes the ordinary new-permission path:
+`bun run grant:permissions --role tenant-admin --all-missing` on every
+existing tenant, and any wider grant is a decision that tenant makes per
+role. Recorded here and in CLAUDE.md's "Owed by" list because the ABSENCE of
+a backfill beside two present ones is otherwise indistinguishable from
+somebody having forgotten to write one.
+
+**What the narrowing costs, named rather than discovered.** Existing tenants
+get a page that disappears from the navigation for everybody but
+`tenant-admin` until they decide otherwise, and a lecturer who had minted a
+token keeps using it but can no longer revoke it themselves. That second one
+is not a dead end: an administrator holding `account.manage` revokes it at
+`DELETE /api/accounts/:id/api-tokens/:tokenId`, which is a different
+authority over somebody else's credentials and has always existed.
+
+---
+
+
 # Solver: the demand ledger, and why a short answer cannot authorise a delete
 
 ## The incident (2026-09-01)
@@ -2543,5 +2612,229 @@ size before it reaches the wire (the solver is never sent a demand for more
 lecturers than exist), and reports any mismatch on
 `AssemblyReport.offeringsWithInsufficientLecturers`, the same warn-and-allow
 shape as `offeringsWithNoDerivableCapacity`.
+
+---
+
+# i18n: vue-i18n directly, and why the locale question was already answered (issue #19)
+
+## Two axes, not one, and no migration
+
+Issue #17 had already shipped locale resolution: `resolveLocale()`
+(`shared/locale.ts`) picks Person → Tenant → `Accept-Language` → fallback,
+server-side, once, and carries the answer to the client on the session. The
+temptation was to reuse that value as the language directly. It cannot be,
+because `Person.locale` and `TenantDisplaySettings.defaultLocale` accept ANY
+tag `Intl` validates: `fr-FR`, `ja-JP` and `pt-BR` are all storable today and
+all mean something useful, since that value decides DATE AND NUMBER SHAPE.
+
+Collapsing the two would have meant narrowing what those columns may hold,
+which is a migration and a regression: a French administrator would lose
+French dates to gain nothing. So `resolveLanguage()` (`shared/language.ts`)
+derives the message language from the resolved locale's PRIMARY SUBTAG.
+`de-AT` gets German text with Austrian date shape; `fr-FR` gets French date
+shape with English text. **No schema change was needed for any of this**, and
+`prisma/schema.prisma`'s comment on `Person.locale` had already reserved the
+split ("never affects what UI text says (issue #19's territory)").
+
+The two fallbacks differ, and that falls out of the existing chain rather than
+being a branch anybody has to maintain: no preference at all resolves to
+`FALLBACK_LOCALE` (`de-DE`) and therefore `de`, while an explicit `fr` resolves
+to `fr-FR` and therefore, being untranslated, to `en`. "Stated nothing" and
+"stated a language we do not have" are different facts and deserve different
+answers, and English serves a French speaker better than German does.
+
+## Why not `@nuxtjs/i18n`
+
+Two reasons, and the second is a live hazard rather than a preference.
+
+**It brings its own locale detection** (cookie, browser, route prefix). This
+app's answer to "which locale" already exists and is shared with the server,
+so the module would have been a second implementation of a decided question —
+the failure CLAUDE.md's one-implementation rule exists to name. Configuring it
+away (`detectBrowserLanguage: false`) means paying a module's cost for the
+parts that were switched off.
+
+**Its default strategy prefixes every route.** `app/middleware/auth.global.ts`
+decides what needs a session by matching `to.path` against exact strings
+(`PUBLIC_ROUTES`, `ANONYMOUS_ROUTES`). A `/de/login` matches neither, so the
+guard meant to let an anonymous visitor through would bounce them off the
+sign-in page instead. `HOME_ROUTE` (`app/utils/routes.ts`) is likewise
+documented as the ONLY place "where a signed-in session belongs" is written,
+and generated locale routes would have been a second.
+
+So: `vue-i18n` and a ~40-line plugin. What the module would have given for
+free was one dynamic `import()` and about fifteen lines.
+
+## A chunk per language, not the SSR payload
+
+The obvious alternative was to serialise the active language's messages into
+the payload via `useState`, the way `useViewerLocale()` carries the locale
+itself. That is right for one string and wrong for a catalogue: the payload is
+inlined into every HTML response and never cached, so each navigation would
+re-ship the whole tree. A chunk is fetched once, then served from the browser
+cache, and Nuxt emits a `modulepreload` so it downloads in parallel with the
+main bundle. Verified on a production build: German and English are separate
+chunks, so a viewer downloads one language, never both.
+
+`i18n/messages.ts` uses two literal `import()` specifiers rather than one
+computed from a variable, because a computed specifier makes the bundler emit
+a chunk for every directory that could match and abandon what it cannot see.
+
+## Why the language is settled in MIDDLEWARE and not in the plugin
+
+Nuxt runs plugins before route middleware, and the acting Person's own locale
+arrives with the session, which `auth.global.ts` fetches IN middleware. So at
+plugin time the two sides legitimately see different things: on the server
+there is no session yet, while on the client `useState` has already been
+restored from the payload.
+
+Fetching the session from the plugin would have settled it, and would have put
+an API call on `/` and `/pricing`, breaking the rule that the landing page
+reads no session and calls no API. So the plugin starts from what is known and
+`app/middleware/i18n.global.ts` guarantees the final language before the first
+render. Middleware is awaited on both sides, so server and client both finish
+at the session's language and the markup matches by construction.
+
+**The ordering is the filename.** Nuxt runs global middleware in filename
+order, so `auth` precedes `i18n`. Renaming either file reintroduces the bug.
+
+## The latent bug this uncovered
+
+`fetchSession()` forwarded `useRequestHeaders(['cookie'])` and nothing else, so
+during SSR `/api/auth/session` never saw `Accept-Language` and fell through to
+`FALLBACK_LOCALE` for every signed-in viewer whose Person and Tenant both
+stated no locale — the default state of every account.
+
+It was never merely cosmetic. On the CLIENT the browser attaches the header to
+that same request automatically, so SSR resolved one locale and hydration
+resolved another: a genuine mismatch, invisible for as long as the fallback was
+`en-GB` and the only symptom was date shape. Flipping the fallback to `de-DE`
+turned it into a whole page rendering in the wrong language on the server and
+the right one on the client, which is how the rendering test found it.
+
+Two related bugs were fixed in passing, both instances of a rule this repo had
+already written down: `htmlAttrs.lang` was hardcoded `'en'`
+(`app/composables/layout.ts`), which a screen reader uses to choose
+pronunciation; and `ScheduleMiniMonth.vue` called
+`Intl.DateTimeFormat(undefined, …)` twice, the exact hazard
+`app/utils/formatDate.ts`'s doc comment exists to warn about, with one of the
+two feeding a `title` attribute, which Vue silently declines to patch.
+
+## How ~200 English test assertions survived a language flip
+
+The suite sends no `Accept-Language`, so before this change it rendered English
+and asserted English. With `de-DE` as the fallback it would have rendered
+German against 49 files of English assertions, and the failure message would
+have said a page did not render its content — indistinguishable from a blanked
+page, a dropped fetch or a permissions bug.
+
+Rewriting the assertions into German was rejected: it would have retired the
+one net protecting a 2,500-string refactor while the refactor was in progress.
+Instead `tests/helpers/setup.ts` patches `fetch` once to add
+`accept-language: en-GB` when a caller has not set one. There were 51 bare
+`fetch` calls across 18 files in a dozen shapes; one entry point means the
+guarantee also holds for call sites written later by somebody who never read
+the comment. It is the same technique `nuxt.config.ts` already uses to attach
+the CSRF header, for the same reason. It FILLS IN and never overrides, so
+`tests/i18n-rendering.test.ts` can still demand a specific language.
+
+## Typed keys, and the empty-tree property
+
+`MessageKey` (`i18n/keys.ts`) is a recursive conditional type over the ENGLISH
+tree's inferred shape, so a typo, a stale key or a reference to a branch rather
+than a leaf is a `nuxt build` failure at the call site. Measured before
+committing eight parallel agents to it: 2,770 keys typecheck in 1.25s, and it
+correctly rejects all three error shapes.
+
+English is the STRUCTURAL source while German is the DEFAULT language, and the
+two roles are deliberately separate. Typing from English means a key present
+only in German is a typecheck error rather than a `de`-only string that renders
+as a raw key to every English reader; `tests/i18n-catalogue.test.ts` asserts
+the direction types cannot see.
+
+`never` is the correct `MessageKey` for an empty tree, not a problem to work
+around: with nothing extracted, every `t()` call fails to compile, which
+enforces the intended order of work (extract into JSON, then reference) rather
+than merely encouraging it.
+
+## Copy in plain `.ts` modules: thread `t`, and thread it into the BUILDER
+
+`useT()` is illegal in `navPlaces.ts`, `manageRegistry.ts`,
+`shared/permissions.ts` and `shared/constraintTypes.ts`, for two independent
+reasons either of which is decisive: it needs Vue's injection context, so it
+cannot run inside a lazily-evaluated `computed` getter, and several of those
+modules are imported by unit tests running in plain Node with no Nuxt instance
+— the property their own doc comments say they exist to have.
+
+So they take a `Translate`. **Into the function that builds the structure, not
+onto each field.** The per-field form (`label: (t) => string`) makes the
+READERS pay: `NavEntry.label` is read by five surfaces, and every one would
+have to learn to call a label instead of rendering a string. Required, never
+optional with an identity fallback, so a call site that forgets it is a
+typecheck error and not a page of raw keys.
+
+Where a structure has many consumers that never read copy, the key-field form
+(`labelKey: MessageKey`) is the better trade instead: `MANAGE_ENTITIES` has 12
+value call sites and 8 test files, most reading permissions, icons and relation
+URLs, and the builder form would have forced edits to tests that have nothing
+to do with text.
+
+## Search keywords: translated AND English, merged in one place
+
+Command-palette synonyms are never rendered, which is true and beside the
+point: they are what Ctrl+K matches, so leaving them English makes the palette
+useless in the default language. They are ADDED TO, never replaced, so an admin
+who learned the product in English still finds the page after switching.
+
+One key per entry holding a COMMA-SEPARATED string, not one key per term: the
+number of useful synonyms differs per language and per entry, and a JSON array
+would break `MessageKey`. The corollary binds translators — a keyword may never
+contain a comma.
+
+`searchKeywords()` lives in `app/utils/i18nKeywords.ts` rather than beside its
+first caller, because `manageRegistry.ts` needs the identical merge and two
+copies of "translated terms plus English aliases, deduped" is the
+one-implementation rule failing exactly as CLAUDE.md describes it: they drift
+on the delimiter or the dedupe, and the only symptom is a search that quietly
+stops finding one section.
+
+The English aliases stay in CODE, duplicated into `en/*.json`. Reading them
+back out of the English tree with a locale override is legal vue-i18n and
+returns the RAW KEY when that tree is not loaded — a palette that silently
+stops matching, unfixable by inspection. Dedupe makes the duplication free.
+
+## What is deliberately NOT translated
+
+**Tenant-entered open vocabulary, ever.** Role names, Group names, `kind`
+values, Equipment tags, custom Constraint names. This is the fixed-vs-open
+taxonomy principle applied to text: a tenant that named a kind "Vorlesung" has
+named it that, and translating it would be the app deciding what the tenant's
+own vocabulary means. The test is whether this repo wrote the string or a
+customer typed it.
+
+**Server error messages (206 sites), for now.** ~15 UI sites display one
+verbatim. They stay English diagnostic detail behind an app-authored translated
+message, which keeps this issue to its stated scope and the 24 tests asserting
+those substrings green. Also deferred: ~79 English strings in downloaded
+spreadsheets (`personExport.ts`, `tenantExport.ts`, whose headers come from an
+inherently English `humanize()`), and `formatDate()`'s `'date unknown'`.
+
+**The 398 `defineRouteMeta` OpenAPI strings.** API documentation, not UI.
+
+## Three tables store app-authored English as DATA
+
+`role.name` ('Lecturer'), `access_role.name` ('Tenant Administrator') and
+`constraint.name` (from the catalogue's `type.label`) are written at
+provisioning, so translating the catalogue does not retro-translate existing
+rows — and `ManageConstraintBuilder.vue` compares a typed name against the
+English label to detect "renamed from default".
+
+Every one of those rows carries a stable identity beside its name (`role.key`,
+`access_role.key`, `constraint.type`, plus `is_system` / `is_default`), so the
+resolution needs no migration and changes no row: display the TRANSLATED
+catalogue label while a row is still system/default and its stored name matches
+the English original, and the STORED name otherwise, because a tenant who
+renamed it has spoken and their vocabulary wins. Making the column nullable was
+considered and rejected for being a migration where none is required.
 
 ---

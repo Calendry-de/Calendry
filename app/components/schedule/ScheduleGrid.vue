@@ -10,7 +10,7 @@
         :class="{ 'grid--placing': placing, 'grid--swapping': swapping }"
         :style="cssVars"
         role="group"
-        aria-label="Week grid"
+        :aria-label="t('schedule.grid.regionLabel')"
     >
         <div
             class="grid_corner"
@@ -37,8 +37,8 @@
             <span
                 v-if="dayDiffers(day)"
                 class="grid_day-note"
-                title="This day has its own break schedule, so its blocks do not start at the times in the left column."
-            >own breaks</span>
+                :title="t('schedule.grid.ownBreaksTitle')"
+            >{{ t('schedule.grid.ownBreaks') }}</span>
         </div>
 
         <!--
@@ -76,8 +76,8 @@
                     class="grid_gap"
                     :style="{ gridRow: row.line, gridColumn: '2 / -1' }"
                 >
-                    <span class="grid_gap-label">{{ row.label ?? 'Break' }}</span>
-                    <span class="grid_gap-mins">{{ row.minutes }} min</span>
+                    <span class="grid_gap-label">{{ row.label ?? t('schedule.grid.break') }}</span>
+                    <span class="grid_gap-mins">{{ t('schedule.grid.gapMinutes', { minutes: row.minutes }) }}</span>
                 </div>
             </template>
         </template>
@@ -144,6 +144,7 @@ import {
     blockTime, formatSlotDate, weekdayName, weekdayShort,
 } from '~/composables/schedule';
 import { useViewerLocale } from '~/composables/locale';
+import { useT } from '~/composables/i18n';
 import { clusterSlots, useGridGeometry } from '~/composables/gridGeometry';
 import type { DisplaySettings } from '#shared/sessionColor';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
@@ -207,6 +208,7 @@ defineEmits<{
 }>();
 
 const locale = useViewerLocale();
+const { t } = useT();
 
 /** This column's calendar date, in the week currently shown. */
 const dateOf = (day: number) => props.slotDateOf(props.termWeek, day);
@@ -240,8 +242,11 @@ const cells = computed(() => props.grid.activeDays.flatMap((day, index) => (
         day,
         blockIndex: row.index,
         label: props.placing
-            ? `${props.targetVerb ?? 'Move to'} ${weekdayName(day)} `
-                + `${blockTime(props.grid, row.index, day).start}`
+            ? t('schedule.grid.cellLabel', {
+                verb: props.targetVerb ?? t('schedule.page.targetVerbMove'),
+                day: weekdayName(day),
+                time: blockTime(props.grid, row.index, day).start,
+            })
             : undefined,
         style: { gridRow: String(row.line), gridColumn: String(index + 2) },
     }))

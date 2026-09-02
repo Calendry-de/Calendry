@@ -34,7 +34,7 @@ export async function assertLeadsOffering(
      * never resolve to "leads everything" through an `undefined` filter.
      */
     if (!identity.actorPersonId) {
-        throw createError({ statusCode: 403, statusMessage: 'Only a signed-in person can request an exam.' });
+        throw createError({ statusCode: 403, message: 'Only a signed-in person can request an exam.' });
     }
 
     const offering = await tx.offering.findFirst({
@@ -56,7 +56,7 @@ export async function assertLeadsOffering(
     if (!offering) {
         throw createError({
             statusCode: 404,
-            statusMessage: 'No module you lead in this term has that id.',
+            message: 'No module you lead in this term has that id.',
         });
     }
 
@@ -80,13 +80,13 @@ export async function assertExamKind(tx: Tx, tenantId: string, kindId: string) {
     });
 
     if (!kind) {
-        throw createError({ statusCode: 404, statusMessage: 'Session kind not found.' });
+        throw createError({ statusCode: 404, message: 'Session kind not found.' });
     }
 
     if (kind.type !== 'EXAM') {
         throw createError({
             statusCode: 422,
-            statusMessage: `'${kind.name}' is not an exam kind, so the exam rules would not apply `
+            message: `'${kind.name}' is not an exam kind, so the exam rules would not apply `
                 + 'to anything created under it. Set that kind’s type to Exam, or choose one '
                 + 'already marked as an exam.',
             data: { field: 'kindId', type: kind.type },
@@ -122,7 +122,7 @@ export async function assertPlacementFits(
     if (placement.termWeek > weeks) {
         throw createError({
             statusCode: 409,
-            statusMessage: `Week ${placement.termWeek} is outside the term, which has ${weeks} weeks.`,
+            message: `Week ${placement.termWeek} is outside the term, which has ${weeks} weeks.`,
             data: { termWeek: placement.termWeek, weeks },
         });
     }
@@ -139,7 +139,7 @@ export async function assertPlacementFits(
     if (grid && !fitsGrid(placement, grid)) {
         throw createError({
             statusCode: 409,
-            statusMessage: `Day ${placement.dayOfWeek} block ${placement.blockIndex}`
+            message: `Day ${placement.dayOfWeek} block ${placement.blockIndex}`
                 + `${placement.durationBlocks > 1 ? ` (${placement.durationBlocks} blocks)` : ''}`
                 + ` is not a slot in '${grid.name}', which has ${grid.blocksPerDay} blocks`
                 + ` on days ${grid.activeDays.join(', ')}.`,

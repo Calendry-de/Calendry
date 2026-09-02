@@ -9,14 +9,15 @@
                 id="who-title"
                 class="audience_line"
             >
-                For the people who actually build the timetable: registrars, timetabling officers
-                and department heads, plus the lecturers who have to live in the result.
+                {{ t('landing.audience.line') }}
             </p>
         </div>
     </section>
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * Who the product is for, as the only thing on its line.
  *
@@ -47,6 +48,7 @@
  * It earns its separation by scale and space instead, which is what the rest of
  * the page does too.
  */
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

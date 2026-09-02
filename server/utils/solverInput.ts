@@ -29,6 +29,8 @@ import { isPlacedSession } from '../../shared/sessionPlacement';
 import {
     findConstraintType,
     missingConstraintParams,
+    parseBlockPositions,
+    parseWeekdayList,
     severityMismatch,
 } from '../../shared/constraintTypes';
 
@@ -322,28 +324,20 @@ export function toWireConstraint(row: {
      * rule to every offering: the opposite of what was configured.
      */
     /*
-     * A PROTECTED BLOCK NAMING NOTHING WOULD BLOCK EVERYTHING.
-     *
-     * `BlockedWindow` follows `Unavailability`'s convention: an empty axis means
-     * EVERY value on that axis. So a window with no days and no blocks is not
-     * "nothing reserved": it is the whole grid reserved, as a HARD rule, and
-     * the solver accepts it without complaint. Every session of the applying
-     * kinds becomes unplaceable, reported as nothing more specific than no
-     * feasible placement.
-     *
-     * Skipped and named rather than sent, matching how an offering-scoped rule
-     * is handled below: the two axes cannot BOTH be `required`, because "block 4
-     * every day" and "all of Wednesday" are each legitimate and each leaves one
-     * of them empty.
+     * A PARAMETER COMBINATION THAT CANNOT BE SENT (`ConstraintTypeDef
+     * .unsendableWhen`): `protected_block` with no days and no blocks would
+     * reserve the ENTIRE timetable rather than nothing (an empty axis means
+     * "every value"), and `minimize_block_usage` with nothing selected has no
+     * blocks to steer away from at all. Skipped and named here as ordinary
+     * narrowing; `validateConstraint` (shared/constraintTypes.ts) runs the
+     * SAME check before a run is even created, so the tenant sees this before
+     * clicking "Generate schedule" rather than reading it off a skipped-rule
+     * report after the fact.
      */
-    if (type.key === 'protected_block'
-        && parseWeekdayList(params.days).length === 0
-        && parseBlockPositions(params.blocks).length === 0) {
-        return {
-            skip: 'No days and no blocks are set, which would reserve the ENTIRE timetable '
-                + 'rather than nothing: an empty axis means "every value". Name at least '
-                + 'one day or one block.',
-        };
+    const unsendable = type.unsendableWhen?.(params);
+
+    if (unsendable) {
+        return { skip: unsendable.message };
     }
 
     /**
@@ -468,34 +462,11 @@ function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'different
  * `{}`, and the first four have explicit cases below. `PersonPreferenceFit` was
  * the only one that could reach the default, and it did the moment its
  * `wireField` was set.
- */
-/** Weekday numbers a `weekdays` param holds, sorted and cleaned. */
-function parseWeekdayList(value: unknown): number[] {
-    return Array.isArray(value)
-        ? [...new Set(value.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 7))]
-            .sort((a, b) => a - b)
-        : [];
-}
-
-/**
- * A comma-separated list of 1-BASED block positions, as the wire's 0-based
- * indices: the same conversion `minimize_block_usage` does, and for the same
- * reason: a human counts blocks from one and the grid counts from zero.
  *
- * Unparseable and out-of-range entries are dropped rather than rejected. The
- * field is free text and a stale position is already inert solver-side, so
- * failing a whole run over one stray character is the harsher answer to the
- * same input.
+ * `parseWeekdayList`/`parseBlockPositions` moved to `shared/constraintTypes.ts`
+ * (imported above): `unsendableWhen` needs them too, and that file is loaded
+ * client-side, where this one (importing `node:crypto`) cannot go.
  */
-function parseBlockPositions(value: unknown): number[] {
-    return [...new Set(
-        String(value ?? '')
-            .split(',')
-            .map((part) => Number(part.trim()))
-            .filter((n) => Number.isInteger(n) && n >= 1)
-            .map((n) => n - 1),
-    )].sort((a, b) => a - b);
-}
 
 /**
  * The GROUP / PERSON / BOTH selector shared by every whole-day rule.
@@ -693,7 +664,7 @@ export async function assembleSolverInput(
     });
 
     if (!term) {
-        throw createError({ statusCode: 404, statusMessage: 'Term not found.' });
+        throw createError({ statusCode: 404, message: 'Term not found.' });
     }
 
     // A grid is not optional: every placement is addressed against it, and
@@ -707,7 +678,7 @@ export async function assembleSolverInput(
     if (!grid) {
         throw createError({
             statusCode: 422,
-            statusMessage: 'This term has no TimeGrid and the tenant has no default. Nothing can be placed.',
+            message: 'This term has no TimeGrid and the tenant has no default. Nothing can be placed.',
         });
     }
 

@@ -12,7 +12,7 @@
             />
             <div class="next_text">
                 <h3 class="next_title">
-                    <span class="sr-only">Not built yet: </span>
+                    <span class="sr-only">{{ t('landing.roadmap.nextPrefix') }}</span>
                     {{ item.title }}
                 </h3>
                 <p class="next_note">{{ item.note }}</p>
@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import type { LandingRoadmapItem } from '~/utils/landingContent';
+import { useT } from '~/composables/i18n';
 
 /**
  * What is not built, in the one shape on the page that is deliberately quieter
@@ -57,6 +58,8 @@ import type { LandingRoadmapItem } from '~/utils/landingContent';
 defineProps<{
     items: LandingRoadmapItem[];
 }>();
+
+const { t } = useT();
 
 const NEXT_ICON = 'material-symbols:radio-button-unchecked';
 </script>

@@ -4,6 +4,8 @@ import { MAX_ROOMS_PER_SESSION } from '#shared/rooms';
 import { SESSION_KIND_TYPES, SESSION_KIND_TYPE_HELP, SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
 import type { TenantMode } from '#shared/tenantMode';
 import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
+import type { Translate } from '~/composables/i18n';
+import { searchKeywords } from '~/utils/i18nKeywords';
 
 /**
  * The management area's entity registry: a client mirror of the server's
@@ -17,6 +19,41 @@ import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
  * of this array, so adding an entity here puts it in the sidebar, index, header
  * and palette in one edit. Entities appear only once they have a working editor:
  * an entry whose detail page cannot edit the entity is a nav item that lies.
+ *
+ * A FUNCTION OF `t`, NOT A CONST (issue #19)
+ *
+ * `manageEntities(t)` BUILDS the array; every copy-bearing field is still a
+ * plain resolved `string` when a reader gets it. That is the shape
+ * `i18n/CONVENTIONS.md` § "Copy in plain `.ts` modules" prescribes, and here
+ * it is not merely the preferred one, it is the only one that works. Two
+ * properties of this file decide it:
+ *
+ *   1. THE ~26 ARROW-FUNCTION FIELDS. `title(row)`, `optionLabel(row)`,
+ *      `reference.label(row)`, `derived.describe(data)` and
+ *      `startFromTemplate.label(row)` interpolate TENANT DATA, which is never
+ *      translated, with an APP-AUTHORED fallback, which always is. A message
+ *      key cannot express that, so a per-field `labelKey` would have forced
+ *      these to `(row, t) => string` and pushed the translator into every
+ *      component that calls one. Inside a builder they close over `t` and
+ *      their signatures do not change at all.
+ *
+ *   2. `FieldDef` AND `RelationDef` ARE NOT ONLY OURS. `ScheduleInspector.vue`
+ *      and `ScheduleEventForm.vue` construct `RelationDef` literals of their
+ *      own and hand them to `ManageRelationPicker`, and their copy belongs to
+ *      the `schedule` namespace, not this one. Turning `RelationDef.label`
+ *      into a `MessageKey` would have demanded `schedule.*` keys that do not
+ *      exist yet, from an agent that does not own them; leaving it a `string`
+ *      leaves those call sites, and every component that renders one,
+ *      untouched.
+ *
+ * So the rule this file follows, uniformly: **`t` is threaded into the builder,
+ * and every field of the built structure is a resolved `string` or a function
+ * of ROW DATA ALONE.** No field is a key, none takes a translator, and there is
+ * no mixed case to reason about at a call site.
+ *
+ * The one thing a builder cannot serve is a caller with no translator, which
+ * is what `manageSections()` at the bottom of this file exists for; see its
+ * own comment.
  */
 
 export type EntityRow = Record<string, unknown>;
@@ -114,6 +151,10 @@ export interface ColumnDef {
  * pre-composes `name` for the grid's own lookups. A label function written for
  * one renders `"undefined undefined"` for the other, silently, since both are
  * `EntityRow` and neither typechecks the field it reads.
+ *
+ * TAKES NO TRANSLATOR, unlike the copy-bearing label functions in the builder
+ * below, and that is not an oversight: every branch here renders TENANT DATA,
+ * and the last one renders an id. There is no app-authored word in it.
  */
 export function personOptionLabel(row: EntityRow): string {
     if (typeof row.name === 'string' && row.name.trim()) {
@@ -271,7 +312,15 @@ export interface ManageEntity {
     icon: string;
     /** One line, shown on the section card and as the palette subtitle. */
     description: string;
-    /** Extra terms the Ctrl+K fuzzy match should hit. */
+    /**
+     * Extra terms the Ctrl+K fuzzy match should hit.
+     *
+     * Translated AND keeping their English terms, merged by `searchKeywords()`
+     * (`~/utils/i18nKeywords`), never by hand: two implementations of "the
+     * translated list plus the English aliases, deduped" drift on the delimiter
+     * or the dedupe and the only symptom is a search that stops finding one
+     * section. Never shown is not never read.
+     */
     keywords: string[];
     /** Row → human title. Used in lists, delete confirmations and page titles. */
     title: (row: EntityRow) => string;
@@ -375,285 +424,319 @@ const OFFERING_TEMPLATE_SHAPE_FIELDS = [
     'requiredRoomCount', 'requiredLecturerCount', 'allowOnline', 'notes',
 ] as const;
 
-export const OFFERING_ENTITY: ManageEntity = {
-    key: 'offerings',
-    permissionPrefix: 'offering',
-    label: 'Offering',
-    plural: 'Offerings',
-    icon: 'material-symbols:book-outline',
-    description: 'What must be scheduled: the recurring demand sessions are placed from.',
-    keywords: ['offering', 'course', 'module', 'subject', 'demand', 'curriculum', 'lecture'],
-    federationOwnable: true,
-    advancedFieldsForMode: offeringFieldsToDeemphasize,
-    startFromTemplate: {
-        resource: 'offering-templates',
-        label: (row) => String(row.name ?? 'Template'),
-        readPermission: 'offering_template.read',
-        apply: (row, draft) => {
-            /*
-             * SKIP NULL, DO NOT COERCE. A template field left blank means
-             * "let whoever creates the offering decide": copying a coerced
-             * '' or 0 over the freshly-seeded draft would silently overwrite
-             * that choice with a value nobody chose.
-             */
-            for (const key of OFFERING_TEMPLATE_SHAPE_FIELDS) {
-                const value = row[key];
+export function offeringEntity(t: Translate): ManageEntity {
+    return {
+        key: 'offerings',
+        permissionPrefix: 'offering',
+        label: t('manage.offering.label'),
+        plural: t('manage.offering.plural'),
+        icon: 'material-symbols:book-outline',
+        description: t('manage.offering.description'),
+        keywords: searchKeywords(t, 'manage.offering.keywords', [
+            'offering', 'course', 'module', 'subject', 'demand', 'curriculum', 'lecture',
+        ]),
+        federationOwnable: true,
+        advancedFieldsForMode: offeringFieldsToDeemphasize,
+        startFromTemplate: {
+            resource: 'offering-templates',
+            label: (row) => String(row.name ?? t('manage.offering.startFromTemplate.fallback')),
+            readPermission: 'offering_template.read',
+            apply: (row, draft) => {
+                /*
+                 * SKIP NULL, DO NOT COERCE. A template field left blank means
+                 * "let whoever creates the offering decide": copying a coerced
+                 * '' or 0 over the freshly-seeded draft would silently overwrite
+                 * that choice with a value nobody chose.
+                 */
+                for (const key of OFFERING_TEMPLATE_SHAPE_FIELDS) {
+                    const value = row[key];
 
-                if (value !== null && value !== undefined) {
-                    draft[key] = value;
+                    if (value !== null && value !== undefined) {
+                        draft[key] = value;
+                    }
                 }
-            }
 
-            // Informational only; see `Offering.createdFromTemplateId`'s
-            // own comment. Nothing ever reads this back to resolve a field.
-            draft.createdFromTemplateId = row.id;
-        },
-    },
-    saveAsTemplate: {
-        resource: 'offering-templates',
-        createPermission: 'offering_template.create',
-        // The reverse copy: same fields, same reasoning about null meaning
-        // "not fixed", just read from an Offering instead of written to one.
-        buildTemplate: (row) => Object.fromEntries(
-            OFFERING_TEMPLATE_SHAPE_FIELDS
-                .map((key) => [key, row[key] ?? null] as const),
-        ),
-    },
-    title: (row) => [row.code, row.title].filter(Boolean).join(' · ') || 'Offering',
-    columns: [
-        { key: 'code', label: 'Code', format: 'code' },
-        { key: 'title', label: 'Title' },
-        { key: 'color', label: 'Colour', format: 'swatch' },
-        { key: 'frequency', label: 'Sessions', format: 'number' },
-        { key: 'durationBlocks', label: 'Blocks', format: 'number' },
-        { key: 'isActive', label: 'Active', format: 'boolean' },
-    ],
-    fields: [
-        { key: 'title', label: 'Title', type: 'text', required: true },
-        { key: 'code', label: 'Code', type: 'text' },
-        {
-            key: 'color',
-            label: 'Colour',
-            type: 'color',
-            help: 'Tints every session of this offering. Leave it empty to inherit the '
-                + 'session kind\'s colour: empty means inherit, not grey.',
-        },
-        {
-            key: 'termId',
-            label: 'Term',
-            type: 'reference',
-            required: true,
-            // The server's update schema omits termId: moving an Offering between
-            // terms would orphan its placed Sessions, which belong to a term.
-            createOnly: true,
-            reference: {
-                resource: 'terms',
-                label: (row) => String(row.name),
-                emptyHint: 'Create a term first: an offering has to belong to one.',
+                // Informational only; see `Offering.createdFromTemplateId`'s
+                // own comment. Nothing ever reads this back to resolve a field.
+                draft.createdFromTemplateId = row.id;
             },
         },
-        {
-            key: 'kindId',
-            label: 'Kind',
-            type: 'reference',
-            required: true,
-            reference: {
-                resource: 'session-kinds',
-                label: (row) => String(row.name ?? row.key),
-                emptyHint: 'Create a session kind first: lecture, lab, seminar, whatever you call them.',
+        saveAsTemplate: {
+            resource: 'offering-templates',
+            createPermission: 'offering_template.create',
+            // The reverse copy: same fields, same reasoning about null meaning
+            // "not fixed", just read from an Offering instead of written to one.
+            buildTemplate: (row) => Object.fromEntries(
+                OFFERING_TEMPLATE_SHAPE_FIELDS
+                    .map((key) => [key, row[key] ?? null] as const),
+            ),
+        },
+        /*
+         * THE FALLBACK IS THE ENTITY'S OWN NAME, resolved from the same key
+         * `label` reads rather than a second message saying the same word. An
+         * untitled row reading "Offering" is not a coincidence to be
+         * maintained in two places: it is the answer "we know what KIND of
+         * thing this is and nothing else", and every one of the sixteen
+         * entities below gives it the same way.
+         */
+        title: (row) => [row.code, row.title].filter(Boolean).join(' · ') || t('manage.offering.label'),
+        columns: [
+            { key: 'code', label: t('common.field.code'), format: 'code' },
+            { key: 'title', label: t('manage.offering.column.title') },
+            { key: 'color', label: t('common.field.colour'), format: 'swatch' },
+            { key: 'frequency', label: t('manage.offering.column.frequency'), format: 'number' },
+            { key: 'durationBlocks', label: t('manage.offering.column.durationBlocks'), format: 'number' },
+            { key: 'isActive', label: t('common.field.active'), format: 'boolean' },
+        ],
+        fields: [
+            { key: 'title', label: t('manage.offering.field.title.label'), type: 'text', required: true },
+            { key: 'code', label: t('common.field.code'), type: 'text' },
+            {
+                key: 'color',
+                label: t('common.field.colour'),
+                type: 'color',
+                help: t('manage.offering.field.color.help'),
             },
-        },
-        {
-            key: 'frequency',
-            label: 'Sessions per term',
-            type: 'number',
-            min: 1,
-            help: 'Exactly this many sessions must exist. Enforced as a hard constraint.',
-        },
-        {
-            key: 'durationBlocks',
-            label: 'Length in blocks',
-            type: 'number',
-            min: 1,
-            help: 'How many consecutive TimeGrid blocks one session occupies.',
-        },
-        {
-            key: 'schedulingPattern',
-            label: 'How the sessions spread',
-            type: 'select',
-            /*
-             * NOT `required`, and the blank option is not "none". It is
-             * UNCLASSIFIED, which is where every existing offering starts and
-             * the honest answer for one nobody has decided about. Making this
-             * required would force a choice at the point of least information,
-             * and prefilling "every week" would write the common assumption in
-             * as though somebody had chosen it.
-             */
-            options: [
-                { value: '', label: 'Not decided' },
-                { value: 'DISTRIBUTED', label: 'Spread across the term' },
-                { value: 'BLOCK', label: 'Concentrated into a window' },
-            ],
-            help: 'A weekly slot for the whole term, or the whole course in a short block. '
-                + 'Recorded either way; it changes a timetable only once an administrator '
-                + 'enables the matching rule.',
-        },
-        {
-            key: 'requiredRoleId',
-            label: 'Required role',
-            type: 'reference',
-            help: 'Scheduling role a lecturer must hold to lead this. Leave unset if it does not matter.',
-            reference: {
-                resource: 'roles',
-                label: (row) => String(row.name ?? row.key),
-                nullable: true,
-                emptyHint: 'No roles defined yet.',
-            },
-        },
-        {
-            key: 'requiredLecturerCount',
-            label: 'Lecturers needed at once',
-            type: 'number',
-            min: 1,
-            help: 'Leave blank to require exactly one, chosen by the solver from '
-                + '“Who leads it” below. Set higher only for genuine '
-                + 'co-teaching: the list below is a candidate pool, not a '
-                + 'guaranteed roster.',
-        },
-        {
-            key: 'requiredRoomCount',
-            label: 'Rooms needed at once',
-            type: 'number',
-            min: 1,
-            /*
-             * THE CEILING IS STATED, NOT DISCOVERED. Past
-             * `MAX_ROOMS_PER_SESSION` the solver refuses the whole input rather
-             * than degrading, so the failure is not "this offering scheduled
-             * badly": it is every run failing for the tenant, reported against
-             * an offering edited weeks earlier.
-             *
-             * The help text also names the SUMMING reading, because the
-             * alternative ("each room must hold the whole group") is a coherent
-             * thing to want, gives the opposite answer on the same input, and
-             * is not what this does. Left unsaid, a timetabler would only find
-             * out from a timetable that looks wrong.
-             */
-            max: MAX_ROOMS_PER_SESSION,
-            help: `One for almost everything. Above one, a session occupies that many rooms `
-                + `simultaneously and their capacities are ADDED: 120 students fit two `
-                + `60-seat halls. Use it for a cohort too large for any single room, not for a `
-                + `practical where each room must hold everyone. At most ${MAX_ROOMS_PER_SESSION}.`,
-        },
-        {
-            key: 'requiredCapacity',
-            label: 'Required room capacity',
-            type: 'number',
-            min: 0,
-            help: 'Leave unset to derive it from the attached groups. Compared against the '
-                + 'SUM of the capacities when more than one room is needed at once.',
-            derived: {
-                path: '/api/offering-capacity/:id',
-                describe: (data) => {
-                    const capacity = data.capacity as number | null;
-                    const basis = data.basis as string;
-                    const groups = data.attachedGroups as number;
-
-                    if (capacity === null) {
-                        return groups === 0
-                            ? 'No groups attached, so nothing can be derived: every room would qualify.'
-                            : 'The attached groups have neither members nor an expected size, so nothing '
-                                + 'can be derived: every room would qualify.';
-                    }
-
-                    const source = basis === 'membership'
-                        ? `${capacity} enrolled ${capacity === 1 ? 'person' : 'people'}`
-                        : 'expected sizes';
-
-                    const line = `If left blank: ${capacity}, from ${groups} attached `
-                        + `${groups === 1 ? 'group' : 'groups'} (${source}).`;
-
-                    /*
-                     * The warning belongs HERE, next to the decision it affects.
-                     * A capacity of 4 where 96 are expected is still the honest
-                     * count, but someone leaving this field blank on that basis
-                     * should see why the number looks small before a room turns
-                     * out to be far too small.
-                     */
-                    if (data.partialEnrolment) {
-                        return `${line} Warning: only ${capacity} of an expected `
-                            + `${data.estimate as number} are enrolled, so this may be incomplete.`;
-                    }
-
-                    return line;
+            {
+                key: 'termId',
+                label: t('manage.offering.field.termId.label'),
+                type: 'reference',
+                required: true,
+                // The server's update schema omits termId: moving an Offering between
+                // terms would orphan its placed Sessions, which belong to a term.
+                createOnly: true,
+                reference: {
+                    resource: 'terms',
+                    label: (row) => String(row.name),
+                    emptyHint: t('manage.offering.field.termId.emptyHint'),
                 },
             },
-        },
-        {
-            key: 'allowOnline',
-            label: 'May be scheduled online',
-            type: 'boolean',
-            help: 'Lets the solver place this in a virtual room. Online delivery is a virtual room, not a session flag.',
-        },
-        { key: 'isActive', label: 'Active', type: 'boolean' },
-        { key: 'notes', label: 'Notes', type: 'textarea' },
-        /*
-         * NEVER RENDERED: `custom: true` with no bespoke component to supply
-         * a control, which is deliberate here rather than the usual
-         * "picker lives in the detail component" reading of that flag.
-         * `startFromTemplate.apply()` is the only writer, so the field still
-         * has to be declared to take part in the draft and the save payload
-         * at all (an undeclared key is silently dropped; see `splitChildren`
-         * on the server and `useEntityForm.save()`'s per-field loop here).
-         */
-        { key: 'createdFromTemplateId', label: 'Started from template', type: 'text', custom: true, createOnly: true },
-    ],
-    relations: [
-        {
-            key: 'groups',
-            label: 'Groups this is for',
-            help: 'Nesting propagates: assigning a cohort also blocks its seminars. '
-                + 'Only groups available in this offering\u2019s term are listed.',
-            resource: 'groups',
-            valueKey: 'groupId',
-            indentTree: true,
-            optionLabel: (row) => String(row.name),
-            // The Offering's own term. Without this the picker offered every
-            // cohort the tenant has ever had, so nothing stopped attaching a
-            // 2024 cohort to a 2027 Offering.
-            scopeBy: { filter: 'termId', from: 'termId' },
-            emptyHint: 'No groups available in this term.',
-        },
-        {
-            key: 'lecturers',
-            label: 'Who leads it',
-            help: 'Eligible to lead it: a candidate pool the solver chooses from, '
-                + 'sized by “Lecturers needed at once” above. Optionally state '
-                + 'the scheduling role each person fills here.',
-            resource: 'persons',
-            valueKey: 'personId',
-            searchable: true,
-            optionLabel: personOptionLabel,
-            extraReference: {
-                key: 'roleId',
-                resource: 'roles',
-                label: (row) => String(row.name ?? row.key),
-                placeholder: 'Any role',
+            {
+                key: 'kindId',
+                label: t('manage.offering.field.kindId.label'),
+                type: 'reference',
+                required: true,
+                reference: {
+                    resource: 'session-kinds',
+                    label: (row) => String(row.name ?? row.key),
+                    emptyHint: t('manage.offering.field.kindId.emptyHint'),
+                },
             },
-            emptyHint: 'No people defined yet.',
-        },
-        {
-            key: 'equipment',
-            label: 'Equipment it needs',
-            help: 'Restricts placement to rooms providing all of it. A count means at '
-                + 'least that many units, so only rooms that state enough qualify.',
-            resource: 'equipment',
-            valueKey: 'equipmentId',
-            optionLabel: (row) => String(row.name ?? row.key),
-            quantity: { key: 'quantity', label: 'Count' },
-            emptyHint: 'No equipment defined yet.',
-        },
-    ],
-};
+            {
+                key: 'frequency',
+                label: t('manage.offering.field.frequency.label'),
+                type: 'number',
+                min: 1,
+                help: t('manage.offering.field.frequency.help'),
+            },
+            {
+                key: 'durationBlocks',
+                label: t('manage.offering.field.durationBlocks.label'),
+                type: 'number',
+                min: 1,
+                help: t('manage.offering.field.durationBlocks.help'),
+            },
+            {
+                key: 'schedulingPattern',
+                label: t('manage.offering.field.schedulingPattern.label'),
+                type: 'select',
+                /*
+                 * NOT `required`, and the blank option is not "none". It is
+                 * UNCLASSIFIED, which is where every existing offering starts and
+                 * the honest answer for one nobody has decided about. Making this
+                 * required would force a choice at the point of least information,
+                 * and prefilling "every week" would write the common assumption in
+                 * as though somebody had chosen it.
+                 *
+                 * The option KEYS are semantic, not the stored values: `''` is
+                 * not a legal message-key segment, so the three options are
+                 * keyed `notDecided`/`distributed`/`block` and the `value` a
+                 * viewer never sees stays exactly what the server accepts.
+                 */
+                options: [
+                    { value: '', label: t('manage.offering.field.schedulingPattern.option.notDecided') },
+                    { value: 'DISTRIBUTED', label: t('manage.offering.field.schedulingPattern.option.distributed') },
+                    { value: 'BLOCK', label: t('manage.offering.field.schedulingPattern.option.block') },
+                ],
+                help: t('manage.offering.field.schedulingPattern.help'),
+            },
+            {
+                key: 'requiredRoleId',
+                label: t('manage.offering.field.requiredRoleId.label'),
+                type: 'reference',
+                help: t('manage.offering.field.requiredRoleId.help'),
+                reference: {
+                    resource: 'roles',
+                    label: (row) => String(row.name ?? row.key),
+                    nullable: true,
+                    emptyHint: t('manage.offering.field.requiredRoleId.emptyHint'),
+                },
+            },
+            {
+                key: 'requiredLecturerCount',
+                label: t('manage.offering.field.requiredLecturerCount.label'),
+                type: 'number',
+                min: 1,
+                help: t('manage.offering.field.requiredLecturerCount.help'),
+            },
+            {
+                key: 'requiredRoomCount',
+                label: t('manage.offering.field.requiredRoomCount.label'),
+                type: 'number',
+                min: 1,
+                /*
+                 * THE CEILING IS STATED, NOT DISCOVERED. Past
+                 * `MAX_ROOMS_PER_SESSION` the solver refuses the whole input rather
+                 * than degrading, so the failure is not "this offering scheduled
+                 * badly": it is every run failing for the tenant, reported against
+                 * an offering edited weeks earlier.
+                 *
+                 * The help text also names the SUMMING reading, because the
+                 * alternative ("each room must hold the whole group") is a coherent
+                 * thing to want, gives the opposite answer on the same input, and
+                 * is not what this does. Left unsaid, a timetabler would only find
+                 * out from a timetable that looks wrong.
+                 *
+                 * The ceiling reaches the sentence as a NAMED PLACEHOLDER rather
+                 * than by concatenation: a translator must be able to move it,
+                 * and German puts it somewhere else.
+                 */
+                max: MAX_ROOMS_PER_SESSION,
+                help: t('manage.offering.field.requiredRoomCount.help', { max: MAX_ROOMS_PER_SESSION }),
+            },
+            {
+                key: 'requiredCapacity',
+                label: t('manage.offering.field.requiredCapacity.label'),
+                type: 'number',
+                min: 0,
+                help: t('manage.offering.field.requiredCapacity.help'),
+                derived: {
+                    path: '/api/offering-capacity/:id',
+                    describe: (data) => {
+                        const capacity = data.capacity as number | null;
+                        const basis = data.basis as string;
+                        const groups = data.attachedGroups as number;
+
+                        if (capacity === null) {
+                            return groups === 0
+                                ? t('manage.offering.field.requiredCapacity.derived.noGroups')
+                                : t('manage.offering.field.requiredCapacity.derived.noSize');
+                        }
+
+                        /*
+                         * `person`/`people` and `group`/`groups` are vue-i18n
+                         * PLURAL FORMS of one message, not a word patched into
+                         * a sentence: German has no `-s` plural, so a suffix
+                         * flip is never a translation, and a word split across
+                         * an expression has no key at all.
+                         */
+                        const source = basis === 'membership'
+                            ? t('manage.offering.field.requiredCapacity.derived.basisMembership', capacity)
+                            : t('manage.offering.field.requiredCapacity.derived.basisExpected');
+
+                        const line = t(
+                            'manage.offering.field.requiredCapacity.derived.line',
+                            { capacity, count: groups, source },
+                            groups,
+                        );
+
+                        /*
+                         * The warning belongs HERE, next to the decision it affects.
+                         * A capacity of 4 where 96 are expected is still the honest
+                         * count, but someone leaving this field blank on that basis
+                         * should see why the number looks small before a room turns
+                         * out to be far too small.
+                         *
+                         * Two complete sentences joined by a space, rather than
+                         * one message interpolating the other: a translator
+                         * reading `{line}` cannot see what it holds.
+                         */
+                        if (data.partialEnrolment) {
+                            const warning = t('manage.offering.field.requiredCapacity.derived.warning', {
+                                capacity,
+                                estimate: data.estimate as number,
+                            });
+
+                            return `${line} ${warning}`;
+                        }
+
+                        return line;
+                    },
+                },
+            },
+            {
+                key: 'allowOnline',
+                label: t('manage.offering.field.allowOnline.label'),
+                type: 'boolean',
+                help: t('manage.offering.field.allowOnline.help'),
+            },
+            { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
+            { key: 'notes', label: t('manage.offering.field.notes.label'), type: 'textarea' },
+            /*
+             * NEVER RENDERED: `custom: true` with no bespoke component to supply
+             * a control, which is deliberate here rather than the usual
+             * "picker lives in the detail component" reading of that flag.
+             * `startFromTemplate.apply()` is the only writer, so the field still
+             * has to be declared to take part in the draft and the save payload
+             * at all (an undeclared key is silently dropped; see `splitChildren`
+             * on the server and `useEntityForm.save()`'s per-field loop here).
+             *
+             * Keyed all the same: "never rendered" is a property of today's
+             * components, not a promise, and a label nobody translated is how
+             * the next one ships in English.
+             */
+            {
+                key: 'createdFromTemplateId',
+                label: t('manage.offering.field.createdFromTemplateId.label'),
+                type: 'text',
+                custom: true,
+                createOnly: true,
+            },
+        ],
+        relations: [
+            {
+                key: 'groups',
+                label: t('manage.offering.relation.groups.label'),
+                help: t('manage.offering.relation.groups.help'),
+                resource: 'groups',
+                valueKey: 'groupId',
+                indentTree: true,
+                optionLabel: (row) => String(row.name),
+                // The Offering's own term. Without this the picker offered every
+                // cohort the tenant has ever had, so nothing stopped attaching a
+                // 2024 cohort to a 2027 Offering.
+                scopeBy: { filter: 'termId', from: 'termId' },
+                emptyHint: t('manage.offering.relation.groups.emptyHint'),
+            },
+            {
+                key: 'lecturers',
+                label: t('manage.offering.relation.lecturers.label'),
+                help: t('manage.offering.relation.lecturers.help'),
+                resource: 'persons',
+                valueKey: 'personId',
+                searchable: true,
+                optionLabel: personOptionLabel,
+                extraReference: {
+                    key: 'roleId',
+                    resource: 'roles',
+                    label: (row) => String(row.name ?? row.key),
+                    placeholder: t('manage.offering.relation.lecturers.rolePlaceholder'),
+                },
+                emptyHint: t('manage.offering.relation.lecturers.emptyHint'),
+            },
+            {
+                key: 'equipment',
+                label: t('manage.offering.relation.equipment.label'),
+                help: t('manage.offering.relation.equipment.help'),
+                resource: 'equipment',
+                valueKey: 'equipmentId',
+                optionLabel: (row) => String(row.name ?? row.key),
+                quantity: { key: 'quantity', label: t('manage.offering.relation.equipment.quantity') },
+                emptyHint: t('manage.offering.relation.equipment.emptyHint'),
+            },
+        ],
+    };
+}
 
 /**
  * Issue #8. A REUSABLE SHAPE, structurally mirroring `defaultConstraintRow`
@@ -662,80 +745,118 @@ export const OFFERING_ENTITY: ManageEntity = {
  * function.
  *
  * Every field is optional and there is no `required: true` anywhere below,
- * unlike `OFFERING_ENTITY`: a template states only the part of the shape it
+ * unlike `offeringEntity()`: a template states only the part of the shape it
  * wants to fix, and a blank field leaves that decision to whoever creates an
  * Offering from it. `createOnly` is absent for the same reason it is absent
  * from most of Offering's own fields: nothing here is an identifier fixed
  * at creation, just a value that may or may not be copied later.
  */
-export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
-    key: 'offering-templates',
-    permissionPrefix: 'offering_template',
-    label: 'Offering template',
-    plural: 'Offering templates',
-    icon: 'material-symbols:content-copy-outline',
-    description: 'Reusable offering shapes, such as "Maths, 4x/week", a new offering can start from.',
-    keywords: ['template', 'offering', 'shape', 'reuse', 'preset', 'copy'],
-    title: (row) => String(row.name ?? 'Offering template'),
-    columns: [
-        { key: 'name', label: 'Name' },
-        { key: 'title', label: 'Offering title', secondary: true },
-        { key: 'frequency', label: 'Sessions', format: 'number' },
-        { key: 'durationBlocks', label: 'Blocks', format: 'number' },
-    ],
-    fields: [
-        {
-            key: 'name',
-            label: 'Template name',
-            type: 'text',
-            required: true,
-            help: 'What you pick this template by, not the title it gives the offering.',
-        },
-        { key: 'title', label: 'Offering title', type: 'text', help: 'Leave blank to name each offering individually.' },
-        {
-            key: 'kindId',
-            label: 'Kind',
-            type: 'reference',
-            reference: {
-                resource: 'session-kinds',
-                label: (row) => String(row.name ?? row.key),
-                nullable: true,
-                emptyHint: 'Create a session kind first: lecture, lesson, whatever you call them.',
+export function offeringTemplateEntity(t: Translate): ManageEntity {
+    return {
+        key: 'offering-templates',
+        permissionPrefix: 'offering_template',
+        label: t('manage.offeringTemplate.label'),
+        plural: t('manage.offeringTemplate.plural'),
+        icon: 'material-symbols:content-copy-outline',
+        description: t('manage.offeringTemplate.description'),
+        keywords: searchKeywords(t, 'manage.offeringTemplate.keywords', [
+            'template', 'offering', 'shape', 'reuse', 'preset', 'copy',
+        ]),
+        title: (row) => String(row.name ?? t('manage.offeringTemplate.label')),
+        columns: [
+            { key: 'name', label: t('common.field.name') },
+            { key: 'title', label: t('manage.offeringTemplate.column.title'), secondary: true },
+            { key: 'frequency', label: t('manage.offeringTemplate.column.frequency'), format: 'number' },
+            { key: 'durationBlocks', label: t('manage.offeringTemplate.column.durationBlocks'), format: 'number' },
+        ],
+        fields: [
+            {
+                key: 'name',
+                label: t('manage.offeringTemplate.field.name.label'),
+                type: 'text',
+                required: true,
+                help: t('manage.offeringTemplate.field.name.help'),
             },
-        },
-        { key: 'code', label: 'Code', type: 'text' },
-        { key: 'color', label: 'Colour', type: 'color' },
-        { key: 'frequency', label: 'Sessions per term', type: 'number', min: 1 },
-        { key: 'durationBlocks', label: 'Length in blocks', type: 'number', min: 1 },
-        {
-            key: 'schedulingPattern',
-            label: 'How the sessions spread',
-            type: 'select',
-            options: [
-                { value: '', label: 'Not decided' },
-                { value: 'DISTRIBUTED', label: 'Spread across the term' },
-                { value: 'BLOCK', label: 'Concentrated into a window' },
-            ],
-        },
-        {
-            key: 'requiredRoleId',
-            label: 'Required role',
-            type: 'reference',
-            help: 'The "lecturer pool" hint. A specific person is named on the offering itself, not here.',
-            reference: {
-                resource: 'roles',
-                label: (row) => String(row.name ?? row.key),
-                nullable: true,
-                emptyHint: 'No roles defined yet.',
+            {
+                key: 'title',
+                label: t('manage.offeringTemplate.field.title.label'),
+                type: 'text',
+                help: t('manage.offeringTemplate.field.title.help'),
             },
-        },
-        { key: 'requiredCapacity', label: 'Required room capacity', type: 'number', min: 0 },
-        { key: 'requiredRoomCount', label: 'Rooms needed at once', type: 'number', min: 1, max: MAX_ROOMS_PER_SESSION },
-        { key: 'requiredLecturerCount', label: 'Lecturers needed at once', type: 'number', min: 1 },
-        { key: 'allowOnline', label: 'May be scheduled online', type: 'boolean' },
-        { key: 'notes', label: 'Notes', type: 'textarea' },
-    ],
-};
+            {
+                key: 'kindId',
+                label: t('manage.offeringTemplate.field.kindId.label'),
+                type: 'reference',
+                reference: {
+                    resource: 'session-kinds',
+                    label: (row) => String(row.name ?? row.key),
+                    nullable: true,
+                    emptyHint: t('manage.offeringTemplate.field.kindId.emptyHint'),
+                },
+            },
+            { key: 'code', label: t('common.field.code'), type: 'text' },
+            { key: 'color', label: t('common.field.colour'), type: 'color' },
+            {
+                key: 'frequency',
+                label: t('manage.offeringTemplate.field.frequency.label'),
+                type: 'number',
+                min: 1,
+            },
+            {
+                key: 'durationBlocks',
+                label: t('manage.offeringTemplate.field.durationBlocks.label'),
+                type: 'number',
+                min: 1,
+            },
+            {
+                key: 'schedulingPattern',
+                label: t('manage.offeringTemplate.field.schedulingPattern.label'),
+                type: 'select',
+                options: [
+                    { value: '', label: t('manage.offeringTemplate.field.schedulingPattern.option.notDecided') },
+                    {
+                        value: 'DISTRIBUTED',
+                        label: t('manage.offeringTemplate.field.schedulingPattern.option.distributed'),
+                    },
+                    { value: 'BLOCK', label: t('manage.offeringTemplate.field.schedulingPattern.option.block') },
+                ],
+            },
+            {
+                key: 'requiredRoleId',
+                label: t('manage.offeringTemplate.field.requiredRoleId.label'),
+                type: 'reference',
+                help: t('manage.offeringTemplate.field.requiredRoleId.help'),
+                reference: {
+                    resource: 'roles',
+                    label: (row) => String(row.name ?? row.key),
+                    nullable: true,
+                    emptyHint: t('manage.offeringTemplate.field.requiredRoleId.emptyHint'),
+                },
+            },
+            {
+                key: 'requiredCapacity',
+                label: t('manage.offeringTemplate.field.requiredCapacity.label'),
+                type: 'number',
+                min: 0,
+            },
+            {
+                key: 'requiredRoomCount',
+                label: t('manage.offeringTemplate.field.requiredRoomCount.label'),
+                type: 'number',
+                min: 1,
+                max: MAX_ROOMS_PER_SESSION,
+            },
+            {
+                key: 'requiredLecturerCount',
+                label: t('manage.offeringTemplate.field.requiredLecturerCount.label'),
+                type: 'number',
+                min: 1,
+            },
+            { key: 'allowOnline', label: t('manage.offeringTemplate.field.allowOnline.label'), type: 'boolean' },
+            { key: 'notes', label: t('manage.offeringTemplate.field.notes.label'), type: 'textarea' },
+        ],
+    };
+}
 
 /**
  * A reusable, ORDERED bundle of Offering templates ("this is what Jahrgang
@@ -746,868 +867,1060 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
  * sequence (`OfferingPlanItem.position`), which the generic `relations`
  * mechanism cannot express: it replaces a SET. See `ManageOfferingPlanItems`.
  */
-export const OFFERING_PLAN_ENTITY: ManageEntity = {
-    key: 'offering-plans',
-    permissionPrefix: 'offering_plan',
-    label: 'Curriculum plan',
-    plural: 'Curriculum plans',
-    icon: 'material-symbols:playlist-add-check',
-    description: 'A cohort’s whole course load, bundled: apply it to a group to create every offering at once.',
-    keywords: ['plan', 'curriculum', 'jahrgang', 'cohort', 'bundle', 'template', 'load'],
-    title: (row) => String(row.name ?? 'Curriculum plan'),
-    detailComponent: 'OfferingPlanForm',
-    columns: [
-        { key: 'name', label: 'Name' },
-        { key: 'description', label: 'Description', secondary: true },
-    ],
-    fields: [
-        { key: 'name', label: 'Name', type: 'text', required: true },
-        { key: 'description', label: 'Description', type: 'textarea' },
-        {
-            key: 'nextPlanId',
-            label: 'Successor plan',
-            help: 'What a Group on this plan moves to next: "Semester 3" names "Semester 4". '
-                + 'Lets a Group advance with no picker: the Term defaults to whichever starts next.',
-            type: 'reference',
-            // A plan cannot name itself as its own successor: the option
-            // list excludes the row being edited, which no static registry
-            // entry can express (it depends on which row that is). See
-            // `ManageOfferingPlanForm`.
-            custom: true,
-            reference: {
-                resource: 'offering-plans',
-                label: (row) => String(row.name ?? row.id),
-                nullable: true,
-                emptyHint: 'No other plans to point at yet.',
-            },
-        },
-    ],
-};
-
-export const CONSTRAINT_ENTITY: ManageEntity = {
-    key: 'constraints',
-    permissionPrefix: 'constraint',
-    label: 'Constraint',
-    plural: 'Constraints',
-    icon: 'material-symbols:checklist',
-    description: 'The rules a timetable must respect, and the preferences it should weigh.',
-    keywords: ['constraint', 'rule', 'hard', 'soft', 'penalty', 'conflict', 'policy'],
-    title: (row) => String(row.name ?? 'Constraint'),
-    detailComponent: 'ConstraintBuilder',
-    /**
-     * The catalogue is thirteen live types and every tenant holds one default
-     * row for each, plus any scoped variants: bounded and small. The grid
-     * needs the WHOLE set to group it correctly, and reports loudly rather than
-     * silently truncating if it ever stops being complete.
-     */
-    listComponent: 'ConstraintGrid',
-    listPageSize: 200,
-    hideCreateAction: true,
-    columns: [
-        { key: 'name', label: 'Name' },
-        { key: 'type', label: 'Type', format: 'code', secondary: true },
-        { key: 'severity', label: 'Severity' },
-        { key: 'weight', label: 'Weight', format: 'number' },
-        { key: 'isEnabled', label: 'Enabled', format: 'boolean' },
-    ],
-    /*
-     * `type`, `severity`, `weight` and `params` are all `custom`: they constrain
-     * each other. The chosen type fixes the severity and dictates which
-     * parameters exist, and weight is meaningful only when severity is SOFT, a
-     * pairing the database CHECK enforces. Rendered as four independent controls
-     * they would compose states the server rejects.
-     */
-    fields: [
-        { key: 'name', label: 'Name', type: 'text', required: true },
-        { key: 'type', label: 'Rule', type: 'select', required: true, createOnly: true, custom: true },
-        { key: 'severity', label: 'Severity', type: 'select', required: true, custom: true },
-        { key: 'weight', label: 'Penalty weight', type: 'number', custom: true },
-        { key: 'params', label: 'Parameters', type: 'json', custom: true },
-        /*
-         * Kind scopes. `custom` because the builder renders the picker, and
-         * because the value is an ARRAY: the shape that produced
-         * "[object Object]" when a structured field reached ManageField. It is
-         * declared here so it takes part in the draft, dirty tracking and the
-         * payload, exactly as `time_grid.breaks` does.
-         */
-        { key: 'scopes', label: 'Applies to kinds', type: 'text', custom: true },
-        /*
-         * A relation type's ordered Offering operands (ADR-0028 in
-         * calendry-solver), `ConstraintRelationMember`, never
-         * `ConstraintScope`. Same reasoning as `scopes` just above: `custom`
-         * because `ManageOfferingRelationMembers` renders the picker and the
-         * value is an array, and it has to be declared here to take part in
-         * the draft, dirty tracking and the save payload at all; undeclared,
-         * `useEntityForm.save()`'s generic per-field loop never sends it.
-         */
-        { key: 'members', label: 'Related offerings', type: 'text', custom: true },
-        { key: 'isEnabled', label: 'Enabled', type: 'boolean' },
-    ],
-};
-
-export const MANAGE_ENTITIES: ManageEntity[] = [
-    {
-        key: 'persons',
-        permissionPrefix: 'person',
-        label: 'Person',
-        plural: 'People',
-        icon: 'material-symbols:person-outline',
-        description: 'Everyone the timetable places or notifies.',
-        keywords: ['people', 'staff', 'student', 'lecturer', 'teacher', 'roster', 'directory'],
-        title: (row) => `${row.givenName ?? ''} ${row.familyName ?? ''}`.trim() || 'Person',
-        // Every field below is plain; this exists solely to add issue #84's
-        // GDPR export action outside the generic form. See detailComponents.ts.
-        detailComponent: 'PersonForm',
+export function offeringPlanEntity(t: Translate): ManageEntity {
+    return {
+        key: 'offering-plans',
+        permissionPrefix: 'offering_plan',
+        label: t('manage.offeringPlan.label'),
+        plural: t('manage.offeringPlan.plural'),
+        icon: 'material-symbols:playlist-add-check',
+        description: t('manage.offeringPlan.description'),
+        keywords: searchKeywords(t, 'manage.offeringPlan.keywords', [
+            'plan', 'curriculum', 'jahrgang', 'cohort', 'bundle', 'template', 'load',
+        ]),
+        title: (row) => String(row.name ?? t('manage.offeringPlan.label')),
+        detailComponent: 'OfferingPlanForm',
         columns: [
-            { key: 'familyName', label: 'Family name' },
-            { key: 'givenName', label: 'Given name' },
-            { key: 'email', label: 'Email', secondary: true },
-            { key: 'isActive', label: 'Active', format: 'boolean' },
+            { key: 'name', label: t('common.field.name') },
+            { key: 'description', label: t('common.field.description'), secondary: true },
         ],
         fields: [
-            { key: 'givenName', label: 'Given name', type: 'text', required: true },
-            { key: 'familyName', label: 'Family name', type: 'text', required: true },
-            { key: 'email', label: 'Email', type: 'email' },
+            { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+            { key: 'description', label: t('common.field.description'), type: 'textarea' },
             {
-                key: 'externalRef',
-                label: 'External reference',
-                type: 'text',
-                help: 'Stable id from an external SIS or LDAP, used to reconcile imports.',
-            },
-            {
-                key: 'timezone',
-                label: 'Timezone',
-                type: 'text',
-                placeholder: 'Europe/Berlin',
-                help: 'Display and export only. It never affects grid placement or "same day" logic.',
-            },
-            { key: 'isActive', label: 'Active', type: 'boolean' },
-        ],
-        relations: [
-            {
-                key: 'roles',
-                label: 'Scheduling roles',
-                help: 'What this person can be scheduled AS: Lecturer, Auditor. Not permissions.',
-                resource: 'roles',
-                valueKey: 'roleId',
-                optionLabel: (row) => String(row.name ?? row.key),
-                emptyHint: 'No roles defined yet.',
-            },
-            {
-                key: 'access-roles',
-                label: 'Access roles',
-                help: 'What this person may DO in Calendry. Distinct from the scheduling roles '
-                    + 'above, which are vocabulary and grant nothing.',
-                resource: 'access-roles',
-                valueKey: 'accessRoleId',
-                optionLabel: (row) => String(row.name ?? row.key),
-                emptyHint: 'No access roles defined yet.',
-                emptyWarning: 'No access role assigned. This person can sign in and will be '
-                    + 'shown an empty application: no schedule, no navigation.',
-                /*
-                 * No read gate declared: it is DERIVED from `resource`; see
-                 * `relationReadRequirement`. `/api/access-roles` accepts either
-                 * administration permission, and the derivation says so without
-                 * this entry having to know.
-                 */
-                writeRequiresPermissions: ['person_access_role.assign'],
-            },
-            {
-                key: 'groups',
-                label: 'Group memberships',
-                help: 'Which cohorts and seminars this person belongs to.',
-                resource: 'groups',
-                valueKey: 'groupId',
-                indentTree: true,
-                optionLabel: (row) => String(row.name),
-                emptyHint: 'No groups defined yet.',
-            },
-        ],
-    },
-
-    {
-        key: 'roles',
-        permissionPrefix: 'role',
-        label: 'Role',
-        plural: 'Roles',
-        icon: 'material-symbols:badge-outline',
-        // The Role/AccessRole distinction is load-bearing (TAXONOMY.md §2 vs §4)
-        // and the two share a word, so the UI says which one this is.
-        description: 'Scheduling vocabulary: Lecturer, Auditor. Not permissions.',
-        keywords: ['role', 'lecturer', 'auditor', 'vocabulary', 'title'],
-        title: (row) => String(row.name ?? 'Role'),
-        systemFlag: 'isSystem',
-        columns: [
-            { key: 'key', label: 'Key', format: 'code' },
-            { key: 'name', label: 'Name' },
-            { key: 'description', label: 'Description', secondary: true },
-        ],
-        fields: [
-            {
-                key: 'key',
-                label: 'Key',
-                type: 'text',
-                required: true,
-                createOnly: true,
-                help: 'Stable identifier used by imports and constraints. Cannot be changed later.',
-            },
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'description', label: 'Description', type: 'textarea' },
-        ],
-    },
-
-    {
-        key: 'rooms',
-        permissionPrefix: 'room',
-        label: 'Room',
-        plural: 'Rooms',
-        icon: 'material-symbols:meeting-room-outline',
-        description: 'Physical and virtual spaces sessions can be placed in.',
-        keywords: ['room', 'space', 'hall', 'lab', 'venue', 'building', 'capacity'],
-        federationOwnable: true,
-        title: (row) => [row.code, row.name].filter(Boolean).join(' · ') || 'Room',
-        columns: [
-            { key: 'code', label: 'Code', format: 'code' },
-            { key: 'name', label: 'Name' },
-            { key: 'capacity', label: 'Capacity', format: 'number' },
-            { key: 'examCapacity', label: 'Exam capacity', format: 'number', secondary: true },
-            { key: 'location', label: 'Location', secondary: true },
-            { key: 'isActive', label: 'Active', format: 'boolean' },
-        ],
-        fields: [
-            { key: 'code', label: 'Code', type: 'text', required: true },
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            {
-                key: 'capacity',
-                label: 'Capacity',
-                type: 'number',
-                min: 0,
-                /* Stated, because 0 is the column's DEFAULT: a room saved
-                 * without a capacity gets it, and the reading has to be the one
-                 * that keeps such a room usable. */
-                help: 'Seats. Leave it 0 for no limit: an online room, or one nobody has measured.',
-            },
-            {
-                key: 'examCapacity',
-                label: 'Exam capacity',
-                type: 'number',
-                min: 0,
-                /* Nullable, unlike `capacity`: unset is a real, distinct state
-                 * ("this room has no separate exam limit"), not "zero seats". */
-                help: 'Seats available for an exam sitting, if fewer than the normal capacity: '
-                    + 'exam spacing and invigilation often use more room per person. '
-                    + "Leave unset to fall back to this room's normal capacity.",
-            },
-            { key: 'location', label: 'Location', type: 'text' },
-            {
-                key: 'ranking',
-                label: 'Ranking',
-                type: 'number',
-                /*
-                 * Direction-neutral, because the constraint that reads this is
-                 * now direction-neutral too. It used to say "soft constraints
-                 * minimise use of high-ranking rooms", which stopped being the
-                 * whole truth when "Steer room choice by rank" gained a
-                 * direction: the same ranking can now be used to steer TOWARD
-                 * the premium rooms.
-                 */
-                help: 'Desirability, HIGHER = more premium. The "Steer room choice by rank" '
-                    + 'constraint reads this to bias placement toward one end of the scale.',
-            },
-            { key: 'isVirtual', label: 'Virtual', type: 'boolean' },
-            { key: 'isActive', label: 'Active', type: 'boolean' },
-        ],
-        relations: [
-            {
-                key: 'equipment',
-                label: 'Equipment in this room',
-                help: 'What this room provides. Offerings requiring it can only be placed '
-                    + 'here, and a count is what an offering asking for a minimum is '
-                    + 'measured against. Left blank, this room answers presence only.',
-                resource: 'equipment',
-                valueKey: 'equipmentId',
-                optionLabel: (row) => String(row.name ?? row.key),
-                quantity: { key: 'quantity', label: 'Count' },
-                emptyHint: 'No equipment defined yet.',
-            },
-        ],
-    },
-
-    {
-        key: 'equipment',
-        permissionPrefix: 'equipment',
-        label: 'Equipment',
-        plural: 'Equipment',
-        icon: 'material-symbols:videocam-outline',
-        description: 'Feature tags rooms provide and offerings require.',
-        keywords: ['equipment', 'feature', 'projector', 'lab', 'tag', 'facility'],
-        federationOwnable: true,
-        title: (row) => String(row.name ?? 'Equipment'),
-        columns: [
-            { key: 'key', label: 'Key', format: 'code' },
-            { key: 'name', label: 'Name' },
-            { key: 'description', label: 'Description', secondary: true },
-        ],
-        fields: [
-            {
-                key: 'key',
-                label: 'Key',
-                type: 'text',
-                required: true,
-                createOnly: true,
-                help: 'Stable identifier used by imports. Cannot be changed later.',
-            },
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'description', label: 'Description', type: 'textarea' },
-        ],
-    },
-
-    {
-        key: 'groups',
-        permissionPrefix: 'group',
-        label: 'Group',
-        plural: 'Groups',
-        icon: 'material-symbols:account-tree-outline',
-        description: 'Cohorts and their nested sub-groups.',
-        keywords: ['group', 'cohort', 'class', 'section', 'seminar', 'nesting', 'hierarchy', 'tree'],
-        title: (row) => String(row.name ?? 'Group'),
-        listComponent: 'GroupTree',
-        detailComponent: 'GroupForm',
-        // A tree assembled from one page of rows would show orphans whose
-        // parents are on page 2. See ManageGroupTree for what happens past this.
-        listPageSize: 200,
-        columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'expectedSize', label: 'Expected size', format: 'number' },
-            { key: 'description', label: 'Description', secondary: true },
-        ],
-        fields: [
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'description', label: 'Description', type: 'textarea' },
-            {
-                key: 'expectedSize',
-                label: 'Expected size',
-                type: 'number',
-                min: 0,
-                help: 'Advisory headcount for room-capacity checks. Membership remains the source of truth.',
-            },
-            {
-                key: 'parentGroupId',
-                label: 'Parent group',
+                key: 'nextPlanId',
+                label: t('manage.offeringPlan.field.nextPlanId.label'),
+                help: t('manage.offeringPlan.field.nextPlanId.help'),
                 type: 'reference',
-                // Rendered by ManageGroupForm: the option list depends on WHICH
-                // group is being edited, since self and every descendant must be
-                // excluded. A static registry entry cannot express that.
+                // A plan cannot name itself as its own successor: the option
+                // list excludes the row being edited, which no static registry
+                // entry can express (it depends on which row that is). See
+                // `ManageOfferingPlanForm`.
                 custom: true,
-                reference: {
-                    resource: 'groups',
-                    label: (row) => String(row.name ?? row.id),
-                    nullable: true,
-                    emptyHint: 'No other groups to nest under yet.',
-                },
-            },
-            {
-                key: 'curriculumPlanId',
-                label: 'Curriculum plan',
-                type: 'reference',
-                help: 'The plan this group is meant to follow: an intent, set before it has '
-                    + 'any offerings. Lets the plan’s own "roll out to several groups" panel '
-                    + 'pre-select this group instead of it being picked by hand every time. '
-                    + 'Not the same as which plan this group already has offerings from; see '
-                    + 'the "Curriculum plans" panel below for that.',
                 reference: {
                     resource: 'offering-plans',
                     label: (row) => String(row.name ?? row.id),
                     nullable: true,
-                    emptyHint: 'No curriculum plans defined yet.',
+                    emptyHint: t('manage.offeringPlan.field.nextPlanId.emptyHint'),
                 },
             },
         ],
-        relations: [
-            {
-                key: 'terms',
-                label: 'Available in terms',
-                // The empty case is stated explicitly because it reads backwards:
-                // an empty set WIDENS the group rather than hiding it. Leaving
-                // the user to infer that from a blank list is how someone
-                // "clears" a scope expecting the opposite.
-                help: 'Leave empty to make this group available in every term. '
-                    + 'Adding terms restricts it to those, which is what narrows the '
-                    + 'group pickers on offerings in other terms.',
-                resource: 'terms',
-                valueKey: 'termId',
-                optionLabel: (row) => String(row.name),
-                emptyHint: 'Available in every term.',
-            },
-        ],
-    },
+    };
+}
 
-    {
-        key: 'time-grids',
-        permissionPrefix: 'time_grid',
-        label: 'Time grid',
-        plural: 'Time grids',
-        icon: 'material-symbols:grid-on-outline',
-        description: 'Block length, blocks per day, and which days this institution teaches on.',
-        keywords: ['time grid', 'timegrid', 'blocks', 'periods', 'slots', 'days', 'schedule shape'],
-        title: (row) => String(row.name ?? 'Time grid'),
-        detailComponent: 'TimeGridEditor',
+export function constraintEntity(t: Translate): ManageEntity {
+    return {
+        key: 'constraints',
+        permissionPrefix: 'constraint',
+        label: t('manage.constraint.label'),
+        plural: t('manage.constraint.plural'),
+        icon: 'material-symbols:checklist',
+        description: t('manage.constraint.description'),
+        keywords: searchKeywords(t, 'manage.constraint.keywords', [
+            'constraint', 'rule', 'hard', 'soft', 'penalty', 'conflict', 'policy',
+        ]),
+        title: (row) => String(row.name ?? t('manage.constraint.label')),
+        detailComponent: 'ConstraintBuilder',
+        /**
+         * The catalogue is thirteen live types and every tenant holds one default
+         * row for each, plus any scoped variants: bounded and small. The grid
+         * needs the WHOLE set to group it correctly, and reports loudly rather than
+         * silently truncating if it ever stops being complete.
+         */
+        listComponent: 'ConstraintGrid',
+        listPageSize: 200,
+        hideCreateAction: true,
         columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'blocksPerDay', label: 'Blocks/day', format: 'number' },
-            { key: 'blockLengthMinutes', label: 'Block length', format: 'number' },
-            { key: 'activeDays', label: 'Days', format: 'weekdays' },
-            { key: 'isDefault', label: 'Default', format: 'boolean' },
+            { key: 'name', label: t('common.field.name') },
+            { key: 'type', label: t('manage.constraint.column.type'), format: 'code', secondary: true },
+            { key: 'severity', label: t('manage.constraint.column.severity') },
+            { key: 'weight', label: t('common.field.weight'), format: 'number' },
+            { key: 'isEnabled', label: t('manage.constraint.column.isEnabled'), format: 'boolean' },
         ],
         /*
-         * Every field is `custom`: the editor renders them against a live
-         * preview of the resulting day, because these numbers are meaningless in
-         * isolation: "45 minutes, 8 blocks, break 15" only becomes checkable
-         * when you can see it lands at 17:00. They stay declared here so draft
-         * seeding, dirty tracking, payload building and server-side field errors
-         * all keep working exactly as they do for a generic entity.
+         * `type`, `severity`, `weight` and `params` are all `custom`: they constrain
+         * each other. The chosen type fixes the severity and dictates which
+         * parameters exist, and weight is meaningful only when severity is SOFT, a
+         * pairing the database CHECK enforces. Rendered as four independent controls
+         * they would compose states the server rejects.
          */
         fields: [
-            { key: 'name', label: 'Name', type: 'text', required: true, custom: true },
-            {
-                key: 'blockLengthMinutes',
-                label: 'Block length (minutes)',
-                type: 'number',
-                required: true,
-                min: 1,
-                custom: true,
-            },
-            { key: 'blocksPerDay', label: 'Blocks per day', type: 'number', required: true, min: 1, custom: true },
-            { key: 'startHour', label: 'Start hour', type: 'number', min: 0, max: 23, custom: true },
-            { key: 'startMinute', label: 'Start minute', type: 'number', min: 0, max: 59, custom: true },
-            { key: 'breakMinutes', label: 'Default gap between blocks (minutes)', type: 'number', min: 0, custom: true },
-            // custom: true keeps it in the draft, dirty tracking and the payload
-            // while ManageTimeGridEditor supplies the control. Leaving it out of
-            // the registry instead would drop it from the draft and silently
-            // from saves: the trap Step 13 documented.
-            { key: 'breaks', label: 'Named breaks', type: 'text', custom: true },
-            { key: 'activeDays', label: 'Teaching days', type: 'select', required: true, custom: true },
-            { key: 'isDefault', label: 'Default grid', type: 'boolean', custom: true },
-        ],
-    },
-
-    {
-        key: 'session-kinds',
-        permissionPrefix: 'session_kind',
-        label: 'Session kind',
-        plural: 'Session kinds',
-        icon: 'material-symbols:label-outline',
-        description: 'Your own vocabulary: lecture, lab, seminar. Nothing here is built in.',
-        keywords: ['kind', 'type', 'lecture', 'lab', 'seminar', 'exam', 'vocabulary', 'category'],
-        title: (row) => String(row.name ?? 'Session kind'),
-        columns: [
-            { key: 'key', label: 'Key', format: 'code' },
-            { key: 'name', label: 'Name' },
-            { key: 'color', label: 'Colour', format: 'swatch' },
-            { key: 'type', label: 'Type' },
-            { key: 'requiresGroup', label: 'Has groups', format: 'boolean' },
-        ],
-        fields: [
-            {
-                key: 'key',
-                label: 'Key',
-                type: 'text',
-                required: true,
-                createOnly: true,
-                help: 'Stable identifier used by imports and constraints. Cannot be changed later.',
-            },
-            { key: 'name', label: 'Name', type: 'text', required: true },
+            { key: 'name', label: t('common.field.name'), type: 'text', required: true },
             {
                 key: 'type',
-                label: 'What it is',
+                label: t('manage.constraint.field.type.label'),
                 type: 'select',
-                /*
-                 * NOT `createOnly`, unlike `key`. A tenant that has been running
-                 * for a term and only now wants exam rules must be able to
-                 * reclassify the kind it already has, rather than create a
-                 * second one and re-point every offering.
-                 *
-                 * No blank option: every kind is one of these, and the default
-                 * is the honest answer for a kind nobody has thought about,
-                 * unlike `schedulingPattern`, where "not decided" is a real
-                 * third state.
-                 */
-                options: SESSION_KIND_TYPES.map((value) => ({
-                    value,
-                    label: SESSION_KIND_TYPE_LABELS[value],
-                })),
-                help: 'Decides which rules reach this kind. '
-                    + SESSION_KIND_TYPE_HELP.EXAM,
-            },
-            {
-                key: 'color',
-                label: 'Colour',
-                type: 'color',
-                help: 'Tints this kind on the schedule. Chips stay legible without it: colour is never the only cue.',
-            },
-            {
-                key: 'requiresGroup',
-                label: 'Carries groups',
-                type: 'boolean',
-                help: 'Whether sessions of this kind are expected to have Groups assigned. Lets a group-based constraint be rejected when aimed at a kind that has none.',
-            },
-        ],
-    },
-
-    OFFERING_ENTITY,
-    OFFERING_TEMPLATE_ENTITY,
-    OFFERING_PLAN_ENTITY,
-    CONSTRAINT_ENTITY,
-
-    {
-        /*
-         * Lobby displays. Own handlers under `server/api/screens/`, not the
-         * generic scaffold: a Screen carries a secret, and the scaffold returns
-         * the row it wrote. The gate is still declared in `RESOURCE_PERMISSIONS`
-         * so this registry can predict it, exactly as `accounts` does.
-         */
-        key: 'screens',
-        permissionPrefix: 'screen',
-        permissionOverrides: {
-            read: 'screen.read',
-            create: 'screen.manage',
-            update: 'screen.manage',
-            delete: 'screen.manage',
-        },
-        label: 'Screen',
-        plural: 'Screens',
-        icon: 'material-symbols:cast-outline',
-        description: 'Lobby and corridor displays showing live room occupancy.',
-        keywords: [
-            'screen', 'screens', 'display', 'displays', 'lobby', 'kiosk',
-            'signage', 'board', 'monitor', 'tv', 'corridor', 'occupancy',
-        ],
-        title: (row) => String(row.name ?? 'Screen'),
-        detailComponent: 'ScreenForm',
-        columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'roomSummary', label: 'Shows' },
-            { key: 'isActive', label: 'Active', format: 'boolean' },
-            { key: 'lastSeenAt', label: 'Last seen', format: 'date', secondary: true },
-        ],
-        fields: [
-            {
-                key: 'name',
-                label: 'Name',
-                type: 'text',
-                required: true,
-                help: 'Where the display physically is (e.g. "Main entrance", "B-block corridor"), '
-                    + 'so the right one can be revoked without a guess.',
-            },
-            {
-                key: 'isActive',
-                label: 'Active',
-                type: 'boolean',
-                help: 'Turning a screen off stops its key working immediately, and is reversible. '
-                    + 'Deleting it is not.',
-            },
-            /*
-             * `custom`, because both controls are bespoke: the room scope needs
-             * "empty means every room" stated in words rather than inferred from
-             * a blank multi-select, and the key can only ever be shown once.
-             */
-            {
-                key: 'roomIds',
-                label: 'Rooms shown',
-                /*
-                 * `reference`, not `text`, and that is what makes the picker
-                 * work at all: `referencedResources()` builds the form's fetch
-                 * wave from fields carrying one, so a field without it renders
-                 * an empty list reading "No rooms defined yet" in a tenant full
-                 * of rooms. Shipped exactly that way once.
-                 *
-                 * `custom` because the control is a multi-select whose EMPTY
-                 * state means "every room": a meaning no generic reference
-                 * control can convey, and the opposite of what a blank select
-                 * looks like.
-                 */
-                type: 'reference',
-                custom: true,
-                reference: {
-                    resource: 'rooms',
-                    label: (row) => String(row.name ?? row.code ?? row.id),
-                    nullable: true,
-                    emptyHint: 'No rooms defined yet.',
-                },
-            },
-            /*
-             * The device key, generated in the BROWSER and shown once: the same
-             * shape as an account's initial password, and for the same reason:
-             * the create page navigates away on success, so a server-generated
-             * secret would be gone before it could be read. `custom` because the
-             * control is the display URL with a copy button, not a text input.
-             */
-            { key: 'key', label: 'Display address', type: 'text', custom: true },
-        ],
-    },
-
-    {
-        key: 'terms',
-        permissionPrefix: 'term',
-        label: 'Term',
-        plural: 'Terms',
-        icon: 'material-symbols:calendar-month-outline',
-        description: 'Academic periods sessions are scheduled within.',
-        keywords: ['term', 'semester', 'trimester', 'academic', 'year', 'period'],
-        title: (row) => String(row.name ?? 'Term'),
-        columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'startDate', label: 'Starts', format: 'date' },
-            { key: 'endDate', label: 'Ends', format: 'date' },
-        ],
-        fields: [
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'startDate', label: 'Start date', type: 'date', required: true },
-            { key: 'endDate', label: 'End date', type: 'date', required: true },
-            {
-                key: 'timeGridId',
-                label: 'Time grid',
-                type: 'reference',
-                help: 'Which grid this term is scheduled on. Falls back to the tenant default when unset.',
-                reference: {
-                    resource: 'time-grids',
-                    label: (row) => String(row.name ?? row.id),
-                    nullable: true,
-                    emptyHint: 'No time grids configured yet.',
-                },
-            },
-        ],
-    },
-
-    {
-        key: 'calendar-periods',
-        // A child of Term, so `term.update` governs it: changing when a term's
-        // exam period falls IS editing the term. Same reasoning as
-        // `time_grid_break` living under `time_grid.update`.
-        permissionPrefix: 'term',
-        label: 'Calendar period',
-        plural: 'Calendar periods',
-        icon: 'material-symbols:event-busy-outline',
-        description: 'Holidays, break weeks and exam periods within a term.',
-        keywords: ['calendar', 'period', 'holiday', 'break', 'exam', 'vacation', 'reading week', 'recess'],
-        title: (row) => String(row.name ?? 'Calendar period'),
-        detailComponent: 'CalendarPeriodForm',
-        columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'kind', label: 'Kind' },
-            { key: 'startDate', label: 'Starts', format: 'date' },
-            { key: 'endDate', label: 'Ends', format: 'date' },
-        ],
-        fields: [
-            {
-                key: 'termId',
-                label: 'Term',
-                type: 'reference',
                 required: true,
                 createOnly: true,
-                help: 'Which term this period falls in. Cannot be changed afterwards: '
-                    + 'moving a period to another term is creating a different period.',
-                reference: {
+                custom: true,
+            },
+            {
+                key: 'severity',
+                label: t('manage.constraint.field.severity.label'),
+                type: 'select',
+                required: true,
+                custom: true,
+            },
+            { key: 'weight', label: t('manage.constraint.field.weight.label'), type: 'number', custom: true },
+            { key: 'params', label: t('manage.constraint.field.params.label'), type: 'json', custom: true },
+            /*
+             * Kind scopes. `custom` because the builder renders the picker, and
+             * because the value is an ARRAY: the shape that produced
+             * "[object Object]" when a structured field reached ManageField. It is
+             * declared here so it takes part in the draft, dirty tracking and the
+             * payload, exactly as `time_grid.breaks` does.
+             */
+            { key: 'scopes', label: t('manage.constraint.field.scopes.label'), type: 'text', custom: true },
+            /*
+             * A relation type's ordered Offering operands (ADR-0028 in
+             * calendry-solver), `ConstraintRelationMember`, never
+             * `ConstraintScope`. Same reasoning as `scopes` just above: `custom`
+             * because `ManageOfferingRelationMembers` renders the picker and the
+             * value is an array, and it has to be declared here to take part in
+             * the draft, dirty tracking and the save payload at all; undeclared,
+             * `useEntityForm.save()`'s generic per-field loop never sends it.
+             */
+            { key: 'members', label: t('manage.constraint.field.members.label'), type: 'text', custom: true },
+            { key: 'isEnabled', label: t('manage.constraint.field.isEnabled.label'), type: 'boolean' },
+        ],
+    };
+}
+
+/**
+ * Every managed entity, with its copy resolved in the reader's language.
+ *
+ * The array is built per call rather than memoised: `t` decides its contents,
+ * so caching it would hand the previous language's labels to the next reader.
+ * Callers hold it for the life of a page (`findManageEntity` in the three
+ * `/manage/[entity]` pages) or inside a `computed` (`navPlaces`), which is
+ * where the language becomes a dependency rather than a snapshot.
+ */
+export function manageEntities(t: Translate): ManageEntity[] {
+    return [
+        {
+            key: 'persons',
+            permissionPrefix: 'person',
+            label: t('manage.person.label'),
+            plural: t('manage.person.plural'),
+            icon: 'material-symbols:person-outline',
+            description: t('manage.person.description'),
+            keywords: searchKeywords(t, 'manage.person.keywords', [
+                'people', 'staff', 'student', 'lecturer', 'teacher', 'roster', 'directory',
+            ]),
+            title: (row) => `${row.givenName ?? ''} ${row.familyName ?? ''}`.trim() || t('manage.person.label'),
+            // Every field below is plain; this exists solely to add issue #84's
+            // GDPR export action outside the generic form. See detailComponents.ts.
+            detailComponent: 'PersonForm',
+            columns: [
+                { key: 'familyName', label: t('manage.person.column.familyName') },
+                { key: 'givenName', label: t('manage.person.column.givenName') },
+                { key: 'email', label: t('manage.person.column.email'), secondary: true },
+                { key: 'isActive', label: t('common.field.active'), format: 'boolean' },
+            ],
+            fields: [
+                {
+                    key: 'givenName',
+                    label: t('manage.person.field.givenName.label'),
+                    type: 'text',
+                    required: true,
+                },
+                {
+                    key: 'familyName',
+                    label: t('manage.person.field.familyName.label'),
+                    type: 'text',
+                    required: true,
+                },
+                { key: 'email', label: t('manage.person.field.email.label'), type: 'email' },
+                {
+                    key: 'externalRef',
+                    label: t('manage.person.field.externalRef.label'),
+                    type: 'text',
+                    help: t('manage.person.field.externalRef.help'),
+                },
+                {
+                    key: 'timezone',
+                    label: t('common.field.timezone'),
+                    type: 'text',
+                    /*
+                     * NOT a message. An IANA zone id is an identifier the user
+                     * types verbatim, the same class of value as a Role key:
+                     * translating "Europe/Berlin" would produce a hint that
+                     * does not parse.
+                     */
+                    placeholder: 'Europe/Berlin',
+                    help: t('manage.person.field.timezone.help'),
+                },
+                { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
+            ],
+            relations: [
+                {
+                    key: 'roles',
+                    label: t('manage.person.relation.roles.label'),
+                    help: t('manage.person.relation.roles.help'),
+                    resource: 'roles',
+                    valueKey: 'roleId',
+                    optionLabel: (row) => String(row.name ?? row.key),
+                    emptyHint: t('manage.person.relation.roles.emptyHint'),
+                },
+                {
+                    key: 'access-roles',
+                    label: t('manage.person.relation.accessRoles.label'),
+                    help: t('manage.person.relation.accessRoles.help'),
+                    resource: 'access-roles',
+                    valueKey: 'accessRoleId',
+                    optionLabel: (row) => String(row.name ?? row.key),
+                    emptyHint: t('manage.person.relation.accessRoles.emptyHint'),
+                    emptyWarning: t('manage.person.relation.accessRoles.emptyWarning'),
+                    /*
+                     * No read gate declared: it is DERIVED from `resource`; see
+                     * `relationReadRequirement`. `/api/access-roles` accepts either
+                     * administration permission, and the derivation says so without
+                     * this entry having to know.
+                     */
+                    writeRequiresPermissions: ['person_access_role.assign'],
+                },
+                {
+                    key: 'groups',
+                    label: t('manage.person.relation.groups.label'),
+                    help: t('manage.person.relation.groups.help'),
+                    resource: 'groups',
+                    valueKey: 'groupId',
+                    indentTree: true,
+                    optionLabel: (row) => String(row.name),
+                    emptyHint: t('manage.person.relation.groups.emptyHint'),
+                },
+            ],
+        },
+
+        {
+            key: 'roles',
+            permissionPrefix: 'role',
+            label: t('manage.role.label'),
+            plural: t('manage.role.plural'),
+            icon: 'material-symbols:badge-outline',
+            // The Role/AccessRole distinction is load-bearing (TAXONOMY.md §2 vs §4)
+            // and the two share a word, so the UI says which one this is.
+            description: t('manage.role.description'),
+            keywords: searchKeywords(t, 'manage.role.keywords', [
+                'role', 'lecturer', 'auditor', 'vocabulary', 'title',
+            ]),
+            title: (row) => String(row.name ?? t('manage.role.label')),
+            systemFlag: 'isSystem',
+            columns: [
+                { key: 'key', label: t('manage.role.column.key'), format: 'code' },
+                { key: 'name', label: t('common.field.name') },
+                { key: 'description', label: t('common.field.description'), secondary: true },
+            ],
+            fields: [
+                {
+                    key: 'key',
+                    label: t('manage.role.field.key.label'),
+                    type: 'text',
+                    required: true,
+                    createOnly: true,
+                    help: t('manage.role.field.key.help'),
+                },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                { key: 'description', label: t('common.field.description'), type: 'textarea' },
+            ],
+        },
+
+        {
+            key: 'rooms',
+            permissionPrefix: 'room',
+            label: t('manage.room.label'),
+            plural: t('manage.room.plural'),
+            icon: 'material-symbols:meeting-room-outline',
+            description: t('manage.room.description'),
+            keywords: searchKeywords(t, 'manage.room.keywords', [
+                'room', 'space', 'hall', 'lab', 'venue', 'building', 'capacity',
+            ]),
+            federationOwnable: true,
+            title: (row) => [row.code, row.name].filter(Boolean).join(' · ') || t('manage.room.label'),
+            columns: [
+                { key: 'code', label: t('common.field.code'), format: 'code' },
+                { key: 'name', label: t('common.field.name') },
+                { key: 'capacity', label: t('manage.room.column.capacity'), format: 'number' },
+                {
+                    key: 'examCapacity',
+                    label: t('manage.room.column.examCapacity'),
+                    format: 'number',
+                    secondary: true,
+                },
+                { key: 'location', label: t('manage.room.column.location'), secondary: true },
+                { key: 'isActive', label: t('common.field.active'), format: 'boolean' },
+            ],
+            fields: [
+                { key: 'code', label: t('common.field.code'), type: 'text', required: true },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                {
+                    key: 'capacity',
+                    label: t('manage.room.field.capacity.label'),
+                    type: 'number',
+                    min: 0,
+                    /* Stated, because 0 is the column's DEFAULT: a room saved
+                     * without a capacity gets it, and the reading has to be the one
+                     * that keeps such a room usable. */
+                    help: t('manage.room.field.capacity.help'),
+                },
+                {
+                    key: 'examCapacity',
+                    label: t('manage.room.field.examCapacity.label'),
+                    type: 'number',
+                    min: 0,
+                    /* Nullable, unlike `capacity`: unset is a real, distinct state
+                     * ("this room has no separate exam limit"), not "zero seats". */
+                    help: t('manage.room.field.examCapacity.help'),
+                },
+                { key: 'location', label: t('manage.room.field.location.label'), type: 'text' },
+                {
+                    key: 'ranking',
+                    label: t('manage.room.field.ranking.label'),
+                    type: 'number',
+                    /*
+                     * Direction-neutral, because the constraint that reads this is
+                     * now direction-neutral too. It used to say "soft constraints
+                     * minimise use of high-ranking rooms", which stopped being the
+                     * whole truth when "Steer room choice by rank" gained a
+                     * direction: the same ranking can now be used to steer TOWARD
+                     * the premium rooms.
+                     */
+                    help: t('manage.room.field.ranking.help'),
+                },
+                { key: 'isVirtual', label: t('manage.room.field.isVirtual.label'), type: 'boolean' },
+                { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
+            ],
+            relations: [
+                {
+                    key: 'equipment',
+                    label: t('manage.room.relation.equipment.label'),
+                    help: t('manage.room.relation.equipment.help'),
+                    resource: 'equipment',
+                    valueKey: 'equipmentId',
+                    optionLabel: (row) => String(row.name ?? row.key),
+                    quantity: { key: 'quantity', label: t('manage.room.relation.equipment.quantity') },
+                    emptyHint: t('manage.room.relation.equipment.emptyHint'),
+                },
+            ],
+        },
+
+        {
+            key: 'equipment',
+            permissionPrefix: 'equipment',
+            label: t('manage.equipment.label'),
+            plural: t('manage.equipment.plural'),
+            icon: 'material-symbols:videocam-outline',
+            description: t('manage.equipment.description'),
+            keywords: searchKeywords(t, 'manage.equipment.keywords', [
+                'equipment', 'feature', 'projector', 'lab', 'tag', 'facility',
+            ]),
+            federationOwnable: true,
+            title: (row) => String(row.name ?? t('manage.equipment.label')),
+            columns: [
+                { key: 'key', label: t('manage.equipment.column.key'), format: 'code' },
+                { key: 'name', label: t('common.field.name') },
+                { key: 'description', label: t('common.field.description'), secondary: true },
+            ],
+            fields: [
+                {
+                    key: 'key',
+                    label: t('manage.equipment.field.key.label'),
+                    type: 'text',
+                    required: true,
+                    createOnly: true,
+                    help: t('manage.equipment.field.key.help'),
+                },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                { key: 'description', label: t('common.field.description'), type: 'textarea' },
+            ],
+        },
+
+        {
+            key: 'groups',
+            permissionPrefix: 'group',
+            label: t('manage.group.label'),
+            plural: t('manage.group.plural'),
+            icon: 'material-symbols:account-tree-outline',
+            description: t('manage.group.description'),
+            keywords: searchKeywords(t, 'manage.group.keywords', [
+                'group', 'cohort', 'class', 'section', 'seminar', 'nesting', 'hierarchy', 'tree',
+            ]),
+            title: (row) => String(row.name ?? t('manage.group.label')),
+            listComponent: 'GroupTree',
+            detailComponent: 'GroupForm',
+            // A tree assembled from one page of rows would show orphans whose
+            // parents are on page 2. See ManageGroupTree for what happens past this.
+            listPageSize: 200,
+            columns: [
+                { key: 'name', label: t('common.field.name') },
+                { key: 'expectedSize', label: t('manage.group.column.expectedSize'), format: 'number' },
+                { key: 'description', label: t('common.field.description'), secondary: true },
+            ],
+            fields: [
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                { key: 'description', label: t('common.field.description'), type: 'textarea' },
+                {
+                    key: 'expectedSize',
+                    label: t('manage.group.field.expectedSize.label'),
+                    type: 'number',
+                    min: 0,
+                    help: t('manage.group.field.expectedSize.help'),
+                },
+                {
+                    key: 'parentGroupId',
+                    label: t('manage.group.field.parentGroupId.label'),
+                    type: 'reference',
+                    // Rendered by ManageGroupForm: the option list depends on WHICH
+                    // group is being edited, since self and every descendant must be
+                    // excluded. A static registry entry cannot express that.
+                    custom: true,
+                    reference: {
+                        resource: 'groups',
+                        label: (row) => String(row.name ?? row.id),
+                        nullable: true,
+                        emptyHint: t('manage.group.field.parentGroupId.emptyHint'),
+                    },
+                },
+                {
+                    key: 'curriculumPlanId',
+                    label: t('manage.group.field.curriculumPlanId.label'),
+                    type: 'reference',
+                    help: t('manage.group.field.curriculumPlanId.help'),
+                    reference: {
+                        resource: 'offering-plans',
+                        label: (row) => String(row.name ?? row.id),
+                        nullable: true,
+                        emptyHint: t('manage.group.field.curriculumPlanId.emptyHint'),
+                    },
+                },
+            ],
+            relations: [
+                {
+                    key: 'terms',
+                    label: t('manage.group.relation.terms.label'),
+                    // The empty case is stated explicitly because it reads backwards:
+                    // an empty set WIDENS the group rather than hiding it. Leaving
+                    // the user to infer that from a blank list is how someone
+                    // "clears" a scope expecting the opposite.
+                    help: t('manage.group.relation.terms.help'),
                     resource: 'terms',
-                    label: (row) => String(row.name ?? row.id),
-                    emptyHint: 'No terms configured yet.',
+                    valueKey: 'termId',
+                    optionLabel: (row) => String(row.name),
+                    emptyHint: t('manage.group.relation.terms.emptyHint'),
                 },
-            },
-            {
-                key: 'kind',
-                label: 'Kind',
-                type: 'select',
-                required: true,
-                // Structural, not tenant vocabulary: TAXONOMY.md §2 names these
-                // three explicitly, and each has different week-classification
-                // semantics that only exist because the set is fixed.
-                options: [
-                    { value: 'EXAM', label: 'Exam period' },
-                    { value: 'BREAK', label: 'Break' },
-                    { value: 'HOLIDAY', label: 'Holiday' },
-                ],
-                help: 'An EXAM period claims any week it touches. A BREAK or HOLIDAY '
-                    + 'claims a week only if it covers the whole of it.',
-            },
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'startDate', label: 'Start date', type: 'date', required: true },
-            { key: 'endDate', label: 'End date', type: 'date', required: true },
-            {
-                key: 'weekPreview',
-                label: 'Weeks this reclassifies',
-                type: 'text',
-                // Rendered by ManageCalendarPeriodPreview. `custom` keeps the key
-                // out of the payload while leaving the field in the form's
-                // layout; there is no `weekPreview` column.
-                custom: true,
-            },
-        ],
-    },
-
-    /**
-     * Account: the LOGIN, which is not a Person.
-     *
-     * THE DISTINCTION THIS SECTION EXISTS TO MAKE VISIBLE: a Person is who the
-     * timetable places and notifies (TAXONOMY.md §2); an Account is a credential
-     * that can act as one Person per institution (§4). Creating a Person
-     * therefore does not create a login, which is exactly the gap that sent
-     * admins to `bun run create:account`, where an already-existing Person
-     * answered "already exists" and the trail ended.
-     *
-     * SECTION GATE IS `account.read`, and reading the API additionally accepts
-     * `account.manage`, the same deliberate divergence `access-roles` carries in
-     * the opposite direction. A role that may issue logins therefore needs
-     * `account.read` as well to see the section; the API stays usable either way
-     * so a create response and the person picker never 403 under a manage-only
-     * role.
-     *
-     * Second-to-last, immediately before Access roles: the two administration
-     * sections belong together, and this is the one you visit first: a login is
-     * what makes an access role reach anybody.
-     */
-    {
-        key: 'accounts',
-        // Naming the table, as `access-roles` does; the four verbs come from the
-        // overrides below because the catalogue holds two capabilities, not eight.
-        permissionPrefix: 'account',
-        permissionOverrides: {
-            read: 'account.read',
-            create: 'account.manage',
-            update: 'account.manage',
-            delete: 'account.manage',
+            ],
         },
-        label: 'Login',
-        plural: 'Logins',
-        icon: 'material-symbols:key-outline',
-        description: 'How people sign in: credentials, separate from the people they act as.',
-        keywords: [
-            'account', 'accounts', 'login', 'logins', 'credential', 'password',
-            'sign in', 'signin', 'user', 'users', 'reset',
-        ],
-        title: (row) => String(row.email ?? 'Login'),
-        detailComponent: 'AccountForm',
-        columns: [
-            { key: 'email', label: 'Email' },
-            { key: 'personName', label: 'Acts as' },
-            { key: 'isActive', label: 'Active', format: 'boolean' },
-            { key: 'mustChangePassword', label: 'Must change', format: 'boolean', secondary: true },
-            { key: 'lastLoginAt', label: 'Last sign-in', format: 'date', secondary: true },
-        ],
-        fields: [
-            {
-                key: 'email',
-                label: 'Email',
-                type: 'email',
-                required: true,
-                help: 'The sign-in address, and unique across the whole deployment: one '
-                    + 'credential can act in several institutions.',
-            },
-            /*
-             * `custom`, so the control is the bespoke picker over
-             * `/api/accounts/candidates` rather than a `reference` field over
-             * every Person. Most people already have a login, and offering them
-             * produces a 409 from `@@unique([personId])` after the form is
-             * filled in. Declared here so the key still takes part in the draft,
-             * dirty tracking and the payload: omitting it drops it from saves
-             * silently.
-             */
-            { key: 'personId', label: 'Acts as', type: 'text', required: true, custom: true },
-            /*
-             * `createOnly` AND `custom`. Changing a password later is an explicit
-             * verb (`POST /api/accounts/:id/reset-password`) because it revokes
-             * every session, so an editable field on the detail page would offer
-             * that consequence as an ordinary save.
-             */
-            { key: 'password', label: 'Initial password', type: 'text', createOnly: true, custom: true },
-            /*
-             * Explicit consent to reuse the credential that already holds the
-             * typed address, rather than minting a second one. A FIELD and not a
-             * second endpoint, because it has to ride along in the create payload
-             * the shared form builds, and because it belongs to the draft: the
-             * admin's answer to "attach instead?" is part of what they are about
-             * to submit, not a separate action.
-             */
-            { key: 'attachExisting', label: 'Attach the existing login', type: 'boolean', createOnly: true, custom: true },
-            {
-                key: 'mustChangePassword',
-                label: 'Must choose a new password at first sign-in',
-                type: 'boolean',
-                help: 'A password an administrator knows is a shared secret. This is what makes '
-                    + 'that temporary: sign-in succeeds but issues no session until it is changed.',
-            },
-            {
-                key: 'isActive',
-                label: 'Active',
-                type: 'boolean',
-                help: 'Deactivating blocks sign-in immediately, in every institution this '
-                    + 'credential is used at. The Person stays on the timetable either way.',
-            },
-        ],
-    },
 
-    /**
-     * AccessRole: who may DO what, as opposed to the domain Role directly
-     * above, which is scheduling vocabulary and grants nothing (TAXONOMY.md §4
-     * vs §2). The two share a word and nothing else, so both descriptions say
-     * which one they are.
-     *
-     * Last in the array, and therefore last in the sidebar: it is the section
-     * a tenant visits least and the one whose entries are hardest to undo.
-     */
-    {
-        key: 'access-roles',
-        // Unused for permissions (see `permissionOverrides`), but the field is
-        // required and naming the table is still the honest answer.
-        permissionPrefix: 'access_role',
-        permissionOverrides: {
-            read: 'access_role.manage',
-            create: 'access_role.manage',
-            update: 'access_role.manage',
-            delete: 'access_role.manage',
+        {
+            key: 'time-grids',
+            permissionPrefix: 'time_grid',
+            label: t('manage.timeGrid.label'),
+            plural: t('manage.timeGrid.plural'),
+            icon: 'material-symbols:grid-on-outline',
+            description: t('manage.timeGrid.description'),
+            keywords: searchKeywords(t, 'manage.timeGrid.keywords', [
+                'time grid', 'timegrid', 'blocks', 'periods', 'slots', 'days', 'schedule shape',
+            ]),
+            title: (row) => String(row.name ?? t('manage.timeGrid.label')),
+            detailComponent: 'TimeGridEditor',
+            columns: [
+                { key: 'name', label: t('common.field.name') },
+                { key: 'blocksPerDay', label: t('manage.timeGrid.column.blocksPerDay'), format: 'number' },
+                {
+                    key: 'blockLengthMinutes',
+                    label: t('manage.timeGrid.column.blockLengthMinutes'),
+                    format: 'number',
+                },
+                { key: 'activeDays', label: t('manage.timeGrid.column.activeDays'), format: 'weekdays' },
+                { key: 'isDefault', label: t('manage.timeGrid.column.isDefault'), format: 'boolean' },
+            ],
+            /*
+             * Every field is `custom`: the editor renders them against a live
+             * preview of the resulting day, because these numbers are meaningless in
+             * isolation: "45 minutes, 8 blocks, break 15" only becomes checkable
+             * when you can see it lands at 17:00. They stay declared here so draft
+             * seeding, dirty tracking, payload building and server-side field errors
+             * all keep working exactly as they do for a generic entity.
+             */
+            fields: [
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true, custom: true },
+                {
+                    key: 'blockLengthMinutes',
+                    label: t('manage.timeGrid.field.blockLengthMinutes.label'),
+                    type: 'number',
+                    required: true,
+                    min: 1,
+                    custom: true,
+                },
+                {
+                    key: 'blocksPerDay',
+                    label: t('manage.timeGrid.field.blocksPerDay.label'),
+                    type: 'number',
+                    required: true,
+                    min: 1,
+                    custom: true,
+                },
+                {
+                    key: 'startHour',
+                    label: t('manage.timeGrid.field.startHour.label'),
+                    type: 'number',
+                    min: 0,
+                    max: 23,
+                    custom: true,
+                },
+                {
+                    key: 'startMinute',
+                    label: t('manage.timeGrid.field.startMinute.label'),
+                    type: 'number',
+                    min: 0,
+                    max: 59,
+                    custom: true,
+                },
+                {
+                    key: 'breakMinutes',
+                    label: t('manage.timeGrid.field.breakMinutes.label'),
+                    type: 'number',
+                    min: 0,
+                    custom: true,
+                },
+                // custom: true keeps it in the draft, dirty tracking and the payload
+                // while ManageTimeGridEditor supplies the control. Leaving it out of
+                // the registry instead would drop it from the draft and silently
+                // from saves: the trap Step 13 documented.
+                { key: 'breaks', label: t('manage.timeGrid.field.breaks.label'), type: 'text', custom: true },
+                {
+                    key: 'activeDays',
+                    label: t('manage.timeGrid.field.activeDays.label'),
+                    type: 'select',
+                    required: true,
+                    custom: true,
+                },
+                {
+                    key: 'isDefault',
+                    label: t('manage.timeGrid.field.isDefault.label'),
+                    type: 'boolean',
+                    custom: true,
+                },
+            ],
         },
-        label: 'Access role',
-        plural: 'Access roles',
-        icon: 'material-symbols:admin-panel-settings-outline',
-        description: 'Who may do what: bundles of permissions people are granted.',
-        keywords: ['access', 'permission', 'role', 'admin', 'rights', 'authorization', 'security'],
-        title: (row) => String(row.name ?? 'Access role'),
-        detailComponent: 'AccessRoleForm',
-        // `tenant-admin` is provisioning's own row: renamable, never deletable.
-        // The server refuses it too; this only stops offering the button.
-        systemFlag: 'isSystem',
-        columns: [
-            { key: 'key', label: 'Key', format: 'code' },
-            { key: 'name', label: 'Name' },
-            { key: 'description', label: 'Description', secondary: true },
-        ],
-        fields: [
-            {
-                key: 'key',
-                label: 'Key',
-                type: 'text',
-                required: true,
-                createOnly: true,
-                help: 'Stable identifier. `create:account --role <key>` and any import address the role by it, '
-                    + 'so it cannot be changed later.',
-            },
-            { key: 'name', label: 'Name', type: 'text', required: true },
-            { key: 'description', label: 'Description', type: 'textarea' },
+
+        {
+            key: 'session-kinds',
+            permissionPrefix: 'session_kind',
+            label: t('manage.sessionKind.label'),
+            plural: t('manage.sessionKind.plural'),
+            icon: 'material-symbols:label-outline',
+            description: t('manage.sessionKind.description'),
+            keywords: searchKeywords(t, 'manage.sessionKind.keywords', [
+                'kind', 'type', 'lecture', 'lab', 'seminar', 'exam', 'vocabulary', 'category',
+            ]),
+            title: (row) => String(row.name ?? t('manage.sessionKind.label')),
+            columns: [
+                { key: 'key', label: t('manage.sessionKind.column.key'), format: 'code' },
+                { key: 'name', label: t('common.field.name') },
+                { key: 'color', label: t('common.field.colour'), format: 'swatch' },
+                { key: 'type', label: t('manage.sessionKind.column.type') },
+                { key: 'requiresGroup', label: t('manage.sessionKind.column.requiresGroup'), format: 'boolean' },
+            ],
+            fields: [
+                {
+                    key: 'key',
+                    label: t('manage.sessionKind.field.key.label'),
+                    type: 'text',
+                    required: true,
+                    createOnly: true,
+                    help: t('manage.sessionKind.field.key.help'),
+                },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                {
+                    key: 'type',
+                    label: t('manage.sessionKind.field.type.label'),
+                    type: 'select',
+                    /*
+                     * NOT `createOnly`, unlike `key`. A tenant that has been running
+                     * for a term and only now wants exam rules must be able to
+                     * reclassify the kind it already has, rather than create a
+                     * second one and re-point every offering.
+                     *
+                     * No blank option: every kind is one of these, and the default
+                     * is the honest answer for a kind nobody has thought about,
+                     * unlike `schedulingPattern`, where "not decided" is a real
+                     * third state.
+                     *
+                     * THE OPTION LABELS AND THE EXAM SENTENCE ARE NOT THIS
+                     * NAMESPACE'S. `SESSION_KIND_TYPE_LABELS` and
+                     * `SESSION_KIND_TYPE_HELP` live in `shared/sessionKindType.ts`,
+                     * a SHARED catalogue the server reads too, which issue #19
+                     * translates in Phase 3 rather than during extraction. So the
+                     * labels pass through untouched and the help text takes the
+                     * sentence as a NAMED PLACEHOLDER: when that catalogue starts
+                     * answering in German, this line does too, with no edit here.
+                     */
+                    options: SESSION_KIND_TYPES.map((value) => ({
+                        value,
+                        label: SESSION_KIND_TYPE_LABELS[value],
+                    })),
+                    help: t('manage.sessionKind.field.type.help', { examHelp: SESSION_KIND_TYPE_HELP.EXAM }),
+                },
+                {
+                    key: 'color',
+                    label: t('common.field.colour'),
+                    type: 'color',
+                    help: t('manage.sessionKind.field.color.help'),
+                },
+                {
+                    key: 'requiresGroup',
+                    label: t('manage.sessionKind.field.requiresGroup.label'),
+                    type: 'boolean',
+                    help: t('manage.sessionKind.field.requiresGroup.help'),
+                },
+            ],
+        },
+
+        offeringEntity(t),
+        offeringTemplateEntity(t),
+        offeringPlanEntity(t),
+        constraintEntity(t),
+
+        {
             /*
-             * The grants. `custom` because the control is a matrix over the
-             * fixed catalogue rather than a field, and because the value is an
-             * ARRAY: the shape that renders as "[object Object]" if it ever
-             * reaches ManageField. Declared here so it takes part in the draft,
-             * dirty tracking and the payload, exactly as `constraint.scopes`
-             * does.
+             * Lobby displays. Own handlers under `server/api/screens/`, not the
+             * generic scaffold: a Screen carries a secret, and the scaffold returns
+             * the row it wrote. The gate is still declared in `RESOURCE_PERMISSIONS`
+             * so this registry can predict it, exactly as `accounts` does.
              */
-            { key: 'permissions', label: 'Permissions', type: 'text', custom: true },
-        ],
-    },
-];
+            key: 'screens',
+            permissionPrefix: 'screen',
+            permissionOverrides: {
+                read: 'screen.read',
+                create: 'screen.manage',
+                update: 'screen.manage',
+                delete: 'screen.manage',
+            },
+            label: t('manage.screen.label'),
+            plural: t('manage.screen.plural'),
+            icon: 'material-symbols:cast-outline',
+            description: t('manage.screen.description'),
+            keywords: searchKeywords(t, 'manage.screen.keywords', [
+                'screen', 'screens', 'display', 'displays', 'lobby', 'kiosk',
+                'signage', 'board', 'monitor', 'tv', 'corridor', 'occupancy',
+            ]),
+            title: (row) => String(row.name ?? t('manage.screen.label')),
+            detailComponent: 'ScreenForm',
+            columns: [
+                { key: 'name', label: t('common.field.name') },
+                { key: 'roomSummary', label: t('manage.screen.column.roomSummary') },
+                { key: 'isActive', label: t('common.field.active'), format: 'boolean' },
+                { key: 'lastSeenAt', label: t('manage.screen.column.lastSeenAt'), format: 'date', secondary: true },
+            ],
+            fields: [
+                {
+                    key: 'name',
+                    label: t('common.field.name'),
+                    type: 'text',
+                    required: true,
+                    help: t('manage.screen.field.name.help'),
+                },
+                {
+                    key: 'isActive',
+                    label: t('common.field.active'),
+                    type: 'boolean',
+                    help: t('manage.screen.field.isActive.help'),
+                },
+                /*
+                 * `custom`, because both controls are bespoke: the room scope needs
+                 * "empty means every room" stated in words rather than inferred from
+                 * a blank multi-select, and the key can only ever be shown once.
+                 */
+                {
+                    key: 'roomIds',
+                    label: t('manage.screen.field.roomIds.label'),
+                    /*
+                     * `reference`, not `text`, and that is what makes the picker
+                     * work at all: `referencedResources()` builds the form's fetch
+                     * wave from fields carrying one, so a field without it renders
+                     * an empty list reading "No rooms defined yet" in a tenant full
+                     * of rooms. Shipped exactly that way once.
+                     *
+                     * `custom` because the control is a multi-select whose EMPTY
+                     * state means "every room": a meaning no generic reference
+                     * control can convey, and the opposite of what a blank select
+                     * looks like.
+                     */
+                    type: 'reference',
+                    custom: true,
+                    reference: {
+                        resource: 'rooms',
+                        label: (row) => String(row.name ?? row.code ?? row.id),
+                        nullable: true,
+                        emptyHint: t('manage.screen.field.roomIds.emptyHint'),
+                    },
+                },
+                /*
+                 * The device key, generated in the BROWSER and shown once: the same
+                 * shape as an account's initial password, and for the same reason:
+                 * the create page navigates away on success, so a server-generated
+                 * secret would be gone before it could be read. `custom` because the
+                 * control is the display URL with a copy button, not a text input.
+                 */
+                { key: 'key', label: t('manage.screen.field.key.label'), type: 'text', custom: true },
+            ],
+        },
 
+        {
+            key: 'terms',
+            permissionPrefix: 'term',
+            label: t('manage.term.label'),
+            plural: t('manage.term.plural'),
+            icon: 'material-symbols:calendar-month-outline',
+            description: t('manage.term.description'),
+            keywords: searchKeywords(t, 'manage.term.keywords', [
+                'term', 'semester', 'trimester', 'academic', 'year', 'period',
+            ]),
+            title: (row) => String(row.name ?? t('manage.term.label')),
+            columns: [
+                { key: 'name', label: t('common.field.name') },
+                { key: 'startDate', label: t('manage.term.column.startDate'), format: 'date' },
+                { key: 'endDate', label: t('manage.term.column.endDate'), format: 'date' },
+            ],
+            fields: [
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                {
+                    key: 'startDate',
+                    label: t('manage.term.field.startDate.label'),
+                    type: 'date',
+                    required: true,
+                },
+                { key: 'endDate', label: t('manage.term.field.endDate.label'), type: 'date', required: true },
+                {
+                    key: 'timeGridId',
+                    label: t('manage.term.field.timeGridId.label'),
+                    type: 'reference',
+                    help: t('manage.term.field.timeGridId.help'),
+                    reference: {
+                        resource: 'time-grids',
+                        label: (row) => String(row.name ?? row.id),
+                        nullable: true,
+                        emptyHint: t('manage.term.field.timeGridId.emptyHint'),
+                    },
+                },
+            ],
+        },
 
-export function findManageEntity(key: string | undefined): ManageEntity | undefined {
-    return MANAGE_ENTITIES.find((entity) => entity.key === key);
+        {
+            key: 'calendar-periods',
+            // A child of Term, so `term.update` governs it: changing when a term's
+            // exam period falls IS editing the term. Same reasoning as
+            // `time_grid_break` living under `time_grid.update`.
+            permissionPrefix: 'term',
+            label: t('manage.calendarPeriod.label'),
+            plural: t('manage.calendarPeriod.plural'),
+            icon: 'material-symbols:event-busy-outline',
+            description: t('manage.calendarPeriod.description'),
+            keywords: searchKeywords(t, 'manage.calendarPeriod.keywords', [
+                'calendar', 'period', 'holiday', 'break', 'exam', 'vacation', 'reading week', 'recess',
+            ]),
+            title: (row) => String(row.name ?? t('manage.calendarPeriod.label')),
+            detailComponent: 'CalendarPeriodForm',
+            columns: [
+                { key: 'name', label: t('common.field.name') },
+                { key: 'kind', label: t('manage.calendarPeriod.column.kind') },
+                { key: 'startDate', label: t('manage.calendarPeriod.column.startDate'), format: 'date' },
+                { key: 'endDate', label: t('manage.calendarPeriod.column.endDate'), format: 'date' },
+            ],
+            fields: [
+                {
+                    key: 'termId',
+                    label: t('manage.calendarPeriod.field.termId.label'),
+                    type: 'reference',
+                    required: true,
+                    createOnly: true,
+                    help: t('manage.calendarPeriod.field.termId.help'),
+                    reference: {
+                        resource: 'terms',
+                        label: (row) => String(row.name ?? row.id),
+                        emptyHint: t('manage.calendarPeriod.field.termId.emptyHint'),
+                    },
+                },
+                {
+                    key: 'kind',
+                    label: t('manage.calendarPeriod.field.kind.label'),
+                    type: 'select',
+                    required: true,
+                    // Structural, not tenant vocabulary: TAXONOMY.md §2 names these
+                    // three explicitly, and each has different week-classification
+                    // semantics that only exist because the set is fixed.
+                    options: [
+                        { value: 'EXAM', label: t('manage.calendarPeriod.field.kind.option.exam') },
+                        { value: 'BREAK', label: t('manage.calendarPeriod.field.kind.option.break') },
+                        { value: 'HOLIDAY', label: t('manage.calendarPeriod.field.kind.option.holiday') },
+                    ],
+                    help: t('manage.calendarPeriod.field.kind.help'),
+                },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                {
+                    key: 'startDate',
+                    label: t('manage.calendarPeriod.field.startDate.label'),
+                    type: 'date',
+                    required: true,
+                },
+                {
+                    key: 'endDate',
+                    label: t('manage.calendarPeriod.field.endDate.label'),
+                    type: 'date',
+                    required: true,
+                },
+                {
+                    key: 'weekPreview',
+                    label: t('manage.calendarPeriod.field.weekPreview.label'),
+                    type: 'text',
+                    // Rendered by ManageCalendarPeriodPreview. `custom` keeps the key
+                    // out of the payload while leaving the field in the form's
+                    // layout; there is no `weekPreview` column.
+                    custom: true,
+                },
+            ],
+        },
+
+        /**
+         * Account: the LOGIN, which is not a Person.
+         *
+         * THE DISTINCTION THIS SECTION EXISTS TO MAKE VISIBLE: a Person is who the
+         * timetable places and notifies (TAXONOMY.md §2); an Account is a credential
+         * that can act as one Person per institution (§4). Creating a Person
+         * therefore does not create a login, which is exactly the gap that sent
+         * admins to `bun run create:account`, where an already-existing Person
+         * answered "already exists" and the trail ended.
+         *
+         * SECTION GATE IS `account.read`, and reading the API additionally accepts
+         * `account.manage`, the same deliberate divergence `access-roles` carries in
+         * the opposite direction. A role that may issue logins therefore needs
+         * `account.read` as well to see the section; the API stays usable either way
+         * so a create response and the person picker never 403 under a manage-only
+         * role.
+         *
+         * Second-to-last, immediately before Access roles: the two administration
+         * sections belong together, and this is the one you visit first: a login is
+         * what makes an access role reach anybody.
+         */
+        {
+            key: 'accounts',
+            // Naming the table, as `access-roles` does; the four verbs come from the
+            // overrides below because the catalogue holds two capabilities, not eight.
+            permissionPrefix: 'account',
+            permissionOverrides: {
+                read: 'account.read',
+                create: 'account.manage',
+                update: 'account.manage',
+                delete: 'account.manage',
+            },
+            label: t('manage.account.label'),
+            plural: t('manage.account.plural'),
+            icon: 'material-symbols:key-outline',
+            description: t('manage.account.description'),
+            keywords: searchKeywords(t, 'manage.account.keywords', [
+                'account', 'accounts', 'login', 'logins', 'credential', 'password',
+                'sign in', 'signin', 'user', 'users', 'reset',
+            ]),
+            title: (row) => String(row.email ?? t('manage.account.label')),
+            detailComponent: 'AccountForm',
+            columns: [
+                { key: 'email', label: t('manage.account.column.email') },
+                { key: 'personName', label: t('manage.account.column.personName') },
+                { key: 'isActive', label: t('common.field.active'), format: 'boolean' },
+                {
+                    key: 'mustChangePassword',
+                    label: t('manage.account.column.mustChangePassword'),
+                    format: 'boolean',
+                    secondary: true,
+                },
+                {
+                    key: 'lastLoginAt',
+                    label: t('manage.account.column.lastLoginAt'),
+                    format: 'date',
+                    secondary: true,
+                },
+            ],
+            fields: [
+                {
+                    key: 'email',
+                    label: t('manage.account.field.email.label'),
+                    type: 'email',
+                    required: true,
+                    help: t('manage.account.field.email.help'),
+                },
+                /*
+                 * `custom`, so the control is the bespoke picker over
+                 * `/api/accounts/candidates` rather than a `reference` field over
+                 * every Person. Most people already have a login, and offering them
+                 * produces a 409 from `@@unique([personId])` after the form is
+                 * filled in. Declared here so the key still takes part in the draft,
+                 * dirty tracking and the payload: omitting it drops it from saves
+                 * silently.
+                 */
+                {
+                    key: 'personId',
+                    label: t('manage.account.field.personId.label'),
+                    type: 'text',
+                    required: true,
+                    custom: true,
+                },
+                /*
+                 * `createOnly` AND `custom`. Changing a password later is an explicit
+                 * verb (`POST /api/accounts/:id/reset-password`) because it revokes
+                 * every session, so an editable field on the detail page would offer
+                 * that consequence as an ordinary save.
+                 */
+                {
+                    key: 'password',
+                    label: t('manage.account.field.password.label'),
+                    type: 'text',
+                    createOnly: true,
+                    custom: true,
+                },
+                /*
+                 * Explicit consent to reuse the credential that already holds the
+                 * typed address, rather than minting a second one. A FIELD and not a
+                 * second endpoint, because it has to ride along in the create payload
+                 * the shared form builds, and because it belongs to the draft: the
+                 * admin's answer to "attach instead?" is part of what they are about
+                 * to submit, not a separate action.
+                 */
+                {
+                    key: 'attachExisting',
+                    label: t('manage.account.field.attachExisting.label'),
+                    type: 'boolean',
+                    createOnly: true,
+                    custom: true,
+                },
+                {
+                    key: 'mustChangePassword',
+                    label: t('manage.account.field.mustChangePassword.label'),
+                    type: 'boolean',
+                    help: t('manage.account.field.mustChangePassword.help'),
+                },
+                {
+                    key: 'isActive',
+                    label: t('common.field.active'),
+                    type: 'boolean',
+                    help: t('manage.account.field.isActive.help'),
+                },
+            ],
+        },
+
+        /**
+         * AccessRole: who may DO what, as opposed to the domain Role directly
+         * above, which is scheduling vocabulary and grants nothing (TAXONOMY.md §4
+         * vs §2). The two share a word and nothing else, so both descriptions say
+         * which one they are.
+         *
+         * Last in the array, and therefore last in the sidebar: it is the section
+         * a tenant visits least and the one whose entries are hardest to undo.
+         */
+        {
+            key: 'access-roles',
+            // Unused for permissions (see `permissionOverrides`), but the field is
+            // required and naming the table is still the honest answer.
+            permissionPrefix: 'access_role',
+            permissionOverrides: {
+                read: 'access_role.manage',
+                create: 'access_role.manage',
+                update: 'access_role.manage',
+                delete: 'access_role.manage',
+            },
+            label: t('manage.accessRole.label'),
+            plural: t('manage.accessRole.plural'),
+            icon: 'material-symbols:admin-panel-settings-outline',
+            description: t('manage.accessRole.description'),
+            keywords: searchKeywords(t, 'manage.accessRole.keywords', [
+                'access', 'permission', 'role', 'admin', 'rights', 'authorization', 'security',
+            ]),
+            title: (row) => String(row.name ?? t('manage.accessRole.label')),
+            detailComponent: 'AccessRoleForm',
+            // `tenant-admin` is provisioning's own row: renamable, never deletable.
+            // The server refuses it too; this only stops offering the button.
+            systemFlag: 'isSystem',
+            columns: [
+                { key: 'key', label: t('manage.accessRole.column.key'), format: 'code' },
+                { key: 'name', label: t('common.field.name') },
+                { key: 'description', label: t('common.field.description'), secondary: true },
+            ],
+            fields: [
+                {
+                    key: 'key',
+                    label: t('manage.accessRole.field.key.label'),
+                    type: 'text',
+                    required: true,
+                    createOnly: true,
+                    help: t('manage.accessRole.field.key.help'),
+                },
+                { key: 'name', label: t('common.field.name'), type: 'text', required: true },
+                { key: 'description', label: t('common.field.description'), type: 'textarea' },
+                /*
+                 * The grants. `custom` because the control is a matrix over the
+                 * fixed catalogue rather than a field, and because the value is an
+                 * ARRAY: the shape that renders as "[object Object]" if it ever
+                 * reaches ManageField. Declared here so it takes part in the draft,
+                 * dirty tracking and the payload, exactly as `constraint.scopes`
+                 * does.
+                 */
+                {
+                    key: 'permissions',
+                    label: t('manage.accessRole.field.permissions.label'),
+                    type: 'text',
+                    custom: true,
+                },
+            ],
+        },
+    ];
+}
+
+export function findManageEntity(key: string | undefined, t: Translate): ManageEntity | undefined {
+    return manageEntities(t).find((entity) => entity.key === key);
+}
+
+/**
+ * The registry's WORDLESS HALF: which route segments are management sections,
+ * and what permission each one's four verbs need.
+ *
+ * WHY IT EXISTS AS ITS OWN TYPE. `manageEntities()` takes a `Translate`, and
+ * ROUTE MIDDLEWARE CANNOT HAVE ONE: `useT()` needs a component setup context
+ * and route middleware is not one, which is exactly why `app/plugins/i18n.ts`
+ * hands `i18n.global.ts` an `$applyLanguage` instead of the instance.
+ * `app/middleware/manage.ts` asks this registry two questions, "is this a
+ * section?" and "what does reading it need?", and neither is a question about
+ * words.
+ *
+ * DERIVED FROM THE ONE REGISTRY, never declared beside it, so a section cannot
+ * exist with a gate that disagrees with the one the middleware checks: that is
+ * CLAUDE.md's one-implementation-per-operation rule, and a hand-kept second
+ * table of permission prefixes is precisely the silent drift it names.
+ *
+ * `NO_COPY` IS SAFE BECAUSE THE COPY IS UNREACHABLE, not merely unread. The
+ * return type is a `Pick` of the three structural fields, so nothing a caller
+ * can hold carries a label at all; there is no way for this to become a second
+ * path that renders an untranslated string. Memoised because the shape never
+ * varies: the copy is what `t` decides, and there is none here.
+ */
+export type ManageSection = Pick<ManageEntity, 'key' | 'permissionPrefix' | 'permissionOverrides'>;
+
+const NO_COPY: Translate = () => '';
+
+let sections: ManageSection[] | undefined;
+
+export function manageSections(): ManageSection[] {
+    sections ??= manageEntities(NO_COPY).map(({ key, permissionPrefix, permissionOverrides }) => ({
+        key,
+        permissionPrefix,
+        permissionOverrides,
+    }));
+
+    return sections;
+}
+
+/** The `findManageEntity` a caller with no translator can use. */
+export function findManageSection(key: string | undefined): ManageSection | undefined {
+    return manageSections().find((section) => section.key === key);
 }
 
 /**
@@ -1654,8 +1967,14 @@ export function relationReadRequirement(def: RelationDef): PermissionRequirement
     });
 }
 
-/** The four CRUD permissions for an entity, in catalogue form. */
-export function entityPermission(entity: ManageEntity, action: 'read' | 'create' | 'update' | 'delete'): string {
+/**
+ * The four CRUD permissions for an entity, in catalogue form.
+ *
+ * Takes a `ManageSection` rather than a whole `ManageEntity`: a permission is
+ * not copy, so this is answerable with no translator in play, and typing the
+ * parameter that way is what lets `manage.ts` middleware call it.
+ */
+export function entityPermission(entity: ManageSection, action: 'read' | 'create' | 'update' | 'delete'): string {
     return entity.permissionOverrides?.[action] ?? `${entity.permissionPrefix}.${action}`;
 }
 

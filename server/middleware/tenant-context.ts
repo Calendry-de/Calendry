@@ -70,6 +70,6 @@ export default defineEventHandler(async (event) => {
     }
 
     if (!PUBLIC_API_PATHS.includes(path)) {
-        throw createError({ statusCode: 401, statusMessage: 'Authentication required.' });
+        throw createError({ statusCode: 401, message: 'Authentication required.' });
     }
 });

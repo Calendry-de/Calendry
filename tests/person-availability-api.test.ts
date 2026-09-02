@@ -198,7 +198,7 @@ describe('a lecturer, holding only availability.manage_own', () => {
     });
 
     it('is refused a window that blocks everything', async () => {
-        const total = await api<{ statusMessage?: string }>('/api/me/availability/vetoes', {
+        const total = await api<{ message?: string }>('/api/me/availability/vetoes', {
             method: 'POST',
             cookie: cookies.lecturer,
             body: JSON.stringify({ days: [], blocks: [], weeks: [] }),
@@ -265,7 +265,7 @@ describe('review', () => {
         expect(row.decidedAt).not.toBeNull();
         expect(row.decisionNote).toBe('Confirmed with the department');
 
-        const again = await api<{ statusMessage?: string }>(`/api/availability/vetoes/${pending.id}/decision`, {
+        const again = await api<{ message?: string }>(`/api/availability/vetoes/${pending.id}/decision`, {
             method: 'POST',
             cookie: cookies.reviewer,
             body: JSON.stringify({ decision: 'REJECTED' }),
@@ -665,7 +665,7 @@ describe('holiday entry', () => {
     });
 
     it('refuses a range that falls outside every term, naming them', async () => {
-        const outside = await api<{ statusMessage?: string }>('/api/me/availability/holidays', {
+        const outside = await api<{ message?: string }>('/api/me/availability/holidays', {
             method: 'POST',
             cookie: cookies.lecturer,
             body: JSON.stringify({ startDate: '2030-06-01', endDate: '2030-06-08' }),
@@ -684,7 +684,7 @@ describe('holiday entry', () => {
             },
         });
 
-        const spanning = await api<{ statusMessage?: string }>('/api/me/availability/holidays', {
+        const spanning = await api<{ message?: string }>('/api/me/availability/holidays', {
             method: 'POST',
             cookie: cookies.lecturer,
             body: JSON.stringify({ startDate: '2027-02-20', endDate: '2027-03-10' }),

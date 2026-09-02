@@ -47,13 +47,13 @@ export default defineEventHandler(async (event) => {
     const token = getCookie(event, SESSION_COOKIE);
 
     if (!token) {
-        throw createError({ statusCode: 401, statusMessage: 'Not authenticated.' });
+        throw createError({ statusCode: 401, message: 'Not authenticated.' });
     }
 
     const session = await resolveSessionToken(token);
 
     if (!session) {
-        throw createError({ statusCode: 401, statusMessage: 'Session expired or revoked.' });
+        throw createError({ statusCode: 401, message: 'Session expired or revoked.' });
     }
 
     const identities = await listAccountIdentities(session.account_id);

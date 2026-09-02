@@ -58,7 +58,7 @@ export async function assertTenantRetainsAdministrator(tx: Tx, tenantId: string)
         if (holders === 0) {
             throw createError({
                 statusCode: 422,
-                statusMessage: `This would leave nobody in this tenant able to ${capability.describes} `
+                message: `This would leave nobody in this tenant able to ${capability.describes} `
                     + `('${capability.key}'). Grant it to somebody else first; recovering from `
                     + 'this state needs an operator with database access.',
                 data: { field: 'permissions', permission: capability.key },

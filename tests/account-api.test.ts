@@ -510,7 +510,7 @@ describe('deleting a person who holds a login', () => {
      * gone too.
      */
     it('is refused, naming the login', async () => {
-        const res = await api<{ statusMessage?: string }>('/api/persons/test-person-a', {
+        const res = await api<{ message?: string }>('/api/persons/test-person-a', {
             method: 'DELETE',
             cookie: cookies.adminA,
         });

@@ -349,6 +349,50 @@ const EXPLICIT_PERMISSIONS = [
     { key: 'ics_link.generate', category: 'ics_link', description: 'Create a calendar-subscription link for your own schedule or for specific Groups' },
 
     /**
+     * MANAGING your own API tokens: listing, minting and revoking them
+     * (`/api/me/api-tokens/*`, `/my/api-tokens`). Until this key existed, any
+     * signed-in Person could mint one; an institution now decides who may
+     * automate.
+     *
+     * `manage_own`, ONE KEY FOR THREE VERBS, the same shape and the same
+     * reason `availability.manage_own` gives: this catalogue has no
+     * implication mechanism, so splitting list/create/revoke would allow
+     * "may mint but not see, or revoke but not list", which is not a
+     * distinction anybody wants to configure. `_own` follows
+     * `ics_link.generate_own`: the scope is structural rather than checked,
+     * because `/api/me/*` takes no person id at all. Somebody else's tokens
+     * are a different authority entirely, already behind `account.read` /
+     * `account.manage` at `GET /api/accounts/:id/api-tokens`.
+     *
+     * GATES MANAGING A TOKEN, NEVER USING ONE, and the difference is the
+     * whole design. A token's effective authority is
+     * `heldPermissions()`'s intersection of its stored ceiling with its
+     * Person's LIVE permissions, and this key appears in neither half of
+     * that computation for any route but these three. So revoking it stops
+     * a Person minting and revoking, while every token they already hold
+     * keeps working exactly as before, narrowing only when the underlying
+     * permissions are taken away. Nothing here weakens "a token can never
+     * mint or revoke tokens" (CLAUDE.md § "Four principals"): the three
+     * routes refuse `identity.kind !== 'account'` BEFORE consulting any
+     * permission, so a ceiling that happens to contain this key is inert,
+     * and the token-minting form does not offer it for that reason.
+     *
+     * NO INCLUSIVE BACKFILL, deliberately, and this is where it differs from
+     * `ics_link.generate_own` and `dashboard.view`. Both of those minted a
+     * gate over a capability whose REACH was not meant to change, so they
+     * backfilled every role for which it was ever meaningful. This one is a
+     * requested NARROWING: the product owner wants fewer people able to
+     * automate, so granting it to every role that could mint a token
+     * yesterday (which is all of them) would deliver nothing. It follows the
+     * ordinary new-permission path instead: `bun run grant:permissions --role
+     * tenant-admin --all-missing`, then whichever further roles a tenant
+     * decides on. Hence no `scripts/backfill-api-token-manage-own.ts` beside
+     * `scripts/backfill-ics-link-generate-own.ts`; § "API tokens gain a
+     * permission" (DECISIONS.md).
+     */
+    { key: 'api_token.manage_own', category: 'api_token', description: 'Create, list and revoke your own API tokens for scripts and integrations' },
+
+    /**
      * GDPR data-access tooling (issue #84). SEPARATE FROM `person.read`
      * deliberately, the same reasoning `solver.snapshot.read` gives for
      * standing apart from `solver.trigger`: a full export reaches well past

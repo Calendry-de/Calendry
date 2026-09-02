@@ -1,12 +1,10 @@
 <template>
     <CommonAppShell
-        description="Which curriculum plan each group is currently on, and moving every eligible one forward at once."
-        title="Curriculum progression"
+        :description="t('managePages.curriculumProgression.description')"
+        :title="t('managePages.curriculumProgression.pageTitle')"
     >
         <p class="intro">
-            Nothing here is stored on the group: this is worked out fresh each time
-            from the offerings a plan already created. A group with a plan that names a
-            successor, and a later term to move into, is eligible to advance.
+            {{ t('managePages.curriculumProgression.intro') }}
         </p>
 
         <p
@@ -19,17 +17,24 @@
             <p
                 v-if="!eligibleCount"
                 class="note"
-            >No group is eligible to advance right now.</p>
+            >{{ t('managePages.curriculumProgression.noneEligible') }}</p>
 
             <div
                 v-else
                 class="actions"
             >
+                <!--
+                    ONE plural message with the count inside it: "group{s}" was
+                    a word split across an expression, so no part of it could be
+                    keyed and German pluralises the stem, not the suffix.
+                -->
                 <CommonButton
                     :disabled="advancing"
                     type="primary"
                     @click="advanceAll"
-                >{{ advancing ? 'Advancing…' : `Advance ${eligibleCount} eligible group${eligibleCount === 1 ? '' : 's'}` }}</CommonButton>
+                >{{ advancing
+                    ? t('managePages.curriculumProgression.advancing')
+                    : t('managePages.curriculumProgression.advance', { count: eligibleCount }) }}</CommonButton>
             </div>
 
             <p
@@ -42,6 +47,15 @@
                 v-if="result"
                 class="result"
             >
+                <!--
+                    Both rows below join TENANT-NAMED values (group, plan, term)
+                    with punctuation only, so the joins stay in code:
+                    i18n/CONVENTIONS.md § "Assembled sentences" — the arrow, the
+                    colon and the parentheses carry no grammar, and a message
+                    whose whole content is "{a}: {b} → {c} ({d})" gives a
+                    translator nothing to translate. The failure row is the
+                    opposite case (it has a verb and a plural), so it IS keyed.
+                -->
                 <li
                     v-for="row in result.advanced"
                     :key="`${row.groupId}:${row.toPlanId}`"
@@ -51,8 +65,12 @@
                     v-for="batch in result.failed"
                     :key="`${batch.planId}:${batch.termId}`"
                     class="result_row result_row--error"
-                >{{ batch.groupIds.length }} group{{ batch.groupIds.length === 1 ? '' : 's' }} could not move to
-                    {{ batch.planName }} ({{ batch.termName }}): {{ batch.reason }}</li>
+                >{{ t('managePages.curriculumProgression.failedRow', {
+                    count: batch.groupIds.length,
+                    plan: batch.planName,
+                    term: batch.termName,
+                    reason: batch.reason,
+                }) }}</li>
             </ul>
 
             <table
@@ -61,9 +79,9 @@
             >
                 <thead>
                     <tr>
-                        <th>Group</th>
-                        <th>Current phase</th>
-                        <th>Advances to</th>
+                        <th>{{ t('managePages.curriculumProgression.columnGroup') }}</th>
+                        <th>{{ t('managePages.curriculumProgression.columnPhase') }}</th>
+                        <th>{{ t('managePages.curriculumProgression.columnAdvances') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -82,7 +100,7 @@
                                 <span
                                     v-else
                                     class="table_muted"
-                                >(none)</span>
+                                >{{ t('managePages.curriculumProgression.advancesToNone') }}</span>
                             </td>
                         </tr>
                     </template>
@@ -92,7 +110,7 @@
             <p
                 v-else-if="!loadError"
                 class="note"
-            >No group has an offering created from a curriculum plan yet.</p>
+            >{{ t('managePages.curriculumProgression.emptyHint') }}</p>
         </template>
     </CommonAppShell>
 </template>
@@ -100,6 +118,7 @@
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
+import { useT } from '~/composables/i18n';
 import { useSession } from '~/composables/session';
 
 /**
@@ -125,14 +144,16 @@ definePageMeta({
             if (!held.has('offering_plan.apply')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Curriculum progression needs offering_plan.apply.',
+                    message: 'Curriculum progression needs offering_plan.apply.',
                 }));
             }
         },
     ],
 });
 
-useHead({ title: 'Curriculum progression' });
+const { t } = useT();
+
+useHead(() => ({ title: t('managePages.curriculumProgression.pageTitle') }));
 
 interface AdvanceTarget { planId: string; planName: string; termId: string; termName: string }
 interface Application { planId: string; planName: string; termId: string; termName: string; advance: AdvanceTarget | null }
@@ -150,7 +171,7 @@ const { data, error, refresh } = await useAsyncData(
 );
 
 const rows = computed(() => data.value?.rows ?? []);
-const loadError = computed(() => (error.value ? 'Could not load curriculum progression.' : ''));
+const loadError = computed(() => (error.value ? t('managePages.curriculumProgression.loadError') : ''));
 
 const eligibleCount = computed(
     () => rows.value.reduce((sum, row) => sum + row.applications.filter((a) => a.advance).length, 0),
@@ -173,8 +194,8 @@ async function advanceAll() {
         result.value = await request<AdvanceAllResult>('/api/group-plan-applications/advance-all', { method: 'POST' });
         await refresh();
     } catch (cause) {
-        advanceError.value = (cause as { data?: { statusMessage?: string } }).data?.statusMessage
-            ?? 'Could not advance groups. Nothing was changed.';
+        advanceError.value = serverErrorMessage(cause)
+            ?? t('managePages.curriculumProgression.advanceError');
     } finally {
         advancing.value = false;
     }

@@ -4,7 +4,7 @@
             <button
                 type="button"
                 class="mini_step"
-                aria-label="Previous month"
+                :aria-label="t('schedule.miniMonth.previousMonth')"
                 @click="shiftMonth(-1)"
             >
                 <Icon
@@ -18,7 +18,7 @@
             <button
                 type="button"
                 class="mini_step"
-                aria-label="Next month"
+                :aria-label="t('schedule.miniMonth.nextMonth')"
                 @click="shiftMonth(1)"
             >
                 <Icon
@@ -56,7 +56,9 @@
                 }"
                 :disabled="!cell.inTerm"
                 :aria-current="cell.isToday ? 'date' : undefined"
-                :aria-label="`${cell.label}, week ${cell.termWeek}${cell.termWeek === week ? ' (current)' : ''}`"
+                :aria-label="cell.termWeek === week
+                    ? t('schedule.miniMonth.dayLabelCurrent', { date: cell.label, week: cell.termWeek })
+                    : t('schedule.miniMonth.dayLabel', { date: cell.label, week: cell.termWeek })"
                 @click="$emit('select-week', cell.termWeek)"
             >{{ cell.date.getUTCDate() }}</button>
         </div>
@@ -67,6 +69,8 @@
 import type { Term } from '~/composables/schedule';
 import { weekdayShort } from '~/composables/schedule';
 import { addDays, isoDate, mondayOf, weekIndexOf } from '#shared/academicCalendar';
+import { useViewerLocale } from '~/composables/locale';
+import { useT } from '~/composables/i18n';
 
 /**
  * A "jump to a date" tool, secondary to `ScheduleWeekNav`'s prev/next stepper:
@@ -83,6 +87,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ 'select-week': [week: number] }>();
+
+const { t } = useT();
 
 const termStart = computed(() => (props.term ? new Date(props.term.startDate) : null));
 
@@ -115,7 +121,18 @@ function shiftMonth(by: number) {
     viewedMonth.value = monthOf(next);
 }
 
-const monthLabel = computed(() => new Intl.DateTimeFormat(undefined, {
+/**
+ * Both formatters below took `undefined` as their locale until issue #19,
+ * which is the exact hazard `app/utils/formatDate.ts`'s doc comment exists to
+ * warn about: `undefined` resolves the SERVER's locale during SSR and the
+ * BROWSER's on hydration, so "October 2026" and "Oktober 2026" render for the
+ * same month whenever the two disagree. The cell label made it worse than a
+ * cosmetic mismatch by feeding a `title` attribute, which Vue silently
+ * declines to patch, leaving the server's language in a tooltip forever.
+ */
+const locale = useViewerLocale();
+
+const monthLabel = computed(() => new Intl.DateTimeFormat(locale.value, {
     month: 'long', year: 'numeric', timeZone: 'UTC',
 }).format(new Date(Date.UTC(viewedMonth.value.year, viewedMonth.value.month, 1))));
 
@@ -148,7 +165,7 @@ const cells = computed<Cell[]>(() => {
         return {
             date,
             iso: isoDate(date),
-            label: new Intl.DateTimeFormat(undefined, {
+            label: new Intl.DateTimeFormat(locale.value, {
                 weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC',
             }).format(date),
             inMonth: date.getUTCMonth() === viewedMonth.value.month,

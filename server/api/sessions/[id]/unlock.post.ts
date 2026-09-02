@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
         const session = await tx.session.findFirst({ where: { id, tenantId: identity.tenantId } });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (!session.isLocked) {

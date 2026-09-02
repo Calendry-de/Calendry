@@ -1,6 +1,6 @@
 <template>
     <CommonAppShell
-        :title="session?.activeTenant?.name ?? 'Dashboard'"
+        :title="session?.activeTenant?.name ?? t('dashboard.page.fallbackTitle')"
         :description="greeting"
     >
         <!--
@@ -20,13 +20,13 @@
                 type="secondary"
                 :disabled="busy"
                 @click="switchTenant"
-            >Switch institution</CommonButton>
+            >{{ t('dashboard.action.switchInstitution') }}</CommonButton>
 
             <CommonButton
                 type="secondary-black"
                 :disabled="busy"
                 @click="signOut"
-            >{{ busy ? 'Signing out…' : 'Sign out' }}</CommonButton>
+            >{{ busy ? t('dashboard.action.signOutBusy') : t('dashboard.action.signOut') }}</CommonButton>
         </template>
 
         <Transition name="dash-error">
@@ -69,7 +69,7 @@
             -->
             <details
                 v-for="(group, index) in groups"
-                :key="group.label"
+                :key="group.id"
                 class="dash_group"
                 :style="{ '--stagger-index': index }"
                 open
@@ -123,8 +123,7 @@
             v-else
             class="dash_empty"
         >
-            You do not have read access to any management section in this
-            institution. An administrator can grant it through your access role.
+            {{ t('dashboard.empty.noManageAccess') }}
         </p>
 
         <DashboardPermissionSummary
@@ -142,10 +141,15 @@ import { logout, useSession } from '~/composables/session';
 import { useManageSections } from '~/composables/navigation';
 import { groupNavEntries } from '~/utils/navGroups';
 import { useInstitutionCounts } from '~/composables/dashboardCounts';
-
-useHead({ title: 'Home' });
+import { useT } from '~/composables/i18n';
 
 const session = useSession();
+const { t } = useT();
+
+// A getter, not a plain string: `useHead` re-evaluates it, so the tab title
+// follows a language change instead of freezing at whatever was active when
+// this page first mounted.
+useHead(() => ({ title: t('dashboard.page.title') }));
 
 // The manage-entities overview: what `/manage/index.vue` used to render on
 // its own separate hub page. Schedule and My settings are one click away in
@@ -157,7 +161,7 @@ const sections = useManageSections();
 // The one taxonomy, not a second one authored here: `groupNavEntries` is what
 // the sidebar groups by too, so the headings a visitor reads in the nav and
 // the headings they read here are the same list in the same order.
-const groups = computed(() => groupNavEntries(sections.value));
+const groups = computed(() => groupNavEntries(sections.value, t));
 
 /*
  * THE TOP-LEVEL AWAIT LIVES HERE, not in the composable: `useInstitutionCounts`
@@ -170,7 +174,9 @@ const { data: counts, status: countsStatus } = await useInstitutionCounts();
 const greeting = computed(() => {
     const person = session.value?.activePerson;
 
-    return person ? `Signed in as ${ person.givenName } ${ person.familyName }` : undefined;
+    return person
+        ? t('dashboard.greeting.signedInAs', { givenName: person.givenName, familyName: person.familyName })
+        : undefined;
 });
 
 // Shared between the two actions below: only one of them is ever reachable at
@@ -216,7 +222,7 @@ async function signOut() {
     try {
         await logout();
     } catch {
-        actionError.value = 'Could not sign out. Check your connection and try again.';
+        actionError.value = t('dashboard.error.signOut');
     } finally {
         busy.value = false;
     }

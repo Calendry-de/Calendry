@@ -1,11 +1,20 @@
 <template>
-    <CommonPage title="My unavailability">
-        <p class="intro">
-            Days and blocks you cannot teach. What you submit here is
-            <strong>reviewed by an administrator</strong> before it affects any timetable:
-            declaring unavailability is a hard rule for the scheduler, so it is not
-            applied on your say-so alone.
-        </p>
+    <CommonPage :title="t('my.availability.pageTitle')">
+        <!--
+            `<i18n-t>`, so the emphasised clause stays inside ONE translatable
+            sentence: it is grammar, not decoration, and German would not leave
+            it at the same point in the clause.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="my.availability.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #reviewed>
+                <strong>{{ t('my.availability.introReviewed') }}</strong>
+            </template>
+        </i18n-t>
 
         <!--
             The limitation, stated where the person is about to rely on it. The
@@ -29,10 +38,15 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            <span>
-                The scheduler applies this when you are the <strong>lecturer</strong> of a session.
-                Sessions you are attached to in another capacity are not affected yet.
-            </span>
+            <i18n-t
+                keypath="my.availability.lecturerNote"
+                scope="global"
+                tag="span"
+            >
+                <template #lecturer>
+                    <strong>{{ t('my.availability.lecturerNoteRole') }}</strong>
+                </template>
+            </i18n-t>
         </p>
 
         <p
@@ -40,8 +54,7 @@
             class="note note--warn"
             role="alert"
         >
-            This institution has no time grid configured, so blocks cannot be shown or
-            checked. An administrator has to create one first.
+            {{ t('my.availability.noGrid') }}
         </p>
 
         <!--
@@ -68,10 +81,10 @@
         <div
             class="modes"
             role="tablist"
-            aria-label="How to declare unavailability"
+            :aria-label="t('my.availability.modesLabel')"
         >
             <button
-                v-for="(entry, position) in MODES"
+                v-for="(entry, position) in modes"
                 :id="`mode-tab-${entry.id}`"
                 :key="entry.id"
                 :ref="(el) => registerTab(el, position)"
@@ -98,7 +111,7 @@
             aria-labelledby="mode-tab-holiday"
             tabindex="0"
         >
-            <h2>Away on specific dates</h2>
+            <h2>{{ t('my.availability.holidayHead') }}</h2>
 
             <AvailabilityHolidayForm
                 ref="holidayForm"
@@ -117,7 +130,7 @@
             aria-labelledby="mode-tab-recurring"
             tabindex="0"
         >
-            <h2>Declare unavailability</h2>
+            <h2>{{ t('my.availability.recurringHead') }}</h2>
 
             <!--
                 THE SELECTION IS THE PREVIEW.
@@ -142,12 +155,12 @@
             />
 
             <label class="field">
-                <span class="field_label">Reason (optional)</span>
+                <span class="field_label">{{ t('my.availability.reasonLabel') }}</span>
                 <input
                     v-model="draftReason"
                     class="field_input"
                     maxlength="500"
-                    placeholder="Fixed commitment elsewhere"
+                    :placeholder="t('my.availability.reasonPlaceholder')"
                     type="text"
                 >
             </label>
@@ -199,17 +212,17 @@
 
         <section class="card">
             <header class="card_head">
-                <h2>What you have declared</h2>
+                <h2>{{ t('my.availability.declaredHead') }}</h2>
+                <!--
+                    ONE message per shape, and the week-scoped parenthetical is
+                    a plural form rather than an inline `entry`/`entries` switch:
+                    a noun chosen by a ternary inside the sentence has no key,
+                    and German pluralises the stem.
+                -->
                 <span
                     v-if="blocked"
                     class="card_meter"
-                >
-                    {{ blocked.blocked }} of {{ blocked.total }} teaching slots blocked
-                    <template v-if="blocked.weekScopedWindows">
-                        ({{ blocked.weekScopedWindows }} week-specific
-                        {{ blocked.weekScopedWindows === 1 ? 'entry' : 'entries' }} not counted)
-                    </template>
-                </span>
+                >{{ meterLabel }}</span>
             </header>
 
             <p
@@ -220,7 +233,7 @@
             <p
                 v-if="!vetoes.length"
                 class="empty"
-            >Nothing declared. The scheduler may place you at any time.</p>
+            >{{ t('my.availability.emptyHint') }}</p>
 
             <ul
                 v-else
@@ -249,7 +262,7 @@
                         <span
                             class="rows_status"
                             :class="`rows_status--${row.status.toLowerCase()}`"
-                        >{{ STATUS_LABEL[row.status] }}</span>
+                        >{{ statusLabel[row.status] }}</span>
 
                         <span class="rows_what">{{ describeRow(row) }}</span>
                     </span>
@@ -264,12 +277,12 @@
                         pending row LOOKS like a blocked Friday, and the person
                         plans around something that is not in force.
                     -->
-                    <span class="rows_effect">{{ EFFECT[row.status] }}</span>
+                    <span class="rows_effect">{{ effectLabel[row.status] }}</span>
 
                     <span
                         v-if="row.decisionNote"
                         class="rows_reason"
-                    >Reviewer: {{ row.decisionNote }}</span>
+                    >{{ t('my.availability.reviewerNote', { note: row.decisionNote }) }}</span>
 
                     <!--
                         When it was submitted, and when it was decided. Both were
@@ -277,11 +290,12 @@
                         that had been waiting a week looked exactly like one
                         submitted a minute ago.
                     -->
-                    <span class="rows_when">
-                        Submitted {{ formatDate(row.createdAt, locale) }}<template
-                            v-if="row.decidedAt"
-                        > · decided {{ formatDate(row.decidedAt, locale) }}</template>
-                    </span>
+                    <!--
+                        ONE message per shape. The decided half used to be a
+                        nested `<template v-if>` inside the sentence, which is
+                        the same untranslatable splice as a concatenation.
+                    -->
+                    <span class="rows_when">{{ whenLabel(row) }}</span>
 
                     <span
                         v-if="rowError[row.id]"
@@ -294,30 +308,33 @@
                         class="rows_confirm"
                     >
                         <span class="rows_confirm-ask">
-                            Remove this approved window? It stops applying immediately, and a
-                            replacement has to be reviewed again.
+                            {{ t('my.availability.removeApprovedAsk') }}
                         </span>
                         <button
                             class="rows_remove rows_remove--danger"
                             :disabled="workingId === row.id"
                             type="button"
                             @click="requestRemove(row)"
-                        >{{ workingId === row.id ? 'Removing…' : 'Remove anyway' }}</button>
+                        >{{ workingId === row.id
+                            ? t('my.availability.removing')
+                            : t('my.availability.removeAnyway') }}</button>
                         <button
                             class="rows_remove"
                             type="button"
                             @click="cancelRemove"
-                        >Keep</button>
+                        >{{ t('my.availability.keep') }}</button>
                     </div>
 
                     <button
                         v-else
                         class="rows_remove"
-                        :aria-label="`Remove: ${describeRow(row)}`"
+                        :aria-label="t('my.availability.removeLabel', { what: describeRow(row) })"
                         :disabled="workingId === row.id"
                         type="button"
                         @click="requestRemove(row)"
-                    >{{ workingId === row.id ? 'Removing…' : 'Remove' }}</button>
+                    >{{ workingId === row.id
+                        ? t('my.availability.removing')
+                        : t('my.availability.remove') }}</button>
                 </li>
             </ul>
         </section>
@@ -330,14 +347,16 @@ import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityHolidayForm from '~/components/availability/AvailabilityHolidayForm.vue';
 import AvailabilityWeekPainter from '~/components/availability/AvailabilityWeekPainter.vue';
 import { describeWindow } from '~/utils/availabilityLabels';
+import { useT } from '~/composables/i18n';
 import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
 
 const locale = useViewerLocale();
+const { t } = useT();
 
 definePageMeta({ middleware: 'my' });
 
-useHead({ title: 'My unavailability' });
+useHead(() => ({ title: t('my.availability.pageTitle') }));
 
 interface VetoRow {
     id: string;
@@ -367,11 +386,16 @@ interface Payload {
     blocked: BlockedSlotSummary | null;
 }
 
-const STATUS_LABEL: Record<VetoRow['status'], string> = {
-    PENDING: 'Awaiting review',
-    APPROVED: 'Approved',
-    REJECTED: 'Rejected',
-};
+/*
+ * COMPUTED, not a module constant: a constant is evaluated once, before any
+ * language is resolved, so it would pin the labels to whichever language
+ * happened to be active at import time.
+ */
+const statusLabel = computed<Record<VetoRow['status'], string>>(() => ({
+    PENDING: t('my.availability.statusPending'),
+    APPROVED: t('my.availability.statusApproved'),
+    REJECTED: t('my.availability.statusRejected'),
+}));
 
 /**
  * What each status MEANS for the timetable, spelled out per row.
@@ -381,11 +405,11 @@ const STATUS_LABEL: Record<VetoRow['status'], string> = {
  * whole cost of the approval step lands on the person who then discovers they
  * were scheduled anyway.
  */
-const EFFECT: Record<VetoRow['status'], string> = {
-    PENDING: 'Not yet in effect: the scheduler can still place you here.',
-    APPROVED: 'In effect from the next schedule run.',
-    REJECTED: 'Not in effect. Remove it, or talk to an administrator.',
-};
+const effectLabel = computed<Record<VetoRow['status'], string>>(() => ({
+    PENDING: t('my.availability.effectPending'),
+    APPROVED: t('my.availability.effectApproved'),
+    REJECTED: t('my.availability.effectRejected'),
+}));
 
 /*
  * `useRequestFetch`, not `$fetch`: on the server a bare fetch carries no cookie
@@ -403,11 +427,24 @@ const terms = computed(() => data.value?.terms ?? []);
 
 type Mode = 'recurring' | 'holiday';
 
-/** The two tabs, as data, so markup and keyboard order cannot disagree. */
-const MODES: readonly { id: Mode; title: string; hint: string }[] = [
-    { id: 'recurring', title: 'Every week', hint: 'Days or blocks you never teach' },
-    { id: 'holiday', title: 'Specific dates', hint: 'Holiday or another absence' },
-] as const;
+/**
+ * The two tabs, as data, so markup and keyboard order cannot disagree.
+ *
+ * A `computed` rather than a module constant now that the copy is translated:
+ * the array is read on every render and has to follow a language change.
+ */
+const modes = computed<{ id: Mode; title: string; hint: string }[]>(() => [
+    {
+        id: 'recurring',
+        title: t('my.availability.modeRecurringTitle'),
+        hint: t('my.availability.modeRecurringHint'),
+    },
+    {
+        id: 'holiday',
+        title: t('my.availability.modeHolidayTitle'),
+        hint: t('my.availability.modeHolidayHint'),
+    },
+]);
 
 /** Which entry mode the form is showing. Not persisted; it is a question, not a setting. */
 const mode = ref<Mode>('recurring');
@@ -426,7 +463,7 @@ function registerTab(el: unknown, position: number) {
  * cheap and reversible.
  */
 function onTabKey(event: KeyboardEvent, position: number) {
-    const last = MODES.length - 1;
+    const last = modes.value.length - 1;
     let next: number | null = null;
 
     if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
@@ -442,7 +479,7 @@ function onTabKey(event: KeyboardEvent, position: number) {
     if (next === null) return;
 
     event.preventDefault();
-    mode.value = MODES[next]!.id;
+    mode.value = modes.value[next]!.id;
     tabRefs.value[next]?.focus();
 }
 const holidayForm = ref<{ reset: () => void } | null>(null);
@@ -534,14 +571,44 @@ function onSelectWindow(id: string) {
     void nextTick(() => rowNodes.get(id)?.scrollIntoView({ block: 'nearest' }));
 }
 
-/** Names what pressing it will actually send, since it may be several windows. */
-const submitLabel = computed(() => {
-    if (busy.value) return 'Submitting…';
+/**
+ * Names what pressing it will actually send, since it may be several windows.
+ *
+ * ONE plural message with three forms (none | one | several), rather than a
+ * count-bearing sentence assembled at the call site: the zero and one cases
+ * read as prose in both languages and only the third states a number.
+ */
+const submitLabel = computed(() => (busy.value
+    ? t('my.availability.submitBusy')
+    : t('my.availability.submit', { count: draftRects.value.length })));
 
-    const count = draftRects.value.length;
+/**
+ * The blocked-slot meter, with the week-scoped exclusion inside the same
+ * sentence rather than appended to it.
+ */
+const meterLabel = computed(() => {
+    const summary = blocked.value;
 
-    return count > 1 ? `Submit ${count} entries for approval` : 'Submit for approval';
+    if (!summary) return '';
+
+    return summary.weekScopedWindows
+        ? t('my.availability.meterWithWeekScoped', {
+            blocked: summary.blocked,
+            total: summary.total,
+            count: summary.weekScopedWindows,
+        })
+        : t('my.availability.meter', { blocked: summary.blocked, total: summary.total });
 });
+
+/** "Submitted <date>", and the decided date only when there is one. */
+function whenLabel(row: VetoRow): string {
+    return row.decidedAt
+        ? t('my.availability.submittedAndDecidedAt', {
+            created: formatDate(row.createdAt, locale.value),
+            decided: formatDate(row.decidedAt, locale.value),
+        })
+        : t('my.availability.submittedAt', { created: formatDate(row.createdAt, locale.value) });
+}
 
 /**
  * One POST per rectangle, because one rectangle is one window.
@@ -575,8 +642,8 @@ async function submit() {
             sent += 1;
         } catch (cause) {
             failed.push(rect);
-            formError.value = (cause as { statusMessage?: string }).statusMessage
-                ?? 'Could not submit that.';
+            formError.value = serverErrorMessage(cause)
+                ?? t('my.availability.submitError');
         }
     }
 
@@ -590,13 +657,17 @@ async function submit() {
     await refresh();
 
     if (sent > 0) {
-        const what = sent === 1 ? 'Entry' : `${sent} entries`;
-
+        /*
+         * ONE plural message per outcome, not a "{n} entries" fragment glued to
+         * two different sentences: the subject of each sentence declines with
+         * its count, so the count has to live inside the sentence.
+         *
+         * The remainder is stated because the grid still shows it, and "some of
+         * it worked" is the one outcome a person must not have to guess.
+         */
         formNotice.value = failed.length === 0
-            ? `${what} submitted for approval. Nothing is blocked until an administrator approves it.`
-            // The count is stated because the grid still shows the remainder,
-            // and "some of it worked" is the one outcome a person must not guess.
-            : `${what} submitted. ${failed.length} still on the grid; press again to retry.`;
+            ? t('my.availability.submitted', { count: sent })
+            : t('my.availability.submittedPartly', { count: sent, failed: failed.length });
     }
 
     await announce();
@@ -613,13 +684,16 @@ async function submit() {
  */
 function describeRow(row: VetoRow): string {
     if (row.weeks.length === 0) {
-        return describeWindow(row, grid.value);
+        return describeWindow(t, row, grid.value);
     }
 
-    const label = row.term?.name ?? 'term';
-    const weeks = row.weeks.map((week) => week + 1).join(', ');
-
-    return `${label}: week${row.weeks.length === 1 ? '' : 's'} ${weeks}, away all day`;
+    // ONE plural message: `week{s}` was a word split across an expression, so
+    // no part of it could be keyed, and German pluralises the stem.
+    return t('my.availability.holidayRow', {
+        term: row.term?.name ?? t('my.availability.holidayRowTerm'),
+        weeks: row.weeks.map((week) => week + 1).join(', '),
+        count: row.weeks.length,
+    });
 }
 
 async function submitHoliday(payload: { startDate: string; endDate: string; reason: string | null }) {
@@ -632,10 +706,11 @@ async function submitHoliday(payload: { startDate: string; endDate: string; reas
 
         holidayForm.value?.reset();
         await refresh();
-        formNotice.value = 'Submitted for approval. Nothing is blocked until an administrator approves it.';
+        formNotice.value = t('my.availability.holidaySubmitted');
         await announce();
     } catch (cause) {
-        holidayError.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not submit that.';
+        holidayError.value = serverErrorMessage(cause)
+            ?? t('my.availability.submitError');
     } finally {
         busy.value = false;
     }
@@ -677,11 +752,12 @@ async function remove(row: VetoRow) {
         await request(`/api/me/availability/vetoes/${row.id}`, { method: 'DELETE' });
         pendingRemoval.value = null;
         await refresh();
-        listNotice.value = `Removed: ${describeRow(row)}.`;
+        listNotice.value = t('my.availability.removed', { what: describeRow(row) });
     } catch (cause) {
         rowError.value = {
             ...rowError.value,
-            [row.id]: (cause as { statusMessage?: string }).statusMessage ?? 'Could not remove that.',
+            [row.id]: serverErrorMessage(cause)
+                ?? t('my.availability.removeError'),
         };
     } finally {
         workingId.value = null;

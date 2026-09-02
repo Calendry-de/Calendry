@@ -41,10 +41,11 @@
     "backfill:constraints": "bun run scripts/backfill-constraints.ts",
     "backfill:dashboard-view": "bun run scripts/backfill-dashboard-view.ts",
     "backfill:ics-link-generate-own": "bun run scripts/backfill-ics-link-generate-own.ts",
-    "repair:generation-status": "bun run scripts/repair-generation-status.ts"
+    "repair:generation-status": "bun run scripts/repair-generation-status.ts",
+    "repair:unsendable-constraints": "bun run scripts/repair-unsendable-constraints.ts"
   },
   "dependencies": {
-    "@calendry-de/calendry-proto": "^0.16.1",
+    "@calendry-de/calendry-proto": "^0.17.0",
     "@grpc/grpc-js": "^1.14.4",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/icon": "^2.5.1",

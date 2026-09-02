@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         // A banked Session (issue #22) has no slot to cover, same
@@ -55,7 +55,7 @@ export default defineEventHandler(async (event) => {
         if (!isPlacedSession(session)) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'This session is in the spare bank and has no slot to cover.',
+                message: 'This session is in the spare bank and has no slot to cover.',
             });
         }
 
@@ -68,7 +68,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!person) {
-            throw createError({ statusCode: 404, statusMessage: 'Person not found.' });
+            throw createError({ statusCode: 404, message: 'Person not found.' });
         }
 
         await assertFreeForSubstitution(tx, {

@@ -1,20 +1,18 @@
 <template>
     <CommonBox>
-        <h1 class="staff_cp_title">Calendry staff</h1>
+        <h1 class="staff_cp_title">{{ t('staff.brand.heading') }}</h1>
 
         <form
             class="staff_cp_form"
             @submit.prevent="submit"
         >
             <p class="staff_cp_lead">
-                {{ forced
-                    ? 'This account was reset by an administrator. Set a new password to continue.'
-                    : 'Enter your current password and a new one.' }}
+                {{ forced ? t('staff.changePassword.forcedLead') : t('staff.changePassword.lead') }}
             </p>
 
             <CommonInputText
                 v-model="email"
-                placeholder="Email"
+                :placeholder="t('staff.changePassword.emailPlaceholder')"
                 input-type="email"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'username', required: true }"
@@ -22,7 +20,7 @@
 
             <CommonInputText
                 v-model="currentPassword"
-                placeholder="Current password"
+                :placeholder="t('staff.changePassword.currentPasswordPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'current-password', required: true }"
@@ -30,13 +28,13 @@
 
             <CommonInputText
                 v-model="newPassword"
-                placeholder="New password"
+                :placeholder="t('staff.changePassword.newPasswordPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'new-password', required: true, minlength: 12 }"
             />
 
-            <p class="staff_cp_hint">At least 12 characters, and different from the current one.</p>
+            <p class="staff_cp_hint">{{ t('staff.changePassword.hint') }}</p>
 
             <p
                 v-if="error"
@@ -49,13 +47,13 @@
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Saving…' : 'Change password' }}</CommonButton>
+            >{{ busy ? t('common.action.saving') : t('staff.changePassword.submit') }}</CommonButton>
 
             <CommonButton
                 type="link"
                 :disabled="busy"
                 @click="navigateTo(STAFF_LOGIN_ROUTE)"
-            >Back to sign in</CommonButton>
+            >{{ t('staff.changePassword.backToSignIn') }}</CommonButton>
         </form>
     </CommonBox>
 </template>
@@ -65,6 +63,7 @@ import CommonBox from '~/components/common/CommonBox.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonInputText from '~/components/common/CommonInputText.vue';
 import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
+import { useT } from '~/composables/i18n';
 
 /**
  * Clears a StaffAccount's forced or expired password: issue #106's missing
@@ -80,7 +79,12 @@ import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
  * `staff/login.vue` already states for staying separate from `login.vue`.
  */
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Change staff password' });
+
+const { t } = useT();
+
+// A getter, so the tab title follows a language change instead of freezing at
+// whatever was active when this page first mounted.
+useHead(() => ({ title: t('staff.changePassword.pageTitle') }));
 
 const route = useRoute();
 
@@ -122,8 +126,8 @@ async function submit() {
         // current password, unknown or deactivated account) reads as one
         // generic message, matching staff login's own existence-oracle care.
         error.value = status === 422
-            ? ((e as { statusMessage?: string }).statusMessage ?? 'That password cannot be used.')
-            : 'Invalid credentials.';
+            ? (serverErrorMessage(e) ?? t('staff.changePassword.invalidPassword'))
+            : t('staff.changePassword.error');
         currentPassword.value = '';
     } finally {
         busy.value = false;

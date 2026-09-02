@@ -23,8 +23,8 @@
                 <ManageWeekdayPicker
                     v-model="activeDaysModel"
                     :error="form.fieldErrors.value.activeDays
-                        ?? (activeDays.length ? undefined : 'A grid must schedule at least one day.')"
-                    label="Teaching days"
+                        ?? (activeDays.length ? undefined : t('manageUi.timeGridEditor.noDaysError'))"
+                    :label="t('manageUi.timeGridEditor.teachingDays')"
                     :readonly="readonly"
                 />
 
@@ -36,11 +36,9 @@
                         @change="draft.isDefault = ($event.target as HTMLInputElement).checked"
                     >
                     <span>
-                        <strong>Default grid</strong>
+                        <strong>{{ t('manageUi.timeGridEditor.defaultLabel') }}</strong>
                         <em>
-                            Used by any term that names no grid of its own. At most one
-                            per institution: the database enforces it, so promoting a
-                            second is refused rather than silently accepted.
+                            {{ t('manageUi.timeGridEditor.defaultHelp') }}
                         </em>
                     </span>
                 </label>
@@ -69,7 +67,7 @@
                 -->
                 <section class="grid-editor_preview">
                     <h3>
-                        A day on this grid
+                        {{ t('manageUi.timeGridEditor.previewTitle') }}
                         <!-- One canonical day is no longer enough: a day-specific
                              break makes Friday genuinely different, so the day
                              being previewed is chosen rather than assumed. -->
@@ -104,8 +102,12 @@
                                 class="grid-editor_break-row"
                             >
                                 <span class="grid-editor_block-n">·</span>
+                                <!-- ` · ` is punctuation between two finished items. -->
                                 <span class="grid-editor_block-time">
-                                    {{ block.breakAfter.label }} · {{ block.breakAfter.durationMinutes }} min
+                                    {{ block.breakAfter.label }} ·
+                                    {{ t('manageUi.shared.minutes', {
+                                        minutes: block.breakAfter.durationMinutes,
+                                    }) }}
                                 </span>
                             </li>
                         </template>
@@ -114,19 +116,34 @@
                     <p
                         v-else
                         class="grid-editor_hint"
-                    >Set a block length and a count to see the day.</p>
+                    >{{ t('manageUi.timeGridEditor.previewEmpty') }}</p>
 
                     <p
                         v-if="previewBlocks.length"
                         class="grid-editor_summary"
                     >
-                        Teaching ends at <strong>{{ previewBlocks[previewBlocks.length - 1]?.end }}</strong>,
-                        {{ previewBlocks.length }} blocks over
-                        {{ activeDays.length }} day{{ activeDays.length === 1 ? '' : 's' }} a week.
+                        <!--
+                            `<i18n-t>` with a plural: the finishing time stays a
+                            `<strong>` inside one translatable sentence, and
+                            `day{{ 's' }}` is gone: a word split across
+                            mustaches has no key, and German pluralises by stem.
+                        -->
+                        <i18n-t
+                            keypath="manageUi.timeGridEditor.summary"
+                            :plural="activeDays.length"
+                            scope="global"
+                            tag="span"
+                        >
+                            <template #end>
+                                <strong>{{ previewBlocks[previewBlocks.length - 1]?.end }}</strong>
+                            </template>
+                            <template #blocks>{{ previewBlocks.length }}</template>
+                            <template #count>{{ activeDays.length }}</template>
+                        </i18n-t>
                         <span
                             v-if="rollsPastMidnight"
                             class="grid-editor_warn"
-                        >The last block runs past midnight. Check the start hour and block length.</span>
+                        >{{ t('manageUi.timeGridEditor.midnightWarning') }}</span>
                     </p>
                 </section>
             </div>
@@ -143,6 +160,7 @@ import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import ManageTimeGridBreaks from '~/components/manage/ManageTimeGridBreaks.vue';
 import type { TimeGridBreak } from '#shared/timeGrid';
 import { blockBoundaries, breakAfter } from '#shared/timeGrid';
+import { useT } from '~/composables/i18n';
 import { blockTime, weekdayName } from '~/composables/schedule';
 
 /**
@@ -167,6 +185,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
+
+const { t } = useT();
 
 // Everything except the day toggles and the default flag, which get their own
 // controls below.

@@ -59,12 +59,14 @@ export function useNavRail() {
  * A cookie again, for the same SSR reason as the rail: the server renders the
  * collapsed state directly, so there is no expanded-then-snap flash on a
  * surface that is present on every page. `useCookie` serializes the array
- * itself, so labels containing spaces and an ampersand ("Access & review")
- * need no escaping of ours.
+ * itself, so an id containing dots needs no escaping of ours.
  *
- * Keyed by LABEL rather than by index: `NAV_GROUPS` order can change, and an
- * index would silently transfer a reader's collapsed state to whichever topic
- * moved into that slot.
+ * Keyed by the GROUP ID (`groupNavEntries`' `id`, the group's message key)
+ * rather than by index or by its heading. An index would silently transfer a
+ * reader's collapsed state to whichever topic moved into that slot; the
+ * heading is translated, so it gave one account a separate collapse memory
+ * per language and changed the key under them on a language switch. The id
+ * changes only when a group is genuinely renamed.
  */
 export function useNavGroupCollapse() {
     const closed = useCookie<string[]>('nav_closed', {
@@ -75,8 +77,8 @@ export function useNavGroupCollapse() {
         default: () => [],
     });
 
-    function isClosed(label: string): boolean {
-        return (closed.value ?? []).includes(label);
+    function isClosed(groupId: string): boolean {
+        return (closed.value ?? []).includes(groupId);
     }
 
     /**
@@ -85,16 +87,16 @@ export function useNavGroupCollapse() {
      * `:open` back into the same `<details>` re-fires `toggle`, and an
      * unconditional write would then feed itself.
      */
-    function setOpen(label: string, open: boolean) {
+    function setOpen(groupId: string, open: boolean) {
         const current = closed.value ?? [];
 
-        if (open === !current.includes(label)) {
+        if (open === !current.includes(groupId)) {
             return;
         }
 
         closed.value = open
-            ? current.filter((entry) => entry !== label)
-            : [...current, label];
+            ? current.filter((entry) => entry !== groupId)
+            : [...current, groupId];
     }
 
     return { isClosed, setOpen };

@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!offering) {
-            throw createError({ statusCode: 404, statusMessage: 'Module not found.' });
+            throw createError({ statusCode: 404, message: 'Module not found.' });
         }
 
         // Ownership, kind and placement, in that order: the least informative

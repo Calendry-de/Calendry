@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { RESOURCES } from '../server/utils/resources';
-import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
+import { manageEntities } from '../app/utils/manageRegistry';
+import { englishT } from './helpers/manageMessages';
 
 /**
  * `Group.curriculumPlanId`: the plan a Group INTENDS to follow, set before
@@ -98,7 +99,9 @@ describe('the write schema', () => {
 });
 
 describe('the form', () => {
-    const field = MANAGE_ENTITIES
+    // `englishT`: the last assertion here reads the help TEXT, so an identity
+    // stub would check a key name. See `tests/helpers/manageMessages.ts`.
+    const field = manageEntities(englishT)
         .find((entity) => entity.key === 'groups')!
         .fields.find((f) => f.key === 'curriculumPlanId');
 

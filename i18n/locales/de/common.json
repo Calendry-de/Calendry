@@ -1,0 +1,44 @@
+{
+    "action": {
+        "save": "Speichern",
+        "saving": "Wird gespeichert …",
+        "cancel": "Abbrechen",
+        "create": "Anlegen",
+        "creating": "Wird angelegt …",
+        "delete": "Löschen",
+        "deleting": "Wird gelöscht …",
+        "edit": "Bearbeiten",
+        "close": "Schließen",
+        "retry": "Erneut versuchen",
+        "previous": "Zurück",
+        "next": "Weiter",
+        "back": "Zurück",
+        "downloadExcel": "Excel herunterladen",
+        "downloadJson": "JSON herunterladen"
+    },
+    "field": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "active": "Aktiv",
+        "slug": "Slug",
+        "code": "Kürzel",
+        "colour": "Farbe",
+        "created": "Erstellt",
+        "updated": "Geändert",
+        "expires": "Läuft ab",
+        "timezone": "Zeitzone",
+        "weight": "Gewicht"
+    },
+    "value": {
+        "none": "Keine",
+        "never": "Nie",
+        "all": "Alle"
+    },
+    "a11y": {
+        "close": "Schließen",
+        "loading": "Wird geladen",
+        "commandPalette": "Befehlspalette",
+        "paletteAction": "Aktion",
+        "paletteGoTo": "Wechseln zu …"
+    }
+}

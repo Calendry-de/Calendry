@@ -24,7 +24,7 @@
                 class="issued"
                 role="status"
             >
-                <h3 class="issued_title">Open this address on the display</h3>
+                <h3 class="issued_title">{{ t('manageUi.screenForm.issuedTitle') }}</h3>
 
                 <p class="issued_url">{{ issued }}</p>
 
@@ -34,13 +34,12 @@
                         aria-hidden="true"
                     />
                     <span>
-                        Copy this before saving: only a hash of the key is stored, so it can
-                        never be shown again. If it is lost, delete this screen and create another.
+                        {{ t('manageUi.screenForm.issuedWarning') }}
                     </span>
                 </p>
 
                 <CommonButton
-                    text="Copy address"
+                    :text="t('manageUi.screenForm.copyAddress')"
                     type="secondary"
                     @click="copy"
                 />
@@ -48,11 +47,11 @@
                     v-if="copied"
                     class="issued_copied"
                     role="status"
-                >Copied.</p>
+                >{{ t('manageUi.screenForm.copied') }}</p>
             </section>
 
             <div class="scope">
-                <p class="scope_label">Rooms shown</p>
+                <p class="scope_label">{{ t('manageUi.screenForm.scopeLabel') }}</p>
 
                 <!--
                     "EMPTY MEANS EVERY ROOM" is stated, not implied. A blank
@@ -61,21 +60,32 @@
                     fail-open reading `group_term` has, and the same reason its
                     picker spells it out.
                 -->
-                <p class="scope_help">
-                    Leave all unticked to show <strong>every room</strong>. Ticking some restricts
-                    the display to those.
-                </p>
+                <!--
+                    `<i18n-t>` so the emphasis stays markup inside one
+                    translatable sentence rather than splitting the fail-open
+                    rule across three text nodes.
+                -->
+                <i18n-t
+                    class="scope_help"
+                    keypath="manageUi.screenForm.scopeHelp"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #everyRoom>
+                        <strong>{{ t('manageUi.screenForm.everyRoomEmphasis') }}</strong>
+                    </template>
+                </i18n-t>
 
                 <p
                     v-if="readonly"
                     class="scope_static"
-                >{{ selected.length ? selectedNames : 'Every room' }}</p>
+                >{{ selected.length ? selectedNames : t('manageUi.screenForm.everyRoom') }}</p>
 
                 <fieldset
                     v-else
                     class="scope_set"
                 >
-                    <legend class="scope_legend">Rooms</legend>
+                    <legend class="scope_legend">{{ t('manageUi.screenForm.roomsLegend') }}</legend>
 
                     <label
                         v-for="room in rooms"
@@ -93,7 +103,7 @@
                     <p
                         v-if="!rooms.length"
                         class="scope_help"
-                    >No rooms defined yet.</p>
+                    >{{ t('manageUi.screenForm.noRooms') }}</p>
                 </fieldset>
             </div>
         </template>
@@ -105,6 +115,7 @@ import type { useEntityForm } from '~/composables/entityForm';
 import { randomScreenKey } from '#shared/screenKey';
 import CommonButton from '~/components/common/CommonButton.vue';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * A lobby display's detail: the shared form plus two things it cannot express.
@@ -125,6 +136,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
+
+const { t } = useT();
 
 const copied = ref(false);
 

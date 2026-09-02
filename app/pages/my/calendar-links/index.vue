@@ -1,10 +1,6 @@
 <template>
-    <CommonPage title="Calendar links">
-        <p class="intro">
-            Subscribe an external calendar app (Google Calendar, Outlook, Apple
-            Calendar…) to your own schedule, or, if you may, to a specific
-            Group's.
-        </p>
+    <CommonPage :title="t('my.calendarLinks.pageTitle')">
+        <p class="intro">{{ t('my.calendarLinks.intro') }}</p>
 
         <IcsLinksPanel/>
     </CommonPage>
@@ -13,6 +9,7 @@
 <script setup lang="ts">
 import CommonPage from '~/components/common/CommonPage.vue';
 import IcsLinksPanel from '~/components/my/IcsLinksPanel.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * MOVED from `/manage/external-references` (issue #115): self-service over
@@ -25,7 +22,9 @@ import IcsLinksPanel from '~/components/my/IcsLinksPanel.vue';
  */
 definePageMeta({ middleware: 'my' });
 
-useHead({ title: 'Calendar links' });
+const { t } = useT();
+
+useHead(() => ({ title: t('my.calendarLinks.pageTitle') }));
 </script>
 
 <style scoped lang="scss">

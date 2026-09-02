@@ -16,7 +16,9 @@
             <input
                 type="color"
                 :value="model || FALLBACK_SWATCH"
-                :aria-label="`${label || 'Colour'} picker`"
+                :aria-label="t('manageUi.colorField.pickerAria', {
+                    label: label || t('common.field.colour'),
+                })"
                 :disabled="disabled"
                 @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
             >
@@ -33,7 +35,7 @@
                 v-if="model && !disabled"
                 type="secondary"
                 @click="emit('update:modelValue', null)"
-            >Clear</CommonButton>
+            >{{ t('manageUi.colorField.clear') }}</CommonButton>
         </div>
 
         <p
@@ -45,6 +47,7 @@
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
+import { useT } from '~/composables/i18n';
 import { colorsList } from '~/utils/styles';
 
 /**
@@ -70,6 +73,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ 'update:modelValue': [value: string | null] }>();
+
+const { t } = useT();
 
 const model = computed(() => props.modelValue);
 const controlId = useId();

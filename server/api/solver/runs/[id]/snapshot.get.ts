@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!run) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const snapshot = await tx.solverInputSnapshot.findUnique({
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
         if (!snapshot) {
             // A run started before this feature shipped, or one whose write
             // genuinely failed: distinguishable from "no such run" above.
-            throw createError({ statusCode: 404, statusMessage: 'No snapshot stored for this run.' });
+            throw createError({ statusCode: 404, message: 'No snapshot stored for this run.' });
         }
 
         const decoded = SolverInput.decode(gunzipSync(snapshot.compressedInput));

@@ -1,4 +1,11 @@
+import type { Translate } from '~/composables/i18n';
 import type { PriceInput } from '~/utils/pricingModel';
+import {
+    ADMIN_SEAT_FEE, BASE_TIERS, LOAD_BANDS,
+    complexityTiers, formatCount, formatEuro, formatMultiplier,
+    loadBands, resolveSupportTier, sessionRange, studentRange,
+} from '~/utils/pricingModel';
+import type { MessageKey } from '~~/i18n/keys';
 
 /**
  * Copy and figures for the public pricing page, in one typed module.
@@ -6,6 +13,17 @@ import type { PriceInput } from '~/utils/pricingModel';
  * SAME RULE AS `landingContent`: the page's factual content lives here so that a
  * claim can be checked in one file rather than across five templates, and so
  * that a test can assert the page renders exactly these figures.
+ *
+ * SINCE ISSUE #19 THE COPY IS NOT HERE, only the structure that arranges it:
+ * every sentence is a key in the `pricing` message namespace and every builder
+ * below takes a `Translate`. The figures stay here, as numbers, and are
+ * formatted at render against the viewer's full locale, so a German reader gets
+ * `4.000 €` where an English one gets `€4,000`. Nothing on this page is a
+ * pre-formatted price string any more, which also settled a duplication that
+ * predated the translation: the rate tables used to restate the base fees, the
+ * lecturer rates and the complexity multipliers as hand-typed text beside
+ * `pricingModel`'s own numbers, so the published table and the calculator could
+ * disagree. They are now the same values, read once.
  *
  * WHAT IS DELIBERATELY NOT HERE, because the source document it came from is an
  * internal one and these parts are not customer-facing:
@@ -23,7 +41,7 @@ import type { PriceInput } from '~/utils/pricingModel';
  * structure behind it is not the same decision and has not been taken.
  *
  * THE FIGURES ARE NOT VALIDATED AGAINST ACTUALS YET. That is stated on the page
- * in `RATE_CAVEAT` rather than kept as a footnote here, because a reader
+ * (`pricing.caveat.text`) rather than kept as a footnote here, because a reader
  * planning a budget around these numbers needs to know how firm they are.
  */
 
@@ -34,7 +52,7 @@ export interface RateRow {
     tier: string;
     /** What puts an institution in this band. */
     basis: string;
-    /** The figure. Pre-formatted, because these are prices and not arithmetic. */
+    /** The figure, formatted for the viewer's locale. */
     price: string;
     /** An optional second figure, used by the base table's federation column. */
     extra?: string;
@@ -51,6 +69,13 @@ export interface RateTable {
     rows: RateRow[];
 }
 
+/** One of the arguments the price rests on, resolved for rendering. */
+export interface PricingBasisPoint {
+    id: string;
+    title: string;
+    body: string;
+}
+
 /**
  * WHAT DRIVES THE PRICE, in plain language, before any number appears.
  *
@@ -58,147 +83,156 @@ export interface RateTable {
  * numbers are only its consequence. An institution that disagrees with the
  * basis will not be talked round by a rate card.
  */
-export const PRICING_BASIS = [
+const PRICING_BASIS_KEYS = [
     {
         id: 'measured',
-        title: 'Measured, not assumed',
-        body: 'Pricing is not based on whether you call yourself a school, a Fachhochschule or a '
-            + 'university. That is a prior rather than a measurement, and it overcharges the '
-            + 'well-organised institution and undercharges the chaotic one of exactly the same '
-            + 'size. Everything below is computed from your own data.',
+        title: 'pricing.basis.measured.title',
+        body: 'pricing.basis.measured.body',
     },
     {
         id: 'lecturers',
-        title: 'Per lecturer, weighted by teaching load',
-        body: 'The billable unit is a lecturer, banded by how many sessions a week they actually '
-            + 'teach. Sessions are the real placed unit the solver works on, they cannot be '
-            + 'reorganised on paper to lower a bill, and they match how institutions already '
-            + 'describe load: someone teaches eight hours a week.',
+        title: 'pricing.basis.lecturers.title',
+        body: 'pricing.basis.lecturers.body',
     },
     {
         id: 'students',
-        title: 'Students are not billed at all',
-        body: 'Unlimited, included. A student reads their timetable and receives notifications '
-            + 'about it, which costs almost nothing to serve. Charging per head for that would '
-            + 'price the product against being used, and a timetable nobody can look at is not '
-            + 'worth having.',
+        title: 'pricing.basis.students.title',
+        body: 'pricing.basis.students.body',
     },
     {
         id: 'complexity',
-        title: 'Complexity is computed, auditable and revisited',
-        body: 'A multiplier comes from the rooms and groups each lecturer touches, how much '
-            + 'their weekly pattern varies, and how deeply your groups nest. It is derived from '
-            + 'the finished schedule, not self-declared and not guessed by a salesperson, so '
-            + 'your own IT staff can check it. It is fixed at the start of a term and revisited '
-            + 'when what you actually deliver drifts from that plan, so the price follows your '
-            + 'timetable instead of being frozen for the life of a contract.',
+        title: 'pricing.basis.complexity.title',
+        body: 'pricing.basis.complexity.body',
     },
-] as const;
+] as const satisfies readonly { id: string; title: MessageKey; body: MessageKey }[];
 
-export const RATE_TABLES: RateTable[] = [
-    {
-        id: 'base',
-        title: 'Base package',
-        note: 'One fee per institution, banded by student headcount. Covers hosting, '
-            + 'infrastructure and standard support.',
-        basisLabel: 'Students',
-        priceLabel: 'Per year',
-        extraLabel: 'Federation add-on',
-        rows: [
-            { id: 'base-s', tier: 'S', basis: '0 to 1,499', price: '€4,000', extra: '€4,000' },
-            { id: 'base-m', tier: 'M', basis: '1,500 to 5,999', price: '€10,000', extra: '€4,000' },
-            { id: 'base-l', tier: 'L', basis: '6,000 to 14,999', price: '€20,000', extra: '€8,000' },
-            { id: 'base-xl', tier: 'XL', basis: '15,000 or more', price: '€35,000', extra: '€12,000' },
-        ],
-    },
-    {
-        id: 'lecturer',
-        title: 'Per lecturer',
-        note: 'Banded by the sessions a lecturer teaches in a normal week.',
-        basisLabel: 'Weekly sessions',
-        priceLabel: 'Per year',
-        rows: [
-            { id: 'load-light', tier: 'Light', basis: '1 to 4', price: '€70' },
-            { id: 'load-standard', tier: 'Standard', basis: '5 to 8', price: '€140' },
-            { id: 'load-heavy', tier: 'Heavy', basis: '9 or more', price: '€240' },
-        ],
-    },
-    {
-        id: 'complexity',
-        title: 'Complexity multiplier',
-        note: 'Applied to the lecturer subtotal only, never to the base package.',
-        basisLabel: 'What it means',
-        priceLabel: 'Multiplier',
-        rows: [
-            {
-                id: 'cx-s',
-                tier: 'S',
-                basis: 'Mostly fixed weekly patterns, few rooms and groups per lecturer',
-                price: '1.0x',
-            },
-            { id: 'cx-m', tier: 'M', basis: 'Some variation, moderate spread', price: '1.3x' },
-            {
-                id: 'cx-l',
-                tier: 'L',
-                basis: 'High variation, wide spread, deep group nesting',
-                price: '1.7x',
-            },
-            {
-                id: 'cx-xl',
-                tier: 'XL',
-                basis: 'Very scattered, heavy cross-group and federation interaction',
-                price: '2.2x',
-            },
-        ],
-    },
-];
+export function pricingBasis(t: Translate): PricingBasisPoint[] {
+    return PRICING_BASIS_KEYS.map(point => ({
+        id: point.id,
+        title: t(point.title),
+        body: t(point.body),
+    }));
+}
+
+/**
+ * The three banded tables, derived from the model rather than restating it.
+ *
+ * Row ids are unchanged from when these were literals (`base-s`, `load-light`,
+ * `cx-xl`): they are `v-for` keys and in-page anchors, not copy.
+ */
+export function rateTables(t: Translate, locale: string): RateTable[] {
+    return [
+        {
+            id: 'base',
+            title: t('pricing.rateTable.base.title'),
+            note: t('pricing.rateTable.base.note'),
+            basisLabel: t('pricing.rateTable.base.basisLabel'),
+            priceLabel: t('pricing.rateTable.base.priceLabel'),
+            extraLabel: t('pricing.rateTable.base.extraLabel'),
+            rows: BASE_TIERS.map(tier => ({
+                id: `base-${ tier.id.toLowerCase() }`,
+                tier: tier.id,
+                basis: studentRange(tier, t, locale),
+                price: formatEuro(tier.fee, locale),
+                extra: formatEuro(tier.federationAddon, locale),
+            })),
+        },
+        {
+            id: 'lecturer',
+            title: t('pricing.rateTable.lecturer.title'),
+            note: t('pricing.rateTable.lecturer.note'),
+            basisLabel: t('pricing.rateTable.lecturer.basisLabel'),
+            priceLabel: t('pricing.rateTable.lecturer.priceLabel'),
+            rows: loadBands(t, locale).map(band => ({
+                id: `load-${ band.id }`,
+                tier: band.label,
+                basis: sessionRange(band, t, locale),
+                price: formatEuro(band.rate, locale),
+            })),
+        },
+        {
+            id: 'complexity',
+            title: t('pricing.rateTable.complexity.title'),
+            note: t('pricing.rateTable.complexity.note'),
+            basisLabel: t('pricing.rateTable.complexity.basisLabel'),
+            priceLabel: t('pricing.rateTable.complexity.priceLabel'),
+            rows: complexityTiers(t).map(tier => ({
+                id: `cx-${ tier.id.toLowerCase() }`,
+                tier: tier.id,
+                basis: tier.meaning,
+                price: formatMultiplier(tier.multiplier, t, locale),
+            })),
+        },
+    ];
+}
+
+/**
+ * Figures that appear ONLY on the flat-rate table, so they live here rather
+ * than in `pricingModel`: `computePrice` deliberately excludes one-time
+ * onboarding, and an hourly rate is not part of an annual bill either.
+ */
+const PARTNER_HOURLY_RATE = 200;
+const ONBOARDING_STANDARD = { from: 3000, to: 5000 };
+const ONBOARDING_FULL = { from: 10000, to: 18000 };
 
 /** Everything that is a flat line item rather than a band. */
-export const FLAT_RATES: RateRow[] = [
-    {
-        id: 'seat',
-        tier: 'Admin and scheduler seat',
-        basis: 'Named people who edit, lock or run the solver. Everyone else is included.',
-        price: '€350 per year',
-    },
-    {
-        id: 'support-standard',
-        tier: 'Standard support',
-        basis: 'Included with every base package.',
-        price: 'Included',
-    },
-    {
-        id: 'support-priority',
-        tier: 'Priority support',
-        basis: 'Eight-hour response, a direct channel, and a quarterly roadmap call.',
-        price: '€3,000 per year',
-    },
-    {
-        id: 'support-partner',
-        tier: 'Partner retainer',
-        basis: 'Around sixty development hours a year for feature work you specify.',
-        price: '€12,000 per year, or €200 per hour',
-    },
-    {
-        id: 'onboarding-standard',
-        tier: 'Standard onboarding',
-        basis: 'Template-based import you run yourself, plus about three days of training.',
-        price: '€3,000 to €5,000 once',
-    },
-    {
-        id: 'onboarding-full',
-        tier: 'Happiness Package onboarding',
-        basis: 'We build the import from your legacy system, two weeks of intensive training, '
-            + 'one named lead.',
-        price: '€10,000 to €18,000 once',
-    },
-    {
-        id: 'onboarding-federation',
-        tier: 'Federation onboarding',
-        basis: 'Quoted per federation, because no two consortia share a starting point.',
-        price: 'On request',
-    },
-];
+export function flatRates(t: Translate, locale: string): RateRow[] {
+    return [
+        {
+            id: 'seat',
+            tier: t('pricing.flat.seat.tier'),
+            basis: t('pricing.flat.seat.basis'),
+            price: t('pricing.flat.seat.price', { amount: formatEuro(ADMIN_SEAT_FEE, locale) }),
+        },
+        {
+            id: 'support-standard',
+            tier: t('pricing.flat.supportStandard.tier'),
+            basis: t('pricing.flat.supportStandard.basis'),
+            price: t('pricing.flat.supportStandard.price'),
+        },
+        {
+            id: 'support-priority',
+            tier: t('pricing.flat.supportPriority.tier'),
+            basis: t('pricing.flat.supportPriority.basis'),
+            price: t('pricing.flat.supportPriority.price', {
+                amount: formatEuro(resolveSupportTier('priority').fee, locale),
+            }),
+        },
+        {
+            id: 'support-partner',
+            tier: t('pricing.flat.supportPartner.tier'),
+            basis: t('pricing.flat.supportPartner.basis'),
+            price: t('pricing.flat.supportPartner.price', {
+                amount: formatEuro(resolveSupportTier('partner').fee, locale),
+                hourly: formatEuro(PARTNER_HOURLY_RATE, locale),
+            }),
+        },
+        {
+            id: 'onboarding-standard',
+            tier: t('pricing.flat.onboardingStandard.tier'),
+            basis: t('pricing.flat.onboardingStandard.basis'),
+            price: t('pricing.flat.onboardingStandard.price', {
+                from: formatEuro(ONBOARDING_STANDARD.from, locale),
+                to: formatEuro(ONBOARDING_STANDARD.to, locale),
+            }),
+        },
+        {
+            id: 'onboarding-full',
+            tier: t('pricing.flat.onboardingFull.tier'),
+            basis: t('pricing.flat.onboardingFull.basis'),
+            price: t('pricing.flat.onboardingFull.price', {
+                from: formatEuro(ONBOARDING_FULL.from, locale),
+                to: formatEuro(ONBOARDING_FULL.to, locale),
+            }),
+        },
+        {
+            id: 'onboarding-federation',
+            tier: t('pricing.flat.onboardingFederation.tier'),
+            basis: t('pricing.flat.onboardingFederation.basis'),
+            price: t('pricing.flat.onboardingFederation.price'),
+        },
+    ];
+}
 
 /**
  * WORKED EXAMPLES, defined as CALCULATOR INPUTS rather than as printed totals.
@@ -219,14 +253,15 @@ export const FLAT_RATES: RateRow[] = [
  *
  * `input` doubles as the calculator's preset, so clicking an example loads the
  * exact configuration its figure was computed from.
+ *
+ * THE HEADCOUNTS ARE NOT REPEATED IN THE COPY EITHER. Each `shape` sentence
+ * used to open with "2,500 students and 110 lecturers", typed out beside the
+ * very input it described; both numbers are now interpolated from `input`, so a
+ * changed preset cannot leave its own description behind.
  */
 export const SCENARIOS = [
     {
         id: 'a',
-        short: 'Small, cluttered',
-        title: 'Small university of applied sciences',
-        shape: '2,500 students and 110 lecturers, a heavy adjunct mix, and a timetable nobody '
-            + 'has tidied in years',
         input: {
             students: 2500,
             lecturers: { light: 50, standard: 40, heavy: 20 },
@@ -234,14 +269,10 @@ export const SCENARIOS = [
             adminSeats: 6,
             federation: false,
             support: 'standard',
-            discountPercent: 0,
         },
     },
     {
         id: 'b',
-        short: 'Large, regular',
-        title: 'Large university, regular timetable',
-        shape: '20,000 students and 600 lecturers on clean, repetitive weekly patterns',
         input: {
             students: 20000,
             lecturers: { light: 100, standard: 400, heavy: 100 },
@@ -249,14 +280,10 @@ export const SCENARIOS = [
             adminSeats: 12,
             federation: false,
             support: 'priority',
-            discountPercent: 0,
         },
     },
     {
         id: 'c',
-        short: 'Medium, scattered',
-        title: 'Medium university, scattered timetable',
-        shape: '12,000 students and 450 lecturers spread wide across rooms and nested groups',
         input: {
             students: 12000,
             lecturers: { light: 40, standard: 280, heavy: 130 },
@@ -264,14 +291,10 @@ export const SCENARIOS = [
             adminSeats: 10,
             federation: false,
             support: 'priority',
-            discountPercent: 0,
         },
     },
     {
         id: 'd',
-        short: 'Small school',
-        title: 'Small school',
-        shape: '400 students and 25 teachers on a simple fixed weekly pattern',
         input: {
             students: 400,
             lecturers: { light: 5, standard: 18, heavy: 2 },
@@ -279,21 +302,46 @@ export const SCENARIOS = [
             adminSeats: 2,
             federation: false,
             support: 'standard',
-            discountPercent: 0,
         },
     },
-] as const satisfies readonly { id: string; short: string; title: string; shape: string; input: PriceInput }[];
+] as const satisfies readonly { id: string; input: PriceInput }[];
 
-/**
- * The honesty note, and it is not boilerplate.
- *
- * These figures are planning guidelines that have not been checked against real
- * delivered cost, because there is not yet a portfolio of institutions to check
- * them against. A reader building a budget needs that, and the page two clicks
- * away is titled "Not built yet, and honest about it": a pricing page that
- * implied more certainty than the product page would undo it.
- */
-export const RATE_CAVEAT = 'These are the rates as they stand today, and they are planning '
-    + 'figures rather than a signed tariff: they have not yet been tested against a full year of '
-    + 'real delivery. They will move as that data arrives. If we quote you, the quote is what '
-    + 'holds, and we would rather tell you this here than after you have built a budget on it.';
+/** A worked example with its copy resolved. */
+export interface PricingScenario {
+    id: string;
+    short: string;
+    title: string;
+    shape: string;
+    input: PriceInput;
+}
+
+const SCENARIO_KEYS: Record<
+    (typeof SCENARIOS)[number]['id'],
+    { short: MessageKey; title: MessageKey; shape: MessageKey }
+> = {
+    a: { short: 'pricing.scenario.a.short', title: 'pricing.scenario.a.title', shape: 'pricing.scenario.a.shape' },
+    b: { short: 'pricing.scenario.b.short', title: 'pricing.scenario.b.title', shape: 'pricing.scenario.b.shape' },
+    c: { short: 'pricing.scenario.c.short', title: 'pricing.scenario.c.title', shape: 'pricing.scenario.c.shape' },
+    d: { short: 'pricing.scenario.d.short', title: 'pricing.scenario.d.title', shape: 'pricing.scenario.d.shape' },
+};
+
+export function pricingScenarios(t: Translate, locale: string): PricingScenario[] {
+    return SCENARIOS.map((scenario) => {
+        const keys = SCENARIO_KEYS[scenario.id];
+        const lecturers = LOAD_BANDS.reduce(
+            (sum, band) => sum + scenario.input.lecturers[band.id],
+            0,
+        );
+
+        return {
+            id: scenario.id,
+            short: t(keys.short),
+            title: t(keys.title),
+            shape: t(keys.shape, {
+                students: formatCount(scenario.input.students, locale),
+                lecturers: formatCount(lecturers, locale),
+            }),
+            input: scenario.input,
+        };
+    });
+}

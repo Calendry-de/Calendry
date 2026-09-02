@@ -609,7 +609,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (result.count === 0) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (isAccessRolePermissionChange) {

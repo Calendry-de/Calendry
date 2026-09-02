@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     const personId = identity.actorPersonId;
 
     if (!personId) {
-        throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+        throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
     }
 
     // Sequential: `tx` is one shared connection, and concurrent queries on it

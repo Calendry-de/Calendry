@@ -1,0 +1,28 @@
+{
+    "page": {
+        "title": "Startseite",
+        "fallbackTitle": "Übersicht"
+    },
+    "greeting": {
+        "signedInAs": "Angemeldet als {givenName} {familyName}"
+    },
+    "action": {
+        "switchInstitution": "Institution wechseln",
+        "signOut": "Abmelden",
+        "signOutBusy": "Abmeldung läuft …"
+    },
+    "error": {
+        "signOut": "Abmelden nicht möglich. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+    },
+    "empty": {
+        "noManageAccess": "Sie haben in dieser Institution auf keinen Verwaltungsbereich Lesezugriff. Die Administration kann ihn über Ihre Berechtigungsrolle erteilen."
+    },
+    "counts": {
+        "unavailable": "Nicht abrufbar"
+    },
+    "permissions": {
+        "summary": "{count} Berechtigung in dieser Institution | {count} Berechtigungen in dieser Institution",
+        "otherHeading": "Sonstige",
+        "otherNote": "Vorhanden, aber nicht im Berechtigungskatalog. Wahrscheinlich ein Schlüssel, der in {module} verschoben oder entfernt wurde – eine Meldung wert."
+    }
+}

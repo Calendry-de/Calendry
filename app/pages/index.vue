@@ -13,69 +13,61 @@
 
                 <LandingSection
                     id="what"
-                    title="A timetable you can hold, and one you can ask for"
-                    lead="Two halves. This application stores and presents the schedule and everything
-                        it is made of; a separate solver service builds candidate placements from your
-                        rules and hands them back for a person to accept or reject."
+                    :title="t('landing.section.what.title')"
+                    :lead="t('landing.section.what.lead')"
                 >
-                    <LandingCapabilityRows :items="FEATURES"/>
+                    <LandingCapabilityRows :items="features"/>
                 </LandingSection>
 
 
                 <LandingSection
                     id="built"
-                    title="What works today"
-                    lead="Not a demo reel. Everything below is implemented, in use against a real
-                        database, and covered by this repository's integration suite."
+                    :title="t('landing.section.built.title')"
+                    :lead="t('landing.section.built.lead')"
                 >
-                    <LandingBuiltClusters :items="BUILT"/>
+                    <LandingBuiltClusters :items="built"/>
 
                     <LandingCallout
-                        text="If that already covers most of what your week needs, the useful next step is a conversation about your institution."
-                        action="Get in touch"
+                        :text="t('landing.callout.builtText')"
+                        :action="t('landing.action.getInTouch')"
                         href="#contact"
                     />
                 </LandingSection>
 
                 <LandingSection
                     id="next"
-                    title="Not built yet, and honest about it"
-                    lead="Calendry is being built in phases, and each of these is a phase rather than a
-                        promise with a date on it. Where a decision is still open, it says which one."
+                    :title="t('landing.section.next.title')"
+                    :lead="t('landing.section.next.lead')"
                     layout="narrow"
                 >
-                    <LandingNextList :items="NEXT"/>
+                    <LandingNextList :items="next"/>
                 </LandingSection>
 
                 <LandingSection
                     id="why"
-                    title="Decisions worth defending"
-                    lead="Timetabling software fails in specific, recognisable ways. These are the
-                        choices made against them. Each one is a rule the codebase is actually built
-                        on, not a slogan."
+                    :title="t('landing.section.why.title')"
+                    :lead="t('landing.section.why.lead')"
                     layout="aside"
                 >
-                    <LandingPrincipleList :items="PRINCIPLES"/>
+                    <LandingPrincipleList :items="principles"/>
                 </LandingSection>
 
                 <LandingSection
                     id="contact"
-                    title="Tell us about your institution"
-                    lead="Calendry is being built for real timetables, so the useful conversation is
-                        about yours: how many rooms and cohorts, what your week looks like, and what
-                        breaks today."
+                    :title="t('landing.section.contact.title')"
+                    :lead="t('landing.section.contact.lead')"
                 >
                     <LandingContactCapture/>
                 </LandingSection>
 
                 <LandingSection
                     id="under-the-hood"
-                    title="For the technically curious"
+                    :title="t('landing.section.underTheHood.title')"
                     tone="inverse"
                 >
                     <LandingTechBand
-                        :lead="TECH_LEAD"
-                        :items="TECHNICAL_NOTES"
+                        :lead="techLead"
+                        :items="technicalNotes"
                     />
                 </LandingSection>
             </main>
@@ -87,13 +79,15 @@
 
 <script setup lang="ts">
 import {
-    BUILT,
-    FEATURES,
-    NEXT,
-    PRINCIPLES,
-    TECHNICAL_NOTES,
-    TECH_LEAD,
+    landingBuilt,
+    landingFeatures,
+    landingNext,
+    landingPrinciples,
+    landingTechLead,
+    landingTechnicalNotes,
 } from '~/utils/landingContent';
+import { useLanguage, useT } from '~/composables/i18n';
+import { openGraphLocale } from '#shared/language';
 import { useFirstVisit } from '~/composables/pageOpener';
 
 /**
@@ -125,9 +119,12 @@ import { useFirstVisit } from '~/composables/pageOpener';
  * section addressed to somebody else. What a reader leaves with is a measured
  * number rather than a missing feature.
  *
- * COMPOSITION. Content lives in `~/utils/landingContent`, section markup in
+ * COMPOSITION. The page's structure lives in `~/utils/landingContent` and its
+ * sentences in `i18n/locales/<lang>/landing.json`; section markup is in
  * `app/components/landing/`. This file only arranges them: pages compose, they
- * do not implement.
+ * do not implement. Each list is a `computed` over the builder rather than a
+ * value read once at setup, so a language change re-renders the page instead of
+ * freezing it in whatever language it first mounted in.
  *
  * EVERY SECTION IS A DIFFERENT SHAPE, and that is a rule rather than a
  * flourish. The page previously ran `what`, `built`, `next` and `why` as four
@@ -167,34 +164,68 @@ import { useFirstVisit } from '~/composables/pageOpener';
  */
 definePageMeta({ layout: 'empty' });
 
-const title = 'Timetabling for schools and universities';
-const description = 'Calendry is a multi-tenant timetabling platform for schools and universities: '
-    + 'a calendar management application plus a solver service that proposes schedules for a person '
-    + 'to review. In active development.';
+const { t } = useT();
+const { language } = useLanguage();
 
-useHead({
-    // The layout's titleTemplate appends " | Calendry", so naming the product
-    // again here would render it twice.
-    title,
-    meta: [
-        { name: 'description', content: description },
-        /*
-         * Open Graph and Twitter, because the way this page actually reaches a
-         * decision-maker is somebody pasting it into Slack or Teams, and with
-         * no tags at all it arrives there as a bare URL. `og:image` is
-         * deliberately absent rather than pointed at a file that does not
-         * exist: it needs a real asset, and a broken image card is worse than
-         * a text one.
-         */
-        { property: 'og:type', content: 'website' },
-        { property: 'og:site_name', content: 'Calendry' },
-        { property: 'og:title', content: `${ title } | Calendry` },
-        { property: 'og:description', content: description },
-        { property: 'og:locale', content: 'en' },
-        { name: 'twitter:card', content: 'summary' },
-        { name: 'twitter:title', content: `${ title } | Calendry` },
-        { name: 'twitter:description', content: description },
-    ],
+const features = computed(() => landingFeatures(t));
+const built = computed(() => landingBuilt(t));
+const next = computed(() => landingNext(t));
+const principles = computed(() => landingPrinciples(t));
+const techLead = computed(() => landingTechLead(t));
+const technicalNotes = computed(() => landingTechnicalNotes(t));
+
+// A getter, not a plain object: `useHead` re-evaluates it, so the tab title and
+// the link-preview tags follow a language change rather than freezing at
+// whatever was active when this page first rendered. Same reason `login.vue`
+// does it.
+useHead(() => {
+    const title = t('landing.meta.title');
+    const description = t('landing.meta.description');
+
+    return {
+        // The layout's titleTemplate appends " | Calendry", so naming the
+        // product again here would render it twice.
+        title,
+        meta: [
+            { name: 'description', content: description },
+            /*
+             * Open Graph and Twitter, because the way this page actually
+             * reaches a decision-maker is somebody pasting it into Slack or
+             * Teams, and with no tags at all it arrives there as a bare URL.
+             * `og:image` is deliberately absent rather than pointed at a file
+             * that does not exist: it needs a real asset, and a broken image
+             * card is worse than a text one.
+             *
+             * The " | Calendry" suffix is composed here rather than keyed: it
+             * is the product name and a separator, which is the same string in
+             * every language, and it mirrors what the layout's titleTemplate
+             * appends to the tag itself.
+             *
+             * `og:locale` derives from the message language, via
+             * `openGraphLocale()`, which also supplies the
+             * `language_TERRITORY` form Open Graph actually wants (a bare
+             * `de` is not a valid value).
+             *
+             * The case for leaving it a literal `en` during the migration was
+             * real and was argued: while extraction has copied English into
+             * the German tree, a page reporting `de_DE` announces a language
+             * it is not yet fully serving. True, and equally true of
+             * `<html lang>`, which `useCalendryLayout` already derives. Two
+             * mechanisms for one fact, disagreeing for the length of a
+             * migration, is worse than one mechanism briefly ahead of its
+             * content: the inconsistency outlives the migration, because
+             * nothing reminds anybody to converge them.
+             */
+            { property: 'og:type', content: 'website' },
+            { property: 'og:site_name', content: 'Calendry' },
+            { property: 'og:title', content: `${ title } | Calendry` },
+            { property: 'og:description', content: description },
+            { property: 'og:locale', content: openGraphLocale(language.value) },
+            { name: 'twitter:card', content: 'summary' },
+            { name: 'twitter:title', content: `${ title } | Calendry` },
+            { name: 'twitter:description', content: description },
+        ],
+    };
 });
 /**
  * `isFirstVisit` is read once, at setup, and copied into a plain ref. It is not

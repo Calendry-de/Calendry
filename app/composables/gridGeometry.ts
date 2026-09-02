@@ -36,6 +36,30 @@ export type GridRow =
         from: number;
     };
 
+/**
+ * A block's height follows its own duration, never a manual density choice.
+ *
+ * `rowHeight` here means "the height of one BLOCK", so a tenant whose blocks
+ * run 210 minutes (a lab) and one whose blocks run 45 (a lecture) fed the same
+ * preset used to draw both at the identical pixel height, spending no more
+ * screen space on the block that holds four times the teaching time. Deriving
+ * it from `blockLengthMinutes` at a fixed rate instead makes long blocks draw
+ * tall and short ones draw compact, automatically, from the TimeGrid the
+ * tenant already configured — nothing left to pick.
+ *
+ * `PX_PER_MINUTE` is anchored to the old "Comfortable" preset (60px for a
+ * 45-minute block) so a typical school's view is unchanged. `MIN_BLOCK_PX` is
+ * a floor, not a target: below it a very short block (a 15-20 minute period)
+ * would shrink past legible, so it holds the line while every longer block
+ * keeps scaling past it at the same rate.
+ */
+const PX_PER_MINUTE = 60 / 45;
+const MIN_BLOCK_PX = 40;
+
+export function autoRowHeight(blockLengthMinutes: number): number {
+    return Math.max(MIN_BLOCK_PX, blockLengthMinutes * PX_PER_MINUTE);
+}
+
 export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     /**
      * `line` is the 1-based CSS grid line; the header occupies row 1. Held on

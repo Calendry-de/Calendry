@@ -109,7 +109,7 @@ async function requireLecturerRole(tx: Tx, tenantId: string): Promise<{ id: stri
     if (!role) {
         throw createError({
             statusCode: 422,
-            statusMessage: "This tenant has no 'lecturer' role configured, so nobody can be offered as a substitute.",
+            message: "This tenant has no 'lecturer' role configured, so nobody can be offered as a substitute.",
         });
     }
 
@@ -179,7 +179,7 @@ export async function assertFreeForSubstitution(
     if (!holdsRole) {
         throw createError({
             statusCode: 422,
-            statusMessage: "This person does not hold the tenant's lecturer role, so they cannot cover a session.",
+            message: "This person does not hold the tenant's lecturer role, so they cannot cover a session.",
             data: { field: 'personId' },
         });
     }
@@ -189,7 +189,7 @@ export async function assertFreeForSubstitution(
     if (excluded.has(options.personId)) {
         throw createError({
             statusCode: 409,
-            statusMessage: 'This person is already teaching, or covering another session, at that slot.',
+            message: 'This person is already teaching, or covering another session, at that slot.',
             data: { field: 'personId' },
         });
     }

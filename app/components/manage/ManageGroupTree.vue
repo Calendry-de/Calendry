@@ -9,12 +9,16 @@
                 <input
                     v-model="search"
                     type="search"
-                    placeholder="Search groups…"
+                    :placeholder="t('manageUi.groupTree.searchPlaceholder')"
                     autocomplete="off"
                 >
             </label>
 
-            <span class="tree_count">{{ list.total.value }} {{ list.isFiltered.value ? 'matching' : 'total' }}</span>
+            <span class="tree_count">{{
+                list.isFiltered.value
+                    ? t('manageUi.shared.countMatching', { count: list.total.value })
+                    : t('manageUi.shared.countTotal', { count: list.total.value })
+            }}</span>
         </div>
 
         <p
@@ -22,8 +26,11 @@
             class="tree_blank tree_blank--error"
             role="alert"
         >
-            Could not load groups.
-            {{ (list.error.value as { statusMessage?: string }).statusMessage ?? 'The request failed.' }}
+            {{ t('manageUi.groupTree.loadFailed') }}
+            {{
+                serverErrorMessage(list.error.value)
+                    ?? t('manageUi.shared.requestFailed')
+            }}
         </p>
 
         <div
@@ -37,8 +44,10 @@
             v-else-if="!list.rows.value.length"
             class="tree_blank"
         >
-            <template v-if="list.isFiltered.value">No groups match “{{ search }}”.</template>
-            <template v-else>No groups yet. Create the first cohort to nest others beneath it.</template>
+            <template v-if="list.isFiltered.value">{{
+                t('manageUi.groupTree.noMatch', { search })
+            }}</template>
+            <template v-else>{{ t('manageUi.groupTree.empty') }}</template>
         </p>
 
         <template v-else>
@@ -58,13 +67,13 @@
                     aria-hidden="true"
                 />
                 <span v-if="list.isFiltered.value">
-                    Search results are shown flat: a filtered set has no reliable
-                    hierarchy, because a matching group's parent may not match.
+                    {{ t('manageUi.groupTree.flatFiltered') }}
                 </span>
                 <span v-else>
-                    Showing {{ list.rows.value.length }} of {{ list.total.value }} groups.
-                    The tree needs the whole set to be accurate, so this is a flat
-                    list. Narrow it with search.
+                    {{ t('manageUi.groupTree.flatPartial', {
+                        shown: list.rows.value.length,
+                        total: list.total.value,
+                    }) }}
                 </span>
             </p>
 
@@ -80,7 +89,9 @@
                         class="tree_toggle"
                         type="button"
                         :aria-expanded="!collapsed.has(node.id)"
-                        :aria-label="collapsed.has(node.id) ? 'Expand' : 'Collapse'"
+                        :aria-label="collapsed.has(node.id)
+                            ? t('manageUi.groupTree.expand')
+                            : t('manageUi.groupTree.collapse')"
                         @click="toggle(node.id)"
                     >
                         <Icon
@@ -104,15 +115,15 @@
                         <span
                             v-if="node.children.length"
                             class="tree_meta"
-                        >{{ node.children.length }} nested</span>
+                        >{{ t('manageUi.groupTree.nestedCount', { count: node.children.length }) }}</span>
                         <span
                             v-if="node.row.expectedSize"
                             class="tree_meta"
-                        >~{{ node.row.expectedSize }} people</span>
+                        >{{ t('manageUi.groupTree.sizeApprox', { count: node.row.expectedSize }) }}</span>
                         <span
                             v-else-if="showTree && derivedSizes.get(node.id)"
                             class="tree_meta"
-                        >~{{ derivedSizes.get(node.id) }} people (nested)</span>
+                        >{{ t('manageUi.groupTree.sizeDerived', { count: derivedSizes.get(node.id) }) }}</span>
                     </NuxtLink>
                 </li>
             </ul>
@@ -121,19 +132,19 @@
         <nav
             v-if="list.pageCount.value > 1"
             class="tree_pager"
-            aria-label="Pages"
+            :aria-label="t('manageUi.shared.pagerLabel')"
         >
             <CommonButton
                 :disabled="page === 0"
                 type="secondary"
                 @click="page = Math.max(0, page - 1)"
-            >Previous</CommonButton>
-            <span>Page {{ page + 1 }} of {{ list.pageCount.value }}</span>
+            >{{ t('common.action.previous') }}</CommonButton>
+            <span>{{ t('manageUi.shared.pageOf', { page: page + 1, total: list.pageCount.value }) }}</span>
             <CommonButton
                 :disabled="page + 1 >= list.pageCount.value"
                 type="secondary"
                 @click="page = Math.min(list.pageCount.value - 1, page + 1)"
-            >Next</CommonButton>
+            >{{ t('common.action.next') }}</CommonButton>
         </nav>
     </div>
 </template>
@@ -141,6 +152,7 @@
 <script setup lang="ts">
 import type { useEntityList } from '~/composables/entityList';
 import type { ManageEntity } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 import { buildGroupTree, estimatedSizes, flattenTree } from '~/utils/groupTree';
 
 /**
@@ -156,6 +168,8 @@ const props = defineProps<{
     list: ReturnType<typeof useEntityList>;
     canCreate: boolean;
 }>();
+
+const { t } = useT();
 
 const search = defineModel<string>('search', { required: true });
 const page = defineModel<number>('page', { required: true });

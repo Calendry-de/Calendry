@@ -1,3 +1,4 @@
+import type { MessageKey } from '~~/i18n/keys';
 import type { TenantMode } from '#shared/tenantMode';
 import { DEFAULT_TENANT_MODE } from '#shared/tenantMode';
 
@@ -37,8 +38,18 @@ export interface SessionState {
     tenantMode: TenantMode;
 }
 
-/** The single generic message shown for every authentication failure. */
-export const LOGIN_ERROR = 'Incorrect email or password.';
+/**
+ * The single generic message shown for every authentication failure.
+ *
+ * A KEY rather than the sentence since issue #19, because this is module
+ * scope: `t()` needs a Vue instance, so the string cannot be resolved here
+ * and the two pages that show it (`login.vue`, `change-password.vue`) call
+ * `t(LOGIN_ERROR_KEY)` at render instead. What the constant is FOR survives
+ * the change unaltered: one name, so a wrong password and an unknown email
+ * cannot drift into two distinguishable messages and turn the login form into
+ * an account-enumeration oracle.
+ */
+export const LOGIN_ERROR_KEY = 'auth.error.credentials' as const satisfies MessageKey;
 
 export const useSession = () => useState<SessionState | null>('calendry.session', () => null);
 
@@ -51,6 +62,23 @@ const useSessionLoaded = () => useState<boolean>('calendry.session.loaded', () =
  * On SSR the browser's cookie has to be forwarded explicitly, since $fetch does
  * not inherit it, otherwise the first render always looks logged out and the
  * page flashes the login screen before hydrating.
+ *
+ * `accept-language` IS FORWARDED FOR THE SAME REASON, and leaving it out was a
+ * bug from issue #17 that issue #19 made visible. `session.get.ts` reads that
+ * header as the last tier of `resolveLocale()` (Person, then Tenant, then the
+ * browser's own preference), and a header this call does not forward is a
+ * header that endpoint cannot see: it fell through to `FALLBACK_LOCALE` for
+ * every signed-in viewer whose Person and Tenant both stated no locale, which
+ * is the default state of every account.
+ *
+ * It was nearly undetectable while the fallback was `en-GB` and the only
+ * consequence was date shape, and it was never merely cosmetic: on the CLIENT
+ * the browser attaches `Accept-Language` to this same request automatically,
+ * so SSR resolved one locale and hydration resolved another, which is the
+ * mismatch class this codebase has been bitten by repeatedly. Issue #19 turned
+ * it into a whole page rendering in the wrong LANGUAGE on the server and the
+ * right one on the client. Forwarding it makes both sides ask the identical
+ * question.
  */
 export async function fetchSession(force = false): Promise<SessionState | null> {
     const session = useSession();
@@ -61,7 +89,7 @@ export async function fetchSession(force = false): Promise<SessionState | null> 
     }
 
     try {
-        const headers = import.meta.server ? useRequestHeaders(['cookie']) : undefined;
+        const headers = import.meta.server ? useRequestHeaders(['cookie', 'accept-language']) : undefined;
 
         session.value = await $fetch<SessionState>('/api/auth/session', { headers });
     } catch {

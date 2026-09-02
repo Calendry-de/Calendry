@@ -39,7 +39,7 @@ export async function sourceDrift(tx: Tx, tenantId: string, groupId: string): Pr
     });
 
     if (!group) {
-        throw createError({ statusCode: 404, statusMessage: 'Group not found.' });
+        throw createError({ statusCode: 404, message: 'Group not found.' });
     }
 
     const sourceIds = group.sources.map((s) => s.sourceGroupId);

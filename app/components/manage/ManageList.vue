@@ -9,14 +9,18 @@
                 <input
                     v-model="search"
                     type="search"
-                    :placeholder="`Search ${entity.plural.toLowerCase()}…`"
+                    :placeholder="t('manageUi.list.searchPlaceholder', { entity: entity.plural })"
                     autocomplete="off"
                 >
             </label>
 
             <span class="list_count">
-                <template v-if="list.isFiltered.value">{{ list.total.value }} matching</template>
-                <template v-else>{{ list.total.value }} total</template>
+                <template v-if="list.isFiltered.value">{{
+                    t('manageUi.shared.countMatching', { count: list.total.value })
+                }}</template>
+                <template v-else>{{
+                    t('manageUi.shared.countTotal', { count: list.total.value })
+                }}</template>
             </span>
         </div>
 
@@ -31,8 +35,11 @@
             class="list_blank list_blank--error"
             role="alert"
         >
-            Could not load {{ entity.plural.toLowerCase() }}.
-            {{ (list.error.value as { statusMessage?: string }).statusMessage ?? 'The request failed.' }}
+            {{ t('manageUi.list.loadFailed', { entity: entity.plural }) }}
+            {{
+                serverErrorMessage(list.error.value)
+                    ?? t('manageUi.shared.requestFailed')
+            }}
         </p>
 
         <div
@@ -46,15 +53,15 @@
             v-else-if="!list.rows.value.length && list.isFiltered.value"
             class="list_blank"
         >
-            No {{ entity.plural.toLowerCase() }} match “{{ search }}”.
+            {{ t('manageUi.list.noMatch', { entity: entity.plural, search }) }}
         </p>
 
         <p
             v-else-if="!list.rows.value.length"
             class="list_blank"
         >
-            No {{ entity.plural.toLowerCase() }} yet.
-            <template v-if="canCreate">Create the first one to get started.</template>
+            {{ t('manageUi.list.emptyHint', { entity: entity.plural }) }}
+            <template v-if="canCreate">{{ t('manageUi.list.emptyCreateHint') }}</template>
         </p>
 
         <div
@@ -70,7 +77,7 @@
                             :class="{ 'is-secondary': column.secondary }"
                             :style="column.format === 'number' ? 'text-align:right' : undefined"
                         >{{ column.label }}</th>
-                        <th class="list_chev"><span class="sr-only">Open</span></th>
+                        <th class="list_chev"><span class="sr-only">{{ t('manageUi.list.openRow') }}</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -94,7 +101,11 @@
                                 <span
                                     class="list_flag"
                                     :class="{ 'list_flag--on': !!row[column.key] }"
-                                >{{ row[column.key] ? 'Yes' : 'No' }}</span>
+                                >{{
+                                    row[column.key]
+                                        ? t('manageUi.shared.yes')
+                                        : t('manageUi.shared.no')
+                                }}</span>
                             </template>
                             <template v-else-if="column.format === 'swatch'">
                                 <span
@@ -109,14 +120,14 @@
                             <span
                                 v-if="column.key === entity.columns[0]?.key && isShared(row)"
                                 class="list_badge"
-                                title="Owned by a federation: readable here, editable by its owner"
-                            >shared</span>
+                                :title="t('manageUi.list.sharedTitle')"
+                            >{{ t('manageUi.list.sharedBadge') }}</span>
 
                             <span
                                 v-if="column.key === entity.columns[0]?.key && isSystem(row)"
                                 class="list_badge list_badge--system"
-                                title="Created by provisioning; cannot be deleted"
-                            >system</span>
+                                :title="t('manageUi.list.systemTitle')"
+                            >{{ t('manageUi.list.systemBadge') }}</span>
                         </td>
                         <td class="list_chev">
                             <Icon
@@ -132,21 +143,23 @@
         <nav
             v-if="list.pageCount.value > 1"
             class="list_pager"
-            aria-label="Pages"
+            :aria-label="t('manageUi.shared.pagerLabel')"
         >
             <CommonButton
                 :disabled="page === 0"
                 type="secondary"
                 @click="page = Math.max(0, page - 1)"
-            >Previous</CommonButton>
+            >{{ t('common.action.previous') }}</CommonButton>
 
-            <span>Page {{ page + 1 }} of {{ list.pageCount.value }}</span>
+            <span>{{
+                t('manageUi.shared.pageOf', { page: page + 1, total: list.pageCount.value })
+            }}</span>
 
             <CommonButton
                 :disabled="page + 1 >= list.pageCount.value"
                 type="secondary"
                 @click="page = Math.min(list.pageCount.value - 1, page + 1)"
-            >Next</CommonButton>
+            >{{ t('common.action.next') }}</CommonButton>
         </nav>
     </div>
 </template>
@@ -154,6 +167,7 @@
 <script setup lang="ts">
 import type { useEntityList } from '~/composables/entityList';
 import type { ColumnDef, EntityRow, ManageEntity } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 import { weekdayShort } from '~/composables/schedule';
 
 /**
@@ -169,6 +183,8 @@ const props = defineProps<{
     list: ReturnType<typeof useEntityList>;
     canCreate: boolean;
 }>();
+
+const { t } = useT();
 
 /**
  * The two pieces of list state this component CHANGES are models, not fields

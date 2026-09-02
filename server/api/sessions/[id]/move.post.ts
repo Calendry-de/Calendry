@@ -85,7 +85,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         /**
@@ -103,7 +103,7 @@ export default defineEventHandler(async (event) => {
         if (termWeek === null || dayOfWeek === null || blockIndex === null) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'This Session is in the spare bank and has no current placement to fall back '
+                message: 'This Session is in the spare bank and has no current placement to fall back '
                     + 'on: provide termWeek, dayOfWeek and blockIndex to place it.',
             });
         }
@@ -139,7 +139,7 @@ export default defineEventHandler(async (event) => {
         if (grid && !fitsGrid(target, grid)) {
             throw createError({
                 statusCode: 409,
-                statusMessage: `Day ${target.dayOfWeek} block ${target.blockIndex}`
+                message: `Day ${target.dayOfWeek} block ${target.blockIndex}`
                     + `${target.durationBlocks > 1 ? ` (${target.durationBlocks} blocks)` : ''}`
                     + ` is not a slot in '${grid.name}', which has ${grid.blocksPerDay} blocks`
                     + ` on days ${grid.activeDays.join(', ')}.`,

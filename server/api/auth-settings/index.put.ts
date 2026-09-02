@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (!role) {
-                throw createError({ statusCode: 422, statusMessage: 'No such access role.' });
+                throw createError({ statusCode: 422, message: 'No such access role.' });
             }
         }
 

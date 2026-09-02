@@ -1,6 +1,7 @@
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
-import { isTerminal, serializeRun } from '../../../utils/solverClient';
+import { isTerminal } from '../../../utils/solverClient';
+import { serializeRunWithError } from '../../../utils/solverErrorMapping';
 import { pollSolverRun } from '../../../utils/solverPolling';
 
 /**
@@ -27,18 +28,18 @@ export default defineEventHandler(async (event) => {
         const run = await tx.solverRun.findFirst({ where: { id, tenantId: identity.tenantId } });
 
         if (!run) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (isTerminal(run.status) || !run.externalRunId) {
-            return { run: serializeRun(run), polled: false };
+            return { run: await serializeRunWithError(tx, run), polled: false };
         }
 
         const outcome = await pollSolverRun(tx, run);
         const fresh = await tx.solverRun.findFirstOrThrow({ where: { id: run.id } });
 
         return {
-            run: serializeRun(fresh),
+            run: await serializeRunWithError(tx, fresh),
             polled: outcome.polled,
             ...(outcome.stale ? { stale: true, solverUnreachable: outcome.detail } : {}),
         };

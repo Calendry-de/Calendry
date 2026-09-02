@@ -9,7 +9,7 @@
         class="weeknav"
         :class="{ 'weeknav--loading': loading }"
         role="group"
-        aria-label="Week"
+        :aria-label="t('schedule.weekNav.regionLabel')"
         :aria-busy="loading"
         @wheel="stepOnWheel"
     >
@@ -17,7 +17,7 @@
             class="weeknav_step"
             type="button"
             :disabled="week <= 1"
-            aria-label="Previous week"
+            :aria-label="t('schedule.weekNav.previous')"
             @click="step(-1)"
         >
             <Icon
@@ -35,8 +35,8 @@
                     :key="week"
                     class="weeknav_value"
                 >
-                    <span class="weeknav_number">Week {{ week }}</span>
-                    <span class="weeknav_total">of {{ totalWeeks }}</span>
+                    <span class="weeknav_number">{{ t('schedule.weekNav.week', { week }) }}</span>
+                    <span class="weeknav_total">{{ t('schedule.weekNav.ofTotal', { total: totalWeeks }) }}</span>
                     <span
                         v-if="rangeLabel"
                         class="weeknav_range"
@@ -49,7 +49,7 @@
             class="weeknav_step"
             type="button"
             :disabled="week >= totalWeeks"
-            aria-label="Next week"
+            :aria-label="t('schedule.weekNav.next')"
             @click="step(1)"
         >
             <Icon
@@ -57,11 +57,24 @@
                 aria-hidden="true"
             />
         </button>
+
+        <!--
+            OPAQUE ON PURPOSE. "Today" used to live in the toolbar as a full
+            text button, competing for space with Add Event/Proposals/the
+            solver control; it belongs next to the control it jumps, not
+            filed among edit actions. This component still owns only weeks: it
+            renders whatever the caller hands it here, without knowing it is
+            "Today", so the jump logic and its permission gate stay the
+            page's, the same reason `rangeLabel` above is a prop rather than
+            this component resolving a Term itself.
+        -->
+        <slot name="trailing"/>
     </div>
 </template>
 
 <script setup lang="ts">
 import { useWheelStep } from '~/composables/wheelStep';
+import { useT } from '~/composables/i18n';
 
 /**
  * Week navigation: its own component because it owns three things that belong
@@ -85,6 +98,8 @@ const props = defineProps<{
      */
     rangeLabel?: string;
 }>();
+
+const { t } = useT();
 
 const week = defineModel<number>({ required: true });
 

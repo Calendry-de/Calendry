@@ -1,0 +1,28 @@
+{
+    "page": {
+        "title": "Home",
+        "fallbackTitle": "Dashboard"
+    },
+    "greeting": {
+        "signedInAs": "Signed in as {givenName} {familyName}"
+    },
+    "action": {
+        "switchInstitution": "Switch institution",
+        "signOut": "Sign out",
+        "signOutBusy": "Signing out…"
+    },
+    "error": {
+        "signOut": "Could not sign out. Check your connection and try again."
+    },
+    "empty": {
+        "noManageAccess": "You do not have read access to any management section in this institution. An administrator can grant it through your access role."
+    },
+    "counts": {
+        "unavailable": "Unavailable"
+    },
+    "permissions": {
+        "summary": "{count} permission in this tenant | {count} permissions in this tenant",
+        "otherHeading": "Other",
+        "otherNote": "Held, but not in the permission catalogue. Likely a key that moved or was removed from {module}; worth reporting."
+    }
+}

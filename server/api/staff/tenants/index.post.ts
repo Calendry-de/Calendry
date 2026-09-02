@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
         return result;
     } catch (error) {
         if (error instanceof UnknownFederationError) {
-            throw createError({ statusCode: 400, statusMessage: error.message });
+            throw createError({ statusCode: 400, message: error.message });
         }
 
         // A tenant with this slug already exists: creates, never updates.
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
         if (rawPostgresErrorCode(error) === '23505') {
             throw createError({
                 statusCode: 409,
-                statusMessage: `A tenant with slug '${body.slug}' already exists.`,
+                message: `A tenant with slug '${body.slug}' already exists.`,
             });
         }
 

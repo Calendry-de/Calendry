@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!person) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const limits = await tenantGridLimits(tx, identity.tenantId);
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
         if (outOfRange.length) {
             throw createError({
                 statusCode: 400,
-                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1}. The largest time grid `
+                message: `Blocks must be between 0 and ${limits.blocksPerDay - 1}. The largest time grid `
                     + `in this tenant has ${limits.blocksPerDay} blocks per day.`,
                 data: { field: 'preferredBlocks' },
             });

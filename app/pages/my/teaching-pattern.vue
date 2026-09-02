@@ -1,12 +1,24 @@
 <template>
-    <CommonPage title="My teaching pattern">
-        <p class="intro">
-            How each module you lead is placed across the term.
-            <strong>Spread</strong> gives it a consistent weekly slot; <strong>Kept together</strong>
-            concentrates it into a short window instead. Neither is a guarantee: a pattern is weighed
-            against every other rule the next time this institution generates a timetable, and it takes
-            effect only once a tenant has switched the matching rule on.
-        </p>
+    <CommonPage :title="t('my.teachingPattern.pageTitle')">
+        <!--
+            `<i18n-t>` rather than three keys concatenated in English order: the
+            two emphasised pattern names are grammar, not decoration, and German
+            puts them elsewhere in the clause. One message with two placeholders
+            lets them move; the slot names match the placeholders.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="my.teachingPattern.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #spread>
+                <strong>{{ t('my.teachingPattern.introSpread') }}</strong>
+            </template>
+            <template #together>
+                <strong>{{ t('my.teachingPattern.introTogether') }}</strong>
+            </template>
+        </i18n-t>
 
         <p
             v-if="error"
@@ -18,7 +30,7 @@
             v-if="!offerings.length"
             class="note note--warn"
         >
-            You are not listed as a lecturer on any module, so there is nothing to set a pattern for.
+            {{ t('my.teachingPattern.emptyHint') }}
         </p>
 
         <ul
@@ -31,12 +43,12 @@
                 class="row"
             >
                 <div class="row_main">
-                    <strong>{{ offering.code ? `${offering.code}: ${offering.title}` : offering.title }}</strong>
+                    <strong>{{ moduleLabel(offering) }}</strong>
                     <span class="row_meta">{{ offering.term.name }}</span>
                 </div>
 
                 <label class="row_field">
-                    <span class="row_label">Pattern</span>
+                    <span class="row_label">{{ t('my.teachingPattern.patternLabel') }}</span>
                     <select
                         class="row_select"
                         :disabled="busy.has(offering.id)"
@@ -46,15 +58,15 @@
                         <option
                             :selected="offering.schedulingPattern === null"
                             value=""
-                        >Not decided</option>
+                        >{{ t('my.teachingPattern.patternUndecided') }}</option>
                         <option
                             :selected="offering.schedulingPattern === 'DISTRIBUTED'"
                             value="DISTRIBUTED"
-                        >Spread across the term</option>
+                        >{{ t('my.teachingPattern.patternDistributed') }}</option>
                         <option
                             :selected="offering.schedulingPattern === 'BLOCK'"
                             value="BLOCK"
-                        >Kept together</option>
+                        >{{ t('my.teachingPattern.patternBlock') }}</option>
                         <!--
                             THE TICKET'S THIRD MODE, DELIBERATELY DISABLED. "Multiple sessions
                             grouped into a day" needs a solver evaluator that rewards clustering
@@ -66,20 +78,22 @@
                         <option
                             disabled
                             value="MULTIPLE_PER_DAY"
-                        >Multiple in a day (not available yet)</option>
+                        >{{ t('my.teachingPattern.patternMultiplePerDay') }}</option>
                     </select>
                 </label>
 
                 <span
                     v-if="savedId === offering.id"
                     class="row_status row_status--ok"
-                >Saved</span>
+                >{{ t('my.teachingPattern.saved') }}</span>
             </li>
         </ul>
     </CommonPage>
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * A lecturer's own choice of HOW each module they lead is taught (issue #28),
  * the same shape `/my/preferences` uses for slot preferences, attached to
@@ -91,7 +105,10 @@
  * about what can actually be saved.
  */
 definePageMeta({ middleware: 'my' });
-useHead({ title: 'My teaching pattern' });
+
+const { t } = useT();
+
+useHead(() => ({ title: t('my.teachingPattern.pageTitle') }));
 
 interface OfferingRow {
     id: string;
@@ -99,6 +116,13 @@ interface OfferingRow {
     code: string | null;
     schedulingPattern: 'DISTRIBUTED' | 'BLOCK' | null;
     term: { id: string; name: string };
+}
+
+/** "CODE: Title", or the title alone: the colon is punctuation a translator owns. */
+function moduleLabel(offering: OfferingRow): string {
+    return offering.code
+        ? t('my.teachingPattern.moduleWithCode', { code: offering.code, title: offering.title })
+        : offering.title;
 }
 
 const request = useRequestFetch();
@@ -128,7 +152,8 @@ async function onChange(offeringId: string, value: string) {
         await refresh();
         savedId.value = offeringId;
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage ?? 'Could not save that.';
+        error.value = serverErrorMessage(cause)
+            ?? t('my.teachingPattern.saveError');
         await refresh();
     } finally {
         const next = new Set(busy.value);

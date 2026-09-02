@@ -1,0 +1,478 @@
+{
+    "person": {
+        "label": "Person",
+        "plural": "Personen",
+        "description": "Alle, die der Stundenplan einplant oder benachrichtigt.",
+        "keywords": "Personen, Person, Lehrkraft, Lehrkräfte, Studierende, Lernende, Personal, Verzeichnis, Kartei",
+        "column": {
+            "familyName": "Nachname",
+            "givenName": "Vorname",
+            "email": "E-Mail"
+        },
+        "field": {
+            "givenName": { "label": "Vorname" },
+            "familyName": { "label": "Nachname" },
+            "email": { "label": "E-Mail" },
+            "externalRef": {
+                "label": "Externe Referenz",
+                "help": "Stabile Kennung aus einem externen Verwaltungssystem (SIS) oder LDAP, über die Importe abgeglichen werden."
+            },
+            "timezone": {
+                "help": "Nur für Anzeige und Export. Sie beeinflusst nie die Platzierung im Zeitraster und nie die Logik für „selben Tag“."
+            }
+        },
+        "relation": {
+            "roles": {
+                "label": "Planungsrollen",
+                "help": "Als was diese Person eingeplant werden kann: Lehrkraft, Gasthörende. Keine Berechtigungen.",
+                "emptyHint": "Es sind noch keine Rollen definiert."
+            },
+            "accessRoles": {
+                "label": "Berechtigungsrollen",
+                "help": "Was diese Person in Calendry TUN darf. Etwas anderes als die Planungsrollen darüber, die nur Vokabular sind und keine Rechte vergeben.",
+                "emptyHint": "Es sind noch keine Berechtigungsrollen definiert.",
+                "emptyWarning": "Keine Berechtigungsrolle zugewiesen. Diese Person kann sich anmelden und sieht eine leere Anwendung: keinen Stundenplan, keine Navigation."
+            },
+            "groups": {
+                "label": "Gruppenmitgliedschaften",
+                "help": "Zu welchen Jahrgängen und Seminaren diese Person gehört.",
+                "emptyHint": "Es sind noch keine Gruppen definiert."
+            }
+        }
+    },
+    "role": {
+        "label": "Rolle",
+        "plural": "Rollen",
+        "description": "Vokabular für die Planung: Lehrkraft, Gasthörende. Keine Berechtigungen.",
+        "keywords": "Rolle, Rollen, Lehrkraft, Gasthörende, Vokabular, Bezeichnung",
+        "column": {
+            "key": "Schlüssel"
+        },
+        "field": {
+            "key": {
+                "label": "Schlüssel",
+                "help": "Stabile Kennung, die von Importen und Regeln verwendet wird. Später nicht mehr änderbar."
+            }
+        }
+    },
+    "room": {
+        "label": "Raum",
+        "plural": "Räume",
+        "description": "Physische und virtuelle Räume, in die Termine gelegt werden können.",
+        "keywords": "Raum, Räume, Saal, Hörsaal, Labor, Gebäude, Ort, Kapazität",
+        "column": {
+            "capacity": "Kapazität",
+            "examCapacity": "Prüfungskapazität",
+            "location": "Ort"
+        },
+        "field": {
+            "capacity": {
+                "label": "Kapazität",
+                "help": "Sitzplätze. 0 bedeutet keine Begrenzung: ein Online-Raum oder einer, den niemand ausgezählt hat."
+            },
+            "examCapacity": {
+                "label": "Prüfungskapazität",
+                "help": "Sitzplätze, die für eine Prüfung zur Verfügung stehen, falls es weniger als die normale Kapazität sind: Abstände und Aufsicht brauchen bei Prüfungen oft mehr Platz pro Person. Ohne Angabe gilt die normale Kapazität dieses Raums."
+            },
+            "location": { "label": "Ort" },
+            "ranking": {
+                "label": "Rang",
+                "help": "Attraktivität, HÖHER = hochwertiger. Die Regel „Raumwahl nach Rang steuern“ liest diesen Wert und verschiebt die Platzierung damit an ein Ende der Skala."
+            },
+            "isVirtual": { "label": "Virtuell" }
+        },
+        "relation": {
+            "equipment": {
+                "label": "Ausstattung in diesem Raum",
+                "help": "Was dieser Raum bietet. Lehrveranstaltungen, die eine Ausstattung benötigen, können nur hier stattfinden, und eine Stückzahl ist der Wert, an dem eine Lehrveranstaltung mit Mindestanforderung gemessen wird. Ohne Stückzahl sagt dieser Raum nur aus, dass die Ausstattung vorhanden ist.",
+                "quantity": "Anzahl",
+                "emptyHint": "Es ist noch keine Ausstattung definiert."
+            }
+        }
+    },
+    "equipment": {
+        "label": "Ausstattung",
+        "plural": "Ausstattung",
+        "description": "Merkmale, die Räume bieten und Lehrveranstaltungen benötigen.",
+        "keywords": "Ausstattung, Merkmal, Beamer, Projektor, Labor, Schlagwort, Einrichtung",
+        "column": {
+            "key": "Schlüssel"
+        },
+        "field": {
+            "key": {
+                "label": "Schlüssel",
+                "help": "Stabile Kennung, die von Importen verwendet wird. Später nicht mehr änderbar."
+            }
+        }
+    },
+    "group": {
+        "label": "Gruppe",
+        "plural": "Gruppen",
+        "description": "Jahrgänge und ihre verschachtelten Untergruppen.",
+        "keywords": "Gruppe, Gruppen, Klasse, Kohorte, Jahrgang, Kurs, Seminar, Verschachtelung, Hierarchie, Baum",
+        "column": {
+            "expectedSize": "Erwartete Größe"
+        },
+        "field": {
+            "expectedSize": {
+                "label": "Erwartete Größe",
+                "help": "Richtwert für die Prüfung der Raumkapazität. Maßgeblich bleiben die Mitgliedschaften."
+            },
+            "parentGroupId": {
+                "label": "Übergeordnete Gruppe",
+                "emptyHint": "Es gibt noch keine andere Gruppe, unter die sich diese einordnen ließe."
+            },
+            "curriculumPlanId": {
+                "label": "Lehrplan",
+                "help": "Der Lehrplan, dem diese Gruppe folgen soll: eine Absicht, festgelegt, bevor es überhaupt Lehrveranstaltungen gibt. Damit kann der Bereich „Auf mehrere Gruppen ausrollen“ des Lehrplans diese Gruppe vorauswählen, statt sie jedes Mal von Hand zu wählen. Nicht zu verwechseln damit, aus welchem Lehrplan diese Gruppe bereits Lehrveranstaltungen hat; dafür siehe den Bereich „Lehrpläne“ weiter unten.",
+                "emptyHint": "Es sind noch keine Lehrpläne definiert."
+            }
+        },
+        "relation": {
+            "terms": {
+                "label": "Verfügbar in Semestern",
+                "help": "Leer lassen, damit diese Gruppe in jedem Semester verfügbar ist. Sobald Semester hinzugefügt werden, gilt sie nur noch für diese – und genau das schränkt die Gruppenauswahl bei Lehrveranstaltungen anderer Semester ein.",
+                "emptyHint": "In jedem Semester verfügbar."
+            }
+        }
+    },
+    "timeGrid": {
+        "label": "Zeitraster",
+        "plural": "Zeitraster",
+        "description": "Blocklänge, Blöcke pro Tag und die Tage, an denen diese Institution unterrichtet.",
+        "keywords": "Zeitraster, Raster, Stundenraster, Blöcke, Stunden, Zeitfenster, Tage",
+        "column": {
+            "blocksPerDay": "Blöcke/Tag",
+            "blockLengthMinutes": "Blocklänge",
+            "activeDays": "Tage",
+            "isDefault": "Standard"
+        },
+        "field": {
+            "blockLengthMinutes": { "label": "Blocklänge (Minuten)" },
+            "blocksPerDay": { "label": "Blöcke pro Tag" },
+            "startHour": { "label": "Startstunde" },
+            "startMinute": { "label": "Startminute" },
+            "breakMinutes": { "label": "Standardabstand zwischen Blöcken (Minuten)" },
+            "breaks": { "label": "Benannte Pausen" },
+            "activeDays": { "label": "Unterrichtstage" },
+            "isDefault": { "label": "Standardraster" }
+        }
+    },
+    "sessionKind": {
+        "label": "Terminart",
+        "plural": "Terminarten",
+        "description": "Ihr eigenes Vokabular: Vorlesung, Praktikum, Seminar. Nichts davon ist fest vorgegeben.",
+        "keywords": "Art, Terminart, Typ, Vorlesung, Praktikum, Seminar, Prüfung, Klausur, Vokabular, Kategorie",
+        "column": {
+            "key": "Schlüssel",
+            "type": "Typ",
+            "requiresGroup": "Mit Gruppen"
+        },
+        "field": {
+            "key": {
+                "label": "Schlüssel",
+                "help": "Stabile Kennung, die von Importen und Regeln verwendet wird. Später nicht mehr änderbar."
+            },
+            "type": {
+                "label": "Was es ist",
+                "help": "Legt fest, welche Regeln diese Art erreichen. {examHelp}"
+            },
+            "color": {
+                "help": "Färbt diese Art im Stundenplan ein. Die Einträge im Plan bleiben auch ohne Farbe lesbar: Farbe ist nie der einzige Hinweis."
+            },
+            "requiresGroup": {
+                "label": "Hat Gruppen",
+                "help": "Ob bei Terminen dieser Art Gruppen zugeordnet sein sollen. Damit lässt sich eine gruppenbasierte Regel ablehnen, wenn sie auf eine Art zielt, die gar keine Gruppen hat."
+            }
+        }
+    },
+    "offering": {
+        "label": "Lehrveranstaltung",
+        "plural": "Lehrveranstaltungen",
+        "description": "Was eingeplant werden muss: der wiederkehrende Bedarf, aus dem Termine entstehen.",
+        "keywords": "Lehrveranstaltung, Lehrveranstaltungen, Kurs, Modul, Fach, Unterricht, Vorlesung, Bedarf, Curriculum",
+        "startFromTemplate": {
+            "fallback": "Vorlage"
+        },
+        "column": {
+            "title": "Titel",
+            "frequency": "Termine",
+            "durationBlocks": "Blöcke"
+        },
+        "field": {
+            "title": { "label": "Titel" },
+            "color": {
+                "help": "Färbt jeden Termin dieser Lehrveranstaltung ein. Leer lassen, um die Farbe der Terminart zu übernehmen: leer bedeutet übernehmen, nicht grau."
+            },
+            "termId": {
+                "label": "Semester",
+                "emptyHint": "Legen Sie zuerst ein Semester an: eine Lehrveranstaltung muss zu einem gehören."
+            },
+            "kindId": {
+                "label": "Art",
+                "emptyHint": "Legen Sie zuerst eine Terminart an: Vorlesung, Praktikum, Seminar – wie auch immer Sie sie nennen."
+            },
+            "frequency": {
+                "label": "Termine pro Semester",
+                "help": "Genau so viele Termine müssen existieren. Wird als harte Regel erzwungen."
+            },
+            "durationBlocks": {
+                "label": "Länge in Blöcken",
+                "help": "Wie viele aufeinanderfolgende Blöcke des Zeitrasters ein Termin belegt."
+            },
+            "schedulingPattern": {
+                "label": "Wie sich die Termine verteilen",
+                "help": "Ein wöchentliches Zeitfenster über das ganze Semester oder die gesamte Veranstaltung in einem kurzen Block. Beides wird festgehalten; auf den Stundenplan wirkt es erst, wenn die Administration die passende Regel aktiviert.",
+                "option": {
+                    "notDecided": "Nicht festgelegt",
+                    "distributed": "Über das Semester verteilt",
+                    "block": "In einem Zeitfenster gebündelt"
+                }
+            },
+            "requiredRoleId": {
+                "label": "Erforderliche Rolle",
+                "help": "Planungsrolle, die eine Lehrkraft haben muss, um diese Veranstaltung zu leiten. Ohne Angabe ist sie unerheblich.",
+                "emptyHint": "Es sind noch keine Rollen definiert."
+            },
+            "requiredLecturerCount": {
+                "label": "Gleichzeitig benötigte Lehrkräfte",
+                "help": "Leer lassen, um genau eine zu verlangen, die der Solver aus „Wer leitet sie“ weiter unten auswählt. Höher nur bei echtem Teamteaching: die Liste darunter ist ein Kandidatenpool, keine garantierte Besetzung."
+            },
+            "requiredRoomCount": {
+                "label": "Gleichzeitig benötigte Räume",
+                "help": "Für fast alles genau einer. Über eins belegt ein Termin entsprechend viele Räume gleichzeitig und ihre Kapazitäten werden ADDIERT: 120 Studierende passen in zwei Säle mit je 60 Plätzen. Nutzen Sie das für einen Jahrgang, der in keinen einzelnen Raum passt, nicht für ein Praktikum, bei dem jeder Raum alle aufnehmen muss. Höchstens {max}."
+            },
+            "requiredCapacity": {
+                "label": "Erforderliche Raumkapazität",
+                "help": "Ohne Angabe wird sie aus den zugeordneten Gruppen abgeleitet. Verglichen wird mit der SUMME der Kapazitäten, wenn mehr als ein Raum gleichzeitig benötigt wird.",
+                "derived": {
+                    "noGroups": "Keine Gruppen zugeordnet, daher lässt sich nichts ableiten: jeder Raum käme infrage.",
+                    "noSize": "Die zugeordneten Gruppen haben weder Mitglieder noch eine erwartete Größe, daher lässt sich nichts ableiten: jeder Raum käme infrage.",
+                    "basisMembership": "{count} eingeschriebene Person | {count} eingeschriebene Personen",
+                    "basisExpected": "erwartete Größen",
+                    "line": "Wenn leer gelassen: {capacity}, aus {count} zugeordneter Gruppe ({source}). | Wenn leer gelassen: {capacity}, aus {count} zugeordneten Gruppen ({source}).",
+                    "warning": "Warnung: Es sind nur {capacity} von erwarteten {estimate} eingeschrieben, dieser Wert kann also unvollständig sein."
+                }
+            },
+            "allowOnline": {
+                "label": "Darf online stattfinden",
+                "help": "Erlaubt dem Solver, diese Veranstaltung in einen virtuellen Raum zu legen. Online-Lehre ist ein virtueller Raum, kein Merkmal am Termin."
+            },
+            "notes": { "label": "Notizen" },
+            "createdFromTemplateId": { "label": "Aus Vorlage erstellt" }
+        },
+        "relation": {
+            "groups": {
+                "label": "Gruppen, für die sie gilt",
+                "help": "Verschachtelung wirkt weiter: Wird ein Jahrgang zugeordnet, sind auch dessen Seminargruppen belegt. Aufgeführt werden nur Gruppen, die im Semester dieser Lehrveranstaltung verfügbar sind.",
+                "emptyHint": "In diesem Semester ist keine Gruppe verfügbar."
+            },
+            "lecturers": {
+                "label": "Wer leitet sie",
+                "help": "Berechtigt, sie zu leiten: ein Kandidatenpool, aus dem der Solver auswählt, in der Größe von „Gleichzeitig benötigte Lehrkräfte“ weiter oben. Optional können Sie angeben, welche Planungsrolle jede Person hier ausfüllt.",
+                "emptyHint": "Es sind noch keine Personen definiert.",
+                "rolePlaceholder": "Beliebige Rolle"
+            },
+            "equipment": {
+                "label": "Benötigte Ausstattung",
+                "help": "Beschränkt die Platzierung auf Räume, die alles davon bieten. Eine Stückzahl bedeutet mindestens so viele Einheiten, sodass nur Räume infrage kommen, die genug davon angeben.",
+                "quantity": "Anzahl",
+                "emptyHint": "Es ist noch keine Ausstattung definiert."
+            }
+        }
+    },
+    "offeringTemplate": {
+        "label": "Lehrveranstaltungsvorlage",
+        "plural": "Lehrveranstaltungsvorlagen",
+        "description": "Wiederverwendbare Muster für Lehrveranstaltungen, etwa „Mathematik, 4×/Woche“, von denen eine neue Lehrveranstaltung ausgehen kann.",
+        "keywords": "Vorlage, Vorlagen, Lehrveranstaltungsvorlage, Muster, Vorgabe, Kopie, Wiederverwendung",
+        "column": {
+            "title": "Titel der Lehrveranstaltung",
+            "frequency": "Termine",
+            "durationBlocks": "Blöcke"
+        },
+        "field": {
+            "name": {
+                "label": "Name der Vorlage",
+                "help": "Woran Sie diese Vorlage wiedererkennen, nicht der Titel, den sie der Lehrveranstaltung gibt."
+            },
+            "title": {
+                "label": "Titel der Lehrveranstaltung",
+                "help": "Leer lassen, um jede Lehrveranstaltung einzeln zu benennen."
+            },
+            "kindId": {
+                "label": "Art",
+                "emptyHint": "Legen Sie zuerst eine Terminart an: Vorlesung, Unterrichtsstunde – wie auch immer Sie sie nennen."
+            },
+            "frequency": { "label": "Termine pro Semester" },
+            "durationBlocks": { "label": "Länge in Blöcken" },
+            "schedulingPattern": {
+                "label": "Wie sich die Termine verteilen",
+                "option": {
+                    "notDecided": "Nicht festgelegt",
+                    "distributed": "Über das Semester verteilt",
+                    "block": "In einem Zeitfenster gebündelt"
+                }
+            },
+            "requiredRoleId": {
+                "label": "Erforderliche Rolle",
+                "help": "Der Hinweis auf den Pool möglicher Lehrkräfte. Eine bestimmte Person wird an der Lehrveranstaltung selbst benannt, nicht hier.",
+                "emptyHint": "Es sind noch keine Rollen definiert."
+            },
+            "requiredCapacity": { "label": "Erforderliche Raumkapazität" },
+            "requiredRoomCount": { "label": "Gleichzeitig benötigte Räume" },
+            "requiredLecturerCount": { "label": "Gleichzeitig benötigte Lehrkräfte" },
+            "allowOnline": { "label": "Darf online stattfinden" },
+            "notes": { "label": "Notizen" }
+        }
+    },
+    "offeringPlan": {
+        "label": "Lehrplan",
+        "plural": "Lehrpläne",
+        "description": "Das gesamte Lehrangebot eines Jahrgangs, gebündelt: auf eine Gruppe angewendet, entstehen alle Lehrveranstaltungen auf einmal.",
+        "keywords": "Lehrplan, Lehrpläne, Curriculum, Jahrgang, Kohorte, Bündel, Vorlage, Stundenumfang",
+        "field": {
+            "nextPlanId": {
+                "label": "Nachfolgender Lehrplan",
+                "help": "Wohin eine Gruppe mit diesem Lehrplan als Nächstes wechselt: „Semester 3“ benennt „Semester 4“. Damit rückt eine Gruppe ohne Auswahlfeld vor: als Semester gilt standardmäßig das nächste beginnende.",
+                "emptyHint": "Es gibt noch keinen anderen Lehrplan, auf den verwiesen werden könnte."
+            }
+        }
+    },
+    "constraint": {
+        "label": "Regel",
+        "plural": "Regeln",
+        "description": "Die Regeln, die ein Stundenplan einhalten muss, und die Wünsche, die er abwägen soll.",
+        "keywords": "Regel, Regeln, hart, weich, Strafgewicht, Konflikt, Richtlinie, Nebenbedingung",
+        "column": {
+            "type": "Typ",
+            "severity": "Härte",
+            "isEnabled": "Aktiviert"
+        },
+        "field": {
+            "type": { "label": "Regel" },
+            "severity": { "label": "Härte" },
+            "weight": { "label": "Strafgewicht" },
+            "params": { "label": "Parameter" },
+            "scopes": { "label": "Gilt für Terminarten" },
+            "members": { "label": "Beteiligte Lehrveranstaltungen" },
+            "isEnabled": { "label": "Aktiviert" }
+        }
+    },
+    "screen": {
+        "label": "Anzeigetafel",
+        "plural": "Anzeigetafeln",
+        "description": "Anzeigen im Foyer und auf den Gängen, die die aktuelle Raumbelegung zeigen.",
+        "keywords": "Anzeigetafel, Anzeigetafeln, Anzeige, Bildschirm, Monitor, Foyer, Eingangshalle, Flur, Aushang, Belegung",
+        "column": {
+            "roomSummary": "Zeigt",
+            "lastSeenAt": "Zuletzt gesehen"
+        },
+        "field": {
+            "name": {
+                "help": "Wo die Anzeigetafel physisch hängt (z. B. „Haupteingang“, „Flur Gebäude B“), damit sich die richtige ohne Rätselraten sperren lässt."
+            },
+            "isActive": {
+                "help": "Eine Anzeigetafel abzuschalten macht ihren Schlüssel sofort unwirksam und ist umkehrbar. Das Löschen ist es nicht."
+            },
+            "roomIds": {
+                "label": "Angezeigte Räume",
+                "emptyHint": "Es sind noch keine Räume definiert."
+            },
+            "key": { "label": "Anzeige-Adresse" }
+        }
+    },
+    "term": {
+        "label": "Semester",
+        "plural": "Semester",
+        "description": "Zeitabschnitte des Studien- oder Schuljahres, innerhalb derer Termine geplant werden.",
+        "keywords": "Semester, Halbjahr, Schuljahr, Studienjahr, Trimester, Lernabschnitt",
+        "column": {
+            "startDate": "Beginnt",
+            "endDate": "Endet"
+        },
+        "field": {
+            "startDate": { "label": "Startdatum" },
+            "endDate": { "label": "Enddatum" },
+            "timeGridId": {
+                "label": "Zeitraster",
+                "help": "Auf welchem Raster dieses Semester geplant wird. Ohne Angabe gilt der Standard der Institution.",
+                "emptyHint": "Es sind noch keine Zeitraster eingerichtet."
+            }
+        }
+    },
+    "calendarPeriod": {
+        "label": "Kalenderzeitraum",
+        "plural": "Kalenderzeiträume",
+        "description": "Feiertage, unterrichtsfreie Wochen und Prüfungszeiträume innerhalb eines Semesters.",
+        "keywords": "Kalender, Zeitraum, Zeiträume, Ferien, Feiertag, unterrichtsfrei, Prüfungszeit, Prüfung, Lesewoche",
+        "column": {
+            "kind": "Art",
+            "startDate": "Beginnt",
+            "endDate": "Endet"
+        },
+        "field": {
+            "termId": {
+                "label": "Semester",
+                "help": "In welches Semester dieser Zeitraum fällt. Nachträglich nicht änderbar: einen Zeitraum in ein anderes Semester zu verschieben heißt, einen anderen Zeitraum anzulegen.",
+                "emptyHint": "Es sind noch keine Semester eingerichtet."
+            },
+            "kind": {
+                "label": "Art",
+                "help": "Ein Zeitraum vom Typ EXAM beansprucht jede Woche, die er berührt. BREAK oder HOLIDAY beanspruchen eine Woche nur, wenn sie sie vollständig abdecken.",
+                "option": {
+                    "exam": "Prüfungszeitraum",
+                    "break": "Unterrichtsfreie Zeit",
+                    "holiday": "Feiertag"
+                }
+            },
+            "startDate": { "label": "Startdatum" },
+            "endDate": { "label": "Enddatum" },
+            "weekPreview": { "label": "Wochen, die dies neu einordnet" }
+        }
+    },
+    "account": {
+        "label": "Zugang",
+        "plural": "Zugänge",
+        "description": "Wie sich Personen anmelden: Zugangsdaten, getrennt von den Personen, als die sie handeln.",
+        "keywords": "Zugang, Zugänge, Konto, Konten, Anmeldung, anmelden, Zugangsdaten, Passwort, zurücksetzen",
+        "column": {
+            "email": "E-Mail",
+            "personName": "Handelt als",
+            "mustChangePassword": "Muss wechseln",
+            "lastLoginAt": "Letzte Anmeldung"
+        },
+        "field": {
+            "email": {
+                "label": "E-Mail",
+                "help": "Die Adresse für die Anmeldung, eindeutig über die gesamte Installation: ein Zugang kann in mehreren Institutionen handeln."
+            },
+            "personId": { "label": "Handelt als" },
+            "password": { "label": "Initiales Passwort" },
+            "attachExisting": { "label": "Bestehenden Zugang verknüpfen" },
+            "mustChangePassword": {
+                "label": "Muss bei der ersten Anmeldung ein neues Passwort wählen",
+                "help": "Ein Passwort, das die Administration kennt, ist ein geteiltes Geheimnis. Genau das macht es vorübergehend: die Anmeldung gelingt, erzeugt aber erst dann eine Sitzung, wenn das Passwort geändert wurde."
+            },
+            "isActive": {
+                "help": "Eine Deaktivierung sperrt die Anmeldung sofort, und zwar in jeder Institution, in der dieser Zugang genutzt wird. Die Person bleibt in beiden Fällen im Stundenplan."
+            }
+        }
+    },
+    "accessRole": {
+        "label": "Berechtigungsrolle",
+        "plural": "Berechtigungsrollen",
+        "description": "Wer was darf: Bündel von Berechtigungen, die Personen erhalten.",
+        "keywords": "Berechtigung, Berechtigungen, Berechtigungsrolle, Zugriff, Rechte, Administration, Autorisierung, Sicherheit",
+        "column": {
+            "key": "Schlüssel"
+        },
+        "field": {
+            "key": {
+                "label": "Schlüssel",
+                "help": "Stabile Kennung. `create:account --role <key>` und jeder Import sprechen die Rolle darüber an, sie kann daher später nicht geändert werden."
+            },
+            "permissions": { "label": "Berechtigungen" }
+        }
+    }
+}

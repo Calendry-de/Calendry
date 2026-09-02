@@ -1,6 +1,6 @@
 <template>
     <CommonBox>
-        <h1 class="staff_login_title">Calendry staff</h1>
+        <h1 class="staff_login_title">{{ t('staff.brand.heading') }}</h1>
 
         <form
             class="staff_login_form"
@@ -10,18 +10,17 @@
                 v-if="justChanged"
                 class="staff_login_changed"
                 role="status"
-            >Password changed. Sign in with your new password.</p>
+            >{{ t('staff.login.passwordChanged') }}</p>
             <p
                 v-else
                 class="staff_login_lead"
             >
-                Internal sign-in. This is a separate credential from a tenant
-                account.
+                {{ t('staff.login.lead') }}
             </p>
 
             <CommonInputText
                 v-model="email"
-                placeholder="Email"
+                :placeholder="t('staff.login.emailPlaceholder')"
                 input-type="email"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'username', required: true, autofocus: true }"
@@ -29,7 +28,7 @@
 
             <CommonInputText
                 v-model="password"
-                placeholder="Password"
+                :placeholder="t('staff.login.passwordPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'current-password', required: true }"
@@ -60,7 +59,7 @@
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Signing in…' : 'Sign in' }}</CommonButton>
+            >{{ busy ? t('staff.login.submitBusy') : t('staff.login.submit') }}</CommonButton>
         </form>
     </CommonBox>
 </template>
@@ -71,6 +70,7 @@ import CommonButton from '~/components/common/CommonButton.vue';
 import CommonInputText from '~/components/common/CommonInputText.vue';
 import { STAFF_CHANGE_PASSWORD_ROUTE, STAFF_ROUTE, isInternalPath } from '~/utils/routes';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
+import { useT } from '~/composables/i18n';
 
 /**
  * Cloudflare's widget script attaches itself to `window.turnstile`. Declared
@@ -108,7 +108,20 @@ const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api
  * about when the widget is required.
  */
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Staff sign in' });
+
+/*
+ * ITS OWN COPY, in the `staff` namespace, deliberately NOT `auth.*` even where
+ * the English sentence is identical. This authenticates a `StaffAccount`, a
+ * completely separate credential from a tenant Account (CLAUDE.md § the staff
+ * principal): sharing a message would tie the wording of an internal tool to
+ * the wording of the product's own sign-in, so a change to either would move
+ * both.
+ */
+const { t } = useT();
+
+// A getter, so the tab title follows a language change instead of freezing at
+// whatever was active when this page first mounted.
+useHead(() => ({ title: t('staff.login.pageTitle') }));
 
 const route = useRoute();
 
@@ -231,7 +244,7 @@ async function submit() {
         // ONE message for wrong password, unknown staff account, and a
         // deactivated one: the API returns an identical 401 for all three so
         // this page does not become a staff-account-existence oracle.
-        error.value = 'Invalid credentials.';
+        error.value = t('staff.login.error');
         password.value = '';
         failedAttempts.value += 1;
 

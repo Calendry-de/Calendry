@@ -27,7 +27,12 @@ describe('resolveLocale precedence', () => {
     });
 
     it('falls back to the hardcoded floor when nothing resolves', () => {
-        expect(resolveLocale({})).toBe('en-GB');
+        // `de-DE` since issue #19, not `en-GB`: this value now also decides
+        // the UI LANGUAGE (via `resolveLanguage`), so it is the product's
+        // answer to "no preference stated" rather than a neutral formatting
+        // default. `tests/i18n-catalogue.test.ts` asserts it stays in step
+        // with `DEFAULT_LANGUAGE`.
+        expect(resolveLocale({})).toBe('de-DE');
     });
 
     it('skips an unusable stored value rather than throwing', () => {

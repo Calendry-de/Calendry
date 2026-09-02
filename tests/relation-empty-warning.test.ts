@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
+import { manageEntities } from '../app/utils/manageRegistry';
+import { englishT } from './helpers/manageMessages';
 import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
 import { login } from './helpers/client';
 
@@ -51,7 +52,13 @@ afterAll(async () => {
 });
 
 describe('the registry declares it, and declares it correctly', () => {
-    const relations = MANAGE_ENTITIES.flatMap((entity) => (entity.relations ?? [])
+    /*
+     * `englishT`, not the `(key) => key` stub: every assertion below is about
+     * the WORDING of `emptyWarning` (that it names no role key, that it
+     * instructs nobody), and against an identity stub each would be checking a
+     * key name instead. See `tests/helpers/manageMessages.ts`.
+     */
+    const relations = manageEntities(englishT).flatMap((entity) => (entity.relations ?? [])
         .map((def) => ({ id: `${entity.key}/${def.key}`, def })));
 
     it('has relations to check at all', () => {

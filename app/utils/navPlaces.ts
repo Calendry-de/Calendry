@@ -1,5 +1,8 @@
 import type { PermissionRequirement } from '#shared/permissions';
-import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
+import type { Translate } from '~/composables/i18n';
+import type { MessageKey } from '~~/i18n/keys';
+import { searchKeywords } from '~/utils/i18nKeywords';
+import { entityPermission, manageEntities } from '~/utils/manageRegistry';
 import { MY_HUB_PERMISSIONS, MY_SECTION_PERMISSIONS } from '~/utils/mySectionPermissions';
 import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { HOME_ROUTE } from '~/utils/routes';
@@ -10,7 +13,7 @@ import { HOME_ROUTE } from '~/utils/routes';
  * What places exist, what they are called, and who may see them; not fetching,
  * not the palette's open/close machine, not permissions themselves.
  *
- * The `manage.*` entries are PROJECTED from MANAGE_ENTITIES rather than retyped,
+ * The `manage.*` entries are PROJECTED from `manageEntities()` rather than retyped,
  * which is why the sidebar and the palette cannot drift.
  */
 export type NavSection = 'schedule' | 'my' | 'manage' | 'account';
@@ -23,7 +26,12 @@ export interface NavEntry {
     description?: string;
     icon: string;
     section: NavSection;
-    /** Extra terms the fuzzy match should hit. Never shown. */
+    /**
+     * Extra terms the fuzzy match should hit. Never shown, but translated
+     * anyway: they are how Ctrl+K is searched, so English-only synonyms make
+     * the palette unusable in the default language. `searchKeywords()` merges
+     * the translated list with the English aliases; see its note.
+     */
     keywords: string[];
     /**
      * Catalogue permission(s) required to see this entry at all. Absent means
@@ -53,16 +61,34 @@ export interface NavEntry {
     inHeader?: boolean;
 }
 
-export const NAV_SECTION_LABELS: Record<NavSection, string> = {
-    schedule: 'Schedule',
-    my: 'My settings',
-    manage: 'Manage',
-    account: 'Account',
+/**
+ * The heading each section is announced under, as message keys.
+ *
+ * A `Record` over the union rather than a `switch`, so adding a `NavSection`
+ * is a typecheck error here naming the missing heading, not a section that
+ * renders under `undefined`.
+ */
+const NAV_SECTION_LABEL_KEYS: Record<NavSection, MessageKey> = {
+    schedule: 'nav.section.schedule',
+    my: 'nav.section.my',
+    manage: 'nav.section.manage',
+    account: 'nav.section.account',
 };
 
-/** Manage-area entries, derived from the entity registry. One array, one truth. */
-function manageEntries(): NavEntry[] {
-    return MANAGE_ENTITIES.map((entity) => ({
+/** The heading the command palette groups this section's results under. */
+export function navSectionLabel(section: NavSection, t: Translate): string {
+    return t(NAV_SECTION_LABEL_KEYS[section]);
+}
+
+/**
+ * Manage-area entries, derived from the entity registry. One array, one truth.
+ *
+ * `t` is threaded through rather than used here: every string below is the
+ * REGISTRY's, already resolved by `manageEntities()` (issue #19), so this
+ * projection stays what it was, a rename of fields.
+ */
+function manageEntries(t: Translate): NavEntry[] {
+    return manageEntities(t).map((entity) => ({
         id: `manage.${entity.key}`,
         label: entity.plural,
         description: entity.description,
@@ -87,19 +113,28 @@ function manageEntries(): NavEntry[] {
  * could reach it, and `/manage/data-export` sat unclassified by `NAV_GROUPS`
  * for exactly that reason, reachable in the header and in Ctrl+K but silently
  * missing from the app's one persistent nav.
+ *
+ * Still pure after issue #19: `t` is a PARAMETER, so the only thing a caller
+ * needs is a translator, not a Nuxt instance. `Translate`
+ * (`~/composables/i18n`) carries the reasoning for why this module cannot
+ * call `useT()` itself, and why the parameter is on the function rather than
+ * on each `label`. The manage entries' copy is NOT
+ * translated here: labels, descriptions AND keywords are projected from
+ * `manageEntities()`, so they belong to the `manage` namespace and are
+ * translated at their source.
  */
-export function navPlaces(): NavEntry[] {
+export function navPlaces(t: Translate): NavEntry[] {
     return [
         {
             id: 'home',
-            label: 'Home',
-            description: 'Session overview.',
+            label: t('nav.place.home.label'),
+            description: t('nav.place.home.description'),
             icon: 'material-symbols:other-houses-outline',
             section: 'schedule',
             // Not 'landing': `/` is the PUBLIC landing page and this entry is
             // the signed-in home, so that keyword would send a Ctrl+K search
             // for the marketing page to the dashboard instead.
-            keywords: ['home', 'start', 'dashboard', 'overview'],
+            keywords: searchKeywords(t, 'nav.place.home.keywords', ['home', 'start', 'dashboard', 'overview']),
             // HOME_ROUTE, not the literal: it is the single definition of where
             // a signed-in session belongs, and this entry was the one place that
             // still spelled it out, so changing it would have moved the
@@ -110,11 +145,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'schedule',
-            label: 'Schedule',
-            description: 'The week grid: see, select and move sessions.',
+            label: t('nav.place.schedule.label'),
+            description: t('nav.place.schedule.description'),
             icon: 'material-symbols:calendar-view-week-outline',
             section: 'schedule',
-            keywords: ['schedule', 'timetable', 'grid', 'week', 'calendar', 'sessions'],
+            keywords: searchKeywords(t, 'nav.place.schedule.keywords', ['schedule', 'timetable', 'grid', 'week', 'calendar', 'sessions']),
             /*
              * EITHER read key: see `schedulePermissions.ts`, which the route
              * middleware reads too, so the link and the destination cannot
@@ -134,11 +169,11 @@ export function navPlaces(): NavEntry[] {
              * schedule routes, sharing their `review` middleware.
              */
             id: 'manage.proposals',
-            label: 'Proposals',
-            description: 'Solver-produced schedules awaiting a decision.',
+            label: t('nav.place.manageProposals.label'),
+            description: t('nav.place.manageProposals.description'),
             icon: 'material-symbols:fact-check-outline',
             section: 'manage',
-            keywords: ['proposal', 'proposals', 'generation', 'solver', 'review', 'apply', 'pending'],
+            keywords: searchKeywords(t, 'nav.place.manageProposals.keywords', ['proposal', 'proposals', 'generation', 'solver', 'review', 'apply', 'pending']),
             /*
              * ONE permission, unlike its sibling `/schedule`: this page and the
              * review screen are gated on `generation.read` alone, matching
@@ -155,11 +190,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'my',
-            label: 'My settings',
-            description: 'Your own availability and teaching preferences.',
+            label: t('nav.place.my.label'),
+            description: t('nav.place.my.description'),
             icon: 'material-symbols:manage-accounts-outline',
             section: 'my',
-            keywords: ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences'],
+            keywords: searchKeywords(t, 'nav.place.my.keywords', ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences']),
             /*
              * IN THE HEADER, gated on ANY of the section's own keys
              * (`MY_HUB_PERMISSIONS`), not one hardcoded permission. Without
@@ -189,11 +224,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'my.availability',
-            label: 'My unavailability',
-            description: 'Days and blocks you cannot teach. Submitted for approval.',
+            label: t('nav.place.myAvailability.label'),
+            description: t('nav.place.myAvailability.description'),
             icon: 'material-symbols:event-busy-outline',
             section: 'my',
-            keywords: ['availability', 'unavailable', 'veto', 'blackout', 'absence', 'busy', 'my'],
+            keywords: searchKeywords(t, 'nav.place.myAvailability.keywords', ['availability', 'unavailable', 'veto', 'blackout', 'absence', 'busy', 'my']),
             /*
              * ONE permission, and deliberately not the six-permission shape
              * `/schedule` needs. Everything this page renders (the grid, the
@@ -208,11 +243,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'my.exams',
-            label: 'My exams',
-            description: 'Ask for an exam on a module you lead. Reviewed before it is placed.',
+            label: t('nav.place.myExams.label'),
+            description: t('nav.place.myExams.description'),
             icon: 'material-symbols:history-edu-outline',
             section: 'my',
-            keywords: ['exam', 'klausur', 'assessment', 'request', 'my'],
+            keywords: searchKeywords(t, 'nav.place.myExams.keywords', ['exam', 'klausur', 'assessment', 'request', 'my']),
             /*
              * ONE key, and the page's OWN fetches now match it exactly
              * (issue #108): its own requests and `GET
@@ -229,21 +264,21 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'my.preferences',
-            label: 'My teaching preferences',
-            description: 'Days and times you would rather teach. Recorded, not yet used by the scheduler.',
+            label: t('nav.place.myPreferences.label'),
+            description: t('nav.place.myPreferences.description'),
             icon: 'material-symbols:favorite-outline',
             section: 'my',
-            keywords: ['preference', 'preferred', 'mornings', 'days', 'teaching', 'my'],
+            keywords: searchKeywords(t, 'nav.place.myPreferences.keywords', ['preference', 'preferred', 'mornings', 'days', 'teaching', 'my']),
             permission: MY_SECTION_PERMISSIONS['/my/preferences'],
             to: '/my/preferences',
         },
         {
             id: 'my.teaching-pattern',
-            label: 'My teaching pattern',
-            description: 'How each module you lead is placed: spread across the term, or kept together.',
+            label: t('nav.place.myTeachingPattern.label'),
+            description: t('nav.place.myTeachingPattern.description'),
             icon: 'material-symbols:calendar-view-week-outline',
             section: 'my',
-            keywords: ['pattern', 'block', 'distributed', 'spread', 'module', 'offering', 'teaching', 'my'],
+            keywords: searchKeywords(t, 'nav.place.myTeachingPattern.keywords', ['pattern', 'block', 'distributed', 'spread', 'module', 'offering', 'teaching', 'my']),
             /*
              * Same shape as `my.exams`: one key names the section's authority
              * ("may I set my own module's pattern"), and the page's other
@@ -257,11 +292,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'my.account',
-            label: 'My account',
-            description: 'Your own display locale: dates and numbers, not UI language.',
+            label: t('nav.place.myAccount.label'),
+            description: t('nav.place.myAccount.description'),
             icon: 'material-symbols:translate',
             section: 'my',
-            keywords: ['locale', 'language', 'date', 'format', 'account', 'my'],
+            keywords: searchKeywords(t, 'nav.place.myAccount.keywords', ['locale', 'language', 'date', 'format', 'account', 'my']),
             // Deliberately NO permission: anyone signed in may set their own
             // locale, unlike every other `/my` entry which needs
             // `availability.manage_own`. Reachability still inherits the hub's
@@ -282,24 +317,69 @@ export function navPlaces(): NavEntry[] {
              * permission-less and self-service pages had nowhere else to go.
              */
             id: 'my.calendar-links',
-            label: 'Calendar links',
-            description: 'Subscribe an external calendar app to your schedule, or a Group\'s.',
+            label: t('nav.place.myCalendarLinks.label'),
+            description: t('nav.place.myCalendarLinks.description'),
             icon: 'material-symbols:link',
             section: 'my',
-            keywords: ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external'],
+            keywords: searchKeywords(t, 'nav.place.myCalendarLinks.keywords', ['ics', 'ical', 'calendar', 'subscribe', 'feed', 'export', 'link', 'external']),
             permission: MY_SECTION_PERMISSIONS['/my/calendar-links'],
             to: '/my/calendar-links',
         },
 
-        ...manageEntries(),
+        {
+            /*
+             * SPLIT OUT of `/my/account` (which hosted both panels under its
+             * locale form), so the two things a script author comes here for
+             * are reachable without knowing they sit at the bottom of a
+             * settings page. Grouped with the export below under
+             * `nav.group.accessData`.
+             */
+            id: 'my.api-tokens',
+            label: t('nav.place.myApiTokens.label'),
+            description: t('nav.place.myApiTokens.description'),
+            icon: 'material-symbols:key-outline',
+            section: 'my',
+            keywords: searchKeywords(t, 'nav.place.myApiTokens.keywords', ['api', 'token', 'script', 'automation', 'bearer', 'integration', 'key']),
+            /*
+             * `api_token.manage_own`, read from `MY_SECTION_PERMISSIONS` so
+             * this entry and `middleware/my.ts` cannot disagree. It carried NO
+             * permission until that key existed, on the reasoning
+             * `/my/account` still uses: a token is the caller's own authority
+             * delegated and NARROWED, never a new grant. Still true; the
+             * institution now gets to decide who may automate at all, which is
+             * a policy about the credential rather than about the permissions
+             * inside it.
+             *
+             * ONE KEY names the whole section's authority, and the page's own
+             * fetches need nothing wider: all three token routes are gated on
+             * exactly it, and the minting form reads the caller's permissions
+             * from the session, not from `/api/persons`.
+             */
+            permission: MY_SECTION_PERMISSIONS['/my/api-tokens'],
+            to: '/my/api-tokens',
+        },
+        {
+            id: 'my.data-export',
+            label: t('nav.place.myDataExport.label'),
+            description: t('nav.place.myDataExport.description'),
+            icon: 'material-symbols:download',
+            section: 'my',
+            keywords: searchKeywords(t, 'nav.place.myDataExport.keywords', ['export', 'download', 'gdpr', 'data', 'copy', 'subject access', 'my data']),
+            // No permission: this exports the caller's OWN row and nobody
+            // else's. The tenant-wide export is a different capability behind
+            // `tenant.export` at `/manage/data-export`.
+            to: '/my/data-export',
+        },
+
+        ...manageEntries(t),
 
         {
             id: 'manage.display',
-            label: 'Display',
-            description: 'How the schedule is drawn: colour sources, online marking, fallbacks.',
+            label: t('nav.place.manageDisplay.label'),
+            description: t('nav.place.manageDisplay.description'),
             icon: 'material-symbols:palette-outline',
             section: 'manage',
-            keywords: ['display', 'colour', 'color', 'theme', 'highlight', 'online', 'appearance', 'palette'],
+            keywords: searchKeywords(t, 'nav.place.manageDisplay.keywords', ['display', 'colour', 'color', 'theme', 'highlight', 'online', 'appearance', 'palette']),
             /*
              * `tenant.read`, and NOT the endpoint's own gate.
              *
@@ -319,11 +399,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.access-defaults',
-            label: 'Access defaults',
-            description: 'Whether a newly created Person is granted an access role automatically.',
+            label: t('nav.place.manageAccessDefaults.label'),
+            description: t('nav.place.manageAccessDefaults.description'),
             icon: 'material-symbols:admin-panel-settings-outline',
             section: 'manage',
-            keywords: ['access', 'role', 'default', 'permission', 'grant', 'auto', 'member'],
+            keywords: searchKeywords(t, 'nav.place.manageAccessDefaults.keywords', ['access', 'role', 'default', 'permission', 'grant', 'auto', 'member']),
             // Same `tenant.read`-to-look pairing `manage.display` uses, for the
             // same reason: this is the institution's setting, so the nav gate
             // is the institution's permission, not the wider write gate the
@@ -334,11 +414,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.data-export',
-            label: 'Data export',
-            description: 'Download every Person, login, Group, Room, Offering, Session and Constraint this institution owns.',
+            label: t('nav.place.manageDataExport.label'),
+            description: t('nav.place.manageDataExport.description'),
             icon: 'material-symbols:download',
             section: 'manage',
-            keywords: ['export', 'download', 'gdpr', 'data', 'backup', 'right to access', 'portability'],
+            keywords: searchKeywords(t, 'nav.place.manageDataExport.keywords', ['export', 'download', 'gdpr', 'data', 'backup', 'right to access', 'portability']),
             // The page's own gate, unlike `manage.display`/`manage.access-defaults`
             // above: there is no wider "look" permission this splits from; reading
             // and downloading are the same action here.
@@ -347,11 +427,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.curriculum-progression',
-            label: 'Curriculum progression',
-            description: 'Which curriculum plan each group is on, and advancing every eligible one at once.',
+            label: t('nav.place.manageCurriculumProgression.label'),
+            description: t('nav.place.manageCurriculumProgression.description'),
             icon: 'material-symbols:trending-up',
             section: 'manage',
-            keywords: ['phase', 'progression', 'advance', 'curriculum', 'plan', 'semester', 'promote', 'cohort'],
+            keywords: searchKeywords(t, 'nav.place.manageCurriculumProgression.keywords', ['phase', 'progression', 'advance', 'curriculum', 'plan', 'semester', 'promote', 'cohort']),
             // The same key `ManageGroupApplyPlan.vue`'s single-Group "Advance"
             // button already needs. This is the bulk form of the identical
             // action, so it needs no wider authority than that one does.
@@ -360,11 +440,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.exam-reviews',
-            label: 'Exam review',
-            description: 'Approve or reject exams lecturers have asked for on their own modules.',
+            label: t('nav.place.manageExamReviews.label'),
+            description: t('nav.place.manageExamReviews.description'),
             icon: 'material-symbols:history-edu-outline',
             section: 'manage',
-            keywords: ['exam', 'klausur', 'review', 'approve', 'reject', 'pending', 'assessment'],
+            keywords: searchKeywords(t, 'nav.place.manageExamReviews.keywords', ['exam', 'klausur', 'review', 'approve', 'reject', 'pending', 'assessment']),
             /*
              * `exam.review` and not `exam.request_own`. A page whose only
              * actions are approve and reject is not worth offering to somebody
@@ -376,11 +456,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.availability-reviews',
-            label: 'Unavailability review',
-            description: 'Approve or reject unavailability people have declared for themselves.',
+            label: t('nav.place.manageAvailabilityReviews.label'),
+            description: t('nav.place.manageAvailabilityReviews.description'),
             icon: 'material-symbols:fact-check-outline',
             section: 'manage',
-            keywords: ['review', 'approve', 'reject', 'pending', 'veto', 'unavailability', 'blackout'],
+            keywords: searchKeywords(t, 'nav.place.manageAvailabilityReviews.keywords', ['review', 'approve', 'reject', 'pending', 'veto', 'unavailability', 'blackout']),
             /*
              * Read needs either administration key; DECIDING needs manage_any.
              * The nav gates on the narrower one because a page whose only
@@ -393,11 +473,11 @@ export function navPlaces(): NavEntry[] {
         },
         {
             id: 'manage.availability-preferences',
-            label: 'Teaching preferences',
-            description: 'View and set anyone\u2019s preferred days and blocks.',
+            label: t('nav.place.manageAvailabilityPreferences.label'),
+            description: t('nav.place.manageAvailabilityPreferences.description'),
             icon: 'material-symbols:groups-outline',
             section: 'manage',
-            keywords: ['preferences', 'preferred days', 'mornings', 'staff', 'lecturer'],
+            keywords: searchKeywords(t, 'nav.place.manageAvailabilityPreferences.keywords', ['preferences', 'preferred days', 'mornings', 'staff', 'lecturer']),
             /*
              * `read_any` is enough to reach this page: viewing who prefers what
              * without being able to change it is the whole reason that key

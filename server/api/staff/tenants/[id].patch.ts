@@ -48,11 +48,11 @@ export default defineEventHandler(async (event) => {
         return result;
     } catch (error) {
         if (error instanceof UnknownTenantIdError) {
-            throw createError({ statusCode: 404, statusMessage: 'Tenant not found.', data: { field: 'id' } });
+            throw createError({ statusCode: 404, message: 'Tenant not found.', data: { field: 'id' } });
         }
 
         if (error instanceof UnknownFederationIdError) {
-            throw createError({ statusCode: 404, statusMessage: 'Federation not found.', data: { field: 'federationId' } });
+            throw createError({ statusCode: 404, message: 'Federation not found.', data: { field: 'federationId' } });
         }
 
         throw error;

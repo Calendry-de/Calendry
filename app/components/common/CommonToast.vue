@@ -13,7 +13,7 @@
             <div class="toast-title">{{ toast.title }}</div>
 
             <button
-                aria-label="Close"
+                :aria-label="t('common.a11y.close')"
                 class="toast-close"
                 type="button"
                 @click="emit('close')"
@@ -32,8 +32,11 @@
 
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { ToastMode } from '~~/types/toast';
 import type { Toast } from '~~/types/toast';
+
+const { t } = useT();
 
 defineProps<{
     toast: Toast;

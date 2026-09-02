@@ -11,17 +11,17 @@
     >
         <template #fields>
             <div class="wk">
-                <span class="wk_label">Weeks this reclassifies</span>
+                <span class="wk_label">{{ t('manageUi.calendarPeriod.weeksHeading') }}</span>
 
                 <p
                     v-if="!term"
                     class="wk_hint"
-                >Choose a term to see which weeks this period affects.</p>
+                >{{ t('manageUi.calendarPeriod.chooseTerm') }}</p>
 
                 <p
                     v-else-if="!validRange"
                     class="wk_hint"
-                >Enter a start and end date to see which weeks this period affects.</p>
+                >{{ t('manageUi.calendarPeriod.chooseDates') }}</p>
 
                 <template v-else>
                     <ol class="wk_list">
@@ -31,7 +31,9 @@
                             class="wk_row"
                             :class="{ 'wk_row--hit': week.changed }"
                         >
-                            <span class="wk_no">Week {{ week.index + 1 }}</span>
+                            <span class="wk_no">{{
+                                t('manageUi.calendarPeriod.weekNumber', { week: week.index + 1 })
+                            }}</span>
                             <span class="wk_date">{{ week.startDate }}</span>
                             <span
                                 class="wk_kind"
@@ -40,30 +42,35 @@
                             <span
                                 v-if="week.changed"
                                 class="wk_note"
-                            >was {{ week.was }}</span>
+                            >{{ t('manageUi.calendarPeriod.wasKind', { kind: week.was }) }}</span>
                         </li>
                     </ol>
 
                     <p class="wk_hint">
                         <template v-if="changedCount === 0">
-                            This period reclassifies no week.
-                            <template v-if="kind === 'EXAM'">
-                                An exam period claims any week it touches, so this one falls outside the term.
-                            </template>
-                            <template v-else>
-                                A {{ kind.toLowerCase() }} claims a week only if it covers the whole of it,
-                                Monday to Sunday.
-                            </template>
+                            {{ t('manageUi.calendarPeriod.none.lead') }}
+                            {{ noneNote(kind) }}
                         </template>
                         <template v-else>
-                            {{ changedCount }} week{{ changedCount === 1 ? '' : 's' }} reclassified.
-                            <template v-if="kind === 'EXAM'">
-                                An exam period claims every week it <em>touches</em>, so a period ending on a
-                                Monday still claims that whole week.
-                            </template>
-                            <template v-else>
-                                A {{ kind.toLowerCase() }} claims a week only when it covers the whole of it.
-                            </template>
+                            {{ t('manageUi.calendarPeriod.changed.lead', { count: changedCount }, changedCount) }}
+                            <!--
+                                `<i18n-t>` so the emphasis on "touches" stays
+                                markup while the sentence stays one
+                                translatable string: German puts the clause
+                                somewhere else, and three text nodes around an
+                                `<em>` cannot be reordered by a translator.
+                            -->
+                            <i18n-t
+                                v-if="kind === 'EXAM'"
+                                keypath="manageUi.calendarPeriod.changed.exam"
+                                scope="global"
+                                tag="span"
+                            >
+                                <template #touches>
+                                    <em>{{ t('manageUi.calendarPeriod.changed.examTouches') }}</em>
+                                </template>
+                            </i18n-t>
+                            <template v-else>{{ changedNote(kind) }}</template>
                         </template>
                     </p>
                 </template>
@@ -76,6 +83,7 @@
 import type { useEntityForm } from '~/composables/entityForm';
 import type { EntityRow } from '~/utils/manageRegistry';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
+import { useT } from '~/composables/i18n';
 import {
     WEEK_KIND_NAME, classifyWeeks,
 } from '~~/shared/academicCalendar';
@@ -111,6 +119,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
+
+const { t } = useT();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 
@@ -175,6 +185,40 @@ const weeks = computed(() => {
 });
 
 const changedCount = computed(() => weeks.value.filter((w) => w.changed).length);
+
+/*
+ * ONE MESSAGE PER KIND, never `kind.toLowerCase()` interpolated into a
+ * sentence (i18n/CONVENTIONS.md § "Never case-transform user-facing text"):
+ * `PeriodKind` is an ENUM, so lowercasing it only ever produces an English
+ * word, and the noun has to be declined where it stands. Same pattern, and the
+ * same reason, as `weekLabel()` in `app/pages/my/exams.vue`.
+ */
+
+/** The note shown when this period changes nothing, per kind. */
+function noneNote(periodKind: PeriodKind): string {
+    if (periodKind === 'EXAM') {
+        return t('manageUi.calendarPeriod.none.exam');
+    }
+
+    if (periodKind === 'BREAK') {
+        return t('manageUi.calendarPeriod.none.break');
+    }
+
+    return t('manageUi.calendarPeriod.none.holiday');
+}
+
+/**
+ * The note shown when this period does change weeks.
+ *
+ * BREAK and HOLIDAY only: EXAM's sentence emphasises one word, so it is
+ * rendered by `<i18n-t>` in the template rather than resolved to a flat string
+ * here.
+ */
+function changedNote(periodKind: PeriodKind): string {
+    return periodKind === 'BREAK'
+        ? t('manageUi.calendarPeriod.changed.break')
+        : t('manageUi.calendarPeriod.changed.holiday');
+}
 </script>
 
 <style scoped lang="scss">

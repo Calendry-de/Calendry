@@ -3,7 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 import {
     CONSTRAINT_TYPES, PER_SESSION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES,
-    defaultConstraintRow, defaultConstraintTypes,
+    defaultConstraintRow, defaultConstraintTypes, validateConstraint,
 } from '../shared/constraintTypes';
 
 /**
@@ -119,6 +119,28 @@ describe('the catalogue half', () => {
             key: 'invented', wireField: 'roomDoubleBooking', label: 'x', description: 'x',
             evaluator: 'solver', severity: 'SOFT', params: [],
         } as never)).toThrow(/defaultWeight/);
+    });
+
+    /**
+     * A fresh tenant's seed set must clear `validateConstraint` cleanly: this
+     * is the check `GET /api/solver/preflight` runs, and a default row that
+     * fails it fails on EVERY tenant's very first solver run.
+     * `minimize_block_usage` shipped `defaultEnabled: true` with `params: {}`
+     * and failed exactly this way (`INVALID_ARGUMENT`, 68ms after the run was
+     * created); `server/utils/provisionTenant.ts` now asserts this same
+     * property eagerly, at import time, so this test is the documented,
+     * always-green half of that guard, not the only thing standing between a
+     * bad catalogue entry and a broken tenant.
+     */
+    it('produces zero pre-flight issues for every ENABLED default row', () => {
+        const issues = defaultConstraintTypes()
+            .map(defaultConstraintRow)
+            .filter((row) => row.isEnabled)
+            .flatMap((row) => validateConstraint({
+                id: row.type, name: row.name, type: row.type, severity: row.severity, params: row.params,
+            }));
+
+        expect(issues).toEqual([]);
     });
 });
 

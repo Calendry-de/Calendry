@@ -11,12 +11,26 @@
     >
         <template #fields="{ readonly }">
             <fieldset class="grants">
-                <legend>Permissions</legend>
+                <legend>{{ t('manageUi.accessRoleForm.legend') }}</legend>
 
                 <p class="grants_summary">
-                    <strong>{{ granted.size }}</strong> of {{ catalogueSize }} granted.
-                    Permissions are fixed: they are code, one per action the software implements.
-                    A tenant composes them into roles; it cannot invent one.
+                    <!--
+                        `<i18n-t>` so the count stays a `<strong>` inside one
+                        translatable sentence. The sentence after it is a
+                        SEPARATE, complete one, so it is its own message and the
+                        space between them is punctuation.
+                    -->
+                    <i18n-t
+                        keypath="manageUi.accessRoleForm.grantedCount"
+                        scope="global"
+                        tag="span"
+                    >
+                        <template #count>
+                            <strong>{{ granted.size }}</strong>
+                        </template>
+                        <template #total>{{ catalogueSize }}</template>
+                    </i18n-t>
+                    {{ t('manageUi.accessRoleForm.fixedNote') }}
                 </p>
 
                 <p
@@ -29,9 +43,7 @@
                     v-else-if="!readonly && granted.size === 0"
                     class="grants_note grants_note--warn"
                 >
-                    A role holding nothing is a role that does nothing: it will be granted to
-                    somebody who then cannot act, with nothing on screen to say why. Pick at
-                    least one.
+                    {{ t('manageUi.accessRoleForm.emptyWarning') }}
                 </p>
 
                 <!--
@@ -46,9 +58,10 @@
                     class="grants_note grants_note--warn"
                     role="status"
                 >
-                    ‘{{ nameClash.key }}’ in this tenant already displays as “{{ nameClash.name }}”.
-                    Not blocked, but two roles reading identically in a picker is how the wrong
-                    one gets assigned.
+                    {{ t('manageUi.accessRoleForm.nameClash', {
+                        key: nameClash.key,
+                        name: nameClash.name,
+                    }) }}
                 </p>
 
                 <!--
@@ -58,17 +71,28 @@
                     be refused outright. Saying which keys go, before the button
                     is pressed, is the honest version of that.
                 -->
-                <p
+                <!--
+                    ONE plural message, pronouns and verb included. This
+                    sentence used to agree in four places at once
+                    (`permission{{ 's' }}`, `It grants`/`They grant`, and
+                    `it`/`them` twice), none of which a translator could reach:
+                    German declines the pronoun by case, not by number alone.
+                    `<i18n-t>` keeps the key list a `<code>` element.
+                -->
+                <i18n-t
                     v-if="unknownGrants.length"
                     class="grants_note grants_note--error"
+                    keypath="manageUi.accessRoleForm.unknownGrants"
+                    :plural="unknownGrants.length"
                     role="alert"
+                    scope="global"
+                    tag="p"
                 >
-                    This role holds {{ unknownGrants.length }} permission{{ unknownGrants.length === 1 ? '' : 's' }}
-                    this build does not know: <code>{{ unknownGrants.join(', ') }}</code>.
-                    {{ unknownGrants.length === 1 ? 'It grants' : 'They grant' }} nothing, because no code path
-                    checks {{ unknownGrants.length === 1 ? 'it' : 'them' }}, and saving this role removes
-                    {{ unknownGrants.length === 1 ? 'it' : 'them' }}.
-                </p>
+                    <template #count>{{ unknownGrants.length }}</template>
+                    <template #keys>
+                        <code>{{ unknownGrants.join(', ') }}</code>
+                    </template>
+                </i18n-t>
 
                 <section
                     v-for="category in categories"
@@ -87,7 +111,11 @@
                             class="grants_all"
                             type="button"
                             @click="toggleCategory(category)"
-                        >{{ countIn(category) === category.permissions.length ? 'Clear' : 'All' }}</button>
+                        >{{
+                            countIn(category) === category.permissions.length
+                                ? t('manageUi.accessRoleForm.clearAll')
+                                : t('manageUi.accessRoleForm.selectAll')
+                        }}</button>
                     </header>
 
                     <template v-if="!readonly">
@@ -125,7 +153,7 @@
                         <p
                             v-if="countIn(category) === 0"
                             class="grants_static grants_static--none"
-                        >None</p>
+                        >{{ t('common.value.none') }}</p>
                     </template>
                 </section>
             </fieldset>
@@ -137,6 +165,7 @@
 import type { PermissionCategory, PermissionDef, PermissionKey } from '#shared/permissions';
 import type { useEntityForm } from '~/composables/entityForm';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
+import { useT } from '~/composables/i18n';
 import { isPermissionKey, permissionCategories } from '#shared/permissions';
 
 /**
@@ -173,6 +202,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
+
+const { t } = useT();
 
 const categories = permissionCategories();
 const catalogueSize = categories.reduce((total, category) => total + category.permissions.length, 0);
@@ -288,6 +319,14 @@ function toggleCategory(category: PermissionCategory) {
  * `time_grid` → `Time grid`. Derived rather than listed, so a new category
  * cannot arrive with no heading, the failure the constraint grid's
  * derived-count label exists to prevent, one screen over.
+ *
+ * NOT TRANSLATED, and not an oversight (issue #19). A category heading is
+ * derived from a catalogue KEY, so translating it needs one message per
+ * category, and those belong to the `permissions` namespace
+ * (`shared/permissions.ts`), which issue #19 defers to Phase 3. The
+ * capitalisation here is the exception i18n/CONVENTIONS.md's case-transform
+ * rule does not cover only because there is no message to reach for yet;
+ * tracked with the rest of the catalogue's copy.
  */
 function categoryLabel(key: string): string {
     const words = key.replace(/_/g, ' ');

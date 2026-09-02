@@ -203,7 +203,7 @@ describe('an Event needs a name', () => {
         });
 
         expect(res.status).toBe(400);
-        expect(String(res.body.statusMessage)).toContain('needs a name');
+        expect(String(res.body.message)).toContain('needs a name');
     });
 
     it('stores the title and returns it', async () => {
@@ -221,7 +221,7 @@ describe('an Event needs a name', () => {
         const res = await create({ offeringId: 'test-offering-a', title: 'nope' });
 
         expect(res.status).toBe(400);
-        expect(String(res.body.statusMessage)).toContain('takes its name from that Offering');
+        expect(String(res.body.message)).toContain('takes its name from that Offering');
     });
 
     it('still accepts an Offering-linked Session with NO title', async () => {

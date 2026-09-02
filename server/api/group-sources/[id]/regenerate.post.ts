@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
         if (drift.sourceCount === 0) {
             throw createError({
                 statusCode: 422,
-                statusMessage: 'This group draws from no other groups, so there is nothing to '
+                message: 'This group draws from no other groups, so there is nothing to '
                     + 'copy. Regenerating would empty it. Name at least one source group first.',
                 data: { field: 'sources' },
             });

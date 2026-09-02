@@ -12,7 +12,7 @@
         <p
             v-if="!options.length"
             class="features_empty"
-        >{{ emptyHint }}</p>
+        >{{ emptyText }}</p>
 
         <template v-else>
             <label
@@ -45,6 +45,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * Which room types a Person would rather teach in: the third axis of a
  * preference, beside days and blocks.
@@ -67,7 +69,7 @@ export interface RoomFeatureOption {
     name: string;
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
     options: RoomFeatureOption[];
     label?: string;
     help?: string;
@@ -79,10 +81,23 @@ withDefaults(defineProps<{
     help: undefined,
     error: undefined,
     readonly: false,
-    emptyHint: 'This institution has not defined any equipment yet, so there are no room types to choose between.',
+    emptyHint: undefined,
 });
 
 const selected = defineModel<string[]>({ required: true });
+
+const { t } = useT();
+
+/**
+ * The caller's own wording, or this control's.
+ *
+ * Resolved in a `computed` rather than as the prop's DEFAULT (issue #19): a
+ * prop default is evaluated wherever the prop is first read, which is not
+ * reliably inside this component's setup, and `useT()` needs Vue's injection
+ * context. `undefined` as the default keeps "the caller said nothing"
+ * distinguishable from "the caller passed an empty string".
+ */
+const emptyText = computed(() => props.emptyHint ?? t('availability.roomFeaturePicker.emptyHint'));
 
 function toggle(id: string) {
     const next = new Set(selected.value ?? []);

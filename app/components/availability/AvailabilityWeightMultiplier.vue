@@ -32,12 +32,12 @@
                 v-if="model === null"
                 class="weight_default"
             >
-                <span class="weight_state">Using the institution's default weight</span>
+                <span class="weight_state">{{ t('availability.weight.usingDefault') }}</span>
                 <CommonButton
                     size="S"
                     type="secondary"
                     @click="startOverride"
-                >Set an override</CommonButton>
+                >{{ t('availability.weight.startOverride') }}</CommonButton>
             </div>
 
             <div
@@ -45,7 +45,7 @@
                 class="weight_override"
             >
                 <label class="weight_field">
-                    <span class="weight_fieldLabel">Counts</span>
+                    <span class="weight_fieldLabel">{{ t('availability.weight.factorLabel') }}</span>
                     <input
                         v-model="text"
                         class="weight_input"
@@ -56,14 +56,14 @@
                         type="number"
                         @input="commit"
                     >
-                    <span class="weight_times">× the default</span>
+                    <span class="weight_times">{{ t('availability.weight.factorSuffix') }}</span>
                 </label>
 
                 <CommonButton
                     size="S"
                     type="secondary"
                     @click="clearOverride"
-                >Use default</CommonButton>
+                >{{ t('availability.weight.clearOverride') }}</CommonButton>
             </div>
 
             <p
@@ -87,6 +87,7 @@ import {
     WEIGHT_MULTIPLIER_MIN,
     isWeightMultiplierInRange,
 } from '#shared/availability';
+import { useT } from '~/composables/i18n';
 
 /**
  * How much one person's stated preference counts, relative to the tenant default.
@@ -122,6 +123,8 @@ withDefaults(defineProps<{
 
 const model = defineModel<number | null>({ required: true });
 
+const { t } = useT();
+
 /**
  * The input's own string, kept separate from the model.
  *
@@ -149,8 +152,8 @@ watch(model, (value) => {
 
 function describe(value: number | null): string {
     return value === null
-        ? 'Using the institution\'s default weight'
-        : `Counts ${value}× the default`;
+        ? t('availability.weight.usingDefault')
+        : t('availability.weight.overrideSummary', { value: String(value) });
 }
 
 function startOverride() {
@@ -169,16 +172,19 @@ function commit() {
     const parsed = Number(text.value);
 
     if (text.value.trim() === '' || !Number.isFinite(parsed)) {
-        localError.value = `Enter a number between ${WEIGHT_MULTIPLIER_MIN} and ${WEIGHT_MULTIPLIER_MAX}, `
-            + 'or use the default.';
+        localError.value = t('availability.weight.unparseable', {
+            min: String(WEIGHT_MULTIPLIER_MIN),
+            max: String(WEIGHT_MULTIPLIER_MAX),
+        });
 
         return;
     }
 
     if (!isWeightMultiplierInRange(parsed)) {
-        localError.value = `A multiplier must be between ${WEIGHT_MULTIPLIER_MIN} and `
-            + `${WEIGHT_MULTIPLIER_MAX}. Anything outside that would let one person's preference `
-            + 'outweigh the rules it competes with.';
+        localError.value = t('availability.weight.outOfRange', {
+            min: String(WEIGHT_MULTIPLIER_MIN),
+            max: String(WEIGHT_MULTIPLIER_MAX),
+        });
 
         return;
     }

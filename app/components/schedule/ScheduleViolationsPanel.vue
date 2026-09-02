@@ -9,7 +9,7 @@
                 state says it once, where mistaking absence for a filtered view
                 is the actual risk.
             -->
-            <h2>Violations</h2>
+            <h2>{{ t('schedule.violations.panelTitle') }}</h2>
 
             <!--
                 THE OFFER LIVES AT THE PROBLEM. `refreshViolations` runs inside
@@ -32,7 +32,7 @@
                     name="material-symbols:healing-outline"
                     aria-hidden="true"
                 />
-                Repair {{ hardCount }}
+                {{ t('schedule.violations.repair', { count: hardCount }) }}
             </CommonButton>
         </div>
 
@@ -44,8 +44,7 @@
             v-if="canRepair && hardCount > 0"
             class="panel_muted"
         >
-            A repair moves as little as possible and produces a proposal to review;
-            it never changes the timetable on its own.
+            {{ t('schedule.violations.repairNote') }}
         </p>
 
         <!--
@@ -59,7 +58,7 @@
         <p
             v-if="!violations.length"
             class="panel_muted"
-        >No violations in this term.</p>
+        >{{ t('schedule.violations.empty') }}</p>
 
         <ul v-else>
             <li
@@ -100,7 +99,7 @@
                     {{ subjectOf(violation) }}
                 </span>
 
-                <span>{{ describeViolation(violation, lookup) }}</span>
+                <span>{{ describeViolation(violation, lookup, t) }}</span>
             </li>
         </ul>
     </section>
@@ -109,6 +108,7 @@
 <script setup lang="ts">
 import type { Violation } from '~/composables/schedule';
 import { describeViolation } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 import CommonButton from '~/components/common/CommonButton.vue';
 
 /**
@@ -125,6 +125,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ select: [sessionId: string]; repair: [] }>();
+
+const { t } = useT();
 
 /**
  * Counted from the SAME rows this panel renders, so the offer cannot promise a
@@ -145,7 +147,7 @@ const hardCount = computed(() => props.violations.filter((v) => v.severity === '
  */
 function subjectOf(violation: Violation): string {
     if (!violation.offering) {
-        return 'Unplaced demand';
+        return t('schedule.violations.unplacedDemand');
     }
 
     return [violation.offering.code, violation.offering.title].filter(Boolean).join(' · ');

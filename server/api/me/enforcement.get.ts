@@ -34,7 +34,7 @@ const TRACKED = {
  */
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     if (!identity.actorPersonId) {
-        throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+        throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
     }
 
     const rows = await tx.constraint.findMany({

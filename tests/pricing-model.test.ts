@@ -22,7 +22,6 @@ const base = (over: Partial<PriceInput> = {}): PriceInput => ({
     adminSeats: 0,
     federation: false,
     support: 'standard',
-    discountPercent: 0,
     ...over,
 });
 
@@ -139,24 +138,13 @@ describe('the price', () => {
         expect(seats.total - 4000).toBe(7 * ADMIN_SEAT_FEE);
     });
 
-    it('takes the discount off everything above it', () => {
-        const full = computePrice(base({ students: 20000, adminSeats: 10, support: 'priority' }));
-        const cut = computePrice(base({
-            students: 20000, adminSeats: 10, support: 'priority', discountPercent: 10,
-        }));
-        expect(cut.discount).toBe(-Math.round(full.subtotal * 0.1));
-        expect(cut.total).toBe(full.subtotal + cut.discount);
-    });
-
     it('never lets a negative input become a credit', () => {
         const result = computePrice(base({
             students: -100,
             lecturers: { light: -50, standard: -50, heavy: -50 },
             adminSeats: -10,
-            discountPercent: -25,
         }));
         expect(result.total).toBe(4000);
-        expect(result.discount).toBe(0);
     });
 
     /*
@@ -181,7 +169,11 @@ describe('the price', () => {
             }));
             const summed = result.lines.reduce((sum, line) => sum + line.amount, 0);
             expect(summed).toBe(result.subtotal);
-            expect(result.subtotal + result.discount).toBe(result.total);
+            // `total` and `subtotal` are now equal by construction, nothing
+            // being subtracted since the negotiated discount was removed from
+            // the customer-facing calculator. Asserted rather than dropped so
+            // that reintroducing any deduction has to come past this line.
+            expect(result.total).toBe(result.subtotal);
             expect(Number.isInteger(result.total)).toBe(true);
         }
     });

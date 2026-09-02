@@ -1,6 +1,7 @@
 import type { EntityRow, ManageEntity, RelationDef } from '~/utils/manageRegistry';
 import { relationOptionsUrl, relationReadRequirement } from '~/utils/manageRegistry';
 import { satisfiesPermissionRequirement } from '#shared/permissions';
+import { useT } from '~/composables/i18n';
 import { useSession } from '~/composables/session';
 
 export type RelationRow = Record<string, unknown>;
@@ -28,6 +29,7 @@ export type RelationRow = Record<string, unknown>;
 export function useEntityRelations(entity: ManageEntity, id: string | undefined) {
     const request = useRequestFetch();
     const session = useSession();
+    const { t } = useT();
 
     const held = new Set(session.value?.permissions ?? []);
 
@@ -254,7 +256,8 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
             drafts.value = { ...drafts.value, [def.key]: previous };
             errors.value = {
                 ...errors.value,
-                [def.key]: (error as { statusMessage?: string }).statusMessage ?? 'Could not save that change.',
+                [def.key]: serverErrorMessage(error)
+                    ?? t('manageUi.shared.changeSaveFailed'),
             };
         } finally {
             busy.value = { ...busy.value, [def.key]: false };

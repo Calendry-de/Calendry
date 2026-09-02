@@ -2,11 +2,11 @@
     <div class="calc">
         <div class="calc_controls">
             <fieldset class="calc_group">
-                <legend class="calc_legend">Your institution</legend>
+                <legend class="calc_legend">{{ t('landing.calculator.institutionLegend') }}</legend>
 
                 <label class="calc_field">
-                    <span class="calc_label">Students</span>
-                    <span class="calc_value">{{ formatCount(input.students) }}</span>
+                    <span class="calc_label">{{ t('landing.calculator.studentsLabel') }}</span>
+                    <span class="calc_value">{{ formatCount(input.students, locale) }}</span>
                     <input
                         v-model.number="input.students"
                         class="calc_range"
@@ -15,16 +15,16 @@
                         max="30000"
                         step="100"
                     >
-                    <span class="calc_hint">Base tier {{ result.baseTier.id }}. Students are never billed.</span>
+                    <span class="calc_hint">{{ t('landing.calculator.studentsHint', { tier: result.baseTier.id }) }}</span>
                 </label>
 
                 <label
-                    v-for="band in LOAD_BANDS"
+                    v-for="band in bands"
                     :key="band.id"
                     class="calc_field"
                 >
-                    <span class="calc_label">{{ band.label }} lecturers</span>
-                    <span class="calc_value">{{ formatCount(input.lecturers[band.id]) }}</span>
+                    <span class="calc_label">{{ t('landing.calculator.lecturersLabel', { band: band.label }) }}</span>
+                    <span class="calc_value">{{ formatCount(input.lecturers[band.id], locale) }}</span>
                     <input
                         v-model.number="input.lecturers[band.id]"
                         class="calc_range"
@@ -33,15 +33,15 @@
                         max="500"
                         step="5"
                     >
-                    <span class="calc_hint">{{ band.sessions }}, {{ formatEuro(band.rate) }} each</span>
+                    <span class="calc_hint">{{ t('landing.calculator.lecturersHint', { sessions: band.sessions, rate: formatEuro(band.rate, locale) }) }}</span>
                 </label>
             </fieldset>
 
             <fieldset class="calc_group">
-                <legend class="calc_legend">Complexity score</legend>
+                <legend class="calc_legend">{{ t('landing.calculator.complexityLegend') }}</legend>
 
                 <label
-                    v-for="factor in COMPLEXITY_FACTORS"
+                    v-for="factor in factors"
                     :key="factor.id"
                     class="calc_field"
                 >
@@ -60,11 +60,11 @@
             </fieldset>
 
             <fieldset class="calc_group">
-                <legend class="calc_legend">Seats and services</legend>
+                <legend class="calc_legend">{{ t('landing.calculator.seatsLegend') }}</legend>
 
                 <label class="calc_field">
-                    <span class="calc_label">Admin and scheduler seats</span>
-                    <span class="calc_value">{{ formatCount(input.adminSeats) }}</span>
+                    <span class="calc_label">{{ t('landing.calculator.adminSeatsLabel') }}</span>
+                    <span class="calc_value">{{ formatCount(input.adminSeats, locale) }}</span>
                     <input
                         v-model.number="input.adminSeats"
                         class="calc_range"
@@ -73,28 +73,14 @@
                         max="40"
                         step="1"
                     >
-                    <span class="calc_hint">Only people who edit, lock or run the solver</span>
-                </label>
-
-                <label class="calc_field">
-                    <span class="calc_label">Discount</span>
-                    <span class="calc_value">{{ input.discountPercent }}%</span>
-                    <input
-                        v-model.number="input.discountPercent"
-                        class="calc_range"
-                        type="range"
-                        min="0"
-                        max="30"
-                        step="1"
-                    >
-                    <span class="calc_hint">Applied to everything above</span>
+                    <span class="calc_hint">{{ t('landing.calculator.adminSeatsHint') }}</span>
                 </label>
 
                 <div class="calc_field">
-                    <span class="calc_label">Support</span>
+                    <span class="calc_label">{{ t('landing.calculator.supportLabel') }}</span>
                     <div class="calc_choices">
                         <button
-                            v-for="tier in SUPPORT_TIERS"
+                            v-for="tier in supportChoices"
                             :key="tier.id"
                             class="calc_choice"
                             :class="{ 'calc_choice--on': input.support === tier.id }"
@@ -106,7 +92,7 @@
                 </div>
 
                 <div class="calc_field">
-                    <span class="calc_label">Federation</span>
+                    <span class="calc_label">{{ t('landing.calculator.federationLabel') }}</span>
                     <div class="calc_choices">
                         <button
                             class="calc_choice"
@@ -114,14 +100,14 @@
                             type="button"
                             :aria-pressed="!input.federation"
                             @click="input.federation = false"
-                        >Standalone</button>
+                        >{{ t('landing.calculator.standalone') }}</button>
                         <button
                             class="calc_choice"
                             :class="{ 'calc_choice--on': input.federation }"
                             type="button"
                             :aria-pressed="input.federation"
                             @click="input.federation = true"
-                        >Federation member</button>
+                        >{{ t('landing.calculator.federationMember') }}</button>
                     </div>
                 </div>
             </fieldset>
@@ -129,15 +115,17 @@
 
         <div class="calc_readout">
             <div class="calc_totalBlock">
-                <p class="calc_totalLabel">Total a year</p>
+                <p class="calc_totalLabel">{{ t('landing.calculator.totalLabel') }}</p>
                 <p
                     class="calc_total"
                     aria-live="polite"
-                >{{ formatEuro(shownTotal) }}</p>
+                >{{ formatEuro(shownTotal, locale) }}</p>
                 <p class="calc_tierLine">
-                    Complexity {{ result.complexityScore.toFixed(2) }},
-                    tier {{ result.complexityTier.id }},
-                    {{ result.complexityTier.multiplier }}x on the lecturer subtotal
+                    {{ t('landing.calculator.tierLine', {
+                        score: result.complexityScore.toFixed(2),
+                        tier: result.complexityTier.id,
+                        multiplier: result.complexityTier.multiplier,
+                    }) }}
                 </p>
             </div>
 
@@ -159,7 +147,7 @@
 
             <dl class="calc_lines">
                 <div
-                    v-for="line in result.lines"
+                    v-for="line in lines"
                     :key="line.id"
                     class="calc_line"
                     :class="{ 'calc_line--zero': line.amount === 0 }"
@@ -173,30 +161,15 @@
                         {{ line.label }}
                         <span class="calc_lineDetail">{{ line.detail }}</span>
                     </dt>
-                    <dd class="calc_lineAmount">{{ formatEuro(line.amount) }}</dd>
-                </div>
-
-                <div
-                    v-if="result.discount !== 0"
-                    class="calc_line"
-                >
-                    <dt class="calc_lineLabel">
-                        <span
-                            class="calc_swatch calc_swatch--discount"
-                            aria-hidden="true"
-                        />
-                        Discount
-                        <span class="calc_lineDetail">{{ input.discountPercent }}% off {{ formatEuro(result.subtotal) }}</span>
-                    </dt>
-                    <dd class="calc_lineAmount">{{ formatEuro(result.discount) }}</dd>
+                    <dd class="calc_lineAmount">{{ formatEuro(line.amount, locale) }}</dd>
                 </div>
             </dl>
 
             <div class="calc_examples">
-                <p class="calc_examplesLabel">Load an example</p>
+                <p class="calc_examplesLabel">{{ t('landing.calculator.examplesLabel') }}</p>
                 <div class="calc_choices">
                     <button
-                        v-for="scenario in SCENARIOS"
+                        v-for="scenario in scenarios"
                         :key="scenario.id"
                         class="calc_choice"
                         type="button"
@@ -209,11 +182,12 @@
 </template>
 
 <script setup lang="ts">
-import { SCENARIOS } from '~/utils/pricingContent';
+import { pricingScenarios } from '~/utils/pricingContent';
+import { useLanguage, useT } from '~/composables/i18n';
 import type { PriceInput } from '~/utils/pricingModel';
 import {
-    COMPLEXITY_FACTORS, LOAD_BANDS, SUPPORT_TIERS,
-    computePrice, formatCount, formatEuro,
+    complexityFactors, computePrice, describePriceLines,
+    formatCount, formatEuro, loadBands, supportTiers,
 } from '~/utils/pricingModel';
 
 /**
@@ -251,6 +225,23 @@ import {
  * way.
  */
 
+const { t } = useT();
+
+/*
+ * TWO AXES, NOT ONE (issue #19). The bands' labels come from the message
+ * catalogue and follow the message LANGUAGE; every figure beside them is
+ * formatted against the viewer's FULL locale tag, which the language has
+ * already discarded, so a reader on `de-AT` gets German copy and Austrian
+ * numbers. Both are `computed`, so a change to either re-renders the readout
+ * rather than leaving a stale price on screen.
+ */
+const { locale } = useLanguage();
+
+const bands = computed(() => loadBands(t, locale.value));
+const factors = computed(() => complexityFactors(t));
+const supportChoices = computed(() => supportTiers(t));
+const scenarios = computed(() => pricingScenarios(t, locale.value));
+
 const DEFAULT_INPUT: PriceInput = {
     students: 6000,
     lecturers: { light: 60, standard: 180, heavy: 40 },
@@ -258,7 +249,6 @@ const DEFAULT_INPUT: PriceInput = {
     adminSeats: 8,
     federation: false,
     support: 'standard',
-    discountPercent: 0,
 };
 
 const input = reactive<PriceInput>(structuredClone(DEFAULT_INPUT));
@@ -270,6 +260,16 @@ function load(next: PriceInput): void {
 const result = computed(() => computePrice(input));
 
 const shownTotal = useTweenedNumber(() => result.value.total);
+
+/**
+ * The same lines the price is made of, with their labels.
+ *
+ * `computePrice` stays pure arithmetic over numbers, so its lines carry an id
+ * and an amount and nothing a translator could read; naming them is this one
+ * step later, which is what keeps the model callable from a plain Node test
+ * with no catalogue loaded.
+ */
+const lines = computed(() => describePriceLines(input, result.value, t, locale.value));
 
 /**
  * Segment geometry for the composition bar. Zero-amount lines are dropped
@@ -527,7 +527,6 @@ const segments = computed(() => {
     &_segment--support,
     .calc_swatch--support { background: $surface5; }
 
-    &_swatch--discount { background: $surface3; }
 
     &_lines {
         display: flex;

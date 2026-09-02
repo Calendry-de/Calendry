@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!plan) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const templateIds = [...new Set(body.map((item) => item.templateId))];
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
         if (templates.length !== templateIds.length) {
             throw createError({
                 statusCode: 404,
-                statusMessage: 'One or more templates were not found in this tenant.',
+                message: 'One or more templates were not found in this tenant.',
             });
         }
 

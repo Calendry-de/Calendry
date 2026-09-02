@@ -1,13 +1,23 @@
 <template>
     <CommonAppShell
-        description="Exams lecturers have asked for on their own modules, waiting on a decision."
-        title="Exam review"
+        :description="t('managePages.examReviews.description')"
+        :title="t('managePages.examReviews.pageTitle')"
     >
-        <p class="intro">
-            An approved exam becomes a <strong>locked event</strong> at the slot that was
-            asked for: it occupies its room and its people, and no solve will move it.
-            Approving is the moment the schedule changes, not a formality afterwards.
-        </p>
+        <!--
+            `<i18n-t>` so the emphasised phrase stays inside ONE translatable
+            sentence: it is grammar, not decoration, and German would not leave
+            it at the same point in the clause.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="managePages.examReviews.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #locked>
+                <strong>{{ t('managePages.examReviews.introLocked') }}</strong>
+            </template>
+        </i18n-t>
 
         <p
             v-if="error"
@@ -54,15 +64,33 @@
                 >
                     <div class="row_main">
                         <strong>{{ row.offering.title }}</strong>
-                        <span class="row_meta">
-                            {{ row.kind.name }} · {{ row.term.name }} · week {{ row.termWeek }},
-                            {{ weekdayName(row.dayOfWeek) }},
-                            {{ row.durationBlocks }} block{{ row.durationBlocks === 1 ? '' : 's' }}
-                            from block {{ row.blockIndex + 1 }}
-                        </span>
-                        <span class="row_meta">
-                            asked for by {{ personName(row.requestedBy) }}{{ row.room ? ` · prefers ${row.room.name}` : '' }}
-                        </span>
+                        <!--
+                            ONE plural message for the whole line: "block{s}"
+                            was a word split across an expression, so no part
+                            of it could be keyed, and German pluralises the
+                            stem. `kind` and `term` are tenant-named and pass
+                            through untranslated.
+                        -->
+                        <span class="row_meta">{{ t('managePages.examReviews.rowMeta', {
+                            kind: row.kind.name,
+                            term: row.term.name,
+                            week: row.termWeek,
+                            day: weekdayName(row.dayOfWeek),
+                            block: row.blockIndex + 1,
+                            count: row.durationBlocks,
+                        }) }}</span>
+                        <!--
+                            ONE MESSAGE PER SHAPE rather than a bare " · prefers
+                            {room}" fragment appended: the clause carries a verb,
+                            so it is grammar, not punctuation
+                            (i18n/CONVENTIONS.md § "Assembled sentences").
+                        -->
+                        <span class="row_meta">{{ row.room
+                            ? t('managePages.examReviews.requestedByWithRoom', {
+                                person: personName(row.requestedBy),
+                                room: row.room.name,
+                            })
+                            : t('managePages.examReviews.requestedBy', { person: personName(row.requestedBy) }) }}</span>
                         <!--
                             The reviewer's most useful single fact, and one the
                             request itself does not carry: an exam outside the
@@ -72,7 +100,9 @@
                         <span
                             class="row_meta"
                             :class="{ 'row_meta--warn': row.weekKind !== 'EXAM' }"
-                        >{{ row.weekKind === 'EXAM' ? 'inside the exam period' : 'outside the exam period' }}</span>
+                        >{{ row.weekKind === 'EXAM'
+                            ? t('managePages.examReviews.insideExamPeriod')
+                            : t('managePages.examReviews.outsideExamPeriod') }}</span>
 
                         <!--
                             ISSUE #101, the fact itself rather than a toast: a
@@ -83,12 +113,15 @@
                         <span
                             v-if="!row.teachingComplete.complete"
                             class="row_meta row_meta--warn"
-                        >teaching plan: {{ row.teachingComplete.placedCount }} of {{ row.teachingComplete.requiredCount }} sessions placed</span>
+                        >{{ t('managePages.examReviews.teachingPlanRow', {
+                            placed: row.teachingComplete.placedCount,
+                            required: row.teachingComplete.requiredCount,
+                        }) }}</span>
 
                         <span
                             v-if="row.note"
                             class="row_note"
-                        >“{{ row.note }}”</span>
+                        >{{ t('managePages.examReviews.note', { note: row.note }) }}</span>
                     </div>
 
                     <div
@@ -99,20 +132,24 @@
                             :disabled="busy === row.id"
                             type="primary"
                             @click="decide(row.id, 'approve')"
-                        >Approve</CommonButton>
+                        >{{ t('managePages.examReviews.approve') }}</CommonButton>
                         <CommonButton
                             :disabled="busy === row.id"
                             type="secondary"
                             @click="decide(row.id, 'reject')"
-                        >Reject</CommonButton>
+                        >{{ t('managePages.examReviews.reject') }}</CommonButton>
                     </div>
+                    <!--
+                        ONE MESSAGE PER OUTCOME, verb and preposition inside it:
+                        "{status} by {person}" assembled in the template is a
+                        clause German reorders.
+                    -->
                     <span
                         v-else
                         class="row_status"
-                    >
-                        {{ row.status === 'APPROVED' ? 'Approved' : 'Not approved' }}
-                        by {{ personName(row.decidedBy) }}
-                    </span>
+                    >{{ row.status === 'APPROVED'
+                        ? t('managePages.examReviews.decidedApproved', { person: personName(row.decidedBy) })
+                        : t('managePages.examReviews.decidedRejected', { person: personName(row.decidedBy) }) }}</span>
                 </li>
             </ul>
         </section>
@@ -121,6 +158,7 @@
 
 <script setup lang="ts">
 import { weekdayName } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 import { useSession } from '~/composables/session';
 
 /**
@@ -146,13 +184,15 @@ definePageMeta({
             if (!held.has('exam.review')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Reviewing exam requests needs exam.review.',
+                    message: 'Reviewing exam requests needs exam.review.',
                 }));
             }
         },
     ],
 });
-useHead({ title: 'Exam review' });
+const { t } = useT();
+
+useHead(() => ({ title: t('managePages.examReviews.pageTitle') }));
 
 interface Named { id: string; givenName: string; familyName: string }
 
@@ -188,14 +228,14 @@ const rows = computed(() => data.value?.rows ?? []);
 const groups = computed(() => [
     {
         status: 'PENDING',
-        label: 'Waiting on a decision',
-        empty: 'Nothing is waiting.',
+        label: t('managePages.examReviews.pendingHead'),
+        empty: t('managePages.examReviews.pendingEmpty'),
         rows: rows.value.filter((r) => r.status === 'PENDING'),
     },
     {
         status: 'DECIDED',
-        label: 'Decided',
-        empty: 'Nothing has been decided yet.',
+        label: t('managePages.examReviews.decidedHead'),
+        empty: t('managePages.examReviews.decidedEmpty'),
         rows: rows.value.filter((r) => r.status !== 'PENDING'),
     },
 ]);
@@ -206,7 +246,9 @@ const groups = computed(() => [
  * and the row must still read as a decision.
  */
 function personName(person: Named | null): string {
-    return person ? `${person.givenName} ${person.familyName}` : 'someone since removed';
+    return person
+        ? `${person.givenName} ${person.familyName}`
+        : t('managePages.examReviews.personUnknown');
 }
 
 const busy = ref('');
@@ -228,16 +270,18 @@ async function decide(id: string, action: 'approve' | 'reject') {
         // teaching-plan completeness (now a per-row fact, above), this is
         // only known once the approval has actually run the capacity check.
         if (action === 'approve' && result.examCapacity?.checked && !result.examCapacity.sufficient) {
-            approveWarning.value = `The preferred room seats ${result.examCapacity.roomCapacity} for an exam, `
-                + `but this sitting is expected to need ${result.examCapacity.requiredCapacity}.`;
+            approveWarning.value = t('managePages.examReviews.capacityWarning', {
+                roomCapacity: result.examCapacity.roomCapacity,
+                requiredCapacity: result.examCapacity.requiredCapacity,
+            });
         }
 
         await refresh();
     } catch (cause) {
         // The server's own sentence: approving can fail because the grid changed
         // under a pending request, and "could not save" would hide that.
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not record that decision.';
+        error.value = serverErrorMessage(cause)
+            ?? t('managePages.examReviews.decisionError');
     } finally {
         busy.value = '';
     }

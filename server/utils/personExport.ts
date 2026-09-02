@@ -123,7 +123,7 @@ export async function buildPersonExportBundle(tx: Tx, tenantId: string, personId
     });
 
     if (!personRow) {
-        throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        throw createError({ statusCode: 404, message: 'Not found.' });
     }
 
     // Sequential: `tx` is one shared connection; concurrent queries on it

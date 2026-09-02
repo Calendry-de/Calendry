@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (!session.substitution) {

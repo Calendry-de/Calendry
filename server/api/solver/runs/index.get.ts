@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 import { ACTIVE_RUN_STATUSES, serializeRun } from '../../../utils/solverClient';
+import { serializeRunWithError } from '../../../utils/solverErrorMapping';
 
 const querySchema = z.object({
     termId: z.string().min(1).optional(),
@@ -51,8 +52,18 @@ export default defineEventHandler(async (event) => {
             select: { id: true, termId: true, status: true, createdAt: true, scope: true },
         });
 
+        // Sequential for the same reason as the two queries above: one shared
+        // connection. Only rows carrying an `errorDetail` (i.e. FAILED) do a
+        // lookup at all; `active` never does, since `ACTIVE_RUN_STATUSES`
+        // excludes FAILED and its select omits the column entirely.
+        const runs = [];
+
+        for (const row of rows) {
+            runs.push(await serializeRunWithError(tx, row));
+        }
+
         return {
-            runs: rows.map(serializeRun),
+            runs,
             active: active.map(serializeRun),
         };
     });

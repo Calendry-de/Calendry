@@ -1,12 +1,10 @@
 <template>
     <CommonAppShell
-        description="Every Person, login, Group, Room, Offering, Session, exam request and Constraint this institution owns, in one download."
-        title="Data export"
+        :description="t('exports.tenant.description')"
+        :title="t('exports.tenant.heading')"
     >
         <p class="intro">
-            For a departing institution taking its data with it, or answering a Right to
-            Access request that spans more than one person. A single Person's own record can
-            be exported from their own page instead; this is everything at once.
+            {{ t('exports.tenant.intro') }}
         </p>
 
         <div class="actions">
@@ -14,13 +12,13 @@
                 href="/api/tenant/export?format=json"
                 icon="material-symbols:data-object"
                 type="secondary"
-            >Download JSON</CommonButton>
+            >{{ t('common.action.downloadJson') }}</CommonButton>
 
             <CommonButton
                 href="/api/tenant/export?format=xlsx"
                 icon="material-symbols:table-outline"
                 type="secondary"
-            >Download Excel</CommonButton>
+            >{{ t('common.action.downloadExcel') }}</CommonButton>
         </div>
     </CommonAppShell>
 </template>
@@ -29,6 +27,7 @@
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import { useSession } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 
 /**
  * The tenant-wide half of issue #84: `GET /api/tenant/export`. Bespoke
@@ -46,19 +45,32 @@ import { useSession } from '~/composables/session';
 definePageMeta({
     middleware: [
         () => {
+            /*
+             * `$t`, not `useT()`: route middleware is not a component setup,
+             * inline in `definePageMeta` no less, so it cannot close over this
+             * file's own `t` either. `app/plugins/i18n.ts` provides the
+             * resolved translator for exactly this, and page middleware runs
+             * after every global one, so `i18n.global.ts` has already settled
+             * the language.
+             */
+            const { $t } = useNuxtApp();
             const held = new Set(useSession().value?.permissions ?? []);
 
             if (!held.has('tenant.export')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Data export needs tenant.export.',
+                    message: $t('exports.tenant.denied'),
                 }));
             }
         },
     ],
 });
 
-useHead({ title: 'Data export' });
+const { t } = useT();
+
+// A getter, so the tab title follows a language change instead of freezing at
+// whatever was active when this page first mounted.
+useHead(() => ({ title: t('exports.tenant.heading') }));
 </script>
 
 <style scoped lang="scss">

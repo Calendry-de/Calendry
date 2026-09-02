@@ -36,13 +36,13 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!row) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (row.status !== 'PENDING') {
             throw createError({
                 statusCode: 409,
-                statusMessage: `This window was already ${row.status.toLowerCase()}. `
+                message: `This window was already ${row.status.toLowerCase()}. `
                     + 'Delete it and ask for a new submission rather than re-deciding it.',
             });
         }

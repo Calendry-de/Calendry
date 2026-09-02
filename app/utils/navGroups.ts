@@ -1,3 +1,6 @@
+import type { Translate } from '~/composables/i18n';
+import type { MessageKey } from '~~/i18n/keys';
+
 /**
  * How `CommonAppShell`'s sidebar groups the app's destinations under
  * scan-friendly headings.
@@ -16,15 +19,20 @@
  * the test covers what the field would have guaranteed.
  */
 export interface NavGroup {
-    label: string;
+    /**
+     * The heading, as a message key rather than a string (issue #19). Only
+     * `groupNavEntries()` resolves it, so a caller reading `NAV_GROUPS`
+     * directly cannot accidentally render an untranslated heading.
+     */
+    labelKey: MessageKey;
     /** Exact `NavEntry.to` values. A path claimed by no group is not rendered. */
     paths: string[];
 }
 
 export const NAV_GROUPS: NavGroup[] = [
-    { label: 'Schedule', paths: ['/schedule', '/schedule/proposals'] },
+    { labelKey: 'nav.group.schedule', paths: ['/schedule', '/schedule/proposals'] },
     {
-        label: 'My settings',
+        labelKey: 'nav.group.mySettings',
         paths: [
             '/my',
             '/my/availability',
@@ -35,13 +43,28 @@ export const NAV_GROUPS: NavGroup[] = [
             '/my/account',
         ],
     },
-    { label: 'People', paths: ['/manage/persons', '/manage/roles', '/manage/availability/preferences'] },
+    /*
+     * Issue: "put API token creation in its own category". These two are the
+     * self-service capabilities that are about DATA AND ACCESS rather than
+     * about a person's own schedule, and both were previously panels stacked
+     * under the locale form on `/my/account` — reachable only by scrolling a
+     * settings page nobody visits for them.
+     *
+     * A group of its own rather than two more cards in "My settings": the
+     * hub's card for `/my/account` reads "Your own display locale", so a
+     * reader looking for a token had nothing to aim at.
+     */
     {
-        label: 'Resources',
+        labelKey: 'nav.group.accessData',
+        paths: ['/my/api-tokens', '/my/data-export'],
+    },
+    { labelKey: 'nav.group.people', paths: ['/manage/persons', '/manage/roles', '/manage/availability/preferences'] },
+    {
+        labelKey: 'nav.group.resources',
         paths: ['/manage/rooms', '/manage/equipment', '/manage/groups'],
     },
     {
-        label: 'Curriculum',
+        labelKey: 'nav.group.curriculum',
         paths: [
             '/manage/time-grids',
             '/manage/session-kinds',
@@ -55,7 +78,7 @@ export const NAV_GROUPS: NavGroup[] = [
         ],
     },
     {
-        label: 'Access & review',
+        labelKey: 'nav.group.accessReview',
         paths: [
             '/manage/accounts',
             '/manage/access-roles',
@@ -82,13 +105,27 @@ export const NAV_GROUPS: NavGroup[] = [
  * Generic over the entry type: the sidebar passes `ResolvedNavEntry`, and
  * anything with a `to` works. Order comes from `NAV_GROUPS`, never from the
  * caller's list, so both renderings read top to bottom the same way.
+ *
+ * `t` is a parameter for the reason `Translate` (`~/composables/i18n`) gives:
+ * this is a plain module, called from a `computed`, so it cannot call
+ * `useT()` itself.
+ *
+ * RETURNS BOTH `id` AND `label`, and they are not interchangeable. `label` is
+ * translated and therefore changes with the reader's language; `id` is the
+ * message key, which never does. Anything PERSISTED must use `id`:
+ * `useNavGroupCollapse` remembers which topics a reader collapsed, and keying
+ * that by the translated label gave one account a separate, silently reset
+ * memory per language. `id` is derived from `labelKey` rather than declared
+ * beside it, so there are not two identifiers per group to keep in agreement.
  */
 export function groupNavEntries<T extends { to?: string }>(
     entries: readonly T[],
-): { label: string; entries: T[] }[] {
+    t: Translate,
+): { id: string; label: string; entries: T[] }[] {
     return NAV_GROUPS
         .map((group) => ({
-            label: group.label,
+            id: group.labelKey,
+            label: t(group.labelKey),
             entries: entries.filter((entry) => entry.to !== undefined && group.paths.includes(entry.to)),
         }))
         .filter((group) => group.entries.length > 0);

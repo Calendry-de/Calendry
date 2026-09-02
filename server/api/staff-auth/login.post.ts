@@ -104,7 +104,7 @@ export default defineEventHandler(async (event) => {
         const captchaOk = await verifyTurnstileToken(body.turnstileToken);
 
         if (!captchaOk) {
-            throw createError({ statusCode: 400, statusMessage: 'CAPTCHA verification required.' });
+            throw createError({ statusCode: 400, message: 'CAPTCHA verification required.' });
         }
     }
 
@@ -130,7 +130,7 @@ export default defineEventHandler(async (event) => {
             detail: { reason: !account ? 'no_such_staff_account' : !account.isActive ? 'staff_account_inactive' : 'wrong_password' },
         });
 
-        throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
+        throw createError({ statusCode: 401, message: 'Invalid credentials.' });
     }
 
     await resetRateLimit('staff_login', body.email);

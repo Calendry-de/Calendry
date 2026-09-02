@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
+import { manageEntities } from '../app/utils/manageRegistry';
 
 /**
  * Every Iconify name the app uses must resolve in an INSTALLED collection.
@@ -113,14 +113,19 @@ describe('icon names', () => {
         expect(broken, `\n  ${broken.join('\n  ')}\n`).toEqual([]);
     });
 
-    it('every MANAGE_ENTITIES icon resolves', () => {
+    it('every registry icon resolves', () => {
         // The registry specifically, because these drive the sidebar, the
         // /manage index and the Ctrl+K palette from one array.
         const collection = loadCollection('material-symbols');
 
         expect(collection, '@iconify-json/material-symbols must be installed').not.toBeNull();
 
-        const broken = MANAGE_ENTITIES
+        /*
+         * `(key) => key`: the registry is a function of a translator since
+         * issue #19, and an icon name is not copy, so the identity stub
+         * `i18n/CONVENTIONS.md` prescribes for structural tests is right here.
+         */
+        const broken = manageEntities((key) => key)
             .filter((entity) => {
                 const [prefix, name] = entity.icon.split(':') as [string, string];
 

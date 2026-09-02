@@ -210,7 +210,7 @@ describe('access roles: composing a role', () => {
     });
 
     it('refuses a duplicate key and names the incumbent', async () => {
-        const clash = await api<{ statusMessage?: string; message?: string }>('/api/access-roles', {
+        const clash = await api<{ message?: string }>('/api/access-roles', {
             method: 'POST',
             cookie: cookies.admin,
             body: JSON.stringify({
@@ -403,7 +403,7 @@ describe('a tenant cannot write away its own administration', () => {
             where: { tenantId: TENANT_A, key: 'tenant-admin' },
         });
 
-        const stripped = await api<{ statusMessage?: string }>(`/api/access-roles/${admin.id}`, {
+        const stripped = await api<{ message?: string }>(`/api/access-roles/${admin.id}`, {
             method: 'PATCH',
             cookie: cookies.admin,
             body: JSON.stringify({ permissions: [{ permissionKey: 'session.read' }] }),
@@ -424,7 +424,7 @@ describe('a tenant cannot write away its own administration', () => {
             where: { tenantId: TENANT_A, accessRole: { key: 'tenant-admin' } },
         });
 
-        const revoked = await api<{ statusMessage?: string }>(
+        const revoked = await api<{ message?: string }>(
             `/api/persons/${adminPerson.personId}/access-roles`,
             { method: 'PUT', cookie: cookies.admin, body: JSON.stringify([]) },
         );
@@ -478,7 +478,7 @@ describe('a tenant cannot write away its own administration', () => {
             where: { tenantId: TENANT_A, key: 'tenant-admin' },
         });
 
-        const removed = await api<{ statusMessage?: string }>(`/api/access-roles/${admin.id}`, {
+        const removed = await api<{ message?: string }>(`/api/access-roles/${admin.id}`, {
             method: 'DELETE',
             cookie: cookies.admin,
         });

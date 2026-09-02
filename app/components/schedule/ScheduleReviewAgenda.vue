@@ -18,7 +18,7 @@
         <div
             class="ragenda_days"
             role="tablist"
-            aria-label="Day"
+            :aria-label="t('schedule.agenda.dayTablist')"
         >
             <button
                 v-for="day in grid.activeDays"
@@ -69,7 +69,7 @@
                             class="ragenda_chip-icon"
                             aria-hidden="true"
                         />
-                        {{ DIFF_TAG[item.action] }}
+                        {{ diffTag(item.action, t) }}
                     </span>
                     <span class="ragenda_chip-title">{{ lookup.offering(item.offeringId) }}</span>
                     <span
@@ -79,11 +79,12 @@
                     <span
                         v-if="item.action === 'move' && item.previous"
                         class="ragenda_chip-meta ragenda_chip-was"
-                    >was {{ weekdayShort(item.previous.dayOfWeek) }}
-                        {{ blockTime(grid, item.previous.blockIndex, item.previous.dayOfWeek).start }}
-                        <template v-if="item.previous.termWeek !== item.placement.termWeek">
-                            (wk {{ item.previous.termWeek }})
-                        </template>
+                    >{{ t('schedule.reviewGrid.was', {
+                        day: weekdayShort(item.previous.dayOfWeek),
+                        time: blockTime(grid, item.previous.blockIndex, item.previous.dayOfWeek).start,
+                    }) }}<template v-if="item.previous.termWeek !== item.placement.termWeek">
+                        {{ t('schedule.reviewGrid.wasWeek', { week: item.previous.termWeek }) }}
+                    </template>
                     </span>
                 </article>
             </li>
@@ -94,8 +95,9 @@
 <script setup lang="ts">
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import type { TimeGrid } from '~/composables/schedule';
-import { DIFF_ICON, DIFF_TAG, describePlacement, shownAt } from '~/composables/generationReview';
+import { DIFF_ICON, describePlacement, diffTag, shownAt } from '~/composables/generationReview';
 import type { Placement, ReviewPlacement } from '~/composables/generationReview';
+import { useT } from '~/composables/i18n';
 
 const props = defineProps<{
     grid: TimeGrid;
@@ -106,6 +108,8 @@ const props = defineProps<{
     };
     emptyMessage: string;
 }>();
+
+const { t } = useT();
 
 /**
  * Opens on the first day that has something to look at, not on Monday.
@@ -140,7 +144,7 @@ const dayItems = computed(() => props.placements
         roomId: item.roomId,
         previous: item.previous,
         placement: item.placement,
-        label: describePlacement(item, slotLabel, props.lookup.offering, props.lookup.room),
+        label: describePlacement(item, slotLabel, props.lookup.offering, props.lookup.room, t),
     }))
     .filter((item) => item.at.dayOfWeek === activeDay.value)
     .sort((a, b) => a.at.blockIndex - b.at.blockIndex));

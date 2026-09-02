@@ -50,7 +50,7 @@
             <span
                 v-if="count.total === null"
                 class="counts_value counts_value--unavailable"
-            >Unavailable</span>
+            >{{ t('dashboard.counts.unavailable') }}</span>
             <span
                 v-else
                 class="counts_value"
@@ -63,6 +63,7 @@
 
 <script setup lang="ts">
 import type { EntityCount } from '~/utils/institutionCounts';
+import { useT } from '~/composables/i18n';
 
 /**
  * Presentation only. The fetch lives in `useInstitutionCounts()` and the page
@@ -73,6 +74,13 @@ const props = defineProps<{
     counts: readonly EntityCount[];
     pending?: boolean;
 }>();
+
+/*
+ * ONLY "Unavailable" is this component's own copy: `count.label` arrives
+ * already resolved from `countedEntities(held, t)`, so a tile's name is the
+ * manage registry's one translation of it rather than a second one here.
+ */
+const { t } = useT();
 
 /*
  * Six is the composable's own ceiling. On a first load there is no resolved

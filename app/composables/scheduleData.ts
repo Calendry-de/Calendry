@@ -7,6 +7,7 @@ import { describeScheduleFailure } from '~/composables/httpError';
 import { DISPLAY_DEFAULTS } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
 import { useHasPermission } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 
 interface DirectoryRoom { id: string; code: string; name: string; isVirtual: boolean }
 interface DirectoryPerson { id: string; givenName: string; familyName: string }
@@ -80,6 +81,15 @@ export function useScheduleData(filters: {
      * belongs to the page.
      */
     const request = useRequestFetch();
+
+    /*
+     * Same reasoning one line up, for the same reason: `useT()` needs the Vue
+     * instance, so it is resolved here and the resolved `t` is what the
+     * `loadError` getter below closes over. `describeScheduleFailure` takes it
+     * rather than calling `useT()` itself (i18n/CONVENTIONS.md § "Copy in plain
+     * `.ts` modules").
+     */
+    const { t } = useT();
 
     const canReadViolations = useHasPermission('violation.read');
 
@@ -290,7 +300,7 @@ export function useScheduleData(filters: {
      * reader to create a TimeGrid they already have.
      */
     const loadError = computed(() => (asyncData.error.value
-        ? describeScheduleFailure(asyncData.error.value)
+        ? describeScheduleFailure(t, asyncData.error.value)
         : null));
 
     const allSessions = computed(() => reference.value?.sessions ?? []);

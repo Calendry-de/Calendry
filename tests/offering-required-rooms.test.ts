@@ -3,7 +3,8 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { migrationStatements } from './helpers/migrations';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { RESOURCES } from '../server/utils/resources';
-import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
+import { manageEntities } from '../app/utils/manageRegistry';
+import { englishT } from './helpers/manageMessages';
 import { MAX_ROOMS_PER_SESSION } from '../shared/rooms';
 
 /**
@@ -139,7 +140,14 @@ describe('the ceiling', () => {
 });
 
 describe('the form', () => {
-    const field = MANAGE_ENTITIES
+    /*
+     * `englishT`: two assertions below read the help TEXT (that it states the
+     * ceiling, and that it says capacities are ADDED). The ceiling now reaches
+     * the sentence as the named placeholder `{max}` rather than by string
+     * concatenation, so resolving the real message is also what proves the
+     * interpolation works. See `tests/helpers/manageMessages.ts`.
+     */
+    const field = manageEntities(englishT)
         .find((entity) => entity.key === 'offerings')!
         .fields.find((f) => f.key === 'requiredRoomCount');
 

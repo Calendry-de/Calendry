@@ -1,0 +1,44 @@
+{
+    "action": {
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "create": "Create",
+        "creating": "Creating…",
+        "delete": "Delete",
+        "deleting": "Deleting…",
+        "edit": "Edit",
+        "close": "Close",
+        "retry": "Try again",
+        "previous": "Previous",
+        "next": "Next",
+        "back": "Back",
+        "downloadExcel": "Download Excel",
+        "downloadJson": "Download JSON"
+    },
+    "field": {
+        "name": "Name",
+        "description": "Description",
+        "active": "Active",
+        "slug": "Slug",
+        "code": "Code",
+        "colour": "Colour",
+        "created": "Created",
+        "updated": "Updated",
+        "expires": "Expires",
+        "timezone": "Timezone",
+        "weight": "Weight"
+    },
+    "value": {
+        "none": "None",
+        "never": "Never",
+        "all": "All"
+    },
+    "a11y": {
+        "close": "Close",
+        "loading": "Loading",
+        "commandPalette": "Command palette",
+        "paletteAction": "Action",
+        "paletteGoTo": "Go to…"
+    }
+}

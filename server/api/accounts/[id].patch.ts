@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
         if (body.personId === null) {
             throw createError({
                 statusCode: 422,
-                statusMessage: 'A login has to act as somebody. Choose a person, or use '
+                message: 'A login has to act as somebody. Choose a person, or use '
                     + '“Remove from this institution”: that is a different act, and it is only '
                     + 'possible for a login another institution still holds.',
                 data: { field: 'personId' },

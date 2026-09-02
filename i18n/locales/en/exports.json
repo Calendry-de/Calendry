@@ -1,0 +1,12 @@
+{
+    "self": {
+        "heading": "Your data",
+        "hint": "Everything Calendry holds about you: profile, roles, group memberships, sessions, unavailability, preferences, exam requests, API tokens, calendar links and your own audit trail. A GDPR Right to Access request, self-service."
+    },
+    "tenant": {
+        "heading": "Data export",
+        "description": "Every Person, login, Group, Room, Offering, Session, exam request and Constraint this institution owns, in one download.",
+        "intro": "For a departing institution taking its data with it, or answering a Right to Access request that spans more than one person. A single Person's own record can be exported from their own page instead; this is everything at once.",
+        "denied": "Data export needs tenant.export."
+    }
+}

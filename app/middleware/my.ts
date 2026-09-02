@@ -37,6 +37,9 @@ import { useSession } from '~/composables/session';
  * Convenience, not enforcement: every route re-checks server-side.
  */
 export default defineNuxtRouteMiddleware((to) => {
+    // `$t`, not `useT()`: route middleware is not a component setup. See
+    // `app/plugins/i18n.ts` for why that is safe with respect to language.
+    const { $t } = useNuxtApp();
     const session = useSession();
     const held = new Set(session.value?.permissions ?? []);
 
@@ -54,9 +57,20 @@ export default defineNuxtRouteMiddleware((to) => {
 
     const missing = [...new Set(requirement.flat())];
 
+    /*
+     * A PAIRWISE FOLD THROUGH A MESSAGE, not `missing.join(' or ')`
+     * (i18n/CONVENTIONS.md § "Assembled sentences"): a conjunction is grammar,
+     * and a bare `' or '` fragment is a piece no translator can place. Folding
+     * through `errors.list.or` keeps it translatable at any list length, and
+     * reads correctly at one (the seed alone), two and three.
+     */
+    const named = missing.slice(1).reduce(
+        (list, next) => $t('errors.list.or', { list, next }),
+        missing[0] ?? '',
+    );
+
     return abortNavigation(createError({
         statusCode: 403,
-        statusMessage: `You do not have permission to use this page. It needs ${missing.join(' or ')}. `
-            + 'Ask an administrator to grant it.',
+        message: $t('errors.my.denied', { missing: named }),
     }));
 });

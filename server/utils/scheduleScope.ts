@@ -109,7 +109,7 @@ export async function ownSessionClause(tx: Tx, identity: TenantScopedIdentity): 
          * returning an unscoped clause, because the one thing this must never do
          * is widen.
          */
-        throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+        throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
     }
 
     const memberships = await tx.membership.findMany({

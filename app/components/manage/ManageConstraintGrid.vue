@@ -1,37 +1,63 @@
 <template>
     <div class="cgrid">
-        <p
+        <!--
+            `<i18n-t>` throughout these three banners: each holds `<code>` or
+            `<strong>` markup that has to stay inside ONE translatable
+            sentence, and the two plural ones agreed in three places at once
+            (`rule{{ 's' }}`, `has`/`have`, `is`/`are`), none of which a
+            translator could reach. Identifiers and shell commands travel as
+            SLOTS, never as part of a message: they are not translatable text.
+        -->
+        <i18n-t
             v-if="!list.isComplete.value"
             class="cgrid_alarm"
+            keypath="manageUi.constraintGrid.incomplete"
             role="alert"
+            scope="global"
+            tag="p"
         >
-            Showing {{ list.rows.value.length }} of {{ list.total.value }} rules. This view needs the
-            whole set to group them correctly, so raise <code>listPageSize</code> for constraints.
-        </p>
+            <template #shown>{{ list.rows.value.length }}</template>
+            <template #total>{{ list.total.value }}</template>
+            <template #setting>
+                <code>listPageSize</code>
+            </template>
+        </i18n-t>
 
-        <p
+        <i18n-t
             v-if="missingTypes.length"
             class="cgrid_alarm"
+            keypath="manageUi.constraintGrid.missingTypes"
+            :plural="missingTypes.length"
             role="alert"
+            scope="global"
+            tag="p"
         >
-            {{ missingTypes.length }} rule{{ missingTypes.length === 1 ? '' : 's' }} in the catalogue
-            {{ missingTypes.length === 1 ? 'has' : 'have' }} no row for this tenant and
-            {{ missingTypes.length === 1 ? 'is' : 'are' }} therefore <strong>not evaluated at all</strong>:
-            <code>{{ missingTypeKeys }}</code>.
-            An operator can repair this with <code>bun run backfill:constraints -- --all-missing</code>.
-        </p>
+            <template #count>{{ missingTypes.length }}</template>
+            <template #emphasis>
+                <strong>{{ t('manageUi.constraintGrid.notEvaluatedEmphasis') }}</strong>
+            </template>
+            <template #keys>
+                <code>{{ missingTypeKeys }}</code>
+            </template>
+            <template #command>
+                <code>bun run backfill:constraints -- --all-missing</code>
+            </template>
+        </i18n-t>
 
-        <p
+        <i18n-t
             v-if="unknownTypeRows.length"
             class="cgrid_alarm"
+            keypath="manageUi.constraintGrid.unknownTypes"
+            :plural="unknownTypeRows.length"
             role="alert"
+            scope="global"
+            tag="p"
         >
-            {{ unknownTypeRows.length }} stored rule{{ unknownTypeRows.length === 1 ? '' : 's' }}
-            name{{ unknownTypeRows.length === 1 ? 's' : '' }} a type this build does not know and
-            cannot be shown or edited here:
-            <code>{{ unknownTypeKeys }}</code>.
-            The solver skips {{ unknownTypeRows.length === 1 ? 'it' : 'them' }} too.
-        </p>
+            <template #count>{{ unknownTypeRows.length }}</template>
+            <template #keys>
+                <code>{{ unknownTypeKeys }}</code>
+            </template>
+        </i18n-t>
 
         <!--
             SEVERITY IS NOW A FILTER, NOT THE GROUPING.
@@ -43,31 +69,31 @@
             since there is no other way back to the rest of the list from here.
         -->
         <div
-            aria-label="Filter by severity"
+            :aria-label="t('manageUi.constraintGrid.filterLabel')"
             class="cgrid_filters"
             role="group"
         >
-            <span class="cgrid_filters-label">Show</span>
+            <span class="cgrid_filters-label">{{ t('manageUi.constraintGrid.filterShow') }}</span>
             <button
                 :aria-pressed="severityFilter.has('HARD')"
                 class="cgrid_filter cgrid_filter--hard"
                 :class="{ 'cgrid_filter--active': severityFilter.has('HARD') }"
                 type="button"
                 @click="toggleSeverity('HARD')"
-            >Hard rules</button>
+            >{{ t('manageUi.constraintGrid.filterHard') }}</button>
             <button
                 :aria-pressed="severityFilter.has('SOFT')"
                 class="cgrid_filter cgrid_filter--soft"
                 :class="{ 'cgrid_filter--active': severityFilter.has('SOFT') }"
                 type="button"
                 @click="toggleSeverity('SOFT')"
-            >Soft rules</button>
+            >{{ t('manageUi.constraintGrid.filterSoft') }}</button>
         </div>
 
         <p
             v-if="!categoryGroups.length"
             class="cgrid_empty"
-        >No rules match the current filter.</p>
+        >{{ t('manageUi.constraintGrid.noneMatch') }}</p>
 
         <!--
             ONE `<details>` PER CATEGORY, native rather than a hand-rolled
@@ -119,7 +145,7 @@
                             icon="material-symbols:add"
                             :to="`/manage/constraints/new?type=${entry.type.key}`"
                             type="transparent"
-                        >Add scoped variant</CommonButton>
+                        >{{ t('manageUi.constraintGrid.addVariant') }}</CommonButton>
                     </template>
                 </ManageConstraintRow>
             </ul>
@@ -135,7 +161,7 @@
                 kept visible because it is a rule that is currently running.
             -->
             <template v-if="group.superseded.length">
-                <h3 class="cgrid_subhead">Superseded rules</h3>
+                <h3 class="cgrid_subhead">{{ t('manageUi.constraintGrid.supersededHead') }}</h3>
 
                 <ul class="cgrid_rows">
                     <ManageConstraintRow
@@ -179,13 +205,11 @@
                 />
                 <span class="cgrid_head-text">
                     <h2>
-                        Additional rules
+                        {{ t('manageUi.constraintGrid.additionalTitle') }}
                         <span class="cgrid_count">{{ variants.length }}</span>
                     </h2>
                     <p>
-                        Extra instances of a rule, each narrowed to particular session kinds: a
-                        different weight for seminars than for lectures, say. The tenant-wide
-                        version above still applies everywhere these do not.
+                        {{ t('manageUi.constraintGrid.additionalBlurb') }}
                     </p>
                 </span>
             </summary>
@@ -213,7 +237,9 @@
                         :kinds="kinds"
                         :row="group.row"
                         :scope-required="true"
-                        :subtitle="`${group.type.label}: narrowed from the tenant-wide rule.`"
+                        :subtitle="t('manageUi.constraintGrid.variantSubtitle', {
+                            label: group.type.label,
+                        })"
                         :type="group.type"
                         @update:enabled="setEnabled(group.row, $event)"
                         @update:param="setParam(group.row, $event.key, $event.value)"
@@ -225,7 +251,7 @@
                                 icon="material-symbols:edit-outline"
                                 :to="`/manage/constraints/${group.row.id}`"
                                 type="transparent"
-                            >Edit</CommonButton>
+                            >{{ t('common.action.edit') }}</CommonButton>
                         </template>
                     </ManageConstraintRow>
 
@@ -248,14 +274,14 @@
                 v-else-if="allVariantsCount"
                 class="cgrid_empty"
             >
-                {{ allVariantsCount }} exist, but none match the current severity filter.
+                {{ t('manageUi.constraintGrid.variantsFiltered', { count: allVariantsCount }) }}
             </p>
 
             <p
                 v-else
                 class="cgrid_empty"
             >
-                None yet. Every rule above applies to all session kinds.
+                {{ t('manageUi.constraintGrid.variantsEmpty') }}
             </p>
 
             <CommonButton
@@ -263,7 +289,7 @@
                 icon="material-symbols:add"
                 to="/manage/constraints/new"
                 type="secondary"
-            >Add a rule</CommonButton>
+            >{{ t('manageUi.constraintGrid.addRule') }}</CommonButton>
         </details>
 
         <p
@@ -289,6 +315,7 @@ import {
     findConstraintType,
 } from '#shared/constraintTypes';
 import { isConstraintTypeSuggested } from '#shared/tenantMode';
+import { useT } from '~/composables/i18n';
 import { groupConstraintVariants } from '~/utils/constraintGrouping';
 
 /**
@@ -321,6 +348,8 @@ const props = defineProps<{
 // or search of its own: the set is thirteen rows and always complete.
 defineModel<string>('search', { required: true });
 defineModel<number>('page', { required: true });
+
+const { t } = useT();
 
 /**
  * Declared by the row component and imported here, rather than described twice.
@@ -392,7 +421,7 @@ const variants = computed(() => allVariants.value
  * Issue #103: variants sharing the exact same type/severity/weight/params/
  * enabled state, collapsed to one entry each. Computed from `variants`
  * alone, the whole set the grid already holds (see `listPageSize` on
- * `CONSTRAINT_ENTITY`), so this needs no fetch of its own and reflects
+ * `constraintEntity()`), so this needs no fetch of its own and reflects
  * every edit immediately, the same as everything else on this page.
  */
 const variantGroups = computed(() => groupConstraintVariants(variants.value));
@@ -497,7 +526,9 @@ function entriesForCategory(category: ConstraintCategory, deprecated: boolean): 
 
 /** What replaced this type, in the tenant's language rather than as a key. */
 function supersededBy(type: ConstraintTypeDef): string {
-    return findConstraintType(type.deprecatedBy)?.label ?? type.deprecatedBy ?? 'a newer rule';
+    return findConstraintType(type.deprecatedBy)?.label
+        ?? type.deprecatedBy
+        ?? t('manageUi.constraintGrid.newerRule');
 }
 
 /**
@@ -539,12 +570,10 @@ async function patch(row: ConstraintRow, body: Record<string, unknown>) {
         await request(`/api/constraints/${row.id}`, { method: 'PATCH', body });
         await props.list.refresh();
     } catch (caught: unknown) {
-        const data = (caught as { data?: { statusMessage?: string; message?: string } }).data;
-
         // Named rather than swallowed: a rejected weight or param is the server
         // enforcing a rule this control could not know about, and a silent
         // revert would look like the click did nothing.
-        error.value = data?.statusMessage ?? data?.message ?? 'Could not save that change.';
+        error.value = serverErrorMessage(caught) ?? t('manageUi.shared.changeSaveFailed');
         await props.list.refresh();
     } finally {
         const next = new Set(busy.value);
@@ -560,7 +589,7 @@ function setWeight(row: ConstraintRow, raw: string) {
     const weight = Number(raw);
 
     if (!Number.isFinite(weight)) {
-        error.value = 'Weight must be a number.';
+        error.value = t('manageUi.constraintGrid.weightNotNumber');
 
         return;
     }

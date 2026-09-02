@@ -1,0 +1,142 @@
+{
+    "section": {
+        "schedule": "Stundenplan",
+        "my": "Meine Einstellungen",
+        "manage": "Verwaltung",
+        "account": "Zugang"
+    },
+    "group": {
+        "schedule": "Stundenplan",
+        "mySettings": "Meine Einstellungen",
+        "people": "Personen",
+        "resources": "Ressourcen",
+        "curriculum": "Lehrplanung",
+        "accessReview": "Zugriff & Freigaben",
+        "accessData": "Zugriff & Daten"
+    },
+    "place": {
+        "home": {
+            "label": "Start",
+            "description": "Überblick über die Termine.",
+            "keywords": "start, startseite, übersicht, überblick, einstieg"
+        },
+        "schedule": {
+            "label": "Stundenplan",
+            "description": "Das Wochenraster: Termine ansehen, auswählen und verschieben.",
+            "keywords": "stundenplan, wochenplan, zeitplan, raster, woche, kalender, termine"
+        },
+        "manageProposals": {
+            "label": "Planvorschläge",
+            "description": "Vom Solver erzeugte Stundenpläne, die auf eine Entscheidung warten.",
+            "keywords": "planvorschlag, planvorschläge, vorschlag, solver, planungslauf, prüfen, übernehmen, offen"
+        },
+        "my": {
+            "label": "Meine Einstellungen",
+            "description": "Ihre eigene Verfügbarkeit und Ihre Lehrwünsche.",
+            "keywords": "meine, mich, eigene, selbst, einstellungen, verfügbarkeit, wünsche"
+        },
+        "myAvailability": {
+            "label": "Meine Sperrzeiten",
+            "description": "Tage und Blöcke, an denen Sie nicht unterrichten können. Wird zur Freigabe eingereicht.",
+            "keywords": "verfügbarkeit, sperrzeit, sperrzeiten, veto, abwesenheit, verhindert, meine"
+        },
+        "myExams": {
+            "label": "Meine Prüfungen",
+            "description": "Beantragen Sie eine Prüfung für eine Lehrveranstaltung, die Sie leiten. Sie wird vor der Einplanung geprüft.",
+            "keywords": "prüfung, klausur, prüfungsantrag, antrag, leistungsnachweis, meine"
+        },
+        "myPreferences": {
+            "label": "Meine Lehrwünsche",
+            "description": "Tage und Zeiten, an denen Sie lieber unterrichten. Werden erfasst, aber noch nicht von der Planung berücksichtigt.",
+            "keywords": "wunsch, wünsche, lehrwünsche, bevorzugt, vormittags, tage, lehre, meine"
+        },
+        "myTeachingPattern": {
+            "label": "Meine Terminverteilung",
+            "description": "Wie jede Lehrveranstaltung, die Sie leiten, eingeplant wird: über das Semester verteilt oder am Stück.",
+            "keywords": "verteilung, muster, block, verteilt, rhythmus, lehrveranstaltung, lehre, meine"
+        },
+        "myAccount": {
+            "label": "Mein Zugang",
+            "description": "Ihre eigene Anzeige: Datums- und Zahlenformat sowie Ihre Sprache, soweit Calendry übersetzt ist.",
+            "keywords": "gebietsschema, region, sprache, datum, format, konto, mein"
+        },
+        "myCalendarLinks": {
+            "label": "Kalender-Abos",
+            "description": "Abonnieren Sie Ihren Stundenplan oder den einer Gruppe in einer externen Kalender-App.",
+            "keywords": "ics, ical, kalender, abo, abonnieren, feed, export, link, extern"
+        },
+        "manageDisplay": {
+            "label": "Darstellung",
+            "description": "Wie der Stundenplan gezeichnet wird: Farbquellen, Online-Markierung, Ersatzfarben.",
+            "keywords": "darstellung, farbe, farben, design, hervorhebung, online, aussehen, palette"
+        },
+        "manageAccessDefaults": {
+            "label": "Zugriffsvorgaben",
+            "description": "Ob eine neu angelegte Person automatisch eine Berechtigungsrolle erhält.",
+            "keywords": "zugriff, berechtigungsrolle, berechtigung, vorgabe, vergeben, automatisch, mitglied"
+        },
+        "manageDataExport": {
+            "label": "Datenexport",
+            "description": "Laden Sie alle Personen, Konten, Gruppen, Räume, Lehrveranstaltungen, Termine und Regeln dieser Institution herunter.",
+            "keywords": "export, download, herunterladen, dsgvo, daten, sicherung, auskunftsrecht, datenübertragbarkeit"
+        },
+        "manageCurriculumProgression": {
+            "label": "Lehrplanfortschritt",
+            "description": "Auf welchem Lehrplan jede Gruppe steht und wie sich alle berechtigten Gruppen auf einmal weiterführen lassen.",
+            "keywords": "phase, fortschritt, weiterführen, lehrplan, plan, semester, aufsteigen, kohorte"
+        },
+        "manageExamReviews": {
+            "label": "Prüfungsfreigabe",
+            "description": "Prüfungen freigeben oder ablehnen, die Lehrkräfte für ihre eigenen Lehrveranstaltungen beantragt haben.",
+            "keywords": "prüfung, klausur, freigabe, genehmigen, ablehnen, offen, prüfungsantrag"
+        },
+        "manageAvailabilityReviews": {
+            "label": "Sperrzeitfreigabe",
+            "description": "Sperrzeiten freigeben oder ablehnen, die Personen für sich selbst erklärt haben.",
+            "keywords": "freigabe, genehmigen, ablehnen, offen, veto, sperrzeit, abwesenheit"
+        },
+        "manageAvailabilityPreferences": {
+            "label": "Lehrwünsche",
+            "description": "Bevorzugte Tage und Blöcke aller Personen ansehen und festlegen.",
+            "keywords": "wünsche, lehrwünsche, bevorzugte tage, vormittags, lehrkraft, personal"
+        },
+        "accountTheme": {
+            "label": "Design wechseln",
+            "description": "Zwischen hellem und dunklem Hintergrund wechseln.",
+            "keywords": "design, dunkel, hell, aussehen, kontrast, darstellung"
+        },
+        "accountSwitchTenant": {
+            "label": "Institution wechseln",
+            "description": "Zu einer anderen Institution wechseln, zu der Sie gehören.",
+            "keywords": "wechseln, institution, schule, hochschule, universität, ändern"
+        },
+        "accountLogout": {
+            "label": "Abmelden",
+            "description": "Diese Anmeldung beenden.",
+            "keywords": "abmelden, ausloggen, beenden, verlassen"
+        },
+        "myApiTokens": {
+            "label": "API-Tokens",
+            "description": "Bearer-Token für ein Skript erzeugen, begrenzt auf Berechtigungen, die Sie selbst haben.",
+            "keywords": "api, token, skript, automatisierung, schnittstelle, schlüssel"
+        },
+        "myDataExport": {
+            "label": "Meine Daten exportieren",
+            "description": "Alles herunterladen, was diese Institution über Sie gespeichert hat.",
+            "keywords": "export, download, dsgvo, daten, auskunftsrecht, kopie"
+        }
+    },
+    "shell": {
+        "mainNav": "Hauptnavigation",
+        "menu": "Menü",
+        "search": "Suchen (Strg K)",
+        "navigation": "Navigation",
+        "closeMenu": "Menü schließen",
+        "sections": "Bereiche",
+        "jumpToSection": "Zu einem Bereich springen",
+        "switchInstitution": "Institution wechseln",
+        "switchFailed": "Die Institution konnte nicht gewechselt werden.",
+        "expandSidebar": "ausklappen",
+        "collapseSidebar": "einklappen"
+    }
+}

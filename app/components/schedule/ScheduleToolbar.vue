@@ -1,7 +1,7 @@
 <template>
     <section
         class="bar"
-        aria-label="Filters and schedule actions"
+        :aria-label="t('schedule.toolbar.regionLabel')"
     >
         <div class="bar_group">
             <!--
@@ -15,18 +15,18 @@
                 control most likely to be reached for on every visit.
             -->
             <label class="bar_field">
-                <span>Term</span>
+                <span>{{ t('schedule.toolbar.term') }}</span>
                 <select
                     v-model="termIdModel"
                     class="bar_select"
                     :title="selectedTermName"
                 >
                     <option
-                        v-for="t in terms"
-                        :key="t.id"
-                        :value="t.id"
-                        :selected="t.id === (termIdModel || terms[0]?.id)"
-                    >{{ t.name }}</option>
+                        v-for="term in terms"
+                        :key="term.id"
+                        :value="term.id"
+                        :selected="term.id === (termIdModel || terms[0]?.id)"
+                    >{{ term.name }}</option>
                 </select>
             </label>
 
@@ -48,7 +48,7 @@
                     name="material-symbols:filter-alt-outline"
                     aria-hidden="true"
                 />
-                Filters
+                {{ t('schedule.toolbar.filters') }}
                 <span
                     v-if="activeFilterCount"
                     class="bar_filters-count"
@@ -62,18 +62,6 @@
             disagreed at some widths.
         -->
         <div class="bar_group bar_group--view">
-            <label class="bar_field">
-                <span>Density</span>
-                <select
-                    v-model.number="rowHeightModel"
-                    class="bar_select"
-                >
-                    <option :value="44">Compact</option>
-                    <option :value="60">Comfortable</option>
-                    <option :value="84">Spacious</option>
-                </select>
-            </label>
-
             <!-- Hidden without violation.read: no affordance for data the API
                  would refuse anyway. -->
             <button
@@ -88,28 +76,12 @@
                     name="material-symbols:error-outline"
                     aria-hidden="true"
                 />
-                {{ violationCount }} violation{{ violationCount === 1 ? '' : 's' }}
+                {{ t('schedule.toolbar.violationCount', { count: violationCount }, violationCount) }}
             </button>
         </div>
         <!-- ACTIONS: the only controls here that change anything, which is why
              they hold the right edge on their own. -->
         <div class="bar_group bar_group--end">
-            <!--
-                ISSUE #109. Gated on `solverTermId` alone, like the buttons
-                after it, not on today actually falling inside the visible
-                term/week, which the page decides at CLICK time and answers
-                with a graceful fallback (nearest boundary week) rather than by
-                hiding the control, per the issue's own note that "no term
-                visible today" must say so instead of doing nothing silently.
-            -->
-            <CommonButton
-                v-if="solverTermId"
-                icon="material-symbols:today-outline"
-                type="transparent"
-                @click="$emit('jump-today')"
-            >Today</CommonButton>
-
-
             <!-- Hidden without `session.create`, not disabled: there is no
                  read-only version of "add an event", and disabled reads as
                  "unavailable right now" rather than "not yours". -->
@@ -119,7 +91,7 @@
                 :icon="creating ? 'material-symbols:close' : 'material-symbols:add'"
                 :type="creating ? 'secondary' : 'transparent'"
                 @click="$emit('toggle-create')"
-            >{{ creating ? 'Cancel event' : 'Add event' }}</CommonButton>
+            >{{ creating ? t('schedule.toolbar.cancelEvent') : t('schedule.toolbar.addEvent') }}</CommonButton>
 
             <!--
                 THE DURABLE WAY TO A PROPOSAL. The solver's own "Review" button
@@ -134,7 +106,7 @@
                 icon="material-symbols:fact-check-outline"
                 type="transparent"
                 to="/schedule/proposals"
-            >Proposals</CommonButton>
+            >{{ t('schedule.toolbar.proposals') }}</CommonButton>
 
             <!--
                 Last in the group so its status line and the panel it summarises
@@ -168,6 +140,7 @@
 import type { Term } from '~/composables/schedule';
 import ScheduleSolverControl from '~/components/schedule/ScheduleSolverControl.vue';
 import ScheduleBlockedDayButton from '~/components/schedule/ScheduleBlockedDayButton.vue';
+import { useT } from '~/composables/i18n';
 
 const props = defineProps<{
     terms: Term[];
@@ -189,19 +162,23 @@ const props = defineProps<{
     solverTermId: string;
 }>();
 
-defineEmits<{ 'toggle-create': []; 'jump-today': [] }>();
+defineEmits<{ 'toggle-create': [] }>();
+
+const { t } = useT();
 
 const termIdModel = defineModel<string>('termId', { required: true });
 
 const selectedTermName = computed(
-    () => props.terms.find((t) => t.id === (termIdModel.value || props.terms[0]?.id))?.name ?? '',
+    () => props.terms.find((term) => term.id === (termIdModel.value || props.terms[0]?.id))?.name ?? '',
 );
 
 // Owned by the page, toggling `ScheduleFilterPanel`, not a data filter itself.
 const filtersOpenModel = defineModel<boolean>('filtersOpen', { required: true });
 
-// View state, owned by the page: neither affects the API query.
-const rowHeightModel = defineModel<number>('rowHeight', { required: true });
+// View state, owned by the page: does not affect the API query. Row height
+// used to live here too, a manual density preset; it is now derived
+// automatically from the TimeGrid's block length (see `autoRowHeight`), so
+// there is nothing left for this bar to offer a choice over.
 const showViolationsModel = defineModel<boolean>('showViolations', { required: true });
 
 /**

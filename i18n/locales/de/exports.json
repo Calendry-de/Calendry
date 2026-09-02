@@ -1,0 +1,12 @@
+{
+    "self": {
+        "heading": "Ihre Daten",
+        "hint": "Alles, was Calendry über Sie speichert: Profil, Rollen, Gruppenmitgliedschaften, Termine, Sperrzeiten, Wünsche, Prüfungsanträge, API-Tokens, Kalender-Abos und Ihre eigene Audit-Spur. Ein Auskunftsersuchen nach DSGVO, das Sie selbst auslösen."
+    },
+    "tenant": {
+        "heading": "Datenexport",
+        "description": "Jede Person, jeder Zugang, jede Gruppe, jeder Raum, jede Lehrveranstaltung, jeder Termin, jeder Prüfungsantrag und jede Regel dieser Institution, in einem Download.",
+        "intro": "Für eine Institution, die geht und ihre Daten mitnimmt, oder für ein Auskunftsersuchen, das mehr als eine Person betrifft. Der Datensatz einer einzelnen Person lässt sich stattdessen auf ihrer eigenen Seite exportieren; hier gibt es alles auf einmal.",
+        "denied": "Für den Datenexport ist die Berechtigung tenant.export erforderlich."
+    }
+}

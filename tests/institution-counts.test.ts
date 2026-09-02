@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COUNTED_KEYS, countedEntities } from '../app/utils/institutionCounts';
-import { MANAGE_ENTITIES, entityPermission } from '../app/utils/manageRegistry';
+import { entityPermission, manageEntities } from '../app/utils/manageRegistry';
+import type { Translate } from '../app/composables/i18n';
 import { PERMISSIONS } from '#shared/permissions';
 
 /**
@@ -22,14 +23,22 @@ import { PERMISSIONS } from '#shared/permissions';
  * and this file is what stops the derivation from drifting.
  */
 describe('institution count strip gating', () => {
-    const counted = COUNTED_KEYS.map((key) => MANAGE_ENTITIES.find((entity) => entity.key === key));
+    /*
+     * `(key) => key`: `manageEntities()` and `countedEntities()` both take a
+     * translator since issue #19, and this suite is entirely about permission
+     * keys, so the identity stub `i18n/CONVENTIONS.md` prescribes for
+     * structural tests is what belongs here. No assertion below reads a label.
+     */
+    const t: Translate = (key) => key;
+    const registry = manageEntities(t);
+    const counted = COUNTED_KEYS.map((key) => registry.find((entity) => entity.key === key));
 
     it('names only entities that exist in the registry', () => {
         // Guards the guard, and guards the silent drop: `countedEntities`
         // filters an unresolved key out rather than throwing, so a typo would
         // remove a tile with no error anywhere. Nothing else would report it.
         for (const [index, entity] of counted.entries()) {
-            expect(entity, `COUNTED_KEYS[${index}] (${COUNTED_KEYS[index]}) matches no MANAGE_ENTITIES entry`)
+            expect(entity, `COUNTED_KEYS[${index}] (${COUNTED_KEYS[index]}) matches no registry entry`)
                 .toBeDefined();
         }
 
@@ -54,7 +63,7 @@ describe('institution count strip gating', () => {
             const key = entityPermission(entity!, 'read');
 
             // Holding only this one key offers exactly this one tile.
-            const solo = countedEntities(new Set([key]));
+            const solo = countedEntities(new Set([key]), t);
 
             expect(solo.map((selected) => selected.key), `holding only ${key} should offer only ${entity!.key}`)
                 .toEqual([entity!.key]);
@@ -65,12 +74,12 @@ describe('institution count strip gating', () => {
         // The page is gated on `dashboard.view` alone, so this caller is real:
         // somebody who may land here and read no managed entity at all. The
         // strip must be absent, not six "Unavailable" tiles from six 403s.
-        expect(countedEntities(new Set())).toEqual([]);
+        expect(countedEntities(new Set(), t)).toEqual([]);
     });
 
     it('offers every tile to a caller holding every read key', () => {
         const all = new Set(counted.map((entity) => entityPermission(entity!, 'read')));
 
-        expect(countedEntities(all).map((entity) => entity.key)).toEqual([...COUNTED_KEYS]);
+        expect(countedEntities(all, t).map((entity) => entity.key)).toEqual([...COUNTED_KEYS]);
     });
 });

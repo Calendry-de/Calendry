@@ -1,11 +1,19 @@
 <template>
-    <CommonPage title="My exams">
-        <p class="intro">
-            Ask for an exam on a module you lead. What you submit here is
-            <strong>reviewed by an administrator</strong> before it appears on any
-            timetable, because an exam takes a room and an hour the schedule has to find, so
-            it is not placed on your say-so alone.
-        </p>
+    <CommonPage :title="t('my.exams.pageTitle')">
+        <!--
+            `<i18n-t>`: the emphasised clause is part of the sentence's grammar,
+            and German would not leave it where English does.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="my.exams.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #reviewed>
+                <strong>{{ t('my.exams.introReviewed') }}</strong>
+            </template>
+        </i18n-t>
 
         <p
             v-if="error"
@@ -37,27 +45,24 @@
             v-if="!modules.length"
             class="note note--warn"
         >
-            You are not listed as a lecturer on any module this term, so there is
-            nothing to request an exam for.
+            {{ t('my.exams.noModules') }}
         </p>
         <p
             v-else-if="!examKinds.length"
             class="note note--warn"
         >
-            This institution has no session kind marked as an exam yet, so an exam
-            cannot be recorded under one. An administrator sets that on a session
-            kind.
+            {{ t('my.exams.noExamKinds') }}
         </p>
 
         <section
             v-else
             class="entry"
         >
-            <h2 class="entry_head">Request an exam</h2>
+            <h2 class="entry_head">{{ t('my.exams.entryHead') }}</h2>
 
             <div class="entry_grid">
                 <label class="entry_field">
-                    <span class="entry_label">Module</span>
+                    <span class="entry_label">{{ t('my.exams.moduleLabel') }}</span>
                     <select
                         v-model="offeringId"
                         class="entry_input"
@@ -69,12 +74,12 @@
                             :key="m.id"
                             :selected="m.id === offeringId"
                             :value="m.id"
-                        >{{ m.code ? `${m.code}: ${m.title}` : m.title }}</option>
+                        >{{ moduleLabel(m) }}</option>
                     </select>
                 </label>
 
                 <label class="entry_field">
-                    <span class="entry_label">Kind</span>
+                    <span class="entry_label">{{ t('my.exams.kindLabel') }}</span>
                     <select
                         v-model="kindId"
                         class="entry_input"
@@ -89,7 +94,7 @@
                 </label>
 
                 <label class="entry_field">
-                    <span class="entry_label">Week</span>
+                    <span class="entry_label">{{ t('my.exams.weekLabel') }}</span>
                     <select
                         v-model.number="termWeek"
                         class="entry_input"
@@ -104,7 +109,7 @@
                 </label>
 
                 <label class="entry_field">
-                    <span class="entry_label">Day</span>
+                    <span class="entry_label">{{ t('my.exams.dayLabel') }}</span>
                     <select
                         v-model.number="dayOfWeek"
                         class="entry_input"
@@ -119,7 +124,7 @@
                 </label>
 
                 <label class="entry_field">
-                    <span class="entry_label">Starts at</span>
+                    <span class="entry_label">{{ t('my.exams.startLabel') }}</span>
                     <select
                         v-model.number="blockIndex"
                         class="entry_input"
@@ -134,7 +139,7 @@
                 </label>
 
                 <label class="entry_field">
-                    <span class="entry_label">Length in blocks</span>
+                    <span class="entry_label">{{ t('my.exams.durationLabel') }}</span>
                     <input
                         v-model.number="durationBlocks"
                         class="entry_input"
@@ -153,19 +158,17 @@
                     v-if="examWeeks.length && !chosenIsExamWeek"
                     class="entry_advice entry_field--wide"
                 >
-                    {{ examPeriodLabel }} That is where this institution has said its
-                    assessments belong; you can still ask for another week.
+                    {{ examPeriodAdvice }}
                 </p>
                 <p
                     v-else-if="!examWeeks.length"
                     class="entry_advice entry_field--wide"
                 >
-                    This term has no exam period on the academic calendar, so there is no
-                    week to prefer. An administrator sets one under calendar periods.
+                    {{ t('my.exams.noExamPeriod') }}
                 </p>
 
                 <label class="entry_field entry_field--wide">
-                    <span class="entry_label">Note for the reviewer</span>
+                    <span class="entry_label">{{ t('my.exams.noteLabel') }}</span>
                     <textarea
                         v-model="note"
                         class="entry_input"
@@ -178,16 +181,16 @@
                 :disabled="busy || !offeringId || !kindId"
                 type="primary"
                 @click="submit"
-            >{{ busy ? 'Sending…' : 'Request exam' }}</CommonButton>
+            >{{ busy ? t('my.exams.submitBusy') : t('my.exams.submit') }}</CommonButton>
         </section>
 
         <section class="list">
-            <h2 class="list_head">Your requests</h2>
+            <h2 class="list_head">{{ t('my.exams.listHead') }}</h2>
 
             <p
                 v-if="!rows.length"
                 class="list_empty"
-            >You have not asked for an exam yet.</p>
+            >{{ t('my.exams.listEmpty') }}</p>
 
             <ul
                 v-else
@@ -200,11 +203,13 @@
                 >
                     <div class="row_main">
                         <strong>{{ row.offering.title }}</strong>
-                        <span class="row_meta">
-                            {{ row.kind.name }} · week {{ row.termWeek }}<!--
-                            -->{{ row.weekKind === 'EXAM' ? ' (exam week)' : '' }},
-                            {{ weekdayName(row.dayOfWeek) }} {{ startLabel(row.blockIndex) }}
-                        </span>
+                        <!--
+                            ONE message per shape, not a sentence with an
+                            " (exam week)" clause spliced into the middle of it.
+                            That splice is why the mustaches had to be joined by
+                            an HTML comment; a translator could not have moved it.
+                        -->
+                        <span class="row_meta">{{ requestMeta(row) }}</span>
                         <!--
                             The teaching-plan fact itself, not just a message
                             shown once when this request was submitted: it can
@@ -215,12 +220,15 @@
                         <span
                             v-if="!row.teachingComplete.complete"
                             class="row_meta row_meta--warn"
-                        >teaching plan: {{ row.teachingComplete.placedCount }} of {{ row.teachingComplete.requiredCount }} sessions placed</span>
+                        >{{ t('my.exams.teachingPlanRow', {
+                            placed: row.teachingComplete.placedCount,
+                            required: row.teachingComplete.requiredCount,
+                        }) }}</span>
 
                         <span
                             v-if="row.decisionNote"
                             class="row_meta"
-                        >“{{ row.decisionNote }}”</span>
+                        >{{ t('my.exams.decisionNote', { note: row.decisionNote }) }}</span>
                     </div>
                     <!--
                         The status is the answer the page exists to give, so it
@@ -229,7 +237,7 @@
                     <span
                         class="row_status"
                         :class="`row_status--${row.status.toLowerCase()}`"
-                    >{{ STATUS_LABEL[row.status] }}</span>
+                    >{{ statusLabel[row.status] }}</span>
                 </li>
             </ul>
         </section>
@@ -239,6 +247,7 @@
 <script setup lang="ts">
 import { type TimeGrid, blockTime, weekdayName } from '~/composables/schedule';
 import { WEEK_KIND_NAME, classifyWeeks } from '#shared/academicCalendar';
+import { useT } from '~/composables/i18n';
 
 /**
  * A lecturer's own exam requests, and the form to add one.
@@ -250,7 +259,10 @@ import { WEEK_KIND_NAME, classifyWeeks } from '#shared/academicCalendar';
  * story than the server does.
  */
 definePageMeta({ middleware: 'my' });
-useHead({ title: 'My exams' });
+
+const { t } = useT();
+
+useHead(() => ({ title: t('my.exams.pageTitle') }));
 
 interface RequestRow {
     id: string;
@@ -268,11 +280,16 @@ interface RequestRow {
     teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
 }
 
-const STATUS_LABEL: Record<RequestRow['status'], string> = {
-    PENDING: 'Awaiting a decision',
-    APPROVED: 'Approved',
-    REJECTED: 'Not approved',
-};
+/*
+ * A COMPUTED map, not a module constant: a constant is evaluated once, before
+ * any language is known, so it would freeze the first render's language for the
+ * life of the page.
+ */
+const statusLabel = computed<Record<RequestRow['status'], string>>(() => ({
+    PENDING: t('my.exams.statusPending'),
+    APPROVED: t('my.exams.statusApproved'),
+    REJECTED: t('my.exams.statusRejected'),
+}));
 
 // `useRequestFetch`, not `$fetch`: a bare fetch drops the cookie server-side
 // and 401s into an empty page indistinguishable from having asked for nothing.
@@ -330,7 +347,32 @@ const grid = computed(() => data.value?.grids?.find((g) => g.isDefault) ?? data.
 const activeDays = computed(() => grid.value?.activeDays ?? [1, 2, 3, 4, 5]);
 
 function startLabel(index: number): string {
-    return grid.value ? blockTime(grid.value, index).start : `block ${index + 1}`;
+    return grid.value
+        ? blockTime(grid.value, index).start
+        : t('my.exams.startFallback', { block: index + 1 });
+}
+
+/** "CODE: Title", or the title alone. */
+function moduleLabel(offering: { title: string; code: string | null }): string {
+    return offering.code
+        ? t('my.exams.moduleWithCode', { code: offering.code, title: offering.title })
+        : offering.title;
+}
+
+/**
+ * One row's line, as ONE message chosen by whether the week is an exam week.
+ */
+function requestMeta(row: RequestRow): string {
+    const values = {
+        kind: row.kind.name,
+        week: row.termWeek,
+        day: weekdayName(row.dayOfWeek),
+        start: startLabel(row.blockIndex),
+    };
+
+    return row.weekKind === 'EXAM'
+        ? t('my.exams.requestMetaExamWeek', values)
+        : t('my.exams.requestMeta', values);
 }
 
 const blockOptions = computed(() => Array.from(
@@ -372,17 +414,43 @@ const weeks = computed(() => {
             // The kind is IN the label, not a colour beside it: this select is
             // the one place the choice is made, and an exam week that reads the
             // same as every other week is a choice made blind.
-            label: kind === 'TEACHING' || kind === 'UNSPECIFIED'
-                ? `Week ${w.index + 1}`
-                : `Week ${w.index + 1}: ${kind.toLowerCase()} week`,
+            //
+            // ONE MESSAGE PER KIND, never `kind.toLowerCase()` interpolated
+            // into a template: lowercasing an enum name only produces English,
+            // and the word has to be declined where it stands.
+            label: weekLabel(kind, w.index + 1),
         };
     });
 });
 
+/** A week's own name, per classified kind. */
+function weekLabel(kind: string, week: number): string {
+    if (kind === 'EXAM') {
+        return t('my.exams.weekExam', { week });
+    }
+
+    if (kind === 'BREAK') {
+        return t('my.exams.weekBreak', { week });
+    }
+
+    if (kind === 'HOLIDAY') {
+        return t('my.exams.weekHoliday', { week });
+    }
+
+    return t('my.exams.weekPlain', { week });
+}
+
 const examWeeks = computed(() => weeks.value.filter((w) => w.kind === 'EXAM'));
 const chosenIsExamWeek = computed(() => examWeeks.value.some((w) => w.week === termWeek.value));
 
-const examPeriodLabel = computed(() => {
+/**
+ * The advisory, WHOLE, in one message per shape.
+ *
+ * The sentence used to be built in two halves, a computed naming the weeks and
+ * a trailing clause in the template. Neither half is a sentence, so neither was
+ * translatable on its own.
+ */
+const examPeriodAdvice = computed(() => {
     const list = examWeeks.value.map((w) => w.week);
 
     if (!list.length) {
@@ -390,8 +458,8 @@ const examPeriodLabel = computed(() => {
     }
 
     return list.length === 1
-        ? `This term's exam period is week ${list[0]}.`
-        : `This term's exam period is weeks ${list[0]}–${list[list.length - 1]}.`;
+        ? t('my.exams.examPeriodOne', { week: list[0] })
+        : t('my.exams.examPeriodRange', { from: list[0], to: list[list.length - 1] });
 });
 
 const offeringId = ref('');
@@ -442,9 +510,10 @@ async function submit() {
         });
 
         if (!teachingComplete.complete) {
-            teachingWarning.value = `This module has ${teachingComplete.placedCount} of its `
-                + `${teachingComplete.requiredCount} sessions placed so far. The teaching plan `
-                + 'is not fully scheduled yet, though that does not stop the exam request.';
+            teachingWarning.value = t('my.exams.teachingWarning', {
+                placed: teachingComplete.placedCount,
+                required: teachingComplete.requiredCount,
+            });
         }
 
         note.value = '';
@@ -452,8 +521,8 @@ async function submit() {
     } catch (cause) {
         // The server's own sentence, which names the module or the kind. A
         // generic "could not save" would hide the one thing that is fixable.
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not send that request.';
+        error.value = serverErrorMessage(cause)
+            ?? t('my.exams.submitError');
     } finally {
         busy.value = false;
     }

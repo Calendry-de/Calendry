@@ -42,11 +42,11 @@ export default defineEventHandler(async (event) => {
         const screen = await resolveScreenKey(key);
 
         if (!screen) {
-            throw createError({ statusCode: 401, statusMessage: 'This screen key is not recognised.' });
+            throw createError({ statusCode: 401, message: 'This screen key is not recognised.' });
         }
 
         if (!screen.is_active) {
-            throw createError({ statusCode: 403, statusMessage: 'This screen has been deactivated.' });
+            throw createError({ statusCode: 403, message: 'This screen has been deactivated.' });
         }
     }
 

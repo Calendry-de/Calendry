@@ -1,7 +1,7 @@
 <template>
     <nav
         class="header__menu"
-        aria-label="Main"
+        :aria-label="t('nav.shell.mainNav')"
     >
         <!--
             The menu button and the inline links are the same registry rendered
@@ -14,7 +14,7 @@
             type="button"
             :aria-expanded="drawerOpen"
             aria-controls="nav-drawer"
-            aria-label="Menu"
+            :aria-label="t('nav.shell.menu')"
             @click="drawerOpen = true"
         >
             <Icon
@@ -39,7 +39,7 @@
         <button
             class="header__menu_search"
             type="button"
-            aria-label="Search (Ctrl K)"
+            :aria-label="t('nav.shell.search')"
             @click="openPalette()"
         >
             <Icon
@@ -52,7 +52,10 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { useHeaderNav } from '~/composables/navigation';
+
+const { t } = useT();
 
 /**
  * Top-level navigation, driven by the permission-filtered nav registry.

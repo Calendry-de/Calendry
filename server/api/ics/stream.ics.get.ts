@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
     // returns `null` or an `ics_link`), but it is what narrows `identity` from
     // `RequestIdentity` to `IcsLinkIdentity` for the fields read below.
     if (!identity || identity.kind !== 'ics_link') {
-        throw createError({ statusCode: 401, statusMessage: 'This calendar link is not recognised.' });
+        throw createError({ statusCode: 401, message: 'This calendar link is not recognised.' });
     }
 
     return withTenant(identity, async (tx) => {

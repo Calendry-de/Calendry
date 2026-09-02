@@ -1,0 +1,220 @@
+{
+    "page": {
+        "title": "Pricing",
+        "description": "Calendry is priced per institution on measured cost drivers: a base package by student headcount, a per-lecturer rate by weekly teaching load, and a complexity multiplier computed from your own schedule. Students are not billed.",
+        "opener": {
+            "title": "Priced on what your timetable actually is",
+            "lead": "Not on what kind of institution you are. Two universities the same size pay different amounts if one of them has a genuinely harder timetable, and that difference is measured from your own data rather than assumed from a label."
+        },
+        "rates": {
+            "title": "The rate card",
+            "lead": "Three things are banded and the rest are flat. A bill is the base package, plus each lecturer at their load band, multiplied by your complexity tier, plus the seats and services you choose."
+        },
+        "extras": {
+            "title": "Seats, support and getting started",
+            "lead": "Everything that is a flat line rather than a band. Only the people who edit the timetable need a seat; everybody else who reads it is included."
+        },
+        "calculator": {
+            "title": "Move a variable, watch the price move",
+            "lead": "Every figure below is computed from the rates above. The complexity sliders are the ones worth dragging: they change a bill by more than doubling your lecturer count does, without adding a single student."
+        },
+        "examples": {
+            "title": "Four institutions, four bills",
+            "lead": "The pair worth comparing is the large regular university against the medium scattered one. The smaller institution costs more, and measured complexity is the only thing that explains it."
+        },
+        "talk": {
+            "title": "Getting an actual number",
+            "lead": "The rates above will get you close on your own. A real quote needs your lecturer count, their weekly load, and one look at how scattered the timetable is, which is the part nobody can estimate from outside.",
+            "calloutText": "Accounts are created by an administrator, so there is nothing to sign up for here. Tell us the shape of your institution and we will come back with a figure.",
+            "calloutAction": "Get in touch"
+        }
+    },
+    "basis": {
+        "measured": {
+            "title": "Measured, not assumed",
+            "body": "Pricing is not based on whether you call yourself a school, a Fachhochschule or a university. That is a prior rather than a measurement, and it overcharges the well-organised institution and undercharges the chaotic one of exactly the same size. Everything below is computed from your own data."
+        },
+        "lecturers": {
+            "title": "Per lecturer, weighted by teaching load",
+            "body": "The billable unit is a lecturer, banded by how many sessions a week they actually teach. Sessions are the real placed unit the solver works on, they cannot be reorganised on paper to lower a bill, and they match how institutions already describe load: someone teaches eight hours a week."
+        },
+        "students": {
+            "title": "Students are not billed at all",
+            "body": "Unlimited, included. A student reads their timetable and receives notifications about it, which costs almost nothing to serve. Charging per head for that would price the product against being used, and a timetable nobody can look at is not worth having."
+        },
+        "complexity": {
+            "title": "Complexity is computed, auditable and revisited",
+            "body": "A multiplier comes from the rooms and groups each lecturer touches, how much their weekly pattern varies, and how deeply your groups nest. It is derived from the finished schedule, not self-declared and not guessed by a salesperson, so your own IT staff can check it. It is fixed at the start of a term and revisited when what you actually deliver drifts from that plan, so the price follows your timetable instead of being frozen for the life of a contract."
+        }
+    },
+    "rateTable": {
+        "base": {
+            "title": "Base package",
+            "note": "One fee per institution, banded by student headcount. Covers hosting, infrastructure and standard support.",
+            "basisLabel": "Students",
+            "priceLabel": "Per year",
+            "extraLabel": "Federation add-on"
+        },
+        "lecturer": {
+            "title": "Per lecturer",
+            "note": "Banded by the sessions a lecturer teaches in a normal week.",
+            "basisLabel": "Weekly sessions",
+            "priceLabel": "Per year"
+        },
+        "complexity": {
+            "title": "Complexity multiplier",
+            "note": "Applied to the lecturer subtotal only, never to the base package.",
+            "basisLabel": "What it means",
+            "priceLabel": "Multiplier"
+        }
+    },
+    "flat": {
+        "seat": {
+            "tier": "Admin and scheduler seat",
+            "basis": "Named people who edit, lock or run the solver. Everyone else is included.",
+            "price": "{amount} per year"
+        },
+        "supportStandard": {
+            "tier": "Standard support",
+            "basis": "Included with every base package.",
+            "price": "Included"
+        },
+        "supportPriority": {
+            "tier": "Priority support",
+            "basis": "Eight-hour response, a direct channel, and a quarterly roadmap call.",
+            "price": "{amount} per year"
+        },
+        "supportPartner": {
+            "tier": "Partner retainer",
+            "basis": "Around sixty development hours a year for feature work you specify.",
+            "price": "{amount} per year, or {hourly} per hour"
+        },
+        "onboardingStandard": {
+            "tier": "Standard onboarding",
+            "basis": "Template-based import you run yourself, plus about three days of training.",
+            "price": "{from} to {to} once"
+        },
+        "onboardingFull": {
+            "tier": "Happiness Package onboarding",
+            "basis": "We build the import from your legacy system, two weeks of intensive training, one named lead.",
+            "price": "{from} to {to} once"
+        },
+        "onboardingFederation": {
+            "tier": "Federation onboarding",
+            "basis": "Quoted per federation, because no two consortia share a starting point.",
+            "price": "On request"
+        }
+    },
+    "loadBand": {
+        "light": {
+            "label": "Light"
+        },
+        "standard": {
+            "label": "Standard"
+        },
+        "heavy": {
+            "label": "Heavy"
+        }
+    },
+    "complexityTier": {
+        "s": {
+            "meaning": "Mostly fixed weekly patterns, few rooms and groups per lecturer"
+        },
+        "m": {
+            "meaning": "Some variation, moderate spread"
+        },
+        "l": {
+            "meaning": "High variation, wide spread, deep group nesting"
+        },
+        "xl": {
+            "meaning": "Very scattered, heavy cross-group and federation interaction"
+        }
+    },
+    "complexityFactor": {
+        "entanglement": {
+            "label": "Entanglement",
+            "measure": "Average groups per session, saturating at a cap"
+        },
+        "nesting": {
+            "label": "Nesting depth",
+            "measure": "Average group-tree depth against your deepest tree"
+        },
+        "variance": {
+            "label": "Slot variance",
+            "measure": "How much a lecturer’s pattern moves week to week"
+        },
+        "constraints": {
+            "label": "Constraint density",
+            "measure": "Active constraint weight, saturating at a cap"
+        }
+    },
+    "supportTier": {
+        "standard": {
+            "label": "Standard",
+            "detail": "Included with every base package"
+        },
+        "priority": {
+            "label": "Priority",
+            "detail": "Eight-hour response, direct channel, quarterly roadmap call"
+        },
+        "partner": {
+            "label": "Partner retainer",
+            "detail": "Around sixty development hours a year for work you specify"
+        }
+    },
+    "line": {
+        "base": {
+            "label": "Base package",
+            "detail": "Tier {tier}, {students} students"
+        },
+        "lecturers": {
+            "label": "Lecturers",
+            "detail": "{lecturers} lecturers at {multiplier} complexity"
+        },
+        "seats": {
+            "label": "Admin seats",
+            "detail": "{seats} at {fee}"
+        },
+        "federation": {
+            "label": "Federation add-on",
+            "detail": "Banded with tier {tier}",
+            "detailNone": "Not a federation member"
+        },
+        "support": {
+            "label": "{tier} support"
+        }
+    },
+    "scenario": {
+        "a": {
+            "short": "Small, cluttered",
+            "title": "Small university of applied sciences",
+            "shape": "{students} students and {lecturers} lecturers, a heavy adjunct mix, and a timetable nobody has tidied in years"
+        },
+        "b": {
+            "short": "Large, regular",
+            "title": "Large university, regular timetable",
+            "shape": "{students} students and {lecturers} lecturers on clean, repetitive weekly patterns"
+        },
+        "c": {
+            "short": "Medium, scattered",
+            "title": "Medium university, scattered timetable",
+            "shape": "{students} students and {lecturers} lecturers spread wide across rooms and nested groups"
+        },
+        "d": {
+            "short": "Small school",
+            "title": "Small school",
+            "shape": "{students} students and {lecturers} teachers on a simple fixed weekly pattern"
+        }
+    },
+    "caveat": {
+        "text": "These are the rates as they stand today, and they are planning figures rather than a signed tariff: they have not yet been tested against a full year of real delivery. They will move as that data arrives. If we quote you, the quote is what holds, and we would rather tell you this here than after you have built a budget on it."
+    },
+    "format": {
+        "rangeClosed": "{from} to {to}",
+        "rangeOpen": "{from} or more",
+        "rangeClosedWeekly": "{from} to {to} a week",
+        "rangeOpenWeekly": "{from} or more a week",
+        "multiplier": "{value}x",
+        "flatTitle": "{tier}: {price}"
+    }
+}

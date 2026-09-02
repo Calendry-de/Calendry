@@ -4,12 +4,12 @@
         class="tstart"
     >
         <label class="tstart_label">
-            <span>Start from a template</span>
+            <span>{{ t('manageUi.templateStarter.label') }}</span>
             <select
                 v-model="chosenId"
                 @change="apply"
             >
-                <option value="">Blank: decide every field myself</option>
+                <option value="">{{ t('manageUi.templateStarter.blankOption') }}</option>
                 <option
                     v-for="row in rows"
                     :key="String(row.id)"
@@ -20,14 +20,14 @@
         </label>
 
         <p class="tstart_hint">
-            Copies the template's fields onto this draft once; editing the template
-            afterward will not change what you create here.
+            {{ t('manageUi.templateStarter.hint') }}
         </p>
     </section>
 </template>
 
 <script setup lang="ts">
 import type { EntityRow, ManageEntity } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 
 /**
  * Issue #8: an optional "seed the draft from a saved shape" picker, shown
@@ -47,6 +47,8 @@ const props = defineProps<{
     /** The create form's own draft, mutated in place on selection. */
     draft: Record<string, unknown>;
 }>();
+
+const { t } = useT();
 
 const canRead = useHasPermission(props.config.readPermission);
 const request = useRequestFetch();

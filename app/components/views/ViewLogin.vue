@@ -4,7 +4,7 @@
             <CommonButton
                 v-if="!signedIn"
                 to="/login"
-            >Sign in</CommonButton>
+            >{{ t('auth.loginView.heading') }}</CommonButton>
             <CommonButton
                 v-else
                 icon-width="45px"
@@ -25,6 +25,7 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { ready } from '~/composables/layout';
 import { logout, useIsSignedIn, useSession } from '~/composables/session';
 import CommonLoader from '../common/CommonLoader.vue';
@@ -39,6 +40,7 @@ import CommonLoader from '../common/CommonLoader.vue';
  * The signed-in button was previously a link to /profile; there is no profile
  * page, so it signs out instead. Point it back at /profile when one exists.
  */
+const { t } = useT();
 const session = useSession();
 const signedIn = useIsSignedIn();
 

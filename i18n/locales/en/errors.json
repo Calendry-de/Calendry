@@ -1,0 +1,35 @@
+{
+    "scheduleLoad": {
+        "expired": {
+            "title": "Your session has expired",
+            "detail": "Sign in again to see the schedule."
+        },
+        "forbidden": {
+            "title": "You cannot see this schedule",
+            "detail": "One of the reference endpoints this page reads refused. The permissions it needs are named by the schedule middleware."
+        },
+        "missing": {
+            "title": "This schedule is not there",
+            "detail": "The term or grid this view asked for no longer exists."
+        },
+        "unknown": {
+            "title": "Could not load the schedule",
+            "detail": "The request did not come back. Nothing has been changed, and your timetable is intact."
+        }
+    },
+    "list": {
+        "or": "{list} or {next}"
+    },
+    "manage": {
+        "unknownSection": "No such management section."
+    },
+    "my": {
+        "denied": "You do not have permission to use this page. It needs {missing}. Ask an administrator to grant it."
+    },
+    "review": {
+        "denied": "You do not have permission to review schedule proposals. It needs: generation.read."
+    },
+    "schedule": {
+        "denied": "You do not have permission to view the schedule. It needs session.read (everyone’s) or session.read_own (your own)."
+    }
+}

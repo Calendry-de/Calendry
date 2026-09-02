@@ -446,7 +446,7 @@ export async function checkRateLimit(
     if (attemptCount > options.maxAttempts) {
         throw createError({
             statusCode: 429,
-            statusMessage: 'Too many attempts. Wait a few minutes and try again.',
+            message: 'Too many attempts. Wait a few minutes and try again.',
         });
     }
 

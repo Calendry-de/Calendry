@@ -2,11 +2,22 @@
     <fieldset class="relmembers">
         <legend v-if="label">{{ label }}</legend>
 
-        <p class="relmembers_help">
-            Which Offerings this relates. Order shown is the order they were
-            added; <code>different_time</code> ignores it, a future ordered
-            relation type would not.
-        </p>
+        <!--
+            `<i18n-t>` so the type key stays a `<code>` element inside one
+            translatable sentence. `different_time` is an IDENTIFIER, never
+            translated, which is exactly why it travels as a slot rather than
+            as part of the message.
+        -->
+        <i18n-t
+            class="relmembers_help"
+            keypath="manageUi.relationMembers.help"
+            scope="global"
+            tag="p"
+        >
+            <template #type>
+                <code>different_time</code>
+            </template>
+        </i18n-t>
 
         <ol
             v-if="members.length"
@@ -24,7 +35,7 @@
                     class="relmembers_remove"
                     :disabled="disabled"
                     type="button"
-                    :aria-label="`Remove ${titleOf(offeringId)}`"
+                    :aria-label="t('manageUi.shared.removeAria', { label: titleOf(offeringId) })"
                     @click="remove(offeringId)"
                 >
                     <Icon
@@ -38,13 +49,13 @@
         <p
             v-else
             class="relmembers_empty"
-        >No offerings named yet.</p>
+        >{{ t('manageUi.relationMembers.empty') }}</p>
 
         <label
             v-if="!readonly"
             class="relmembers_add"
         >
-            <span class="sr-only">Add an offering</span>
+            <span class="sr-only">{{ t('manageUi.relationMembers.addLabel') }}</span>
             <select
                 :disabled="disabled || !available.length"
                 :value="''"
@@ -72,6 +83,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * The ordered Offering picker a RELATION-shaped constraint type needs
  * (`ConstraintTypeDef.relation`, ADR-0028 in calendry-solver): its operands,
@@ -111,6 +124,8 @@ const props = defineProps<{
 
 const members = defineModel<string[]>({ required: true });
 
+const { t } = useT();
+
 function titleOf(offeringId: string): string {
     const offering = props.offerings.find((o) => o.id === offeringId);
 
@@ -132,10 +147,12 @@ const available = computed(() => {
 
 const addPlaceholder = computed(() => {
     if (props.loadFailed) {
-        return 'Could not load offerings. Try reloading the page.';
+        return t('manageUi.relationMembers.loadFailed');
     }
 
-    return available.value.length ? 'Add an offering…' : 'Every offering is already named';
+    return available.value.length
+        ? t('manageUi.relationMembers.addOption')
+        : t('manageUi.relationMembers.allNamed');
 });
 
 function add(event: Event) {

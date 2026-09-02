@@ -5,6 +5,8 @@ import { assembleSolverInput } from '../server/utils/solverInput';
 import { demandLedgerFrom, reconcileDemand } from '../server/utils/solverDemand';
 import { isReproducible } from '../server/utils/generationRead';
 import { terminationSentence } from '../app/composables/generationReview';
+import type { Translate } from '../app/composables/i18n';
+import en from '../i18n/locales/en';
 
 /**
  * THE DEMAND LEDGER: what the app asked the solver for, recorded so the apply
@@ -200,6 +202,30 @@ describe('demandLedgerFrom', () => {
 });
 
 /**
+ * The English catalogue, as a translator.
+ *
+ * `terminationSentence` takes a required `Translate` since issue #19
+ * (i18n/CONVENTIONS.md: a plain `.ts` module is handed `t`, never calls
+ * `useT()`), and the assertions below are about the SENTENCES, not the keys,
+ * so the usual `(key) => key` stub would measure nothing. Resolving against
+ * the real English tree keeps them checking what they were written to check
+ * and pins the catalogue's own copy at the same time.
+ */
+const t: Translate = (key, ...args) => {
+    const named = (args[0] ?? {}) as Record<string, unknown>;
+    const message = key.split('.').reduce<unknown>(
+        (node, segment) => (node as Record<string, unknown> | undefined)?.[segment],
+        en as unknown as Record<string, unknown>,
+    );
+
+    if (typeof message !== 'string') {
+        throw new Error(`no such message key: ${ key }`);
+    }
+
+    return message.replace(/\{([a-zA-Z][a-zA-Z0-9]*)\}/g, (_, name: string) => String(named[name]));
+};
+
+/**
  * `stagnated`: the solver's new "could not place everything and stopped
  * searching". Both readers of a termination reason used to answer as though it
  * were good news, for the same reason: each treated its known list as the
@@ -218,15 +244,15 @@ describe('an unrecognised termination reason', () => {
     });
 
     it('is not described as a run from before termination capture', () => {
-        const predates = terminationSentence(null);
+        const predates = terminationSentence(null, t);
 
         expect(predates).toContain('predates');
 
         // Was word-for-word `predates`, so a run that gave up read as archaeology.
-        expect(terminationSentence('stagnated')).not.toBe(predates);
-        expect(terminationSentence('stagnated')).toContain('placing everything');
+        expect(terminationSentence('stagnated', t)).not.toBe(predates);
+        expect(terminationSentence('stagnated', t)).toContain('placing everything');
 
-        expect(terminationSentence('some_future_reason')).not.toBe(predates);
-        expect(terminationSentence('some_future_reason')).toContain('some_future_reason');
+        expect(terminationSentence('some_future_reason', t)).not.toBe(predates);
+        expect(terminationSentence('some_future_reason', t)).toContain('some_future_reason');
     });
 });

@@ -23,17 +23,24 @@
                     <label
                         class="builder_label"
                         :for="typeId"
-                    >Rule<span class="builder_req">*</span></label>
+                    >{{ t('manageUi.constraintBuilder.ruleLabel')
+                    }}<span class="builder_req">*</span></label>
 
                     <p
                         v-if="readonly || mode === 'edit' || typeIsPreset"
                         :id="typeId"
                         class="builder_static"
                     >
-                        {{ selectedType?.label ?? draft.type ?? '(none)' }}
-                        <em v-if="mode === 'edit' && !readonly">Cannot be changed. Create a new constraint instead.</em>
-                        <em v-else-if="typeIsPreset && selectedType?.relation">Name its offerings below, then save.</em>
-                        <em v-else-if="typeIsPreset">A scoped variant of this rule. Scope it below, then save.</em>
+                        {{ selectedType?.label ?? draft.type ?? t('manageUi.constraintBuilder.noneType') }}
+                        <em v-if="mode === 'edit' && !readonly">{{
+                            t('manageUi.constraintBuilder.typeFixed')
+                        }}</em>
+                        <em v-else-if="typeIsPreset && selectedType?.relation">{{
+                            t('manageUi.constraintBuilder.presetRelation')
+                        }}</em>
+                        <em v-else-if="typeIsPreset">{{
+                            t('manageUi.constraintBuilder.presetScoped')
+                        }}</em>
                     </p>
 
                     <select
@@ -46,9 +53,9 @@
                         <option
                             disabled
                             value=""
-                        >Choose a rule…</option>
+                        >{{ t('manageUi.constraintBuilder.chooseRule') }}</option>
                         <!-- `:selected` for the same SSR reason as everywhere else. -->
-                        <optgroup label="Checked as you edit">
+                        <optgroup :label="t('manageUi.shared.evaluatorApp')">
                             <option
                                 v-for="type in appTypes"
                                 :key="type.key"
@@ -56,7 +63,7 @@
                                 :value="type.key"
                             >{{ type.label }}</option>
                         </optgroup>
-                        <optgroup label="Solver">
+                        <optgroup :label="t('manageUi.shared.evaluatorSolver')">
                             <option
                                 v-for="type in solverTypes"
                                 :key="type.key"
@@ -81,7 +88,7 @@
                     v-if="selectedType"
                     class="builder_field"
                 >
-                    <span class="builder_label">Severity</span>
+                    <span class="builder_label">{{ t('manageUi.constraintBuilder.severityLabel') }}</span>
 
                     <p
                         v-if="selectedType.severity"
@@ -92,8 +99,8 @@
                             :class="`builder_sev--${selectedType.severity.toLowerCase()}`"
                         >{{ selectedType.severity }}</span>
                         <em>{{ selectedType.severity === 'HARD'
-                            ? 'A breach is a defect. Surfaced as a violation; manual edits are warned, never blocked.'
-                            : 'A preference. The solver weighs it against the others rather than refusing.' }}</em>
+                            ? t('manageUi.constraintBuilder.severityHardHint')
+                            : t('manageUi.constraintBuilder.severitySoftHint') }}</em>
                     </p>
 
                     <select
@@ -107,11 +114,11 @@
                         <option
                             :selected="draft.severity !== 'SOFT'"
                             value="HARD"
-                        >Hard: a breach is a defect</option>
+                        >{{ t('manageUi.constraintBuilder.severityHardOption') }}</option>
                         <option
                             :selected="draft.severity === 'SOFT'"
                             value="SOFT"
-                        >Soft: a weighted preference</option>
+                        >{{ t('manageUi.constraintBuilder.severitySoftOption') }}</option>
                     </select>
                 </div>
 
@@ -140,15 +147,23 @@
                     v-if="draft.severity === 'SOFT'"
                     class="builder_note"
                 >
-                    <strong>Weights are relative, not absolute.</strong>
-                    A weight only means something next to the other enabled soft
-                    rules: at 5 against rules weighted 100, this one will barely
-                    influence the result, while at 5 against rules weighted 1 it
-                    will dominate them. Multiplying every weight by the same
-                    number changes nothing at all. There is no ceiling and no
-                    "correct" value: pick a number that reflects this rule's
-                    importance <em>relative to your other active rules</em>, and
-                    raise it if the schedule is not respecting it enough.
+                    <strong>{{ t('manageUi.constraintBuilder.weightNoteLead') }}</strong>
+                    <!--
+                        The lead is a COMPLETE sentence of its own, so it is its
+                        own message and the space after it is punctuation. The
+                        body is one sentence whose emphasis falls mid-clause, so
+                        it goes through `<i18n-t>`: German puts that clause
+                        elsewhere.
+                    -->
+                    <i18n-t
+                        keypath="manageUi.constraintBuilder.weightNoteBody"
+                        scope="global"
+                        tag="span"
+                    >
+                        <template #relative>
+                            <em>{{ t('manageUi.constraintBuilder.weightNoteRelative') }}</em>
+                        </template>
+                    </i18n-t>
                 </p>
 
                 <!--
@@ -171,15 +186,13 @@
                     v-if="grids.length > 1"
                     class="builder_scopes"
                 >
-                    <legend>TimeGrid</legend>
+                    <legend>{{ t('manageUi.constraintBuilder.timeGridLegend') }}</legend>
 
                     <p
                         v-if="selectedType?.gridRelative && !draft.timeGridId"
                         class="builder_hint builder_hint--warn"
                     >
-                        This rule counts blocks or the gaps between them, and your grids do not
-                        agree on what a block is. Left on every grid it applies the same numbers
-                        to both.
+                        {{ t('manageUi.constraintBuilder.gridRelativeWarning') }}
                     </p>
 
                     <select
@@ -193,7 +206,7 @@
                         <option
                             :selected="!draft.timeGridId"
                             value=""
-                        >Every grid</option>
+                        >{{ t('manageUi.constraintBuilder.everyGrid') }}</option>
                         <option
                             v-for="grid in grids"
                             :key="grid.id"
@@ -214,7 +227,7 @@
                     v-if="!selectedType?.relation"
                     class="builder_scopes"
                 >
-                    <legend>Applies to</legend>
+                    <legend>{{ t('manageUi.shared.appliesTo') }}</legend>
 
                     <!--
                         DERIVED SCOPE. The rule reaches every kind classified
@@ -229,14 +242,25 @@
                         they meant is not among them.
                     -->
                     <template v-if="derivedKindType">
-                        <p
+                        <!--
+                            `<i18n-t>` so the classification stays a `<strong>`
+                            inside one sentence. The kind names are tenant
+                            vocabulary, joined by punctuation, never translated.
+                        -->
+                        <i18n-t
                             v-if="derivedKinds.length"
                             class="builder_hint"
+                            keypath="manageUi.constraintBuilder.derivedKinds"
+                            scope="global"
+                            tag="p"
                         >
-                            Every session kind marked
-                            <strong>{{ derivedTypeLabel }}</strong>:
-                            {{ derivedKinds.map((kind) => kind.name).join(', ') }}.
-                        </p>
+                            <template #type>
+                                <strong>{{ derivedTypeLabel }}</strong>
+                            </template>
+                            <template #kinds>{{
+                                derivedKinds.map((kind) => kind.name).join(', ')
+                            }}</template>
+                        </i18n-t>
 
                         <!--
                             The inert case, stated as loudly as it deserves: the
@@ -248,15 +272,13 @@
                             v-else
                             class="builder_hint builder_hint--warn"
                         >
-                            No session kind is marked {{ derivedTypeLabel }} yet, so this rule
-                            has nothing to apply to and will not be sent to the scheduler.
-                            Set a kind’s type to {{ derivedTypeLabel }} and it takes effect.
+                            {{ t('manageUi.constraintBuilder.derivedEmpty', { type: derivedTypeLabel }) }}
                         </p>
 
                         <NuxtLink
                             class="builder_scope-link"
                             to="/manage/session-kinds"
-                        >Manage session kinds</NuxtLink>
+                        >{{ t('manageUi.constraintBuilder.manageKindsLink') }}</NuxtLink>
                     </template>
 
                     <template v-else>
@@ -264,14 +286,13 @@
                             v-if="scopeRequired"
                             class="builder_hint builder_hint--warn"
                         >
-                            This rule already has a tenant-wide version. Pick at least one kind,
-                            or this one would silently duplicate it.
+                            {{ t('manageUi.constraintBuilder.scopeRequired') }}
                         </p>
 
                         <p
                             v-else-if="!scopeKinds.length"
                             class="builder_hint"
-                        >Every session kind: this is the tenant-wide rule.</p>
+                        >{{ t('manageUi.constraintBuilder.tenantWide') }}</p>
 
                         <label
                             v-for="kind in kinds"
@@ -290,7 +311,7 @@
                         <p
                             v-if="!kinds.length"
                             class="builder_hint builder_hint--warn"
-                        >No session kinds exist yet, so there is nothing to scope to.</p>
+                        >{{ t('manageUi.shared.noKinds') }}</p>
                     </template>
                 </fieldset>
 
@@ -304,7 +325,9 @@
                     v-if="selectedType?.relation"
                     v-model="relationMemberIds"
                     :error="form.fieldErrors.value.members"
-                    :help="`Needs at least ${selectedType.relation.minMembers} offerings.`"
+                    :help="t('manageUi.constraintBuilder.minMembers', {
+                        count: selectedType.relation.minMembers,
+                    })"
                     :load-failed="Boolean(offeringsData.error.value)"
                     :offerings="offerings"
                     :readonly="readonly"
@@ -314,7 +337,7 @@
                     v-if="selectedType?.params.length"
                     class="builder_params"
                 >
-                    <legend>Parameters</legend>
+                    <legend>{{ t('manageUi.shared.paramsLegend') }}</legend>
 
                     <template
                         v-for="control in paramControls"
@@ -344,7 +367,7 @@
                 <p
                     v-else-if="selectedType"
                     class="builder_hint"
-                >This rule takes no parameters.</p>
+                >{{ t('manageUi.shared.noParams') }}</p>
             </div>
         </template>
     </ManageEntityForm>
@@ -359,6 +382,7 @@ import ManageField from '~/components/manage/ManageField.vue';
 import ManageOfferingRelationMembers from '~/components/manage/ManageOfferingRelationMembers.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { CONSTRAINT_TYPES, findConstraintType, missingConstraintParams } from '#shared/constraintTypes';
+import { useT } from '~/composables/i18n';
 import { constraintParamControls } from '~/utils/constraintFields';
 import { SESSION_KIND_TYPE_LABELS } from '#shared/sessionKindType';
 import type { SessionKindType } from '#shared/sessionKindType';
@@ -379,6 +403,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
+
+const { t } = useT();
 
 const typeId = useId();
 
@@ -536,13 +562,13 @@ if (presetType) {
  * The `help` line stays a sentence because ManageField replaces it with the
  * validation message; the guidance that must not disappear is in the template.
  */
-const weightField: FieldDef = {
+const weightField = computed<FieldDef>(() => ({
     key: 'weight',
-    label: 'Penalty weight',
+    label: t('manageUi.constraintBuilder.weightLabel'),
     type: 'number',
     min: 0,
-    help: 'Relative to your other enabled soft rules, not an absolute score. See below.',
-};
+    help: t('manageUi.constraintBuilder.weightHelp'),
+}));
 
 /**
  * Choosing a type resets everything downstream of it: a severity and parameters

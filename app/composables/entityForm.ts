@@ -1,5 +1,7 @@
 import type { EntityRow, FieldDef, ManageEntity } from '~/utils/manageRegistry';
 import { fieldsFor, referencedResources } from '~/utils/manageRegistry';
+import type { Translate } from '~/composables/i18n';
+import { useT } from '~/composables/i18n';
 
 export type FormMode = 'create' | 'edit';
 
@@ -14,6 +16,7 @@ export type FormMode = 'create' | 'edit';
  */
 export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string) {
     const request = useRequestFetch();
+    const { t } = useT();
 
     /**
      * Two different lists, and conflating them was a bug.
@@ -272,12 +275,9 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
      */
     function applyError(error: unknown) {
         const e = error as {
-            statusMessage?: string;
             statusCode?: number;
             data?: {
                 name?: string;
-                message?: string;
-                statusMessage?: string;
                 data?: Record<string, unknown> & { issues?: unknown };
                 issues?: unknown;
             };
@@ -291,7 +291,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
          */
         errorData.value = e.data?.data ?? null;
 
-        const issues = extractIssues(e.data);
+        const issues = extractIssues(e.data, t);
 
         if (issues.length) {
             const mapped: Record<string, string> = {};
@@ -313,16 +313,25 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
             if (orphaned.length) {
                 formError.value = orphaned.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
             } else {
-                formError.value = 'Some fields need attention.';
+                formError.value = t('manageUi.form.fieldsNeedAttention');
             }
 
             return;
         }
 
-        formError.value = e.data?.statusMessage
-            ?? e.statusMessage
-            ?? e.data?.message
-            ?? 'Could not save. Please try again.';
+        /*
+         * The server's own sentence stays ENGLISH by decision (issue #19;
+         * i18n/CONVENTIONS.md § "What is out of scope"): it is diagnostic
+         * detail from a path this pass deliberately did not touch. Only the
+         * last link in the chain, the sentence this app authors when the
+         * server said nothing usable, is translated.
+         *
+         * `serverErrorMessage` owns which field that sentence lives in, and it
+         * is `data.message` rather than `statusMessage`: h3 sanitises the
+         * latter by default in a coming version, since it is emitted into the
+         * HTTP status line. See that function's comment.
+         */
+        formError.value = serverErrorMessage(error) ?? t('manageUi.form.saveFailed');
     }
 
     return {
@@ -381,8 +390,15 @@ interface Issue { path: (string | number)[]; message: string }
  * silently degrades to "Some fields need attention" with no field marked.
  *
  * Both shapes are accepted so this keeps working if h3 or zod stops flattening.
+ *
+ * TAKES A TRANSLATOR (i18n/CONVENTIONS.md § "Copy in plain `.ts` modules")
+ * rather than calling `useT()`: this is a module-level pure function, not a
+ * composable, and the one app-authored word in it is the fallback for an issue
+ * that arrived without a message of its own. Required, not optional: a call
+ * site that forgot it would render English into a German form and still
+ * compile.
  */
-function extractIssues(data: unknown): Issue[] {
+function extractIssues(data: unknown, t: Translate): Issue[] {
     if (!data || typeof data !== 'object') {
         return [];
     }
@@ -409,7 +425,10 @@ function extractIssues(data: unknown): Issue[] {
         .filter((issue): issue is Issue => Boolean(
             issue && typeof issue === 'object' && Array.isArray((issue as Issue).path),
         ))
-        .map((issue) => ({ path: issue.path, message: String(issue.message ?? 'Invalid value') }));
+        .map((issue) => ({
+            path: issue.path,
+            message: String(issue.message ?? t('manageUi.form.invalidValue')),
+        }));
 }
 
 /** Server value → what the control binds to. */

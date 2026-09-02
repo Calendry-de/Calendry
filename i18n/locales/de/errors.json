@@ -1,0 +1,35 @@
+{
+    "scheduleLoad": {
+        "expired": {
+            "title": "Ihre Anmeldung ist abgelaufen",
+            "detail": "Melden Sie sich erneut an, um den Stundenplan zu sehen."
+        },
+        "forbidden": {
+            "title": "Sie dürfen diesen Stundenplan nicht sehen",
+            "detail": "Einer der Referenz-Endpunkte, die diese Seite abfragt, hat die Anfrage abgelehnt. Welche Berechtigungen dafür nötig sind, nennt die Middleware des Stundenplans."
+        },
+        "missing": {
+            "title": "Diesen Stundenplan gibt es nicht",
+            "detail": "Das Semester oder das Zeitraster, das diese Ansicht angefragt hat, existiert nicht mehr."
+        },
+        "unknown": {
+            "title": "Der Stundenplan konnte nicht geladen werden",
+            "detail": "Die Anfrage blieb ohne Antwort. Es wurde nichts geändert, und Ihr Stundenplan ist unversehrt."
+        }
+    },
+    "list": {
+        "or": "{list} oder {next}"
+    },
+    "manage": {
+        "unknownSection": "Diesen Verwaltungsbereich gibt es nicht."
+    },
+    "my": {
+        "denied": "Sie haben keine Berechtigung für diese Seite. Erforderlich ist {missing}. Bitten Sie die Administration, sie zu erteilen."
+    },
+    "review": {
+        "denied": "Sie haben keine Berechtigung, Planvorschläge zu prüfen. Erforderlich ist: generation.read."
+    },
+    "schedule": {
+        "denied": "Sie haben keine Berechtigung, den Stundenplan zu sehen. Erforderlich ist session.read (alle Termine) oder session.read_own (nur die eigenen)."
+    }
+}

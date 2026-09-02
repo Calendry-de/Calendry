@@ -67,7 +67,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
 
     if (id === body.withSessionId) {
-        throw createError({ statusCode: 422, statusMessage: 'Cannot swap a Session with itself.' });
+        throw createError({ statusCode: 422, message: 'Cannot swap a Session with itself.' });
     }
 
     return withRequestTenant(event, async (tx, identity) => {
@@ -83,7 +83,7 @@ export default defineEventHandler(async (event) => {
         const b = await tx.session.findFirst({ where: { id: body.withSessionId, tenantId: identity.tenantId } });
 
         if (!a || !b) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         /**
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
         if (a.termWeek === null || b.termWeek === null) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'A Session in the spare bank has no placement to swap; place it first.',
+                message: 'A Session in the spare bank has no placement to swap; place it first.',
             });
         }
 

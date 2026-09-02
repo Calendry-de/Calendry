@@ -279,7 +279,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (!parent) {
-                throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+                throw createError({ statusCode: 404, message: 'Not found.' });
             }
 
             const rows = body as Record<string, unknown>[];

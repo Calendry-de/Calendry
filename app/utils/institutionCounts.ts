@@ -1,5 +1,6 @@
+import type { Translate } from '~/composables/i18n';
 import type { ManageEntity } from '~/utils/manageRegistry';
-import { MANAGE_ENTITIES, entityPermission } from '~/utils/manageRegistry';
+import { entityPermission, manageEntities } from '~/utils/manageRegistry';
 
 /**
  * Which entities `/dashboard` states a count for, and who may see each one.
@@ -41,10 +42,19 @@ export interface EntityCount {
  * A key that matches no registry entry is DROPPED rather than throwing: a
  * missing tile is recoverable, a crashing home page is not. The test is what
  * stops that from happening quietly.
+ *
+ * TAKES A TRANSLATOR (issue #19) even though the SELECTION is pure permission
+ * logic: what it returns is registry entries, and `/dashboard` reads `plural`
+ * off them for the tile's label. Threading `t` in is what keeps that label the
+ * registry's own rather than a second name for the same entity, which is the
+ * property `EntityCount.label` exists to have. A test measuring only the
+ * gating stubs it as `(key) => key`.
  */
-export function countedEntities(held: ReadonlySet<string>): ManageEntity[] {
+export function countedEntities(held: ReadonlySet<string>, t: Translate): ManageEntity[] {
+    const entities = manageEntities(t);
+
     return COUNTED_KEYS
-        .map((key) => MANAGE_ENTITIES.find((entity) => entity.key === key))
+        .map((key) => entities.find((entity) => entity.key === key))
         .filter((entity): entity is ManageEntity => entity !== undefined)
         .filter((entity) => held.has(entityPermission(entity, 'read')));
 }

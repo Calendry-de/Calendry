@@ -1,12 +1,19 @@
 <template>
     <CommonAppShell
-        description="Preferred teaching days and blocks, for everyone in this institution."
-        title="Teaching preferences"
+        :description="t('managePages.availabilityPreferences.description')"
+        :title="t('managePages.availabilityPreferences.pageTitle')"
     >
         <!--
             Stated on the administrator's page as well as the lecturer's. An
             administrator looking at a column of carefully-set preferences would
             otherwise reasonably assume the timetable respects them.
+        -->
+        <!--
+            `<i18n-t>` so the emphasised lead stays part of ONE sentence pair
+            rather than two keys a translator has to guess the order of; the
+            prose is wrapped in one `<span>` because `.note` is a flex
+            container and every bare text node would otherwise be its own flex
+            item (see `pages/my/availability.vue` for the measured version).
         -->
         <p
             class="note note--warn"
@@ -16,11 +23,15 @@
                 name="material-symbols:build-outline"
                 aria-hidden="true"
             />
-            <span>
-                <strong>Recorded, not yet used by the scheduler.</strong>
-                These are stored and editable now; the constraint that makes the solver
-                weigh them ships in a later release.
-            </span>
+            <i18n-t
+                keypath="managePages.availabilityPreferences.notYetUsed"
+                scope="global"
+                tag="span"
+            >
+                <template #lead>
+                    <strong>{{ t('managePages.availabilityPreferences.notYetUsedLead') }}</strong>
+                </template>
+            </i18n-t>
         </p>
 
         <p
@@ -31,8 +42,16 @@
                 name="material-symbols:lock-outline"
                 aria-hidden="true"
             />
-            You can view preferences but not change them; that needs
-            <code>availability.manage_any</code>.
+            <!-- The permission key is an identifier, not copy, so it stays a literal. -->
+            <i18n-t
+                keypath="managePages.availabilityPreferences.readOnly"
+                scope="global"
+                tag="span"
+            >
+                <template #permission>
+                    <code>availability.manage_any</code>
+                </template>
+            </i18n-t>
         </p>
 
         <p
@@ -57,7 +76,7 @@
                         v-if="person.roles.length"
                         class="people_roles"
                     >{{ person.roles.join(', ') }}</span>
-                    <span class="people_summary">{{ describePreferences(person.preference, grid, roomFeatureNames) }}</span>
+                    <span class="people_summary">{{ describePreferences(t, person.preference, grid, roomFeatureNames) }}</span>
                     <!--
                         A plain icon, not CommonChevron: that component renders a
                         BUTTON, and a button inside this row's button is invalid
@@ -77,33 +96,31 @@
                 >
                     <ManageWeekdayPicker
                         v-model="draftDays"
-                        help="Nothing ticked means no day preference."
-                        label="Preferred days"
+                        :help="t('managePages.availabilityPreferences.daysHelp')"
+                        :label="t('managePages.availabilityPreferences.daysLabel')"
                         :readonly="!canEdit"
                     />
 
                     <AvailabilityBlockPicker
                         v-model="draftBlocks"
                         :grid="grid"
-                        help="Nothing ticked means no preference about the time of day."
-                        label="Preferred blocks"
+                        :help="t('managePages.availabilityPreferences.blocksHelp')"
+                        :label="t('managePages.availabilityPreferences.blocksLabel')"
                         :readonly="!canEdit"
                     />
 
                     <AvailabilityRoomFeaturePicker
                         v-model="draftRoomFeatures"
-                        help="Nothing ticked means no preference about the kind of room."
-                        label="Preferred room types"
+                        :help="t('managePages.availabilityPreferences.roomTypesHelp')"
+                        :label="t('managePages.availabilityPreferences.roomTypesLabel')"
                         :options="roomFeatureOptions"
                         :readonly="!canEdit"
                     />
 
                     <AvailabilityWeightMultiplier
                         v-model="draftMultiplier"
-                        help="Most people should use the default. Raise it where somebody's
-                            constraints are genuinely harder than everyone else's, and remember
-                            it competes with the institution's other soft rules, not with them."
-                        label="How much this person's preference counts"
+                        :help="t('managePages.availabilityPreferences.weightHelp')"
+                        :label="t('managePages.availabilityPreferences.weightLabel')"
                         :readonly="!canEdit"
                     />
 
@@ -115,12 +132,12 @@
                             :disabled="busy"
                             type="primary"
                             @click="save(person.id)"
-                        >{{ busy ? 'Saving…' : 'Save' }}</CommonButton>
+                        >{{ busy ? t('common.action.saving') : t('common.action.save') }}</CommonButton>
                         <CommonButton
                             :disabled="busy"
                             type="secondary"
                             @click="open = null"
-                        >Cancel</CommonButton>
+                        >{{ t('common.action.cancel') }}</CommonButton>
                     </div>
                 </div>
             </li>
@@ -129,7 +146,7 @@
         <p
             v-if="!people.length"
             class="note"
-        >No active people in this institution yet.</p>
+        >{{ t('managePages.availabilityPreferences.emptyHint') }}</p>
     </CommonAppShell>
 </template>
 
@@ -142,6 +159,7 @@ import AvailabilityWeightMultiplier from '~/components/availability/Availability
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { describePreferences } from '~/utils/availabilityLabels';
+import { useT } from '~/composables/i18n';
 import { useHasPermission, useSession } from '~/composables/session';
 
 definePageMeta({
@@ -155,7 +173,7 @@ definePageMeta({
             if (!held.has('availability.read_any') && !held.has('availability.manage_any')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Viewing teaching preferences needs availability.read_any '
+                    message: 'Viewing teaching preferences needs availability.read_any '
                         + 'or availability.manage_any.',
                 }));
             }
@@ -163,7 +181,9 @@ definePageMeta({
     ],
 });
 
-useHead({ title: 'Teaching preferences' });
+const { t } = useT();
+
+useHead(() => ({ title: t('managePages.availabilityPreferences.pageTitle') }));
 
 interface PersonRow {
     id: string;
@@ -250,7 +270,8 @@ async function save(personId: string) {
         await refresh();
         open.value = null;
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not save that.';
+        error.value = serverErrorMessage(cause)
+            ?? t('managePages.availabilityPreferences.saveError');
     } finally {
         busy.value = false;
     }

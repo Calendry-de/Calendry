@@ -3,7 +3,13 @@
         v-if="permissions.length"
         class="permsummary"
     >
-        <summary>{{ permissions.length }} permission{{ permissions.length === 1 ? '' : 's' }} in this tenant</summary>
+        <!--
+            ONE PLURAL MESSAGE, verb and noun together, never `permission` plus
+            a mustached `s` (i18n/CONVENTIONS.md § "Pluralisation"): German has
+            no `-s` plural, so a suffix flip is not a translation and a word
+            split across mustaches has no key at all.
+        -->
+        <summary>{{ t('dashboard.permissions.summary', permissions.length) }}</summary>
 
         <div class="permsummary_body">
             <section
@@ -42,14 +48,26 @@
                 class="permsummary_group permsummary_group--other"
             >
                 <header class="permsummary_head">
-                    <h3>Other</h3>
+                    <h3>{{ t('dashboard.permissions.otherHeading') }}</h3>
                     <span class="permsummary_count">{{ otherKeys.length }}</span>
                 </header>
 
-                <p class="permsummary_other_note">
-                    Held, but not in the permission catalogue. Likely a key that moved or was
-                    removed from <code>shared/permissions.ts</code>; worth reporting.
-                </p>
+                <!--
+                    `<i18n-t>` rather than three keys around the `<code>`:
+                    German reorders clauses, so a sentence split at the module
+                    name is one no translator can fix without editing this
+                    template. The slot name matches the placeholder.
+                -->
+                <i18n-t
+                    class="permsummary_other_note"
+                    keypath="dashboard.permissions.otherNote"
+                    tag="p"
+                    scope="global"
+                >
+                    <template #module>
+                        <code>shared/permissions.ts</code>
+                    </template>
+                </i18n-t>
 
                 <ul class="permsummary_list">
                     <li
@@ -68,6 +86,7 @@
 <script setup lang="ts">
 import type { PermissionDef } from '#shared/permissions';
 import { permissionCategories } from '#shared/permissions';
+import { useT } from '~/composables/i18n';
 
 /**
  * Replaces the raw `<details><ul>` block that used to sit directly in
@@ -86,11 +105,18 @@ import { permissionCategories } from '#shared/permissions';
  * metadata on a page whose real content is the manage-entities grid above
  * it, not a promotion to primary content just because it is now organized.
  * What changed is what is inside it once opened.
+ *
+ * `categoryLabel` and each row's `description` are NOT translated here: both
+ * come from the permission catalogue's own vocabulary (`shared/permissions.ts`),
+ * which issue #19 handles in Phase 3, in one place, for every surface that
+ * reads it.
  */
 const props = defineProps<{
     /** Held permission keys: a flat array, exactly `session.permissions`. */
     permissions: readonly string[];
 }>();
+
+const { t } = useT();
 
 interface PermissionGroup {
     key: string;

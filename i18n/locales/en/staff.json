@@ -1,0 +1,88 @@
+{
+    "brand": {
+        "heading": "Calendry staff"
+    },
+    "tenants": {
+        "pageTitle": "Staff: tenants",
+        "heading": "Tenants",
+        "signOut": "Sign out",
+        "signOutBusy": "Signing out…",
+        "loadError": "Could not load tenants.",
+        "empty": "No tenants yet.",
+        "noFederationOption": "(none)",
+        "column": {
+            "federation": "Federation",
+            "erase": "Erase",
+            "locale": "Default locale"
+        },
+        "eraseAction": "Erase…",
+        "eraseWarning": "This deletes every Person, login, Group, Room, Offering, Session, Constraint and audit trail entry '{slug}' owns, immediately and permanently. Type the slug to confirm.",
+        "confirmSlugLabel": "Confirm slug",
+        "erasePermanently": "Erase '{slug}' permanently",
+        "erasingBusy": "Erasing…",
+        "eraseSuccess": "Erased '{slug}': {people} and {logins} removed.",
+        "erasePeopleCount": "{count} person | {count} people",
+        "eraseLoginCount": "{count} now-ownerless login | {count} now-ownerless logins",
+        "eraseError": "Could not erase '{slug}'.",
+        "federationUpdateError": "Could not update '{slug}''s federation.",
+        "localeHint": "A BCP-47 tag (e.g. {germanTag}, {britishTag}). Sets this institution's date and number format, and the interface language for everyone who has not chosen their own. Any other tag keeps its own date format and shows English. A person's setting wins, and the institution's own admins can change this; leave empty to follow the browser.",
+        "localeAriaLabel": "Default locale for '{slug}'",
+        "localePlaceholder": "e.g. de-DE (leave empty for none)",
+        "localeSave": "Save locale",
+        "localeSaved": "Set the default locale for '{slug}' to {locale}.",
+        "localeCleared": "Cleared the default locale for '{slug}'.",
+        "localeError": "Could not update the default locale for '{slug}'."
+    },
+    "federations": {
+        "heading": "Federations",
+        "cliNote": "Same effect as the {cli} CLI. Attach or detach a Tenant from the Federation column above.",
+        "loadError": "Could not load federations.",
+        "empty": "No federations yet.",
+        "noMembers": "(none)",
+        "column": {
+            "members": "Member tenants"
+        },
+        "namePlaceholder": "Federation name",
+        "submit": "Create federation",
+        "created": "Created federation '{slug}'.",
+        "alreadyExisted": "Federation '{slug}' already existed; nothing created.",
+        "error": "Could not create the federation."
+    },
+    "createTenant": {
+        "heading": "Create a tenant",
+        "cliNote": "Same effect as the {cli} CLI.",
+        "namePlaceholder": "Institution name",
+        "adminEmail": "Admin email",
+        "adminName": "Admin name",
+        "federationSlug": "Federation slug",
+        "optionalPlaceholder": "(optional)",
+        "submit": "Create tenant",
+        "createdWithPassword": "Created '{slug}'. Initial admin password (shown once): {password}",
+        "createdReusedAccount": "Created '{slug}'. Reused the existing account for {email}; its password is unchanged.",
+        "conflict": "A tenant with slug '{slug}' already exists.",
+        "error": "Could not create the tenant."
+    },
+    "login": {
+        "pageTitle": "Staff sign in",
+        "lead": "Internal sign-in. This is a separate credential from a tenant account.",
+        "passwordChanged": "Password changed. Sign in with your new password.",
+        "emailPlaceholder": "Email",
+        "passwordPlaceholder": "Password",
+        "submit": "Sign in",
+        "submitBusy": "Signing in…",
+        "error": "Invalid credentials."
+    },
+    "changePassword": {
+        "pageTitle": "Change staff password",
+        "lead": "Enter your current password and a new one.",
+        "forcedLead": "This account was reset by an administrator. Set a new password to continue.",
+        "emailPlaceholder": "Email",
+        "currentPasswordPlaceholder": "Current password",
+        "newPasswordPlaceholder": "New password",
+        "hint": "At least 12 characters, and different from the current one.",
+        "submit": "Change password",
+        "backToSignIn": "Back to sign in",
+        "invalidPassword": "That password cannot be used.",
+        "error": "Invalid credentials."
+    }
+}

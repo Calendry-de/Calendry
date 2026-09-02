@@ -9,7 +9,7 @@
     <aside
         class="inspector"
         :class="{ 'inspector--open': !!session }"
-        aria-label="Session details"
+        :aria-label="t('schedule.inspector.regionLabel')"
         tabindex="-1"
         data-inspector-root
     >
@@ -22,7 +22,9 @@
                 class="inspector_empty-icon"
                 aria-hidden="true"
             />
-            <p>{{ canMove || canUpdate ? 'Select a session to see its details and edit it' : 'Select a session to see its details' }}.</p>
+            <p>{{ canMove || canUpdate
+                ? t('schedule.inspector.emptyEditable')
+                : t('schedule.inspector.emptyReadonly') }}.</p>
         </div>
 
         <template v-else>
@@ -48,7 +50,7 @@
                 <button
                     type="button"
                     class="inspector_close"
-                    aria-label="Close details"
+                    :aria-label="t('schedule.inspector.close')"
                     @click="$emit('close')"
                 >
                     <Icon
@@ -60,12 +62,12 @@
 
             <dl class="inspector_facts">
                 <div>
-                    <dt>When</dt>
+                    <dt>{{ t('schedule.inspector.when') }}</dt>
                     <!-- BANKED (issue #22): cancelled, still owed, nowhere to
                          sit. `placedSession` is null exactly then, so nothing
                          below reads the placement fields without it. -->
                     <dd v-if="!placedSession">
-                        In the spare bank, not currently placed.
+                        {{ t('schedule.inspector.banked') }}
                     </dd>
                     <dd v-else>
                         <!-- The full date: "Tuesday, 09:00–12:15" leaves the
@@ -78,11 +80,12 @@
                         </template>
                         {{ blockTime(grid, placedSession.blockIndex, placedSession.dayOfWeek).start }}–{{
                             blockTime(grid, endBlock, placedSession.dayOfWeek).end }}
-                        <span class="inspector_muted">· week {{ placedSession.termWeek }}</span>
+                        <span class="inspector_muted">· {{
+                            t('schedule.inspector.week', { week: placedSession.termWeek }) }}</span>
                     </dd>
                 </div>
                 <div v-if="canMove || session.rooms.length">
-                    <dt>{{ session.rooms.length === 1 ? 'Room' : 'Rooms' }}</dt>
+                    <dt>{{ t('schedule.inspector.roomsLabel', session.rooms.length) }}</dt>
                     <!-- Read-only renders as TEXT, not a disabled control: a
                          disabled select reads as "unavailable right now"
                          rather than "not yours to change". -->
@@ -109,12 +112,12 @@
                         <p
                             v-if="session.rooms.length > 1"
                             class="inspector_hint"
-                        >The solver places a session in one room; the extras are kept here but not sent to it.</p>
+                        >{{ t('schedule.inspector.multiRoomHint') }}</p>
                     </dd>
                 </div>
                 <div v-if="editable || session.kind">
-                    <dt>Kind</dt>
-                    <dd v-if="!editable">{{ session.kind?.name ?? 'None' }}</dd>
+                    <dt>{{ t('schedule.inspector.kind') }}</dt>
+                    <dd v-if="!editable">{{ session.kind?.name ?? t('common.value.none') }}</dd>
                     <dd v-else>
                         <select
                             class="inspector_control"
@@ -140,12 +143,12 @@
                     somebody needs to see.
                 -->
                 <div>
-                    <dt>{{ lecturers.length === 1 ? 'Lecturer' : 'Lecturers' }}</dt>
+                    <dt>{{ t('schedule.inspector.lecturersLabel', lecturers.length) }}</dt>
                     <dd v-if="!lecturerEditable && lecturers.length">{{ lecturerNames }}</dd>
                     <dd
                         v-else-if="!lecturerEditable"
                         class="inspector_muted"
-                    >Nobody assigned</dd>
+                    >{{ t('schedule.inspector.nobodyAssigned') }}</dd>
                     <dd v-else>
                         <ManageRelationPicker
                             :def="lecturerRelation"
@@ -167,8 +170,7 @@
                     <p
                         v-if="canAssignLecturer && !lecturerEditable && session?.offeringId !== null"
                         class="inspector_hint"
-                    >Lock this session to override who teaches it, otherwise the next solve
-                        would silently replace your choice.</p>
+                    >{{ t('schedule.inspector.lecturerLockHint') }}</p>
                 </div>
 
                 <!--
@@ -186,7 +188,7 @@
                     disagreement IS the information this row exists to show.
                 -->
                 <div v-if="session.substitution || canSubstitute">
-                    <dt>Substituted</dt>
+                    <dt>{{ t('schedule.inspector.substituted') }}</dt>
                     <dd v-if="!canSubstitute">{{ lookup.person(session.substitution!.coveringPersonId) }}</dd>
 
                     <!--
@@ -214,7 +216,7 @@
                             size="S"
                             :disabled="busy"
                             @click="addingSubstitute = true"
-                        >Add a substitute</CommonButton>
+                        >{{ t('schedule.inspector.addSubstitute') }}</CommonButton>
                     </dd>
 
                     <dd v-else>
@@ -240,16 +242,16 @@
                             size="S"
                             :disabled="busy"
                             @click="addingSubstitute = false"
-                        >Cancel</CommonButton>
+                        >{{ t('common.action.cancel') }}</CommonButton>
                     </dd>
                 </div>
 
                 <div>
-                    <dt>{{ attendees.length === 1 ? 'Person' : 'People' }}</dt>
+                    <dt>{{ t('schedule.inspector.peopleLabel', attendees.length) }}</dt>
                     <dd
                         v-if="!editable && !attendees.length"
                         class="inspector_muted"
-                    >Nobody assigned individually</dd>
+                    >{{ t('schedule.inspector.nobodyIndividually') }}</dd>
                     <dd v-else-if="!editable">{{ attendeeNames }}</dd>
                     <dd v-else>
                         <!--
@@ -277,7 +279,7 @@
                     </dd>
                 </div>
                 <div v-if="editable">
-                    <dt>{{ session.groups.length === 1 ? 'Group' : 'Groups' }}</dt>
+                    <dt>{{ t('schedule.inspector.groupsLabel', session.groups.length) }}</dt>
                     <dd>
                         <!-- The SAME picker the Offering page and the Event
                              creation form use. Its third consumer, and the
@@ -295,11 +297,11 @@
                 </div>
 
                 <div v-else>
-                    <dt>{{ session.groups.length === 1 ? 'Group' : 'Groups' }}</dt>
+                    <dt>{{ t('schedule.inspector.groupsLabel', session.groups.length) }}</dt>
                     <dd
                         v-if="!session.groups.length"
                         class="inspector_muted"
-                    >No group attends this</dd>
+                    >{{ t('schedule.inspector.noGroup') }}</dd>
                     <dd v-else>
                         <!-- One level of ancestry, muted: "Seminar A1" alone is
                              ambiguous across cohorts, and the nesting is what
@@ -311,7 +313,9 @@
                         }}<span
                             v-if="lookup.groupParent(g.groupId)"
                             class="inspector_muted"
-                        > · under {{ lookup.groupParent(g.groupId) }}</span></span>
+                        > · {{ t('schedule.inspector.underParent', {
+                            parent: lookup.groupParent(g.groupId),
+                        }) }}</span></span>
                     </dd>
                 </div>
             </dl>
@@ -326,19 +330,19 @@
                         :name="worst === 'hard' ? 'material-symbols:error' : 'material-symbols:warning-outline'"
                         aria-hidden="true"
                     />
-                    {{ violations.length }} violation{{ violations.length === 1 ? '' : 's' }}
+                    {{ t('schedule.inspector.violationsHeading', { count: violations.length }, violations.length) }}
                 </h3>
                 <ul>
                     <li
                         v-for="violation in violations"
                         :key="violation.id"
                     >
-                        {{ describeViolation(violation, lookup) }}
+                        {{ describeViolation(violation, lookup, t) }}
                         <span class="inspector_muted">· {{ violation.constraint.name }}</span>
                     </li>
                 </ul>
                 <p class="inspector_note">
-                    Recorded, not blocking. The edit that caused this was allowed.
+                    {{ t('schedule.inspector.violationsNote') }}
                 </p>
             </section>
 
@@ -349,100 +353,157 @@
                     width="100%"
                     :disabled="busy || session.isLocked"
                     @click="$emit('toggle-place')"
-                >{{ placing ? 'Cancel' : (placedSession ? 'Move…' : 'Place…') }}</CommonButton>
+                >{{ placing
+                    ? t('common.action.cancel')
+                    : (placedSession ? t('schedule.inspector.move') : t('schedule.inspector.place')) }}</CommonButton>
 
                 <p
                     v-if="canMove && session.isLocked"
                     class="inspector_hint"
-                >Unlock this session before moving it.</p>
+                >{{ t('schedule.inspector.unlockBeforeMove') }}</p>
 
-                <!-- SWAP AND LOCK BOTH NEED A PLACEMENT TO ACT ON: a banked
-                     Session (issue #22) has none, and the server refuses
-                     either against one. Hidden here rather than merely
-                     disabled, matching how Delete is absent for an
-                     Offering-linked Session rather than greyed out. -->
-                <CommonButton
-                    v-if="canSwap && placedSession"
-                    :type="swapping ? 'secondary-black' : 'secondary'"
-                    width="100%"
-                    :disabled="busy || session.isLocked"
-                    @click="$emit('toggle-swap')"
-                >{{ swapping ? 'Cancel swap' : 'Swap with…' }}</CommonButton>
+                <!--
+                    SECONDARY ACTIONS, ONE ROW. Swap, Lock and Bank used to be
+                    three more full-width buttons stacked under Move, each the
+                    same visual weight as the one action most sessions actually
+                    need. Grouped here as compact icon+label buttons instead:
+                    still every action that was there, just no longer reading
+                    as a wall of equally-loud choices.
+
+                    SWAP AND LOCK BOTH NEED A PLACEMENT TO ACT ON: a banked
+                    Session (issue #22) has none, and the server refuses either
+                    against one. Hidden here rather than merely disabled,
+                    matching how Delete is absent for an Offering-linked
+                    Session rather than greyed out.
+                -->
+                <div
+                    v-if="(canSwap && placedSession) || (canLock && placedSession)
+                        || (canBank && placedSession && session.offeringId !== null)"
+                    class="inspector_secondary"
+                >
+                    <CommonButton
+                        v-if="canSwap && placedSession"
+                        :type="swapping ? 'secondary-black' : 'secondary'"
+                        size="S"
+                        :disabled="busy || session.isLocked"
+                        @click="$emit('toggle-swap')"
+                    >
+                        <template #icon>
+                            <Icon
+                                name="material-symbols:swap-horiz"
+                                aria-hidden="true"
+                            />
+                        </template>
+                        {{ swapping ? t('schedule.inspector.cancelSwap') : t('schedule.inspector.swap') }}
+                    </CommonButton>
+
+                    <CommonButton
+                        v-if="canLock && placedSession"
+                        type="secondary"
+                        size="S"
+                        :disabled="busy"
+                        @click="$emit('toggle-lock')"
+                    >
+                        <template #icon>
+                            <Icon
+                                :name="session.isLocked
+                                    ? 'material-symbols:lock-open-outline'
+                                    : 'material-symbols:lock-outline'"
+                                aria-hidden="true"
+                            />
+                        </template>
+                        {{ session.isLocked ? t('schedule.inspector.unlock') : t('schedule.inspector.lockInPlace') }}
+                    </CommonButton>
+
+                    <!--
+                        THE SPARE BANK (issue #22). Only an Offering-linked
+                        Session carries demand worth preserving; an Event has
+                        none, and Delete below is its equivalent. Not a
+                        two-step confirm like Delete: banking is reversible
+                        (place it again), unlike removing an Event entirely.
+                    -->
+                    <CommonButton
+                        v-if="canBank && placedSession && session.offeringId !== null"
+                        type="secondary"
+                        size="S"
+                        :disabled="busy || session.isLocked"
+                        @click="$emit('bank')"
+                    >
+                        <template #icon>
+                            <Icon
+                                name="material-symbols:inventory-2-outline"
+                                aria-hidden="true"
+                            />
+                        </template>
+                        {{ busy ? t('schedule.inspector.moving') : t('schedule.inspector.bank') }}
+                    </CommonButton>
+                </div>
 
                 <p
                     v-if="swapping"
                     class="inspector_hint"
-                >Now choose the session to swap places with.</p>
-
-                <CommonButton
-                    v-if="canLock && placedSession"
-                    type="secondary"
-                    width="100%"
-                    :disabled="busy"
-                    @click="$emit('toggle-lock')"
-                >{{ session.isLocked ? 'Unlock' : 'Lock in place' }}</CommonButton>
-
-                <!--
-                    THE SPARE BANK (issue #22). Only an Offering-linked Session
-                    carries demand worth preserving; an Event has none, and
-                    Delete below is its equivalent. Not a two-step confirm like
-                    Delete: banking is reversible (place it again), unlike
-                    removing an Event entirely.
-                -->
-                <CommonButton
-                    v-if="canBank && placedSession && session.offeringId !== null"
-                    type="secondary"
-                    width="100%"
-                    :disabled="busy || session.isLocked"
-                    @click="$emit('bank')"
-                >{{ busy ? 'Moving…' : 'Move to spare bank' }}</CommonButton>
+                >{{ t('schedule.inspector.swapHint') }}</p>
 
                 <p
                     v-if="canBank && placedSession && session.offeringId !== null && session.isLocked"
                     class="inspector_hint"
-                >Unlock this session before moving it to the spare bank.</p>
+                >{{ t('schedule.inspector.unlockBeforeBank') }}</p>
 
                 <!--
                     EVENTS ONLY. An Offering-linked Session cannot be deleted:
                     its Offering's frequency would go unmet and the next solve
                     would place it again. So the action is absent rather than
                     disabled.
+
+                    KEPT DELIBERATELY SMALLER than the primary/secondary group
+                    above: destructive, but not the loudest thing in the panel,
+                    which full width next to compact secondary buttons would
+                    have made it.
                 -->
                 <template v-if="canDelete && session.offeringId === null">
                     <CommonButton
                         v-if="!confirmingDelete"
                         type="destructive"
-                        width="100%"
+                        size="S"
                         :disabled="busy"
                         @click="confirmingDelete = true"
-                    >Delete event</CommonButton>
+                    >
+                        <template #icon>
+                            <Icon
+                                name="material-symbols:delete-outline"
+                                aria-hidden="true"
+                            />
+                        </template>
+                        {{ t('schedule.inspector.deleteEvent') }}
+                    </CommonButton>
 
                     <template v-else>
                         <p class="inspector_hint">
-                            Delete this event? It is not backed by an offering, so nothing
-                            will re-create it.
+                            {{ t('schedule.inspector.deleteConfirm') }}
                         </p>
 
-                        <CommonButton
-                            type="destructive"
-                            width="100%"
-                            :disabled="busy"
-                            @click="$emit('delete')"
-                        >{{ busy ? 'Deleting…' : 'Yes, delete it' }}</CommonButton>
+                        <div class="inspector_secondary">
+                            <CommonButton
+                                type="destructive"
+                                size="S"
+                                :disabled="busy"
+                                @click="$emit('delete')"
+                            >{{ busy ? t('common.action.deleting') : t('schedule.inspector.deleteYes') }}</CommonButton>
 
-                        <CommonButton
-                            type="secondary"
-                            width="100%"
-                            :disabled="busy"
-                            @click="confirmingDelete = false"
-                        >Keep it</CommonButton>
+                            <CommonButton
+                                type="secondary"
+                                size="S"
+                                :disabled="busy"
+                                @click="confirmingDelete = false"
+                            >{{ t('schedule.inspector.keepIt') }}</CommonButton>
+                        </div>
                     </template>
                 </template>
 
                 <p
                     v-if="!canMove && !canLock && !canDelete && !canBank"
                     class="inspector_hint"
-                >You have view-only access to this schedule.</p>
+                >{{ t('schedule.inspector.viewOnly') }}</p>
             </div>
         </template>
     </aside>
@@ -456,6 +517,7 @@ import {
 } from '~/composables/schedule';
 import { isPlacedSession } from '#shared/sessionPlacement';
 import { useViewerLocale } from '~/composables/locale';
+import { useT } from '~/composables/i18n';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 import type { RelationDef } from '~/utils/manageRegistry';
 import { personOptionLabel } from '~/utils/manageRegistry';
@@ -508,6 +570,7 @@ const props = defineProps<{
  * edit and would otherwise re-arm.
  */
 const locale = useViewerLocale();
+const { t } = useT();
 
 /**
  * An Offering-linked Session takes its kind, groups and people from its Offering
@@ -528,20 +591,19 @@ const lecturerEditable = computed(() => props.canAssignLecturer
 
 const lecturerRelation: RelationDef = {
     key: 'lecturers',
-    label: 'Lecturer',
-    help: 'Who leads this session. Changing it here overrides what the Offering or the '
-        + 'solver assigned, permanently. That is the whole reason a lock is required first.',
+    label: t('schedule.relation.lecturerLabel'),
+    help: t('schedule.relation.lecturerHelp'),
     resource: 'persons',
     valueKey: 'personId',
     searchable: true,
     optionLabel: personOptionLabel,
-    emptyHint: 'No people in this institution yet.',
+    emptyHint: t('schedule.relation.peopleEmptyHint'),
 };
 
 const personRelation: RelationDef = {
     key: 'people',
-    label: 'People',
-    help: 'Individuals attending in their own right, beyond whole groups.',
+    label: t('schedule.relation.peopleLabel'),
+    help: t('schedule.relation.peopleHelp'),
     resource: 'persons',
     valueKey: 'personId',
     // People are a flat list, not a hierarchy: the one difference from groups.
@@ -550,18 +612,18 @@ const personRelation: RelationDef = {
     // where the name is already composed, while a search result comes straight
     // from `/api/persons` with the parts separate.
     optionLabel: personOptionLabel,
-    emptyHint: 'No people in this institution yet.',
+    emptyHint: t('schedule.relation.peopleEmptyHint'),
 };
 
 const groupRelation: RelationDef = {
     key: 'groups',
-    label: 'Groups',
-    help: 'Nesting propagates: choosing a cohort also covers its seminars.',
+    label: t('schedule.relation.groupsLabel'),
+    help: t('schedule.relation.groupsHelp'),
     resource: 'groups',
     valueKey: 'groupId',
     indentTree: true,
     optionLabel: (row) => String(row.name),
-    emptyHint: 'No groups available in this term.',
+    emptyHint: t('schedule.relation.groupsEmptyHint'),
 };
 
 /**
@@ -578,14 +640,13 @@ const groupRelation: RelationDef = {
  */
 const substituteRelation = computed<RelationDef>(() => ({
     key: 'substitute',
-    label: 'Covered by',
-    help: 'Somebody else teaches this one occurrence. The original lecturer keeps the '
-        + 'Offering and this reverts on its own next week; nothing here is permanent.',
+    label: t('schedule.relation.substituteLabel'),
+    help: t('schedule.relation.substituteHelp'),
     resource: `sessions/${props.session?.id ?? ''}/substitute-candidates`,
     valueKey: 'id',
     searchable: true,
     optionLabel: personOptionLabel,
-    emptyHint: 'Nobody is free to cover this slot right now.',
+    emptyHint: t('schedule.relation.substituteEmptyHint'),
 
     /*
      * NO `emptyWarning`, deliberately. That field exists for a relation whose
@@ -625,8 +686,8 @@ const addingSubstitute = ref(false);
  * That is the same class of untruth this whole change was fixing, one row lower.
  */
 const coverRestingLabel = computed(() => (lecturers.value.length > 0
-    ? 'Taught by the assigned lecturer.'
-    : 'No substitute for this occurrence.'));
+    ? t('schedule.inspector.coverTaught')
+    : t('schedule.inspector.coverNone')));
 
 /*
  * THE PANEL IS REUSED, NOT REMOUNTED. Selecting a different session swaps the
@@ -1022,6 +1083,36 @@ const attendeeNames = computed(() => attendees.value
         flex-direction: column;
         gap: var(--space-4);
         margin-top: auto;
+    }
+
+    /*
+     * Swap / Lock / Bank (and the delete confirm's Yes/Keep pair) share one
+     * row instead of stacking as their own full-width buttons: same actions,
+     * a third the vertical space, and a clear visual step down from Move's
+     * full-width primary button above.
+     */
+    &_secondary {
+        display: flex;
+        gap: var(--space-3);
+
+        > * {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
+        // The base button's padding/gap (20px/12px) is sized for one full-width
+        // action, not three sharing a ~250px row; tightened here rather than on
+        // `CommonButton` itself, which every OTHER caller still wants roomy.
+        :deep(.button) {
+            gap: var(--space-2);
+            padding: var(--space-4) var(--space-3);
+        }
+
+        :deep(.button_content) {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
     }
 
     &_hint {

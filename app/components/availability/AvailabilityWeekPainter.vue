@@ -3,7 +3,7 @@
         <div
             class="painter_grid"
             role="grid"
-            :aria-label="`Teaching week: ${gridLabel}`"
+            :aria-label="gridLabel"
             aria-multiselectable="true"
             :style="geometry.cssVars.value"
             @pointerleave="onPointerLeave"
@@ -23,7 +23,7 @@
                     class="painter_corner"
                     role="columnheader"
                     :style="{ gridRow: 1, gridColumn: 1 }"
-                ><span class="painter_sr">Time</span></span>
+                ><span class="painter_sr">{{ t('availability.painter.timeColumn') }}</span></span>
                 <span
                     v-for="day in grid.activeDays"
                     :key="day"
@@ -35,8 +35,8 @@
                     <span
                         v-if="geometry.dayDiffers(day)"
                         class="painter_own"
-                        title="This day's blocks run to their own break times."
-                    >own breaks</span>
+                        :title="t('availability.painter.ownBreaksHint')"
+                    >{{ t('availability.painter.ownBreaks') }}</span>
                 </span>
             </div>
 
@@ -58,7 +58,7 @@
                     <span
                         v-else-if="row.kind === 'gap'"
                         class="painter_break"
-                    >{{ row.label ?? 'Break' }}</span>
+                    >{{ row.label ?? t('availability.painter.breakRow') }}</span>
                 </span>
 
                 <!--
@@ -117,6 +117,7 @@
 
 <script setup lang="ts">
 import { blockedSlotSummary } from '#shared/availability';
+import { useT } from '~/composables/i18n';
 import type { TimeGrid } from '~/composables/schedule';
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import { useGridGeometry } from '~/composables/gridGeometry';
@@ -182,13 +183,16 @@ const draft = defineModel<Rect[]>({ required: true });
 
 const emit = defineEmits<{ selectWindow: [id: string] }>();
 
+const { t } = useT();
+
 const gridRef = computed(() => props.grid);
 const rowHeight = ref(44);
 const geometry = useGridGeometry(gridRef, rowHeight);
 
-const gridLabel = computed(() => (
-    `${props.grid.activeDays.length} teaching days, ${props.grid.blocksPerDay} blocks`
-));
+const gridLabel = computed(() => t('availability.painter.gridLabel', {
+    days: props.grid.activeDays.length,
+    blocks: props.grid.blocksPerDay,
+}));
 
 /** Column 1 is the time gutter, so the first teaching day is column 2. */
 const columnOf = (day: number) => props.grid.activeDays.indexOf(day) + 2;
@@ -567,29 +571,54 @@ function cellClass(day: number, block: number) {
     };
 }
 
+/**
+ * ONE MESSAGE PER STATE, not a sentence with a state fragment dropped into it.
+ *
+ * The four states used to be bare clauses concatenated onto a template, which
+ * a translator cannot place: the clause has to agree with the sentence it sits
+ * in, and in German that decides both word order and case. So each state names
+ * its own complete message and only the day, block and clock values are
+ * interpolated.
+ */
 function cellLabel(day: number, block: number): string {
     const time = blockTime(props.grid, block, day);
     const held = coverage.value.get(key(day, block));
-    const state = inDraft(day, block)
-        ? 'in your selection, choose again to remove'
-        : held?.status === 'APPROVED'
-            ? 'already blocked, approved'
-            : held?.status === 'PENDING'
-                ? 'already declared, awaiting review'
-                : 'free';
+    const values = {
+        day: weekdayName(day),
+        block: block + 1,
+        start: time.start,
+        end: time.end,
+    };
 
-    return `${weekdayName(day)} block ${block + 1}, ${time.start} to ${time.end}, ${state}`;
+    if (inDraft(day, block)) {
+        return t('availability.painter.cellLabel.inSelection', values);
+    }
+
+    if (held?.status === 'APPROVED') {
+        return t('availability.painter.cellLabel.approved', values);
+    }
+
+    if (held?.status === 'PENDING') {
+        return t('availability.painter.cellLabel.pending', values);
+    }
+
+    return t('availability.painter.cellLabel.free', values);
 }
 
 /** One rectangle as "Mon–Wed, 09:45–11:15". */
 function describeRect(rect: Rect): string {
     const first = blockTime(props.grid, rect.blocks[0]!, rect.days[0]!);
     const last = blockTime(props.grid, rect.blocks[rect.blocks.length - 1]!, rect.days[0]!);
+    // The day range is its own message: a dash is one way to say "Monday to
+    // Wednesday" and a translator may want the other.
     const span = rect.days.length === 1
         ? weekdayName(rect.days[0]!)
-        : `${weekdayShort(rect.days[0]!)}–${weekdayShort(rect.days[rect.days.length - 1]!)}`;
+        : t('availability.painter.rectSpan', {
+            from: weekdayShort(rect.days[0]!),
+            to: weekdayShort(rect.days[rect.days.length - 1]!),
+        });
 
-    return `${span}, ${first.start}–${last.end}`;
+    return t('availability.painter.rectSummary', { span, start: first.start, end: last.end });
 }
 
 const says = computed(() => {
@@ -605,8 +634,7 @@ const says = computed(() => {
              * arrow keys. "A corner, then the opposite one" is true of all three
              * inputs, because that is the model all three share.
              */
-            : 'Mark when you cannot teach: choose one corner of the week, then the opposite one. '
-                + 'Repeat for as many separate times as you need.';
+            : t('availability.painter.emptyHint');
     }
 
     /*
@@ -620,15 +648,28 @@ const says = computed(() => {
         props.grid.blocksPerDay,
     );
 
-    const slots = `Blocks ${summary.blocked} of ${summary.total} teaching slots`;
-
+    /*
+     * TWO WHOLE SENTENCES, not a slot count glued to a rectangle list. The
+     * meter clause is repeated in both messages on purpose: it has to agree
+     * with what follows it, and a `{slots}` placeholder would hand a
+     * translator half a sentence to fit around.
+     */
     if (all.length === 1) {
-        return `${slots} · ${describeRect(all[0]!)}`;
+        return t('availability.painter.saysOne', {
+            blocked: summary.blocked,
+            total: summary.total,
+            rect: describeRect(all[0]!),
+        });
     }
 
     // Named, not just counted: each rectangle becomes its own window and its own
     // row in the approval queue, so the person should see what they are sending.
-    return `${slots} · ${all.length} separate entries: ${all.map(describeRect).join('; ')}`;
+    return t('availability.painter.saysMany', {
+        blocked: summary.blocked,
+        total: summary.total,
+        count: all.length,
+        rects: all.map(describeRect).join('; '),
+    });
 });
 </script>
 

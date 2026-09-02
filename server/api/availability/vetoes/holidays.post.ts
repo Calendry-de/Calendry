@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!person) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const terms = await tenantTerms(tx, identity.tenantId);

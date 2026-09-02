@@ -29,7 +29,7 @@ defineRouteMeta({
  */
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     if (!identity.actorPersonId) {
-        throw createError({ statusCode: 403, statusMessage: 'No acting person on this request.' });
+        throw createError({ statusCode: 403, message: 'No acting person on this request.' });
     }
 
     const { format } = await getValidatedQuery(event, QUERY.parse);

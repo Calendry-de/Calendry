@@ -22,7 +22,19 @@
  * Pure functions on purpose. Nothing here touches `window`, so the rules can be
  * tested without a DOM (`tests/landing-contact.test.ts`); the component owns the
  * one line that navigates.
+ *
+ * WHY EVERY FUNCTION TAKES A `t` (issue #19)
+ *
+ * The validation messages and the mail draft's own prose are copy, and copy
+ * lives in `i18n/locales/<lang>/landing.json`. This module cannot call `useT()`
+ * to reach it: it has no Vue injection context, and the suite above imports it
+ * into plain Node, which is the property that makes the rules testable at all.
+ * So the translator is threaded in, required rather than optional with an
+ * English fallback, exactly as `i18n/CONVENTIONS.md` requires: a call site that
+ * forgets it is a typecheck error instead of a German visitor reading English
+ * error text.
  */
+import type { Translate } from '~/composables/i18n';
 
 export interface EnquiryDraft {
     name: string;
@@ -55,29 +67,31 @@ export const MESSAGE_MAX_LENGTH = 2000;
  * where the visitor can keep writing anyway, so demanding it here would refuse
  * to open a draft for someone who intended to write the whole thing there.
  */
-export function validateEnquiry(draft: EnquiryDraft): EnquiryValidation {
+export function validateEnquiry(draft: EnquiryDraft, t: Translate): EnquiryValidation {
     const errors: Partial<Record<EnquiryField, string>> = {};
 
     if (draft.name.trim() === '') {
-        errors.name = 'Tell us who you are, so a reply has somewhere to go.';
+        errors.name = t('landing.contact.error.name');
     }
 
     if (draft.institution.trim() === '') {
-        errors.institution = 'Which school or university are you asking about?';
+        errors.institution = t('landing.contact.error.institution');
     }
 
     if (draft.message.length > MESSAGE_MAX_LENGTH) {
-        errors.message = `Keep this under ${MESSAGE_MAX_LENGTH} characters. The rest can go in the email itself.`;
+        errors.message = t('landing.contact.error.messageTooLong', { max: MESSAGE_MAX_LENGTH });
     }
 
     return { valid: Object.keys(errors).length === 0, errors };
 }
 
 /** The subject line, so the inbox side reads as one recognisable thread. */
-export function enquirySubject(draft: EnquiryDraft): string {
+export function enquirySubject(draft: EnquiryDraft, t: Translate): string {
     const institution = draft.institution.trim();
 
-    return institution === '' ? 'Calendry enquiry' : `Calendry enquiry: ${institution}`;
+    return institution === ''
+        ? t('landing.contact.mailSubject')
+        : t('landing.contact.mailSubjectForInstitution', { institution });
 }
 
 /**
@@ -87,10 +101,10 @@ export function enquirySubject(draft: EnquiryDraft): string {
  * subject is deliberate: a reply chain outlives its subject line, and the
  * message is the part a human reads first.
  */
-export function enquiryBody(draft: EnquiryDraft): string {
+export function enquiryBody(draft: EnquiryDraft, t: Translate): string {
     const lines = [
-        `Name: ${draft.name.trim()}`,
-        `Institution: ${draft.institution.trim()}`,
+        t('landing.contact.mailBodyName', { name: draft.name.trim() }),
+        t('landing.contact.mailBodyInstitution', { institution: draft.institution.trim() }),
     ];
 
     const message = draft.message.trim();
@@ -111,13 +125,16 @@ export function enquiryBody(draft: EnquiryDraft): string {
  * caller that skipped validation fails loudly instead of opening a draft
  * addressed by nobody.
  */
-export function composeEnquiryMailto(draft: EnquiryDraft, to: string): string {
-    if (!validateEnquiry(draft).valid) {
+export function composeEnquiryMailto(draft: EnquiryDraft, to: string, t: Translate): string {
+    if (!validateEnquiry(draft, t).valid) {
+        // Not a user-facing string and so not in the catalogue: this is a
+        // developer error thrown at a caller that skipped validation, and it
+        // reaches a console rather than a visitor.
         throw new Error('Refusing to compose a mail draft from an invalid enquiry.');
     }
 
-    const subject = encodeURIComponent(enquirySubject(draft));
-    const body = encodeURIComponent(enquiryBody(draft));
+    const subject = encodeURIComponent(enquirySubject(draft, t));
+    const body = encodeURIComponent(enquiryBody(draft, t));
 
     return `mailto:${to}?subject=${subject}&body=${body}`;
 }

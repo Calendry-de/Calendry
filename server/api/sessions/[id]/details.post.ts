@@ -107,13 +107,13 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (session.offeringId !== null) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'This Session belongs to an Offering, so its kind, groups and people '
+                message: 'This Session belongs to an Offering, so its kind, groups and people '
                     + 'come from that Offering and from the solver. Editing them here would be '
                     + 'overwritten by the next apply. Only an Event can be edited this way.',
                 data: { offeringId: session.offeringId },
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
         if (body.title !== undefined && !body.title.trim()) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'An event needs a name. There is no Offering to take one from.',
+                message: 'An event needs a name. There is no Offering to take one from.',
                 data: { field: 'title' },
             });
         }
@@ -142,7 +142,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (!kind) {
-                throw createError({ statusCode: 404, statusMessage: 'Session kind not found.' });
+                throw createError({ statusCode: 404, message: 'Session kind not found.' });
             }
         }
 

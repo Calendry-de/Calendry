@@ -70,7 +70,7 @@
             <span
                 v-if="session.isLocked"
                 class="chip_sr"
-            >Locked. </span>
+            >{{ t('schedule.chip.lockedSr') }} </span>
 
             <Icon
                 v-if="interruptions.length"
@@ -94,7 +94,7 @@
             <span
                 v-if="severity !== 'none'"
                 class="chip_sr"
-            >{{ violations.length }} {{ severity }} violation{{ violations.length === 1 ? '' : 's' }}. </span>
+            >{{ violationSentence }}. </span>
 
             <span
                 class="chip_dot"
@@ -138,7 +138,8 @@
 
 <script setup lang="ts">
 import type { PlacedScheduleSession, TimeGrid, Violation } from '~/composables/schedule';
-import { attendeesOf, blockTime, lecturersOf, sessionLabel, weekdayName } from '~/composables/schedule';
+import { attendeesOf, blockTime, joinAnd, lecturersOf, sessionLabel, weekdayName } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 import { gapsWithinSpan } from '#shared/timeGrid';
 import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/sessionColor';
 import type { DisplaySettings } from '#shared/sessionColor';
@@ -196,6 +197,8 @@ const props = defineProps<{
 }>();
 
 defineEmits<{ select: [] }>();
+
+const { t } = useT();
 
 /**
  * COLOUR IS RESOLVED, NOT READ OFF ONE FIELD. It was `kind?.color ?? primary500`,
@@ -317,12 +320,30 @@ const interruptionLabel = computed(() => {
     }
 
     const total = interruptions.value.reduce((sum, gap) => sum + gap.minutes, 0);
-    const named = interruptions.value.map((gap) => gap.label).filter(Boolean);
+    const named = interruptions.value
+        .map((gap) => gap.label)
+        .filter((label): label is string => Boolean(label));
 
     return named.length
-        ? `Interrupted by ${named.join(' and ')}, ${total} minutes not taught`
-        : `Interrupted by ${total} minutes of break`;
+        ? t('schedule.chip.interruptedNamed', { names: joinAnd(named, t), count: total }, total)
+        : t('schedule.chip.interruptedUnnamed', { count: total }, total);
 });
+
+/**
+ * "3 hard violations", as ONE plural message per severity.
+ *
+ * It used to be `{{ n }} {{ severity }} violation{{ s }}`: an English word
+ * ('hard'/'soft') interpolated mid-sentence next to a suffix flip, so neither
+ * half had a key of its own and German has no `-s` plural to flip anyway
+ * (CONVENTIONS.md). Two whole sentences instead, chosen by severity.
+ */
+const violationSentence = computed(() => t(
+    severity.value === 'hard'
+        ? 'schedule.chip.violationCountHard'
+        : 'schedule.chip.violationCountSoft',
+    { count: props.violations.length },
+    props.violations.length,
+));
 
 const accessibleName = computed(() => {
     const parts = [sessionLabel(props.session)];
@@ -353,12 +374,11 @@ const accessibleName = computed(() => {
     }
 
     if (props.session.isLocked) {
-        parts.push('Locked');
+        parts.push(t('schedule.chip.locked'));
     }
 
     if (props.violations.length) {
-        parts.push(`${props.violations.length} ${severity.value} violation`
-            + `${props.violations.length === 1 ? '' : 's'}`);
+        parts.push(violationSentence.value);
     }
 
     return parts.join(', ');

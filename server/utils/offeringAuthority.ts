@@ -29,7 +29,7 @@ export async function assertLecturesOffering(
      * `undefined` filter.
      */
     if (!identity.actorPersonId) {
-        throw createError({ statusCode: 403, statusMessage: 'Only a signed-in person can set this.' });
+        throw createError({ statusCode: 403, message: 'Only a signed-in person can set this.' });
     }
 
     const offering = await tx.offering.findFirst({
@@ -50,7 +50,7 @@ export async function assertLecturesOffering(
     if (!offering) {
         throw createError({
             statusCode: 404,
-            statusMessage: 'No module you teach has that id.',
+            message: 'No module you teach has that id.',
         });
     }
 

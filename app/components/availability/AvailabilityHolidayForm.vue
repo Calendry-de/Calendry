@@ -2,7 +2,7 @@
     <div class="holiday">
         <div class="holiday_dates">
             <label class="holiday_field">
-                <span class="holiday_label">First day away</span>
+                <span class="holiday_label">{{ t('availability.holidayForm.firstDay') }}</span>
                 <input
                     v-model="startDate"
                     class="holiday_input"
@@ -11,7 +11,7 @@
             </label>
 
             <label class="holiday_field">
-                <span class="holiday_label">Last day away</span>
+                <span class="holiday_label">{{ t('availability.holidayForm.lastDay') }}</span>
                 <input
                     v-model="endDate"
                     class="holiday_input"
@@ -21,12 +21,12 @@
         </div>
 
         <label class="holiday_field">
-            <span class="holiday_label">Reason (optional)</span>
+            <span class="holiday_label">{{ t('availability.holidayForm.reason') }}</span>
             <input
                 v-model="reason"
                 class="holiday_input"
                 maxlength="500"
-                placeholder="Annual leave"
+                :placeholder="t('availability.holidayForm.reasonPlaceholder')"
                 type="text"
             >
         </label>
@@ -43,10 +43,25 @@
             v-if="preview"
             class="holiday_preview"
         >
-            <p class="holiday_preview-head">
-                <strong>{{ preview.term.name }}</strong> ·
-                {{ preview.weeks.length }} week{{ preview.weeks.length === 1 ? '' : 's' }} blocked
-            </p>
+            <!--
+                ONE message, not a term name glued to a hand-built plural. The
+                sentence carried `week{{ n === 1 ? '' : 's' }}`, and a word split
+                across mustaches has no key at all: German pluralises by stem,
+                not by an `-s` suffix. `<i18n-t>` is what lets the `<strong>`
+                stay markup while the whole sentence stays one translatable
+                string, the same technique the login page's landing prompt uses.
+            -->
+            <i18n-t
+                class="holiday_preview-head"
+                keypath="availability.holidayForm.previewHead"
+                :plural="preview.weeks.length"
+                scope="global"
+                tag="p"
+            >
+                <template #term>
+                    <strong>{{ preview.term.name }}</strong>
+                </template>
+            </i18n-t>
 
             <ul class="holiday_weeks">
                 <li
@@ -55,8 +70,12 @@
                     class="holiday_week"
                     :class="{ 'holiday_week--partial': !week.whole }"
                 >
-                    Week {{ week.index + 1 }} · {{ week.start }} – {{ week.end }}
-                    <span v-if="!week.whole">(you are away for part of it, but the whole week is blocked)</span>
+                    {{ t('availability.holidayForm.weekRow', {
+                        week: week.index + 1,
+                        start: week.start,
+                        end: week.end,
+                    }) }}
+                    <span v-if="!week.whole">{{ t('availability.holidayForm.weekPartial') }}</span>
                 </li>
             </ul>
 
@@ -65,11 +84,14 @@
                 class="holiday_note holiday_note--warn"
                 role="status"
             >
-                {{ preview.partial.length === 1 ? 'One week is' : `${preview.partial.length} weeks are` }}
-                blocked in full even though your absence covers only part of
-                {{ preview.partial.length === 1 ? 'it' : 'them' }}. A week is blocked
-                if your absence touches it at all: the scheduler cannot be told about
-                part of a week in one entry.
+                <!--
+                    ONE plural message carrying its own verb AND its own
+                    pronoun ("is/are", "it/them"). Built inline it interleaved
+                    three mustaches with the prose, which is unusable to a
+                    translator: German changes neither word the way English
+                    does here.
+                -->
+                {{ t('availability.holidayForm.partialWarning', { count: preview.partial.length }) }}
             </p>
         </div>
 
@@ -89,7 +111,7 @@
                 :disabled="busy || !preview"
                 type="primary"
                 @click="submit"
-            >{{ busy ? 'Submitting…' : submitLabel }}</CommonButton>
+            >{{ busy ? t('availability.holidayForm.submitBusy') : submitLabel }}</CommonButton>
         </div>
     </div>
 </template>
@@ -98,6 +120,7 @@
 import type { HolidayResolution, TermWindow } from '#shared/availability';
 import { resolveHolidayWeeks } from '#shared/availability';
 import { overlaps } from '#shared/academicCalendar';
+import { useT } from '~/composables/i18n';
 
 /**
  * Pick real dates; see the weeks they block.
@@ -118,14 +141,28 @@ const props = defineProps<{
 
 const emit = defineEmits<{ submit: [payload: { startDate: string; endDate: string; reason: string | null }] }>();
 
+const { t } = useT();
+
 const startDate = ref('');
 const endDate = ref('');
 const reason = ref('');
 
-const submitLabel = computed(() => props.submitLabel ?? 'Submit for approval');
+const submitLabel = computed(() => props.submitLabel ?? t('availability.holidayForm.submit'));
 
 interface Preview extends HolidayResolution {
     term: TermWindow;
+}
+
+/**
+ * "A and B", or "A and B and C", with the conjunction in the CATALOGUE.
+ *
+ * `join(' and ')` left an English word in every language, and a bare `' and '`
+ * key would be a fragment with no grammar around it. Folding pairwise through a
+ * two-placeholder message keeps the conjunction translatable at any list length
+ * without the separator ever existing on its own.
+ */
+function joinWithAnd(names: string[]): string {
+    return names.reduce((list, next) => t('availability.holidayForm.termListJoin', { list, next }));
 }
 
 /**
@@ -144,7 +181,7 @@ const problem = computed(() => {
     const to = new Date(endDate.value);
 
     if (to.getTime() < from.getTime()) {
-        return 'The last day is before the first day.';
+        return t('availability.holidayForm.problemReversed');
     }
 
     const matching = props.terms.filter((term) => overlaps(
@@ -156,14 +193,20 @@ const problem = computed(() => {
 
     if (matching.length === 0) {
         return props.terms.length
-            ? `Those dates fall outside every term, so nothing would be blocked. Terms: ${
-                props.terms.map((term) => `${term.name} (${term.startDate} to ${term.endDate})`).join(', ')}.`
-            : 'No terms are configured yet, so dates cannot be resolved to teaching weeks.';
+            ? t('availability.holidayForm.problemOutsideTerms', {
+                terms: props.terms
+                    .map((term) => t('availability.holidayForm.termRange', {
+                        name: term.name,
+                        from: term.startDate,
+                        to: term.endDate,
+                    }))
+                    .join(', '),
+            })
+            : t('availability.holidayForm.problemNoTerms');
     }
 
     if (matching.length > 1) {
-        return `That range spans ${matching.map((term) => term.name).join(' and ')}. `
-            + 'Enter one absence per term. A single entry counts the weeks of one term only.';
+        return t('availability.holidayForm.problemSpansTerms', { terms: joinWithAnd(matching.map((term) => term.name)) });
     }
 
     return '';

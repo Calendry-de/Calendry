@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
 
     if (!id) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing screen id.' });
+        throw createError({ statusCode: 400, message: 'Missing screen id.' });
     }
 
     return withRequestTenant(event, async (tx) => {
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
         const existing = await tx.screen.findFirst({ where: { id } });
 
         if (!existing) {
-            throw createError({ statusCode: 404, statusMessage: 'Screen not found.' });
+            throw createError({ statusCode: 404, message: 'Screen not found.' });
         }
 
         await tx.screen.delete({ where: { id } });

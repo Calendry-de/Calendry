@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH_LEAD } from '../app/utils/landingContent';
+import {
+    CONTACT_EMAIL,
+    landingBuilt,
+    landingFeatures,
+    landingNext,
+    landingPrinciples,
+    landingTechLead,
+    landingTechnicalNotes,
+} from '../app/utils/landingContent';
+import { englishT } from './helpers/landingMessages';
 
 /**
  * The public landing page at `/`: it renders for a visitor with no session, and
@@ -23,6 +32,35 @@ import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH
  *    than left for somebody to assume.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
+
+/**
+ * The page's claims, resolved to the SENTENCES the page actually serves.
+ *
+ * Issue #19 moved the copy out of `landingContent.ts` and into
+ * `i18n/locales/en/landing.json`; the module kept the ids, the reading order,
+ * the done/next state and the clusters, and each list is now a builder taking a
+ * `Translate`. So this file has two sources instead of one, and it has to read
+ * both or it stops being a drift check:
+ *
+ *   - `englishT` resolves against the English catalogue, so `item.title` below
+ *     is still a real sentence and `expect(html).toContain(item.title)` still
+ *     compares the served page against the authored copy, character for
+ *     character. `tests/helpers/setup.ts` forces `Accept-Language: en-GB`, so
+ *     the page under test is rendering this same tree.
+ *   - the builders supply the structure, so a row deleted, reordered, moved
+ *     between lists or given the wrong state still fails here.
+ *
+ * The `(key) => key` stub `i18n/CONVENTIONS.md` recommends for structural
+ * tests would have been the easy move and would have gutted the suite: it
+ * asserts rendered HTML, and HTML contains sentences, not key names. See
+ * `tests/helpers/landingMessages.ts`.
+ */
+const FEATURES = landingFeatures(englishT);
+const BUILT = landingBuilt(englishT);
+const NEXT = landingNext(englishT);
+const PRINCIPLES = landingPrinciples(englishT);
+const TECHNICAL_NOTES = landingTechnicalNotes(englishT);
+const TECH_LEAD = landingTechLead(englishT);
 
 async function page(path: string) {
     const res = await fetch(`${BASE}${path}`, { redirect: 'manual' });

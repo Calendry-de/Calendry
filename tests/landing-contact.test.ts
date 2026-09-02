@@ -7,6 +7,7 @@ import {
     enquirySubject,
     validateEnquiry,
 } from '../app/utils/landingContact';
+import { englishT } from './helpers/landingMessages';
 
 /**
  * The landing page's contact form, tested where its behaviour actually lives.
@@ -21,6 +22,16 @@ import {
  * The falsification case matters most: a validator that accepted everything
  * would pass a suite made only of valid drafts, and a mailto composed from a
  * blank draft is a mail nobody can answer.
+ *
+ * WHY THE TRANSLATOR IS `englishT` AND NOT `(key) => key`. Issue #19 moved the
+ * validation messages and the mail draft's prose into
+ * `i18n/locales/en/landing.json`, and every function here now takes a `t`. The
+ * identity stub the conventions recommend is right for a suite measuring
+ * structure and would destroy this one: it asserts the composed subject line,
+ * the body's exact bytes and the URL encoding character by character, which is
+ * the whole reason the rules live in a pure module. Resolving the real English
+ * messages keeps all of that, and additionally proves the catalogue carries
+ * every key this module asks for. See `tests/helpers/landingMessages.ts`.
  */
 const VALID = {
     name: 'Nele Ostermann',
@@ -30,18 +41,18 @@ const VALID = {
 
 describe('validateEnquiry', () => {
     it('accepts a complete enquiry', () => {
-        const result = validateEnquiry(VALID);
+        const result = validateEnquiry(VALID, englishT);
 
         expect(result.valid).toBe(true);
         expect(result.errors).toEqual({});
     });
 
     it('accepts an enquiry with no message, since the message is optional', () => {
-        expect(validateEnquiry({ ...VALID, message: '' }).valid).toBe(true);
+        expect(validateEnquiry({ ...VALID, message: '' }, englishT).valid).toBe(true);
     });
 
     it('rejects an empty draft, naming BOTH missing fields at once', () => {
-        const result = validateEnquiry(EMPTY_ENQUIRY);
+        const result = validateEnquiry(EMPTY_ENQUIRY, englishT);
 
         // Both, not the first: a form that reveals one problem per attempt makes
         // the visitor submit repeatedly to discover what it wants.
@@ -55,21 +66,21 @@ describe('validateEnquiry', () => {
         ['name', { ...VALID, name: '   ' }],
         ['institution', { ...VALID, institution: '\t\n ' }],
     ])('treats whitespace-only %s as missing', (field, draft) => {
-        const result = validateEnquiry(draft);
+        const result = validateEnquiry(draft, englishT);
 
         expect(result.valid).toBe(false);
         expect(result.errors[field as 'name' | 'institution']).toBeTruthy();
     });
 
     it('rejects a message past the length a mailto URL can carry', () => {
-        const result = validateEnquiry({ ...VALID, message: 'x'.repeat(MESSAGE_MAX_LENGTH + 1) });
+        const result = validateEnquiry({ ...VALID, message: 'x'.repeat(MESSAGE_MAX_LENGTH + 1) }, englishT);
 
         expect(result.valid).toBe(false);
         expect(result.errors.message).toContain(String(MESSAGE_MAX_LENGTH));
     });
 
     it('accepts a message exactly at the limit', () => {
-        expect(validateEnquiry({ ...VALID, message: 'x'.repeat(MESSAGE_MAX_LENGTH) }).valid).toBe(true);
+        expect(validateEnquiry({ ...VALID, message: 'x'.repeat(MESSAGE_MAX_LENGTH) }, englishT).valid).toBe(true);
     });
 });
 
@@ -82,11 +93,11 @@ const TO = 'timetable@example.edu';
 
 describe('the composed mail draft', () => {
     it('names the institution in the subject', () => {
-        expect(enquirySubject(VALID)).toBe('Calendry enquiry: Fachhochschule Nord');
+        expect(enquirySubject(VALID, englishT)).toBe('Calendry enquiry: Fachhochschule Nord');
     });
 
     it('repeats name and institution in the body, so a reply chain keeps them', () => {
-        const body = enquiryBody(VALID);
+        const body = enquiryBody(VALID, englishT);
 
         expect(body).toContain('Name: Nele Ostermann');
         expect(body).toContain('Institution: Fachhochschule Nord');
@@ -94,7 +105,7 @@ describe('the composed mail draft', () => {
     });
 
     it('trims the fields it copies', () => {
-        const body = enquiryBody({ name: '  Ada  ', institution: ' Uni ', message: '  hello  ' });
+        const body = enquiryBody({ name: '  Ada  ', institution: ' Uni ', message: '  hello  ' }, englishT);
 
         expect(body).toContain('Name: Ada');
         expect(body).toContain('Institution: Uni');
@@ -102,13 +113,13 @@ describe('the composed mail draft', () => {
     });
 
     it('omits the message block entirely when there is no message', () => {
-        const body = enquiryBody({ ...VALID, message: '   ' });
+        const body = enquiryBody({ ...VALID, message: '   ' }, englishT);
 
         expect(body).toBe('Name: Nele Ostermann\nInstitution: Fachhochschule Nord');
     });
 
     it('addresses the mailto and encodes both parameters', () => {
-        const url = composeEnquiryMailto(VALID, TO);
+        const url = composeEnquiryMailto(VALID, TO, englishT);
 
         expect(url.startsWith(`mailto:${TO}?`)).toBe(true);
         expect(url).toContain('subject=Calendry%20enquiry');
@@ -119,7 +130,7 @@ describe('the composed mail draft', () => {
         // URLSearchParams would produce `+` here, which several mail clients
         // render literally in the subject line. This is the reason the module
         // uses encodeURIComponent instead.
-        const url = composeEnquiryMailto(VALID, TO);
+        const url = composeEnquiryMailto(VALID, TO, englishT);
 
         expect(url).not.toContain('+');
     });
@@ -128,6 +139,7 @@ describe('the composed mail draft', () => {
         const url = composeEnquiryMailto(
             { name: 'A&B', institution: 'C?D', message: 'line one\nline two #2' },
             TO,
+            englishT,
         );
 
         expect(url).toContain('A%26B');
@@ -141,6 +153,6 @@ describe('the composed mail draft', () => {
         // Failing loudly rather than opening a mail addressed by nobody: a
         // caller that skipped validation is a bug, and a half-empty draft
         // arriving in someone's outbox is how it would otherwise hide.
-        expect(() => composeEnquiryMailto(EMPTY_ENQUIRY, TO)).toThrow();
+        expect(() => composeEnquiryMailto(EMPTY_ENQUIRY, TO, englishT)).toThrow();
     });
 });

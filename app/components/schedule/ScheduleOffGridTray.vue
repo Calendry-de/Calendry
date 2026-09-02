@@ -5,7 +5,7 @@
                 name="material-symbols:report-outline"
                 aria-hidden="true"
             />
-            {{ sessions.length }} session{{ sessions.length === 1 ? '' : 's' }} cannot be placed on this grid
+            {{ t('schedule.offGrid.heading', { count: sessions.length }, sessions.length) }}
         </h2>
 
         <ul>
@@ -17,7 +17,7 @@
                     type="button"
                     @click="$emit('select', session.id)"
                 >{{ sessionLabel(session) }}</button>
-                <span>{{ offGridReason(grid, session) }}</span>
+                <span>{{ offGridReason(grid, session, t) }}</span>
             </li>
         </ul>
     </section>
@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import type { PlacedScheduleSession, TimeGrid } from '~/composables/schedule';
 import { offGridReason, sessionLabel } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 
 /**
  * Sessions the grid cannot position: a day the TimeGrid does not schedule, or
@@ -44,6 +45,8 @@ defineProps<{
 }>();
 
 defineEmits<{ select: [sessionId: string] }>();
+
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

@@ -16,8 +16,10 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            Save this {{ entity.label.toLowerCase() }} first, then you can assign
-            {{ assignableLabels }}.
+            {{ t('manageUi.relationsPanel.createPending', {
+                entity: entity.label,
+                labels: assignableLabels,
+            }) }}
         </p>
 
         <ManageRelationPicker
@@ -45,6 +47,7 @@
 import type { useEntityRelations } from '~/composables/entityRelations';
 import type { ManageEntity } from '~/utils/manageRegistry';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * Every relation an entity declares, rendered below its form.
@@ -61,9 +64,20 @@ const props = defineProps<{
     canUpdate: boolean;
 }>();
 
-/** What the unsaved-entity hint lists, derived here rather than in the template. */
+const { t } = useT();
+
+/**
+ * What the unsaved-entity hint lists, derived here rather than in the template.
+ *
+ * PUNCTUATION, NOT GRAMMAR (i18n/CONVENTIONS.md § "Assembled sentences"): each
+ * item is a whole, already-translated relation label, and `', '` separates
+ * finished items rather than carrying any part of the sentence. So the join
+ * stays in code and only the sentence around it is a message. No
+ * `.toLowerCase()`: German capitalises every noun, so lowercasing a label
+ * would render "räume" to a German reader.
+ */
 const assignableLabels = computed(() => props.relations.defs
-    .map((def) => def.label.toLowerCase()).join(', '));
+    .map((def) => def.label).join(', '));
 </script>
 
 <style scoped lang="scss">

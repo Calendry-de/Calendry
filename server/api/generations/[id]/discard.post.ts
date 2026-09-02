@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!generation) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         // Discarding the live baseline would leave the tenant with a schedule
@@ -47,14 +47,14 @@ export default defineEventHandler(async (event) => {
         if (generation.isCurrent) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'Generation is the current baseline and cannot be discarded.',
+                message: 'Generation is the current baseline and cannot be discarded.',
             });
         }
 
         if (generation.status !== 'READY') {
             throw createError({
                 statusCode: 409,
-                statusMessage: `Generation is ${generation.status} and is not awaiting a decision.`,
+                message: `Generation is ${generation.status} and is not awaiting a decision.`,
             });
         }
 

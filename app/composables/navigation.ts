@@ -2,6 +2,8 @@ import type { ComputedRef } from 'vue';
 import type { NavEntry } from '~/utils/navPlaces';
 import { satisfiesPermissionRequirement } from '#shared/permissions';
 import { isSidebarPlace, navPlaces } from '~/utils/navPlaces';
+import { searchKeywords } from '~/utils/i18nKeywords';
+import { useT } from '~/composables/i18n';
 import { useThemeToggle } from '~/composables/layout';
 import { logout, useSession } from '~/composables/session';
 
@@ -25,41 +27,48 @@ export interface ResolvedNavEntry extends NavEntry {
  * The places come from `navPlaces()`; what is added here is exactly the
  * `account` section, which is the session-dependent part and the reason this
  * has to be a composable at all.
+ *
+ * `t` is resolved HERE, at setup, and handed to `navPlaces()` inside the
+ * computed. `useT()` needs the Vue injection context, so calling it in the
+ * getter (or in `navPlaces` itself) would throw; capturing it here also means
+ * the computed re-evaluates on a language change, since vue-i18n's locale is
+ * reactive and `t` reads it.
  */
 export function useNavRegistry(): ComputedRef<NavEntry[]> {
     const session = useSession();
     const toggleTheme = useThemeToggle();
+    const { t } = useT();
 
     return computed<NavEntry[]>(() => [
-        ...navPlaces(),
+        ...navPlaces(t),
 
         {
             id: 'account.theme',
-            label: 'Toggle theme',
-            description: 'Switch between the light and dark ground.',
+            label: t('nav.place.accountTheme.label'),
+            description: t('nav.place.accountTheme.description'),
             icon: 'material-symbols:contrast',
             section: 'account',
-            keywords: ['theme', 'dark', 'light', 'appearance', 'contrast'],
+            keywords: searchKeywords(t, 'nav.place.accountTheme.keywords', ['theme', 'dark', 'light', 'appearance', 'contrast']),
             run: toggleTheme,
         },
         ...((session.value?.availableTenants.length ?? 0) > 1
             ? [{
                 id: 'account.switch-tenant',
-                label: 'Switch institution',
-                description: 'Move to another tenant you belong to.',
+                label: t('nav.place.accountSwitchTenant.label'),
+                description: t('nav.place.accountSwitchTenant.description'),
                 icon: 'material-symbols:swap-horiz',
                 section: 'account' as const,
-                keywords: ['switch', 'tenant', 'institution', 'school', 'university', 'change'],
+                keywords: searchKeywords(t, 'nav.place.accountSwitchTenant.keywords', ['switch', 'tenant', 'institution', 'school', 'university', 'change']),
                 to: '/login?select=1',
             }]
             : []),
         {
             id: 'account.logout',
-            label: 'Sign out',
-            description: 'End this session.',
+            label: t('nav.place.accountLogout.label'),
+            description: t('nav.place.accountLogout.description'),
             icon: 'material-symbols:logout',
             section: 'account',
-            keywords: ['sign out', 'logout', 'log off', 'exit', 'leave'],
+            keywords: searchKeywords(t, 'nav.place.accountLogout.keywords', ['sign out', 'logout', 'log off', 'exit', 'leave']),
             run: logout,
         },
     ]);

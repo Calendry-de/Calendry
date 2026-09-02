@@ -1,12 +1,10 @@
 <template>
     <CommonAppShell
-        description="How this institution's schedule is drawn: the standards every session falls back to."
-        title="Display"
+        :description="t('managePages.display.description')"
+        :title="t('managePages.display.pageTitle')"
     >
         <p class="intro">
-            Colour is never the only cue on the schedule: a violation carries an icon and
-            a label, and a locked session carries a lock, whatever you set here. These are
-            the defaults sessions fall back to, not a replacement for those signals.
+            {{ t('managePages.display.intro') }}
         </p>
 
         <p
@@ -19,8 +17,7 @@
             v-else-if="!canEdit"
             class="note"
         >
-            You can see these settings but not change them. Changing them needs the
-            permission that also lets you edit session kinds.
+            {{ t('managePages.display.readOnly') }}
         </p>
 
         <form
@@ -28,18 +25,15 @@
             @submit.prevent="save"
         >
             <section class="panel_group">
-                <h2>Institution type</h2>
+                <h2>{{ t('managePages.display.modeHead') }}</h2>
                 <p class="panel_hint">
-                    A default-behaviour bias, not a fork: this never changes what an offering
-                    is or which constraint rules exist; it only changes which offering-form fields are
-                    shown first and which constraint types the catalogue suggests. Every field
-                    and every rule stays fully reachable in both modes.
+                    {{ t('managePages.display.modeHint') }}
                 </p>
 
                 <div
                     v-if="!canEdit"
                     class="panel_mode-static"
-                >{{ MODE_LABEL[form.mode] }}</div>
+                >{{ modeLabels[form.mode] }}</div>
 
                 <div
                     v-else
@@ -58,18 +52,28 @@
                             type="radio"
                             :value="option"
                         >
-                        <span>{{ MODE_LABEL[option] }}</span>
+                        <span>{{ modeLabels[option] }}</span>
                     </label>
                 </div>
             </section>
 
             <section class="panel_group">
-                <h2>Online sessions</h2>
-                <p class="panel_hint">
-                    Online delivery is a <strong>virtual room</strong>, not a flag on the
-                    session, so this decides how that fact is drawn, never whether it is
-                    true. A session is treated as online when every room it uses is virtual.
-                </p>
+                <h2>{{ t('managePages.display.onlineHead') }}</h2>
+                <!--
+                    `<i18n-t>` so the emphasised phrase stays inside ONE
+                    translatable sentence rather than being a key a translator
+                    cannot place in the clause.
+                -->
+                <i18n-t
+                    class="panel_hint"
+                    keypath="managePages.display.onlineHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #room>
+                        <strong>{{ t('managePages.display.onlineHintRoom') }}</strong>
+                    </template>
+                </i18n-t>
 
                 <label class="panel_check">
                     <input
@@ -77,22 +81,21 @@
                         type="checkbox"
                         :disabled="!canEdit"
                     >
-                    <span>Mark online sessions on the schedule</span>
+                    <span>{{ t('managePages.display.onlineToggle') }}</span>
                 </label>
 
                 <ManageColorField
                     v-model="form.onlineColor"
                     :disabled="!canEdit || !form.highlightOnline"
-                    help="Left empty, online sessions use a neutral outline instead of a colour."
-                    label="Online colour"
+                    :help="t('managePages.display.onlineColourHelp')"
+                    :label="t('managePages.display.onlineColourLabel')"
                 />
             </section>
 
             <section class="panel_group">
-                <h2>Where a session's colour comes from</h2>
+                <h2>{{ t('managePages.display.sourceHead') }}</h2>
                 <p class="panel_hint">
-                    Checked sources are tried in order, most specific first. Unchecking
-                    every source makes the fallback below the only colour on the schedule.
+                    {{ t('managePages.display.sourceHint') }}
                 </p>
 
                 <!--
@@ -114,7 +117,7 @@
                                 :disabled="!canEdit"
                                 @change="toggleSource(source.key)"
                             >
-                            <span>{{ SOURCE_LABEL[source.key] }}</span>
+                            <span>{{ sourceLabels[source.key] }}</span>
                         </label>
 
                         <span class="panel_source-rank">{{ source.enabled ? `${index + 1}` : '-' }}</span>
@@ -123,7 +126,10 @@
                             v-if="canEdit && source.enabled && index > 0"
                             class="panel_move"
                             type="button"
-                            :aria-label="`Move ${SOURCE_LABEL[source.key]} above ${SOURCE_LABEL[orderedSources[index - 1]!.key]}`"
+                            :aria-label="t('managePages.display.sourcePromote', {
+                                source: sourceLabels[source.key],
+                                above: sourceLabels[orderedSources[index - 1]!.key],
+                            })"
                             @click="promote(source.key)"
                         >
                             <Icon
@@ -137,29 +143,41 @@
                 <ManageColorField
                     v-model="form.defaultColor"
                     :disabled="!canEdit"
-                    help="Used when no source above supplies a colour. Left empty, chips use the neutral surface."
-                    label="Fallback colour"
+                    :help="t('managePages.display.fallbackColourHelp')"
+                    :label="t('managePages.display.fallbackColourLabel')"
                 />
             </section>
 
             <section class="panel_group">
-                <h2>Dates and numbers</h2>
-                <p class="panel_hint">
-                    A BCP-47 tag (e.g. <code>de-DE</code>, <code>en-GB</code>) this institution's
-                    dates and numbers default to. A person's own setting under
-                    <NuxtLink to="/my/account">My account</NuxtLink> overrides this; leaving it empty
-                    defers straight to whatever language the visitor's browser requests. This never
-                    changes what any label or button SAYS: that stays English until
-                    <a href="https://github.com/Calendry-de/Calendry/issues/19" target="_blank" rel="noopener">i18n</a>
-                    ships.
-                </p>
+                <h2>{{ t('managePages.display.localeHead') }}</h2>
+                <!--
+                    `<i18n-t>` because this sentence carries two links and two
+                    code samples INSIDE its grammar; keyed as fragments they
+                    could not be reordered for German.
+                -->
+                <i18n-t
+                    class="panel_hint"
+                    keypath="managePages.display.localeHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #germanTag>
+                        <code>de-DE</code>
+                    </template>
+                    <template #britishTag>
+                        <code>en-GB</code>
+                    </template>
+                    <template #myAccount>
+                        <NuxtLink to="/my/account">{{ t('managePages.display.localeHintMyAccount') }}</NuxtLink>
+                    </template>
+                </i18n-t>
 
                 <label class="panel_locale">
-                    <span>Default locale</span>
+                    <span>{{ t('managePages.display.localeLabel') }}</span>
                     <input
                         v-model="localeInput"
                         :disabled="!canEdit"
-                        placeholder="e.g. de-DE (leave empty for none)"
+                        :placeholder="t('managePages.display.localePlaceholder')"
                         type="text"
                     >
                 </label>
@@ -172,21 +190,27 @@
             </section>
 
             <section class="panel_group">
-                <h2>Timezone</h2>
-                <p class="panel_hint">
-                    An IANA zone name (e.g. <code>Europe/Berlin</code>): the wall clock every
-                    Session, TimeGrid and "today" is resolved against, never a person's own
-                    device. A person's own timezone under
-                    <NuxtLink to="/my/account">My account</NuxtLink> is display/export only and
-                    never changes any of that.
-                </p>
+                <h2>{{ t('managePages.display.timezoneHead') }}</h2>
+                <i18n-t
+                    class="panel_hint"
+                    keypath="managePages.display.timezoneHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #zone>
+                        <code>Europe/Berlin</code>
+                    </template>
+                    <template #myAccount>
+                        <NuxtLink to="/my/account">{{ t('managePages.display.localeHintMyAccount') }}</NuxtLink>
+                    </template>
+                </i18n-t>
 
                 <label class="panel_locale">
-                    <span>Institution timezone</span>
+                    <span>{{ t('managePages.display.timezoneLabel') }}</span>
                     <input
                         v-model="timezoneInput"
                         :disabled="!canEdit"
-                        placeholder="e.g. Europe/Berlin"
+                        :placeholder="t('managePages.display.timezonePlaceholder')"
                         type="text"
                     >
                 </label>
@@ -204,7 +228,7 @@
                 hex value and imagining a chip is the part people get wrong.
             -->
             <section class="panel_group">
-                <h2>Preview</h2>
+                <h2>{{ t('managePages.display.previewHead') }}</h2>
                 <div class="preview">
                     <div
                         v-for="sample in samples"
@@ -238,13 +262,13 @@
                     :disabled="saving || !dirty"
                     native-type="submit"
                     type="primary"
-                >{{ saving ? 'Saving…' : 'Save' }}</CommonButton>
+                >{{ saving ? t('common.action.saving') : t('common.action.save') }}</CommonButton>
 
                 <p
                     v-if="saved"
                     class="panel_saved"
                     role="status"
-                >Saved.</p>
+                >{{ t('managePages.display.saved') }}</p>
                 <p
                     v-if="saveError"
                     class="note note--error"
@@ -265,6 +289,7 @@ import { isUsableLocale } from '#shared/locale';
 import { isUsableTimeZone } from '#shared/timezone';
 import { DEFAULT_TENANT_MODE, TENANT_MODES } from '#shared/tenantMode';
 import type { TenantMode } from '#shared/tenantMode';
+import { useT } from '~/composables/i18n';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
@@ -306,24 +331,33 @@ definePageMeta({
             if (!held.has('tenant.read')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Viewing this institution\'s display settings needs tenant.read.',
+                    message: 'Viewing this institution\'s display settings needs tenant.read.',
                 }));
             }
         },
     ],
 });
 
-useHead({ title: 'Display' });
+const { t } = useT();
 
-const SOURCE_LABEL: Record<ColorSource, string> = {
-    offering: 'The offering’s own colour',
-    kind: 'The session kind’s colour',
-};
+useHead(() => ({ title: t('managePages.display.pageTitle') }));
 
-const MODE_LABEL: Record<TenantMode, string> = {
-    UNIVERSITY: 'University: offerings, required session counts, a lecturer pool',
-    SCHOOL: 'School: a subject, a weekly count, a named teacher',
-};
+/*
+ * ONE MESSAGE PER CASE, and a `Record` over the union rather than a ternary:
+ * these are enums, so an interpolated or case-transformed value would only
+ * ever render English (i18n/CONVENTIONS.md § "Never case-transform
+ * user-facing text"), and the exhaustive `Record` makes adding a source or a
+ * mode a typecheck error rather than a silently mislabelled option.
+ */
+const sourceLabels = computed<Record<ColorSource, string>>(() => ({
+    offering: t('managePages.display.sourceOffering'),
+    kind: t('managePages.display.sourceKind'),
+}));
+
+const modeLabels = computed<Record<TenantMode, string>>(() => ({
+    UNIVERSITY: t('managePages.display.modeUniversity'),
+    SCHOOL: t('managePages.display.modeSchool'),
+}));
 
 const canEdit = useHasPermission('tenant.update');
 const request = useRequestFetch();
@@ -336,7 +370,7 @@ const settings = useAsyncData(
 await settings;
 
 const loadError = computed(() => (settings.error.value
-    ? 'Could not load the display settings. Nothing has been changed.'
+    ? t('managePages.display.loadError')
     : ''));
 
 /** The form is seeded from the awaited response, never from a watcher: a
@@ -408,20 +442,24 @@ const samples = computed(() => {
 
     return [
         {
-            title: 'INF201 · Databases',
-            label: first === 'offering' ? 'offering colour' : 'kind colour',
+            title: t('managePages.display.previewOfferingTitle'),
+            label: first === 'offering'
+                ? t('managePages.display.previewOfferingSource')
+                : t('managePages.display.previewKindSource'),
             color: first ? '#3389C6' : form.defaultColor,
             online: false,
         },
         {
-            title: 'MAT100 · Analysis',
-            label: 'no colour set (fallback)',
+            title: t('managePages.display.previewFallbackTitle'),
+            label: t('managePages.display.previewFallbackLabel'),
             color: form.defaultColor,
             online: false,
         },
         {
-            title: 'SEM04 · Remote seminar',
-            label: form.highlightOnline ? 'online' : 'online, not marked',
+            title: t('managePages.display.previewOnlineTitle'),
+            label: form.highlightOnline
+                ? t('managePages.display.previewOnlineMarked')
+                : t('managePages.display.previewOnlineUnmarked'),
             color: form.highlightOnline ? (form.onlineColor ?? null) : null,
             online: form.highlightOnline,
         },
@@ -442,7 +480,7 @@ async function save() {
     const trimmedLocale = localeInput.value.trim();
 
     if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
-        localeError.value = 'Not a recognised locale. Try a tag like "de-DE" or "en-GB".';
+        localeError.value = t('managePages.display.localeError');
         saving.value = false;
 
         return;
@@ -451,7 +489,7 @@ async function save() {
     const trimmedTimezone = timezoneInput.value.trim();
 
     if (!isUsableTimeZone(trimmedTimezone)) {
-        timezoneError.value = 'Not a recognised timezone. Try a zone name like "Europe/Berlin".';
+        timezoneError.value = t('managePages.display.timezoneError');
         saving.value = false;
 
         return;
@@ -466,8 +504,8 @@ async function save() {
         saved.value = true;
     }
     catch (error) {
-        saveError.value = (error as { statusMessage?: string }).statusMessage
-            ?? 'Could not save. Nothing has been changed.';
+        saveError.value = serverErrorMessage(error)
+            ?? t('managePages.display.saveError');
     }
     finally {
         saving.value = false;

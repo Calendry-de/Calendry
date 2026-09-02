@@ -70,6 +70,7 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import type { TimeGrid } from '~/composables/schedule';
 import { blockTime } from '~/composables/schedule';
 
@@ -96,6 +97,8 @@ const props = defineProps<{
 
 const selected = defineModel<number[]>({ required: true });
 
+const { t } = useT();
+
 const indices = computed(() => Array.from(
     { length: props.grid?.blocksPerDay ?? 0 },
     (_, index) => index,
@@ -112,7 +115,7 @@ const indices = computed(() => Array.from(
 /** The read-only rendering: "1 (08:00), 2 (08:45)", or the empty-means-any note. */
 const selectedSummary = computed(() => (selected.value.length
     ? selected.value.map((index) => `${index + 1} (${timeOf(index)})`).join(', ')
-    : 'Any block'));
+    : t('availability.blockPicker.anyBlock')));
 
 function timeOf(index: number): string {
     if (!props.grid) {

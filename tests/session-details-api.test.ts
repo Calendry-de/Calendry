@@ -109,7 +109,7 @@ describe('editing an Event', () => {
         const res = await edit(ev.id, { title: '   ' });
 
         expect(res.status).toBe(400);
-        expect(String(res.body.statusMessage)).toContain('needs a name');
+        expect(String(res.body.message)).toContain('needs a name');
     });
 
     it("refuses another tenant's kind", async () => {
@@ -127,7 +127,7 @@ describe('the Events-only boundary', () => {
             const res = await edit(linked.id, patch);
 
             expect(res.status, Object.keys(patch)[0]).toBe(409);
-            expect(String(res.body.statusMessage)).toContain('belongs to an Offering');
+            expect(String(res.body.message)).toContain('belongs to an Offering');
         }
     });
 

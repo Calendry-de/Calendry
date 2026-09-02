@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
         const personId = identity.actorPersonId;
 
         if (!personId) {
-            throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+            throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
         }
 
         const terms = await tenantTerms(tx, identity.tenantId);

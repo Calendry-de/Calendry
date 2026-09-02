@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!generation) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         return {

@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
         if (identity.kind !== 'account') {
             throw createError({
                 statusCode: 403,
-                statusMessage: 'Calendar links are managed with a signed-in session, not with a token or device key.',
+                message: 'Calendar links are managed with a signed-in session, not with a token or device key.',
             });
         }
 
@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
         if (groupIds.length && !(await holdsPermission(event, tx, 'ics_link.generate'))) {
             throw createError({
                 statusCode: 403,
-                statusMessage: 'ics_link.generate_own may only create a link for your own schedule, not specific Groups.',
+                message: 'ics_link.generate_own may only create a link for your own schedule, not specific Groups.',
             });
         }
 
@@ -90,7 +90,7 @@ export default defineEventHandler(async (event) => {
             const term = await tx.term.findFirst({ where: { id: body.termId, tenantId: identity.tenantId } });
 
             if (!term) {
-                throw createError({ statusCode: 404, statusMessage: 'Term not found.', data: { field: 'termId' } });
+                throw createError({ statusCode: 404, message: 'Term not found.', data: { field: 'termId' } });
             }
         }
 
@@ -101,7 +101,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (found.length !== groupIds.length) {
-                throw createError({ statusCode: 404, statusMessage: 'One or more groupIds not found.', data: { field: 'groupIds' } });
+                throw createError({ statusCode: 404, message: 'One or more groupIds not found.', data: { field: 'groupIds' } });
             }
         }
 

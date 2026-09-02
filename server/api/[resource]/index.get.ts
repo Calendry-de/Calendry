@@ -153,7 +153,7 @@ export default defineEventHandler(async (event) => {
             if (fields.length === 0) {
                 throw createError({
                     statusCode: 400,
-                    statusMessage: `Resource '${resource}' does not support text search.`,
+                    message: `Resource '${resource}' does not support text search.`,
                 });
             }
 

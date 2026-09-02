@@ -1,0 +1,88 @@
+{
+    "brand": {
+        "heading": "Calendry-Betreiber"
+    },
+    "tenants": {
+        "pageTitle": "Betreiber: Institutionen",
+        "heading": "Institutionen",
+        "signOut": "Abmelden",
+        "signOutBusy": "Abmeldung läuft …",
+        "loadError": "Die Institutionen konnten nicht geladen werden.",
+        "empty": "Noch keine Institutionen.",
+        "noFederationOption": "(keiner)",
+        "column": {
+            "federation": "Verbund",
+            "erase": "Löschen",
+            "locale": "Standard-Gebietsschema"
+        },
+        "eraseAction": "Unwiderruflich löschen …",
+        "eraseWarning": "Damit werden jede Person, jeder Zugang, jede Gruppe, jeder Raum, jede Lehrveranstaltung, jeder Termin, jede Regel und jeder Eintrag der Audit-Spur von „{slug}“ gelöscht – sofort und endgültig, ohne Weg zurück. Geben Sie zur Bestätigung den Slug ein.",
+        "confirmSlugLabel": "Slug bestätigen",
+        "erasePermanently": "„{slug}“ endgültig löschen",
+        "erasingBusy": "Wird gelöscht …",
+        "eraseSuccess": "„{slug}“ gelöscht: {people} und {logins} entfernt.",
+        "erasePeopleCount": "{count} Person | {count} Personen",
+        "eraseLoginCount": "{count} nun verwaister Zugang | {count} nun verwaiste Zugänge",
+        "eraseError": "„{slug}“ konnte nicht gelöscht werden.",
+        "federationUpdateError": "Der Verbund von „{slug}“ konnte nicht geändert werden.",
+        "localeHint": "Ein BCP-47-Tag (z. B. {germanTag}, {britishTag}). Legt Datums- und Zahlenformat dieser Institution fest und die Sprache der Oberfläche für alle, die keine eigene gewählt haben. Jedes andere Tag behält sein Datumsformat und zeigt Englisch. Die eigene Einstellung einer Person hat Vorrang, und die Administration der Institution kann das Tag selbst ändern; leer lassen, um dem Browser zu folgen.",
+        "localeAriaLabel": "Standard-Gebietsschema für „{slug}“",
+        "localePlaceholder": "z. B. de-DE (leer lassen für keines)",
+        "localeSave": "Gebietsschema speichern",
+        "localeSaved": "Standard-Gebietsschema für „{slug}“ auf {locale} gesetzt.",
+        "localeCleared": "Standard-Gebietsschema für „{slug}“ entfernt.",
+        "localeError": "Das Standard-Gebietsschema für „{slug}“ konnte nicht geändert werden."
+    },
+    "federations": {
+        "heading": "Verbünde",
+        "cliNote": "Gleiche Wirkung wie {cli} auf der Kommandozeile. Eine Institution wird über die Spalte „Verbund“ oben einem Verbund zugeordnet oder aus ihm gelöst.",
+        "loadError": "Die Verbünde konnten nicht geladen werden.",
+        "empty": "Noch keine Verbünde.",
+        "noMembers": "(keine)",
+        "column": {
+            "members": "Beteiligte Institutionen"
+        },
+        "namePlaceholder": "Name des Verbunds",
+        "submit": "Verbund anlegen",
+        "created": "Verbund „{slug}“ angelegt.",
+        "alreadyExisted": "Verbund „{slug}“ gab es bereits; nichts angelegt.",
+        "error": "Der Verbund konnte nicht angelegt werden."
+    },
+    "createTenant": {
+        "heading": "Institution anlegen",
+        "cliNote": "Gleiche Wirkung wie {cli} auf der Kommandozeile.",
+        "namePlaceholder": "Name der Institution",
+        "adminEmail": "E-Mail der Administration",
+        "adminName": "Name der Administration",
+        "federationSlug": "Slug des Verbunds",
+        "optionalPlaceholder": "(optional)",
+        "submit": "Institution anlegen",
+        "createdWithPassword": "„{slug}“ angelegt. Erstes Passwort der Administration (wird nur einmal angezeigt): {password}",
+        "createdReusedAccount": "„{slug}“ angelegt. Der bestehende Zugang für {email} wird weiterverwendet; sein Passwort bleibt unverändert.",
+        "conflict": "Eine Institution mit dem Slug „{slug}“ gibt es bereits.",
+        "error": "Die Institution konnte nicht angelegt werden."
+    },
+    "login": {
+        "pageTitle": "Betreiber-Anmeldung",
+        "lead": "Interne Anmeldung. Diese Zugangsdaten sind eigene und nicht die eines Zugangs zu einer Institution.",
+        "passwordChanged": "Passwort geändert. Melden Sie sich mit Ihrem neuen Passwort an.",
+        "emailPlaceholder": "E-Mail",
+        "passwordPlaceholder": "Passwort",
+        "submit": "Anmelden",
+        "submitBusy": "Anmeldung läuft …",
+        "error": "Ungültige Zugangsdaten."
+    },
+    "changePassword": {
+        "pageTitle": "Betreiber-Passwort ändern",
+        "lead": "Geben Sie Ihr aktuelles und ein neues Passwort ein.",
+        "forcedLead": "Dieser Zugang wurde administrativ zurückgesetzt. Vergeben Sie ein neues Passwort, um fortzufahren.",
+        "emailPlaceholder": "E-Mail",
+        "currentPasswordPlaceholder": "Aktuelles Passwort",
+        "newPasswordPlaceholder": "Neues Passwort",
+        "hint": "Mindestens 12 Zeichen, und nicht das aktuelle Passwort.",
+        "submit": "Passwort ändern",
+        "backToSignIn": "Zurück zur Anmeldung",
+        "invalidPassword": "Dieses Passwort kann nicht verwendet werden.",
+        "error": "Ungültige Zugangsdaten."
+    }
+}

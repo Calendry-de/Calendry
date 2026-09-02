@@ -357,6 +357,32 @@ export interface ConstraintTypeDef {
     defaultEnabled?: boolean;
     params: ConstraintParamDef[];
     /**
+     * A parameter COMBINATION this type cannot function without, beyond what
+     * each individual param's `required` expresses.
+     *
+     * EXISTS FOR "AT LEAST ONE OF" SHAPES. `missingConstraintParams` can only
+     * ask "is this one param set", so a type where no single param is
+     * required but SOME combination of them must be has no way to say so:
+     * `minimize_block_usage`'s `blocks`/`first`/`last` are each optional, and
+     * all three empty is not a smaller version of the rule, it is a rule with
+     * nothing to steer away from. `toWireConstraint` sent it anyway and the
+     * solver rejected the whole run with `INVALID_ARGUMENT`, 68ms after the
+     * row was created: an instant failure indistinguishable from a broken
+     * button, because nothing before the solver call could see it coming.
+     *
+     * ONE FUNCTION, TWO CALLERS: `toWireConstraint` (skip this constraint,
+     * report why, keep going) and `validateConstraint` (block the RUN before
+     * it starts, name the constraint and the fix). Sharing it means the two
+     * cannot disagree about what "unsendable" means for a given type.
+     *
+     * Returns `undefined` when the configured params are fine.
+     */
+    unsendableWhen?: (params: Record<string, unknown>) => {
+        code: string;
+        message: string;
+        fixHint: string;
+    } | undefined;
+    /**
      * Set for a RELATION type (ADR-0028 in calendry-solver): this type's
      * operands are an ordered, tenant-chosen set of Offerings. `params` is
      * always `[]` for these, and the set itself (`ConstraintRelationMember`)
@@ -381,6 +407,40 @@ export interface ConstraintTypeDef {
      * configured.
      */
     deprecatedBy?: string;
+}
+
+/**
+ * Weekday numbers a `weekdays` param holds, sorted and cleaned.
+ *
+ * Lives here, not in `server/utils/solverInput.ts`, because `unsendableWhen`
+ * below needs it and this file is loaded client-side too (see the file
+ * header); `solverInput.ts` imports `node:crypto` and cannot be.
+ */
+export function parseWeekdayList(value: unknown): number[] {
+    return Array.isArray(value)
+        ? [...new Set(value.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 7))]
+            .sort((a, b) => a - b)
+        : [];
+}
+
+/**
+ * A comma-separated list of 1-BASED block positions, as the wire's 0-based
+ * indices: the same conversion `minimize_block_usage` does, and for the same
+ * reason: a human counts blocks from one and the grid counts from zero.
+ *
+ * Unparseable and out-of-range entries are dropped rather than rejected. The
+ * field is free text and a stale position is already inert solver-side, so
+ * failing a whole run over one stray character is the harsher answer to the
+ * same input.
+ */
+export function parseBlockPositions(value: unknown): number[] {
+    return [...new Set(
+        String(value ?? '')
+            .split(',')
+            .map((part) => Number(part.trim()))
+            .filter((n) => Number.isInteger(n) && n >= 1)
+            .map((n) => n - 1),
+    )].sort((a, b) => a - b);
 }
 
 export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
@@ -656,7 +716,19 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'minimize_block_usage',
         category: 'days',
-        defaultEnabled: true,
+        /*
+         * NOT `defaultEnabled: true`, unlike most solver-owned SOFT types.
+         *
+         * This type has no default SELECTION: `blocks`/`first`/`last` carry no
+         * `default`, so a seeded row starts with `params: {}`, and the
+         * `unsendableWhen` check below says exactly that configuration cannot
+         * be sent. Seeded enabled, it failed `INVALID_ARGUMENT` on the FIRST
+         * run of every tenant provisioned before this fix, 68ms after the row
+         * was created, with nothing before the solver call able to see it
+         * coming: `GET /api/solver/preflight` and this route's own pre-flight
+         * check now catch it, but a rule that can never be sent without the
+         * tenant choosing something first should not start switched on.
+         */
         gridRelative: true,
         wireField: 'minimizeBlockUsage',
         label: 'Avoid particular blocks',
@@ -696,11 +768,36 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
                 required: false,
             },
         ],
+        /*
+         * The real production failure this exists for: `MinimizeBlockUsage
+         * selects no blocks - set at least one index, or first/last`, straight
+         * from the solver, because none of the three params is individually
+         * `required` and all three were left unset.
+         */
+        unsendableWhen: (params) => (
+            parseBlockPositions(params.blocks).length > 0 || params.first === true || params.last === true
+                ? undefined
+                : {
+                    code: 'EMPTY_BLOCK_SELECTION',
+                    message: 'No block positions are set to avoid, and neither "avoid the first block" nor '
+                        + '"avoid the last block" is turned on, so this rule has nothing to steer away from.',
+                    fixHint: 'Open Settings → Constraints → "Avoid particular blocks" and either enter block '
+                        + 'positions to avoid, or turn on "avoid the first block" / "avoid the last block".',
+                }
+        ),
     },
     {
         key: 'minimize_specifc_day',
         category: 'days',
-        defaultEnabled: true,
+        /*
+         * NOT `defaultEnabled: true`, for the same reason as `minimize_block_usage`
+         * just above. `days` is `required` with deliberately no default (see the
+         * param below), so a seeded-enabled row starts with `params: {}` and fails
+         * `missingConstraintParams`/`validateConstraint` on the very first solver
+         * run: "'Avoid particular days' is missing required value(s): Days to
+         * avoid." A rule that can never be sent without the tenant choosing
+         * something first should not start switched on.
+         */
         wireField: 'minimizeDayUsage',
         label: 'Avoid particular days',
         description:
@@ -725,7 +822,15 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'minimize_high_ranking_rooms',
         category: 'rooms',
-        defaultEnabled: true,
+        /*
+         * NOT `defaultEnabled: true`. `rankThreshold` below is `required` with
+         * deliberately no default ("premium" is per-institution), so a
+         * seeded-enabled row would start `params: {}` and fail
+         * `validateConstraint` on the very first solver run — the same shape
+         * as `minimize_block_usage` and `minimize_specifc_day` above, caught
+         * here by `provisionTenant.ts`'s boot-time assertion before it ever
+         * reached a real tenant.
+         */
         wireField: 'minimizeRoomRank',
         /*
          * Named for the AXIS, not for one direction along it.
@@ -983,7 +1088,9 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'max_concurrent_online_sessions',
         category: 'online',
-        defaultEnabled: true,
+        // NOT `defaultEnabled: true`: `maxConcurrent` below is `required` with
+        // deliberately no default (a licence figure, not a preference), the
+        // same seeded-broken shape as `minimize_high_ranking_rooms` above.
         wireField: 'maxConcurrentOnlineSessions',
         label: 'Cap online sessions running at once',
         description:
@@ -1118,7 +1225,9 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'max_weekly_teaching_load',
         category: 'workload',
-        defaultEnabled: true,
+        // NOT `defaultEnabled: true`: `maxPerWeek` below is `required` with
+        // deliberately no default (a contractual figure, not a guess), the
+        // same seeded-broken shape as `minimize_high_ranking_rooms` above.
         gridRelative: true,
         wireField: 'maxWeeklyTeachingLoad',
         label: 'Cap a lecturer\u2019s teaching per week',
@@ -1412,6 +1521,27 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             help: 'Block positions, comma separated, counting from 1 \u2014 e.g. 4 for the '
                 + 'lunch block. Leave empty to reserve the WHOLE of the chosen days.',
         }],
+        /*
+         * `BlockedWindow` follows `Unavailability`'s convention: an empty axis
+         * means EVERY value on that axis. Leaving `blocks` empty legitimately
+         * means "reserve the whole day" (see its `help` text above), so only
+         * BOTH axes empty is the misconfiguration: that reserves the entire
+         * timetable as a HARD rule, not nothing, which is not a smaller
+         * version of "protect a slot", it is a different and far more drastic
+         * rule nobody asked for.
+         */
+        unsendableWhen: (params) => (
+            parseWeekdayList(params.days).length > 0 || parseBlockPositions(params.blocks).length > 0
+                ? undefined
+                : {
+                    code: 'EMPTY_PROTECTED_WINDOW',
+                    message: 'No days and no blocks are set. An empty selection on both axes reserves the '
+                        + 'ENTIRE timetable as protected, not nothing, which the solver cannot place anything '
+                        + 'against.',
+                    fixHint: 'Open Settings \u2192 Constraints \u2192 "Reserve a slot institution-wide" and select at '
+                        + 'least one day or one block position.',
+                }
+        ),
     },
 
     {
@@ -1517,7 +1647,9 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'max_offering_sessions_per_day',
         category: 'days',
-        defaultEnabled: true,
+        // NOT `defaultEnabled: true`: `maxPerDay` below is `required` with
+        // deliberately no default (a scheduling-policy figure, not a guess),
+        // the same seeded-broken shape as `minimize_high_ranking_rooms` above.
         wireField: 'maxOfferingSessionsPerDay',
         label: 'Cap an offering’s sessions per day',
         description:
@@ -1546,7 +1678,9 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
     {
         key: 'max_consecutive_offering_blocks',
         category: 'days',
-        defaultEnabled: true,
+        // NOT `defaultEnabled: true`: `maxConsecutive` below is `required`
+        // with deliberately no default, the same seeded-broken shape as
+        // `minimize_high_ranking_rooms` above.
         gridRelative: true,
         wireField: 'maxConsecutiveOfferingBlocks',
         label: 'Cap an offering’s blocks in a row',
@@ -1733,6 +1867,107 @@ export function missingConstraintParams(
             return param.type === 'weekdays' && Array.isArray(value) && value.length === 0;
         })
         .map((param) => param.key);
+}
+
+/**
+ * One reason an ENABLED constraint cannot be sent to the solver as it is
+ * currently configured, aimed at a person rather than at a log.
+ *
+ * `code` is stable and machine-matchable (e.g. for a test); `message` and
+ * `fixHint` are prose, never solver jargon, and always name the specific
+ * constraint via `constraintName`, never "a constraint" or "your rules".
+ */
+export interface ConstraintIssue {
+    constraintId: string;
+    constraintName: string;
+    constraintType: string;
+    severity: 'HARD' | 'SOFT';
+    code: string;
+    message: string;
+    fixHint: string;
+}
+
+/**
+ * Would this constraint, as stored, make a solver run fail or be silently
+ * dropped — checked BEFORE spending a gRPC round-trip and a `solver_run` row
+ * on it, not after.
+ *
+ * DELIBERATELY NARROWER than `toWireConstraint`'s skip logic. Most of what
+ * that function skips is ordinary NARROWING a tenant chose on purpose (a rule
+ * scoped to a different TimeGrid, an offering-scoped rule the wire cannot
+ * express): skipping those is the correct, silent behaviour and this function
+ * says nothing about them. What it catches is the other kind: a configuration
+ * that cannot function AT ALL, which used to reach the solver and come back
+ * as an opaque `INVALID_ARGUMENT` 68ms after the run started, indistinguishable
+ * from a broken button. Every check here mirrors one `toWireConstraint` also
+ * makes (`missingConstraintParams`, `unsendableWhen`), so the two can never
+ * disagree about what "cannot be sent" means; this only adds WHEN the check
+ * runs and WHO it is shown to.
+ *
+ * Default to "no params required": ~24 of 32 currently-enabled catalogue types
+ * take no params at all and are legitimately parameterless
+ * (`no_double_booking_room`, `group_veto`, `exact_frequency_per_offering`, …).
+ * A type only appears here when the catalogue itself says it needs something,
+ * never by guessing from its shape.
+ */
+export function validateConstraint(row: {
+    id: string;
+    name: string;
+    type: string;
+    /** The row's OWN stored severity; falls back to it only when the catalogue leaves severity open. */
+    severity?: string | null;
+    params?: unknown;
+}): ConstraintIssue[] {
+    const type = findConstraintType(row.type);
+
+    if (!type) {
+        return [{
+            constraintId: row.id,
+            constraintName: row.name,
+            constraintType: row.type,
+            severity: row.severity === 'SOFT' ? 'SOFT' : 'HARD',
+            code: 'UNKNOWN_TYPE',
+            message: `'${row.name}' has type '${row.type}', which is not in the constraint catalogue `
+                + '(shared/constraintTypes.ts). It cannot be evaluated or sent to the solver.',
+            fixHint: 'Delete this rule, or recreate it as a type this version of the app knows about.',
+        }];
+    }
+
+    const severity: 'HARD' | 'SOFT' = type.severity ?? (row.severity === 'SOFT' ? 'SOFT' : 'HARD');
+    const params = (row.params && typeof row.params === 'object' ? row.params : {}) as Record<string, unknown>;
+    const issues: ConstraintIssue[] = [];
+
+    const missing = missingConstraintParams(type, params);
+
+    if (missing.length) {
+        const labels = missing.map((key) => type.params.find((p) => p.key === key)?.label ?? key);
+
+        issues.push({
+            constraintId: row.id,
+            constraintName: row.name,
+            constraintType: type.key,
+            severity,
+            code: 'MISSING_REQUIRED_PARAM',
+            message: `'${row.name}' is missing required value(s): ${labels.join(', ')}.`,
+            fixHint: `Open Settings → Constraints → '${row.name}' and set: ${labels.join(', ')}.`,
+        });
+    }
+
+    const unsendable = type.unsendableWhen?.(params);
+
+    if (unsendable) {
+        issues.push({
+            constraintId: row.id,
+            constraintName: row.name,
+            constraintType: type.key,
+            severity,
+            code: unsendable.code,
+            message: `'${row.name}': ${unsendable.message}`,
+            fixHint: unsendable.fixHint,
+        });
+    }
+
+    return issues;
 }
 
 /**

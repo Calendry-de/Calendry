@@ -22,12 +22,10 @@
             v-if="mode === 'edit' && canExport"
             class="person_export"
         >
-            <h2 class="person_export_title">Data export</h2>
+            <h2 class="person_export_title">{{ t('manageUi.personForm.exportTitle') }}</h2>
 
             <p class="person_export_hint">
-                Everything Calendry holds about {{ personLabel }}: profile, roles, group
-                memberships, sessions, unavailability, preferences, exam requests, API tokens,
-                calendar links and their own audit trail. A GDPR Right to Access request.
+                {{ t('manageUi.personForm.exportHint', { person: personLabel }) }}
             </p>
 
             <div class="person_export_actions">
@@ -35,13 +33,13 @@
                     :href="exportUrl('json')"
                     icon="material-symbols:data-object"
                     type="secondary"
-                >Download JSON</CommonButton>
+                >{{ t('common.action.downloadJson') }}</CommonButton>
 
                 <CommonButton
                     :href="exportUrl('xlsx')"
                     icon="material-symbols:table-outline"
                     type="secondary"
-                >Download Excel</CommonButton>
+                >{{ t('common.action.downloadExcel') }}</CommonButton>
             </div>
         </section>
     </div>
@@ -51,6 +49,7 @@
 import type { useEntityForm } from '~/composables/entityForm';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * Person's detail: the shared generic form (every field here is plain,
@@ -69,6 +68,8 @@ const props = defineProps<{
 
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
+const { t } = useT();
+
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 
 const canExport = useHasPermission('person.export');
@@ -78,7 +79,7 @@ const row = computed(() => props.form.row.value as { id?: string; givenName?: st
 const personLabel = computed(() => {
     const name = `${row.value?.givenName ?? ''} ${row.value?.familyName ?? ''}`.trim();
 
-    return name || 'this person';
+    return name || t('manageUi.personForm.thisPerson');
 });
 
 function exportUrl(format: 'json' | 'xlsx'): string {

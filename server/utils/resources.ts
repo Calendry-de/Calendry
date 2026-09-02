@@ -7,6 +7,7 @@ import { findConstraintType, validateConstraintShape } from '../../shared/constr
 import type { ConstraintShapeProblem } from '../../shared/constraintTypes';
 import { assertTenantRetainsAdministrator } from './accessRoleGuards';
 import { applyDefaultAccessRole } from './defaultAccessRole';
+import { invalidateScheduleCacheOnWrite } from './scheduleCache';
 import { isPermissionKey } from '../../shared/permissions';
 import type { PermissionKey } from '../../shared/permissions';
 import { logger } from './logger';
@@ -267,7 +268,7 @@ async function constraintBeforeUpdate(ctx: {
             if (existingDefault) {
                 throw createError({
                     statusCode: 422,
-                    statusMessage: `Removing every kind would make this a second tenant-wide `
+                    message: `Removing every kind would make this a second tenant-wide `
                         + `'${row.type}' rule alongside "${existingDefault.name}". `
                         + 'Keep at least one kind, or delete this rule instead.',
                     data: { field: 'scopes', type: row.type },
@@ -330,7 +331,7 @@ async function constraintBeforeUpdate(ctx: {
          */
         throw createError({
             statusCode: 400,
-            statusMessage: problems.map((p) => p.message).join(' '),
+            message: problems.map((p) => p.message).join(' '),
             data: {
                 issues: problems.map((p) => ({
                     code: 'custom',
@@ -381,7 +382,7 @@ async function assertPeriodWithinTerm(
 
         throw createError({
             statusCode: 400,
-            statusMessage: `This period (${iso(startDate)} to ${iso(endDate)}) falls entirely outside `
+            message: `This period (${iso(startDate)} to ${iso(endDate)}) falls entirely outside `
                 + `'${term.name}' (${iso(term.startDate)} to ${iso(term.endDate)}), so it would `
                 + 'classify no week and have no effect. Move it inside the term.',
             data: {
@@ -485,7 +486,7 @@ async function assertPermissionsSeeded(tx: Tx, submitted: unknown): Promise<void
     if (missing.length) {
         throw createError({
             statusCode: 422,
-            statusMessage: `${missing.length} permission(s) exist in the code but not in the database `
+            message: `${missing.length} permission(s) exist in the code but not in the database `
                 + `(${missing.slice(0, 6).join(', ')}${missing.length > 6 ? ' …' : ''}). `
                 + 'The catalogue is seeded, not migrated: run `bun run db-seed`.',
             data: { field: 'permissions' },
@@ -529,7 +530,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             if (link) {
                 throw createError({
                     statusCode: 409,
-                    statusMessage: `This person holds the login ${link.account.email}. Delete that `
+                    message: `This person holds the login ${link.account.email}. Delete that `
                         + 'login, or attach it to somebody else, before deleting the person, '
                         + 'otherwise the password keeps working with nobody able to see or revoke it.',
                 });
@@ -561,10 +562,17 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         // see `applyDefaultAccessRole`'s own doc comment for why this is not
         // the same thing as the generic-route escalation the `member` role's
         // comment (provision-tenant.ts) warns against.
+        //
+        // Also invalidates the schedule cache: a Person's `givenName`/
+        // `familyName` is embedded in the cached schedule-context response
+        // (on every create/update, not only create; see
+        // `invalidateScheduleCacheOnWrite`).
         async afterWrite({ tx, tenantId, id, action }) {
             if (action === 'create') {
                 await applyDefaultAccessRole(tx, tenantId, id);
             }
+
+            await invalidateScheduleCacheOnWrite({ tenantId });
         },
     },
 
@@ -640,6 +648,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         },
         orderBy: { name: 'asc' },
         searchFields: ['name', 'description'],
+        // A Group's `name`/`parentGroupId` are embedded in the cached
+        // schedule-context and board responses; see
+        // `invalidateScheduleCacheOnWrite`.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     rooms: {
@@ -675,6 +687,9 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         },
         orderBy: { code: 'asc' },
         searchFields: ['code', 'name', 'location'],
+        // A Room's `code`/`name` are embedded in the cached schedule-context
+        // and board responses; see `invalidateScheduleCacheOnWrite`.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     equipment: {
@@ -799,6 +814,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         }),
         orderBy: { title: 'asc' },
         searchFields: ['title', 'code', 'notes'],
+        // An Offering's `title`/`code`/`color` are embedded in the cached
+        // session-list, board and ics responses; see
+        // `invalidateScheduleCacheOnWrite`.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     /**
@@ -1001,7 +1020,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             if (total > 0) {
                 throw createError({
                     statusCode: 409,
-                    statusMessage: describeOrphans(total, named),
+                    message: describeOrphans(total, named),
                     data: { sessionIds: named.map((s) => s.id), total },
                 });
             }
@@ -1045,6 +1064,12 @@ export const RESOURCES: Record<string, ResourceConfig> = {
                 );
             }
         },
+        // See `invalidateScheduleCacheOnWrite`'s own comment: a TimeGrid edit
+        // (blocks, active days, start time, or a break via `writeChildren`
+        // above) is embedded in the cached schedule/board/ics responses, and
+        // this is the entry point that stops it from going stale for up to
+        // `SCHEDULE_CACHE_TTL_SECONDS` after the edit.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     terms: {
@@ -1064,6 +1089,9 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         filters: z.object({}),
         orderBy: { startDate: 'desc' },
         searchFields: ['name'],
+        // A Term's `name` is embedded in the cached board response
+        // (`GET /api/screens/board`); see `invalidateScheduleCacheOnWrite`.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     /**
@@ -1201,7 +1229,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
                 if (existing) {
                     throw createError({
                         statusCode: 422,
-                        statusMessage: `'${type}' already exists as "${existing.name}" and cannot have `
+                        message: `'${type}' already exists as "${existing.name}" and cannot have `
                             + `a second rule: it applies to every session kind whose type is ${derived}, `
                             + 'so another row would cover exactly the same sessions. Edit that rule, or '
                             + `change which kinds are ${derived}.`,
@@ -1224,7 +1252,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             if (existingDefault) {
                 throw createError({
                     statusCode: 422,
-                    statusMessage: `'${type}' already has a tenant-wide rule ("${existingDefault.name}"). `
+                    message: `'${type}' already has a tenant-wide rule ("${existingDefault.name}"). `
                         + 'An additional rule of the same type must name at least one session kind, '
                         + 'or it would silently duplicate that one.',
                     data: { field: 'scopes', type, defaultConstraintId: existingDefault.id },
@@ -1363,6 +1391,10 @@ export const RESOURCES: Record<string, ResourceConfig> = {
         filters: z.object({ key: z.string().optional() }),
         orderBy: { key: 'asc' },
         searchFields: ['key', 'name'],
+        // A SessionKind's `name`/`color` are embedded in the cached
+        // session-list and board responses; see
+        // `invalidateScheduleCacheOnWrite`.
+        afterWrite: invalidateScheduleCacheOnWrite,
     },
 
     /**
@@ -1438,7 +1470,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             if (clash) {
                 throw createError({
                     statusCode: 409,
-                    statusMessage: `An access role with the key '${key}' already exists in this tenant `
+                    message: `An access role with the key '${key}' already exists in this tenant `
                         + `("${clash.name}"). This creates a role; it does not update one.`,
                     data: { field: 'key' },
                 });
@@ -1531,7 +1563,7 @@ export function getResource(name: string | undefined): ResourceConfig {
     const config = name ? RESOURCES[name] : undefined;
 
     if (!config) {
-        throw createError({ statusCode: 404, statusMessage: `Unknown resource '${name}'.` });
+        throw createError({ statusCode: 404, message: `Unknown resource '${name}'.` });
     }
 
     return config;
@@ -1569,7 +1601,7 @@ export function delegate(tx: Tx, model: string) {
     const d = (tx as unknown as Record<string, unknown>)[model];
 
     if (!d) {
-        throw createError({ statusCode: 500, statusMessage: `No Prisma delegate '${model}'.` });
+        throw createError({ statusCode: 500, message: `No Prisma delegate '${model}'.` });
     }
 
     return d as {

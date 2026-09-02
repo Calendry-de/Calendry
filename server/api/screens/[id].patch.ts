@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, BODY.parse);
 
     if (!id) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing screen id.' });
+        throw createError({ statusCode: 400, message: 'Missing screen id.' });
     }
 
     return withRequestTenant(event, async (tx, identity) => {
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
         const existing = await tx.screen.findFirst({ where: { id } });
 
         if (!existing) {
-            throw createError({ statusCode: 404, statusMessage: 'Screen not found.' });
+            throw createError({ statusCode: 404, message: 'Screen not found.' });
         }
 
         return mapDbErrors(async () => {

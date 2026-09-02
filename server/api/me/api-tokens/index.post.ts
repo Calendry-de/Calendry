@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { generateSessionToken, hashToken } from '../../../utils/auth';
 import { isPermissionKey } from '../../../../shared/permissions';
 import { mapDbErrors } from '../../../utils/dbErrors';
-import { loadPermissions } from '../../../utils/requirePermission';
+import { loadPermissions, requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 defineRouteMeta({
     openAPI: {
         tags: ['API tokens'],
         summary: 'Create an API token',
-        description: 'Self-service: any signed-in Person can mint a token that acts as themselves, restricted to a selected subset of the permissions they hold RIGHT NOW. The effective set stays an intersection with their live permissions on every later request, so losing an AccessRole also narrows every token derived from it. The secret is returned ONCE and only its SHA-256 is stored. Use it as an Authorization: Bearer header. A token cannot call this route: tokens are managed with a session only.',
+        description: 'Mints a token that acts as the caller, restricted to a selected subset of the permissions they hold RIGHT NOW. Needs `api_token.manage_own`: an institution decides who may automate. The effective set stays an intersection with their live permissions on every later request, so losing an AccessRole also narrows every token derived from it. The secret is returned ONCE and only its SHA-256 is stored. Use it as an Authorization: Bearer header. A token cannot call this route: tokens are managed with a session only.',
         requestBody: {
             required: true,
             content: {
@@ -46,7 +46,7 @@ defineRouteMeta({
                 },
             },
             400: { description: 'Unknown permission key, or an expiry in the past.' },
-            403: { description: 'Caller is not a signed-in session, or requested a permission they do not hold.' },
+            403: { description: 'Caller is not a signed-in session, does not hold `api_token.manage_own`, or requested a permission they do not hold.' },
         },
     },
 });
@@ -64,18 +64,30 @@ const BODY = z.object({
 /**
  * Mint an API token: a bearer credential for scripts (imports, integrations).
  *
- * SELF-SERVICE, NO PERMISSION KEY OF ITS OWN, like `/api/me/settings`: the
- * route only ever narrows what the caller can already do, so the authority to
- * delegate a subset of your own permissions is the permissions themselves.
- * What it must therefore enforce is exactly two things:
+ * THREE ENFORCEMENTS, in this order, and the order is the design:
  *
- * 1. SUBSET AT CREATION: every requested key is checked against the caller's
+ * 1. SESSION ONLY: a token must not mint tokens. Otherwise a leaked
+ *    short-lived token launders itself into a permanent one, and revoking the
+ *    original revokes nothing. `kind === 'account'` is that check, and it runs
+ *    FIRST, before any permission is loaded. That is what keeps it true
+ *    regardless of what a ceiling happens to contain: `heldPermissions()`
+ *    intersects a token's ceiling with its Person's live permissions, so if
+ *    the gate below were reached by a token whose ceiling included
+ *    `api_token.manage_own`, it would pass.
+ *
+ * 2. MAY MANAGE TOKENS AT ALL: `api_token.manage_own`. This route used to have
+ *    NO permission of its own, on the reasoning that delegating a subset of
+ *    your own authority needs no authority beyond that subset. True, and it
+ *    stopped being the whole question: an institution wants to decide who gets
+ *    to automate, which is a policy about the CREDENTIAL rather than about the
+ *    permissions inside it. Note the key gates MANAGING a token, never USING
+ *    one: it is checked here, at `GET` and at `DELETE`, and nowhere else, so a
+ *    Person who loses it keeps every token they already minted, working
+ *    exactly as before, until the permissions BEHIND those tokens are revoked.
+ *
+ * 3. SUBSET AT CREATION: every requested key is checked against the caller's
  *    live permissions, and 403 names the ones they lack. Without this, a
  *    viewer could mint themselves an admin token.
- *
- * 2. SESSION ONLY: a token must not mint tokens. Otherwise a leaked
- *    short-lived token launders itself into a permanent one, and revoking the
- *    original revokes nothing. `kind === 'account'` is that check.
  *
  * The stored permission list is a CEILING, not a grant: `heldPermissions()`
  * intersects it with the Person's live permissions on every request, so this
@@ -88,9 +100,11 @@ export default defineEventHandler(async (event) => {
         if (identity.kind !== 'account') {
             throw createError({
                 statusCode: 403,
-                statusMessage: 'API tokens are managed with a signed-in session, not with a token or device key.',
+                message: 'API tokens are managed with a signed-in session, not with a token or device key.',
             });
         }
+
+        await requirePermission(event, tx, 'api_token.manage_own');
 
         const requested = [...new Set(body.permissions)];
         const unknown = requested.filter((key) => !isPermissionKey(key));
@@ -98,21 +112,25 @@ export default defineEventHandler(async (event) => {
         if (unknown.length) {
             throw createError({
                 statusCode: 400,
-                statusMessage: `Unknown permission key(s): ${unknown.join(', ')}.`,
+                message: `Unknown permission key(s): ${unknown.join(', ')}.`,
                 data: { field: 'permissions', unknown },
             });
         }
 
         // The caller's LIVE permissions, loaded directly rather than through
         // `heldPermissions()`: this is a subset check against a list, not a
-        // gate on one key.
+        // gate on one key. A second read of the same rows as the gate above,
+        // deliberately: `heldPermissions()` caches on the event but exposes
+        // nothing, and minting is a once-in-a-while action, so paying one
+        // extra query inside the open transaction is cheaper than a route
+        // reaching into `event.context` for somebody else's cache.
         const held = await loadPermissions(tx, identity.actorPersonId as string);
         const missing = requested.filter((key) => !held.has(key));
 
         if (missing.length) {
             throw createError({
                 statusCode: 403,
-                statusMessage: 'A token cannot hold more than its creator: '
+                message: 'A token cannot hold more than its creator: '
                     + `you do not hold ${missing.join(', ')}.`,
                 data: { field: 'permissions', missing },
             });
@@ -121,7 +139,7 @@ export default defineEventHandler(async (event) => {
         if (body.expiresAt && body.expiresAt.getTime() <= Date.now()) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'The expiry is in the past.',
+                message: 'The expiry is in the past.',
                 data: { field: 'expiresAt' },
             });
         }

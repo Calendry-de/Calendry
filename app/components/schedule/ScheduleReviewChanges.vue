@@ -15,10 +15,7 @@
                 name="material-symbols:check-circle-outline"
                 aria-hidden="true"
             />
-            <span>
-                This proposal changes nothing. Every offering in the term is
-                reproduced exactly where it already sits.
-            </span>
+            <span>{{ t('schedule.reviewChanges.none') }}</span>
         </p>
 
         <!--
@@ -51,7 +48,7 @@
                             rather than a 36-character UUID. A truncated id is
                             not "visibly wrong", it is unreadable.
                         -->
-                        <span>{{ row.title ?? 'An offering you cannot view' }}</span>
+                        <span>{{ row.title ?? t('schedule.reviewChanges.unviewableOffering') }}</span>
                     </h3>
 
                     <!--
@@ -69,7 +66,7 @@
                             name="material-symbols:info-outline"
                             aria-hidden="true"
                         />
-                        not in what you asked for
+                        {{ t('schedule.reviewChanges.notAsked') }}
                     </span>
                 </div>
 
@@ -92,7 +89,7 @@
                         class="rchg_open"
                         @click="emit('show', row)"
                     >
-                        Show in the grid
+                        {{ t('schedule.reviewChanges.showInGrid') }}
                         <Icon
                             name="material-symbols:arrow-forward"
                             aria-hidden="true"
@@ -114,16 +111,14 @@
             v-if="untouchedOfferings > 0 && rows.length"
             class="rchg_untouched"
         >
-            {{ untouchedOfferings }}
-            other offering{{ untouchedOfferings === 1 ? '' : 's' }}
-            {{ untouchedOfferings === 1 ? 'is' : 'are' }} reproduced exactly as
-            {{ untouchedOfferings === 1 ? 'it stands' : 'they stand' }}.
+            {{ t('schedule.reviewChanges.untouched', { count: untouchedOfferings }, untouchedOfferings) }}
         </p>
     </div>
 </template>
 
 <script setup lang="ts">
 import type { OfferingChange } from '~/composables/generationReview';
+import { useT } from '~/composables/i18n';
 
 /**
  * The review page's primary evidence: what this proposal does, by Offering.
@@ -145,6 +140,8 @@ defineProps<{
 
 const emit = defineEmits<{ show: [OfferingChange] }>();
 
+const { t } = useT();
+
 /**
  * Only the counts that are non-zero, in a fixed order.
  *
@@ -157,21 +154,21 @@ function countsFor(row: OfferingChange) {
     const parts: { kind: string; value: number; label: string }[] = [];
 
     if (row.deleted > 0) {
-        parts.push({ kind: 'deleted', value: row.deleted, label: 'removed' });
+        parts.push({ kind: 'deleted', value: row.deleted, label: t('schedule.reviewChanges.countRemoved') });
     }
 
     if (row.created > 0) {
-        parts.push({ kind: 'created', value: row.created, label: 'added' });
+        parts.push({ kind: 'created', value: row.created, label: t('schedule.reviewChanges.countAdded') });
     }
 
     if (row.moved > 0) {
-        parts.push({ kind: 'moved', value: row.moved, label: 'moved' });
+        parts.push({ kind: 'moved', value: row.moved, label: t('schedule.reviewChanges.countMoved') });
     }
 
     // Unchanged rides along only when the Offering ALSO changed; it is the
     // denominator that makes "3 moved" readable ("3 moved, 9 left alone").
     if (row.unchanged > 0) {
-        parts.push({ kind: 'unchanged', value: row.unchanged, label: 'left alone' });
+        parts.push({ kind: 'unchanged', value: row.unchanged, label: t('schedule.reviewChanges.countLeftAlone') });
     }
 
     return parts;
@@ -192,21 +189,21 @@ function weekLabel(weeks: number[]): string {
     const first = weeks[0]!;
 
     if (weeks.length === 1) {
-        return `week ${first}`;
+        return t('schedule.reviewChanges.weekOne', { week: first });
     }
 
     const last = weeks[weeks.length - 1]!;
     const consecutive = last - first + 1 === weeks.length;
 
     if (consecutive) {
-        return `weeks ${first}–${last}`;
+        return t('schedule.reviewChanges.weekRange', { from: first, to: last });
     }
 
     if (weeks.length === 2) {
-        return `weeks ${first} and ${last}`;
+        return t('schedule.reviewChanges.weekTwo', { first, second: last });
     }
 
-    return `${weeks.length} weeks, from ${first}`;
+    return t('schedule.reviewChanges.weekScatter', { count: weeks.length, first });
 }
 </script>
 

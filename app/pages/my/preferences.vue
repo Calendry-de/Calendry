@@ -1,10 +1,19 @@
 <template>
-    <CommonPage title="My teaching preferences">
-        <p class="intro">
-            Days, times and kinds of room you would rather teach in. Unlike unavailability, a preference is a
-            <strong>soft</strong> wish: it never blocks a placement, so it needs no approval
-            and takes effect as soon as you save it.
-        </p>
+    <CommonPage :title="t('my.preferences.pageTitle')">
+        <!--
+            `<i18n-t>`, not a sentence split around its own emphasis: "soft" is
+            the word the whole paragraph turns on, and German declines it.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="my.preferences.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #soft>
+                <strong>{{ t('my.preferences.introSoft') }}</strong>
+            </template>
+        </i18n-t>
 
         <!--
             ISSUE #3, RESOLVED: the hedge this replaced said "This page cannot
@@ -29,19 +38,26 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            <span v-if="preferencesWeighed">
-                <strong>Your institution weighs these.</strong>
-                Preferences are saved, visible to administrators, and read by the timetable
-                generator, which tries to place your sessions on the days, blocks and kinds of
-                room you choose. A preference always loses to a hard requirement, so treat it
-                as a wish that is heard, not a guarantee.
-            </span>
-            <span v-else>
-                <strong>Your institution does not currently weigh these.</strong>
-                Preferences are still saved and visible to administrators, but the timetable
-                generator is not asked to act on them yet: an administrator switches this on
-                for the whole institution. Saving now means it takes effect the moment they do.
-            </span>
+            <i18n-t
+                v-if="preferencesWeighed"
+                keypath="my.preferences.weighed"
+                scope="global"
+                tag="span"
+            >
+                <template #lead>
+                    <strong>{{ t('my.preferences.weighedLead') }}</strong>
+                </template>
+            </i18n-t>
+            <i18n-t
+                v-else
+                keypath="my.preferences.notWeighed"
+                scope="global"
+                tag="span"
+            >
+                <template #lead>
+                    <strong>{{ t('my.preferences.notWeighedLead') }}</strong>
+                </template>
+            </i18n-t>
         </p>
 
         <!--
@@ -60,33 +76,29 @@
                 name="material-symbols:warning-outline"
                 aria-hidden="true"
             />
-            <span>
-                This institution has no time grid configured, so blocks cannot be shown.
-                An administrator has to create one first. Day preferences below still work.
-            </span>
+            <span>{{ t('my.preferences.noGrid') }}</span>
         </p>
 
         <section class="card">
-            <h2>Your preferences</h2>
+            <h2>{{ t('my.preferences.head') }}</h2>
 
             <ManageWeekdayPicker
                 v-model="draftDays"
-                help="Leave everything unticked if you have no day preference."
-                label="Preferred days"
+                :help="t('my.preferences.daysHelp')"
+                :label="t('my.preferences.daysLabel')"
             />
 
             <AvailabilityBlockPicker
                 v-model="draftBlocks"
                 :grid="grid"
-                help="Leave everything unticked if you have no preference about the time of day."
-                label="Preferred blocks"
+                :help="t('my.preferences.blocksHelp')"
+                :label="t('my.preferences.blocksLabel')"
             />
 
             <AvailabilityRoomFeaturePicker
                 v-model="draftRoomFeatures"
-                help="Rooms are matched on what they provide, so this is a wish for a KIND of room
-                      rather than for a particular one. Leave everything unticked if you do not mind."
-                label="Preferred room types"
+                :help="t('my.preferences.roomTypesHelp')"
+                :label="t('my.preferences.roomTypesLabel')"
                 :options="roomFeatureOptions"
             />
 
@@ -100,21 +112,21 @@
                 v-else-if="saved"
                 class="note note--ok"
                 role="status"
-            >Saved.</p>
+            >{{ t('my.preferences.saved') }}</p>
 
             <div class="actions">
                 <CommonButton
                     :disabled="busy || !dirty"
                     type="primary"
                     @click="save"
-                >{{ busy ? 'Saving…' : 'Save preferences' }}</CommonButton>
+                >{{ busy ? t('common.action.saving') : t('my.preferences.save') }}</CommonButton>
 
                 <CommonButton
                     v-if="dirty"
                     :disabled="busy"
                     type="secondary"
                     @click="seed"
-                >Discard changes</CommonButton>
+                >{{ t('my.preferences.discard') }}</CommonButton>
             </div>
         </section>
     </CommonPage>
@@ -126,10 +138,13 @@ import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlock
 import AvailabilityRoomFeaturePicker from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import type { RoomFeatureOption } from '~/components/availability/AvailabilityRoomFeaturePicker.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
+import { useT } from '~/composables/i18n';
 
 definePageMeta({ middleware: 'my' });
 
-useHead({ title: 'My teaching preferences' });
+const { t } = useT();
+
+useHead(() => ({ title: t('my.preferences.pageTitle') }));
 
 interface Payload {
     grid: TimeGrid | null;
@@ -235,7 +250,7 @@ async function save() {
         await refresh();
         saved.value = true;
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not save that.';
+        error.value = serverErrorMessage(cause) ?? t('my.preferences.saveError');
     } finally {
         busy.value = false;
     }

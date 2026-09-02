@@ -138,7 +138,7 @@ describe('different_time', () => {
             });
 
             expect(res.status).toBe(400);
-            expect(String(res.body.statusMessage)).toContain('at least 2 offerings');
+            expect(String(res.body.message)).toContain('at least 2 offerings');
 
             const count = await ownerDb.constraintRelationMember.count({ where: { constraintId: created.body.id } });
 

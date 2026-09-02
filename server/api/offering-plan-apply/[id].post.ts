@@ -103,11 +103,11 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!plan) {
-            throw createError({ statusCode: 404, statusMessage: 'Plan not found.' });
+            throw createError({ statusCode: 404, message: 'Plan not found.' });
         }
 
         if (!plan.items.length) {
-            throw createError({ statusCode: 422, statusMessage: 'This plan has no offerings to apply yet.' });
+            throw createError({ statusCode: 422, message: 'This plan has no offerings to apply yet.' });
         }
 
         const term = await tx.term.findFirst({
@@ -116,7 +116,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!term) {
-            throw createError({ statusCode: 404, statusMessage: 'Term not found.' });
+            throw createError({ statusCode: 404, message: 'Term not found.' });
         }
 
         const groups = await tx.group.findMany({
@@ -129,7 +129,7 @@ export default defineEventHandler(async (event) => {
 
             throw createError({
                 statusCode: 404,
-                statusMessage: `Group(s) not found: ${groupIds.filter((id) => !found.has(id)).join(', ')}.`,
+                message: `Group(s) not found: ${groupIds.filter((id) => !found.has(id)).join(', ')}.`,
             });
         }
 
@@ -144,7 +144,7 @@ export default defineEventHandler(async (event) => {
         if (incomplete.length) {
             throw createError({
                 statusCode: 422,
-                statusMessage: `These templates are missing a kind or a title, and cannot seed an offering yet: ${incomplete.join(', ')}.`,
+                message: `These templates are missing a kind or a title, and cannot seed an offering yet: ${incomplete.join(', ')}.`,
                 data: { incompleteTemplates: incomplete },
             });
         }

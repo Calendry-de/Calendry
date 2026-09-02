@@ -1,6 +1,7 @@
 import type { ComputedRef } from 'vue';
 import type { ScheduleSession } from '~/composables/schedule';
 import { sessionLabel } from '~/composables/schedule';
+import { useT } from '~/composables/i18n';
 import { useOverlayActive } from '~/composables/overlay';
 
 /**
@@ -45,6 +46,8 @@ export function useScheduleEditing(options: {
     sessions: ComputedRef<ScheduleSession[]>;
     onMutated: () => Promise<void>;
 }) {
+    const { t } = useT();
+
     const selectedId = ref<string | null>(null);
     /**
      * What a click on the GRID currently means, which is the whole test for what
@@ -220,7 +223,7 @@ export function useScheduleEditing(options: {
                 blockIndex: target.blockIndex,
             };
         } catch (e) {
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not move that session.';
+            error.value = serverErrorMessage(e) ?? t('schedule.editing.moveFailed');
         } finally {
             busy.value = false;
         }
@@ -264,7 +267,7 @@ export function useScheduleEditing(options: {
                 partnerLabel: sessionLabel(partner),
             };
         } catch (e) {
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not swap those sessions.';
+            error.value = serverErrorMessage(e) ?? t('schedule.editing.swapFailed');
         } finally {
             busy.value = false;
         }
@@ -303,7 +306,7 @@ export function useScheduleEditing(options: {
                 roomCount: roomIds.length,
             };
         } catch (e) {
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not change the room.';
+            error.value = serverErrorMessage(e) ?? t('schedule.editing.roomsFailed');
         } finally {
             busy.value = false;
         }
@@ -331,7 +334,7 @@ export function useScheduleEditing(options: {
             mode.value = 'idle';
             await options.onMutated();
         } catch (e) {
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not move that session to the spare bank.';
+            error.value = serverErrorMessage(e) ?? t('schedule.editing.bankFailed');
         } finally {
             busy.value = false;
         }
@@ -365,7 +368,7 @@ export function useScheduleEditing(options: {
                 locked,
             };
         } catch (e) {
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not change the lock.';
+            error.value = serverErrorMessage(e) ?? t('schedule.editing.lockFailed');
         } finally {
             busy.value = false;
         }

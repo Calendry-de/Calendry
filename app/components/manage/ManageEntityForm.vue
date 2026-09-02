@@ -51,7 +51,7 @@
                 v-if="advancedFields.length"
                 class="entity-form_advanced"
             >
-                <summary>More fields</summary>
+                <summary>{{ t('manageUi.entityForm.moreFields') }}</summary>
 
                 <ManageField
                     v-for="field in advancedFields"
@@ -74,14 +74,14 @@
                 :disabled="form.busy.value || !form.isDirty.value"
                 type="primary"
                 @click="$emit('save')"
-            >{{ form.busy.value ? 'Saving…' : saveLabel }}</CommonButton>
+            >{{ form.busy.value ? t('common.action.saving') : saveLabel }}</CommonButton>
 
             <CommonButton
                 v-if="form.isDirty.value"
                 :disabled="form.busy.value"
                 type="secondary"
                 @click="$emit('reset')"
-            >Discard changes</CommonButton>
+            >{{ t('manageUi.entityForm.discard') }}</CommonButton>
 
             <span class="entity-form_spacer"/>
 
@@ -90,15 +90,14 @@
                 :disabled="form.busy.value"
                 type="destructive"
                 @click="$emit('request-delete')"
-            >Delete</CommonButton>
+            >{{ t('common.action.delete') }}</CommonButton>
         </footer>
 
         <p
             v-if="mode === 'edit' && form.isSystemRow.value"
             class="entity-form_hint"
         >
-            Created by tenant provisioning and required by the system; it can be
-            renamed but not deleted.
+            {{ t('manageUi.entityForm.systemRowHint') }}
         </p>
     </form>
 </template>
@@ -107,6 +106,7 @@
 import type { useEntityForm } from '~/composables/entityForm';
 import type { FieldDef } from '~/utils/manageRegistry';
 import ManageField from '~/components/manage/ManageField.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * The generic form body: registry fields in, one row edited out.
@@ -126,6 +126,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 defineSlots<{ fields?: (props: { readonly: boolean }) => unknown }>();
+
+const { t } = useT();
 
 /**
  * Fields this component renders. `custom` ones are part of the record (draft,
@@ -211,11 +213,11 @@ const readonly = computed(() => !props.canUpdate || props.form.isForeignOwned.va
 
 const readonlyReason = computed(() => {
     if (props.form.isForeignOwned.value) {
-        return 'Shared by a federation. Visible to this tenant, editable only by its owner.';
+        return t('manageUi.entityForm.readonlyFederation');
     }
 
     if (!props.canUpdate) {
-        return 'You have read access to this section. Editing needs an additional permission.';
+        return t('manageUi.entityForm.readonlyPermission');
     }
 
     return '';
@@ -240,14 +242,20 @@ function noteFor(field: FieldDef): string {
         return derived;
     }
 
-    const locked = 'The list of choices for this field could not be loaded: it needs a '
-        + 'permission this account does not hold. The current value is kept as it is and '
-        + 'will not be changed by saving.';
+    const locked = t('manageUi.entityForm.lockedFieldNote');
 
+    /*
+     * Two complete sentences joined by a space, not one message interpolating
+     * the other (i18n/CONVENTIONS.md § "Assembled sentences"): the space is
+     * punctuation between finished items, and a translator handed `{derived}`
+     * could not see what it holds.
+     */
     return derived ? `${derived} ${locked}` : locked;
 }
 
-const saveLabel = computed(() => (props.mode === 'create' ? 'Create' : 'Save changes'));
+const saveLabel = computed(() => (props.mode === 'create'
+    ? t('common.action.create')
+    : t('manageUi.entityForm.saveChanges')));
 </script>
 
 <style scoped lang="scss">

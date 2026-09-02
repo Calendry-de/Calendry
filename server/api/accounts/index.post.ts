@@ -87,7 +87,7 @@ export default defineEventHandler(async (event) => {
              */
             throw createError({
                 statusCode: 409,
-                statusMessage: `A login for ${body.email} already exists. It can be attached to `
+                message: `A login for ${body.email} already exists. It can be attached to `
                     + `${person.givenName} ${person.familyName} instead of creating a second one: `
                     + 'they would keep their existing password, and this institution would no longer '
                     + 'be able to reset it, because the login would then be shared.',

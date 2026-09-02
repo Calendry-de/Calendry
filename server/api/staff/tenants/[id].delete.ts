@@ -51,13 +51,13 @@ export default defineEventHandler(async (event) => {
     const tenant = await getOwnerPrisma().tenant.findUnique({ where: { id: tenantId }, select: { id: true, slug: true } });
 
     if (!tenant) {
-        throw createError({ statusCode: 404, statusMessage: 'Tenant not found.', data: { field: 'id' } });
+        throw createError({ statusCode: 404, message: 'Tenant not found.', data: { field: 'id' } });
     }
 
     if (body.confirmSlug !== tenant.slug) {
         throw createError({
             statusCode: 409,
-            statusMessage: `Confirmation did not match. Type '${tenant.slug}' exactly to erase this institution.`,
+            message: `Confirmation did not match. Type '${tenant.slug}' exactly to erase this institution.`,
             data: { field: 'confirmSlug' },
         });
     }
@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
         return result;
     } catch (error) {
         if (error instanceof UnknownTenantIdError) {
-            throw createError({ statusCode: 404, statusMessage: 'Tenant not found.', data: { field: 'id' } });
+            throw createError({ statusCode: 404, message: 'Tenant not found.', data: { field: 'id' } });
         }
 
         throw error;

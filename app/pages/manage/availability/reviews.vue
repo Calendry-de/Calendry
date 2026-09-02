@@ -1,14 +1,23 @@
 <template>
     <CommonAppShell
-        description="Unavailability people have declared for themselves, waiting on a decision."
-        title="Unavailability review"
+        :description="t('managePages.availabilityReviews.description')"
+        :title="t('managePages.availabilityReviews.pageTitle')"
     >
-        <p class="intro">
-            A declared window is a <strong>hard</strong> rule for the scheduler, so a
-            self-declared one stays inert until it is approved here. Windows an
-            administrator entered directly are already approved: approving your own
-            authorized action would be ceremony, not control.
-        </p>
+        <!--
+            `<i18n-t>` so the emphasised word stays inside ONE translatable
+            sentence: it is grammar, not decoration, and German would not leave
+            it at the same point in the clause.
+        -->
+        <i18n-t
+            class="intro"
+            keypath="managePages.availabilityReviews.intro"
+            scope="global"
+            tag="p"
+        >
+            <template #hard>
+                <strong>{{ t('managePages.availabilityReviews.introHard') }}</strong>
+            </template>
+        </i18n-t>
 
         <p
             v-if="error"
@@ -27,12 +36,12 @@
             class="entry"
         >
             <header class="entry_head">
-                <h2>Record unavailability for someone</h2>
-                <span class="entry_hint">Entered here, it is approved immediately.</span>
+                <h2>{{ t('managePages.availabilityReviews.entryHead') }}</h2>
+                <span class="entry_hint">{{ t('managePages.availabilityReviews.entryHint') }}</span>
             </header>
 
             <label class="entry_field">
-                <span class="entry_label">Person</span>
+                <span class="entry_label">{{ t('managePages.availabilityReviews.personLabel') }}</span>
                 <select
                     v-model="subject"
                     class="entry_input"
@@ -41,7 +50,7 @@
                     <option
                         :selected="!subject"
                         value=""
-                    >Pick a person</option>
+                    >{{ t('managePages.availabilityReviews.personPlaceholder') }}</option>
                     <option
                         v-for="person in people"
                         :key="person.id"
@@ -58,8 +67,8 @@
                     type="button"
                     @click="mode = 'recurring'"
                 >
-                    <strong>Every week</strong>
-                    <span>Days or blocks they never teach</span>
+                    <strong>{{ t('managePages.availabilityReviews.modeRecurringTitle') }}</strong>
+                    <span>{{ t('managePages.availabilityReviews.modeRecurringHint') }}</span>
                 </button>
                 <button
                     class="modes_tab"
@@ -67,8 +76,8 @@
                     type="button"
                     @click="mode = 'holiday'"
                 >
-                    <strong>Specific dates</strong>
-                    <span>Holiday or another absence</span>
+                    <strong>{{ t('managePages.availabilityReviews.modeHolidayTitle') }}</strong>
+                    <span>{{ t('managePages.availabilityReviews.modeHolidayHint') }}</span>
                 </button>
             </div>
 
@@ -77,7 +86,7 @@
                     ref="holidayForm"
                     :busy="busy === 'entry'"
                     :error="entryError"
-                    submit-label="Record it"
+                    :submit-label="t('managePages.availabilityReviews.record')"
                     :terms="terms"
                     @submit="submitHoliday"
                 />
@@ -86,15 +95,15 @@
             <template v-else>
                 <ManageWeekdayPicker
                     v-model="draftDays"
-                    help="Leave every day unticked to mean the whole week."
-                    label="Days"
+                    :help="t('managePages.availabilityReviews.daysHelp')"
+                    :label="t('managePages.availabilityReviews.daysLabel')"
                 />
 
                 <AvailabilityBlockPicker
                     v-model="draftBlocks"
                     :grid="grid"
-                    help="Leave every block unticked to mean the whole day."
-                    label="Blocks"
+                    :help="t('managePages.availabilityReviews.blocksHelp')"
+                    :label="t('managePages.availabilityReviews.blocksLabel')"
                 />
 
                 <p
@@ -108,21 +117,23 @@
                         :disabled="busy === 'entry' || !subject || (!draftDays.length && !draftBlocks.length)"
                         type="primary"
                         @click="submitRecurring"
-                    >{{ busy === 'entry' ? 'Recording…' : 'Record it' }}</CommonButton>
+                    >{{ busy === 'entry'
+                        ? t('managePages.availabilityReviews.recording')
+                        : t('managePages.availabilityReviews.record') }}</CommonButton>
                 </div>
             </template>
         </section>
 
         <section class="queue">
             <header class="queue_head">
-                <h2>Waiting for review</h2>
+                <h2>{{ t('managePages.availabilityReviews.pendingHead') }}</h2>
                 <span class="queue_count">{{ pending.length }}</span>
             </header>
 
             <p
                 v-if="!pending.length"
                 class="empty"
-            >Nothing is waiting. Decided windows are listed below.</p>
+            >{{ t('managePages.availabilityReviews.pendingEmpty') }}</p>
 
             <ul
                 v-else
@@ -143,11 +154,11 @@
                     </div>
 
                     <label class="rows_note">
-                        <span class="sr-only">Note for {{ nameOf(row) }}</span>
+                        <span class="sr-only">{{ t('managePages.availabilityReviews.noteLabel', { person: nameOf(row) }) }}</span>
                         <input
                             v-model="notes[row.id]"
                             maxlength="500"
-                            placeholder="Optional note back to them"
+                            :placeholder="t('managePages.availabilityReviews.notePlaceholder')"
                             type="text"
                         >
                     </label>
@@ -157,12 +168,12 @@
                             :disabled="busy === row.id"
                             type="primary"
                             @click="decide(row.id, 'APPROVED')"
-                        >Approve</CommonButton>
+                        >{{ t('managePages.availabilityReviews.approve') }}</CommonButton>
                         <CommonButton
                             :disabled="busy === row.id"
                             type="secondary"
                             @click="decide(row.id, 'REJECTED')"
-                        >Reject</CommonButton>
+                        >{{ t('managePages.availabilityReviews.reject') }}</CommonButton>
                     </div>
                 </li>
             </ul>
@@ -170,14 +181,14 @@
 
         <section class="queue">
             <header class="queue_head">
-                <h2>Already decided</h2>
+                <h2>{{ t('managePages.availabilityReviews.decidedHead') }}</h2>
                 <span class="queue_count">{{ decided.length }}</span>
             </header>
 
             <p
                 v-if="!decided.length"
                 class="empty"
-            >Nothing decided yet.</p>
+            >{{ t('managePages.availabilityReviews.decidedEmpty') }}</p>
 
             <ul
                 v-else
@@ -189,16 +200,24 @@
                     class="rows_row"
                 >
                     <div class="rows_main">
+                        <!--
+                            ONE MESSAGE PER STATUS, never the enum interpolated
+                            or case-transformed: lowercasing an enum only ever
+                            produces English (i18n/CONVENTIONS.md § "Never
+                            case-transform user-facing text"). The
+                            `.toLowerCase()` below builds a CSS class, which
+                            that rule explicitly exempts.
+                        -->
                         <span
                             class="rows_status"
                             :class="`rows_status--${row.status.toLowerCase()}`"
-                        >{{ row.status }}</span>
+                        >{{ statusLabel(row.status) }}</span>
                         <strong>{{ nameOf(row) }}</strong>
                         <span>{{ describeRow(row) }}</span>
                         <span
                             v-if="row.decisionNote"
                             class="rows_reason"
-                        >Note: {{ row.decisionNote }}</span>
+                        >{{ t('managePages.availabilityReviews.decisionNote', { note: row.decisionNote }) }}</span>
                     </div>
 
                     <!--
@@ -211,7 +230,7 @@
                             :disabled="busy === row.id"
                             type="destructive"
                             @click="remove(row.id)"
-                        >Delete</CommonButton>
+                        >{{ t('common.action.delete') }}</CommonButton>
                     </div>
                 </li>
             </ul>
@@ -227,6 +246,7 @@ import AvailabilityHolidayForm from '~/components/availability/AvailabilityHolid
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
 import { describeWindow } from '~/utils/availabilityLabels';
+import { useT } from '~/composables/i18n';
 import { useHasPermission } from '~/composables/session';
 
 definePageMeta({
@@ -243,14 +263,16 @@ definePageMeta({
             if (!held.has('availability.manage_any')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Reviewing unavailability needs availability.manage_any.',
+                    message: 'Reviewing unavailability needs availability.manage_any.',
                 }));
             }
         },
     ],
 });
 
-useHead({ title: 'Unavailability review' });
+const { t } = useT();
+
+useHead(() => ({ title: t('managePages.availabilityReviews.pageTitle') }));
 
 interface ReviewRow {
     id: string;
@@ -324,13 +346,26 @@ const canDecide = useHasPermission('availability.manage_any');
  */
 function describeRow(row: ReviewRow): string {
     if (row.weeks.length === 0) {
-        return describeWindow(row, grid.value);
+        return describeWindow(t, row, grid.value);
     }
 
-    const label = row.term?.name ?? 'term';
-    const weeks = row.weeks.map((week) => week + 1).join(', ');
+    // ONE plural message: `week{s}` was a word split across an expression, so
+    // no part of it could be keyed, and German pluralises the stem.
+    return t('managePages.availabilityReviews.holidayRow', {
+        term: row.term?.name ?? t('managePages.availabilityReviews.holidayRowTerm'),
+        weeks: row.weeks.map((week) => week + 1).join(', '),
+        count: row.weeks.length,
+    });
+}
 
-    return `${label}: week${row.weeks.length === 1 ? '' : 's'} ${weeks}, away all day`;
+/**
+ * One message per decided status, never the raw enum: an interpolated or
+ * lowercased enum value only ever renders English.
+ */
+function statusLabel(status: ReviewRow['status']): string {
+    return status === 'APPROVED'
+        ? t('managePages.availabilityReviews.statusApproved')
+        : t('managePages.availabilityReviews.statusRejected');
 }
 
 async function submitRecurring() {
@@ -347,7 +382,8 @@ async function submitRecurring() {
         draftBlocks.value = [];
         await refresh();
     } catch (cause) {
-        entryError.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that.';
+        entryError.value = serverErrorMessage(cause)
+            ?? t('managePages.availabilityReviews.recordError');
     } finally {
         busy.value = null;
     }
@@ -355,7 +391,7 @@ async function submitRecurring() {
 
 async function submitHoliday(payload: { startDate: string; endDate: string; reason: string | null }) {
     if (!subject.value) {
-        entryError.value = 'Pick a person first.';
+        entryError.value = t('managePages.availabilityReviews.pickPersonFirst');
 
         return;
     }
@@ -372,7 +408,8 @@ async function submitHoliday(payload: { startDate: string; endDate: string; reas
         holidayForm.value?.reset();
         await refresh();
     } catch (cause) {
-        entryError.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that.';
+        entryError.value = serverErrorMessage(cause)
+            ?? t('managePages.availabilityReviews.recordError');
     } finally {
         busy.value = null;
     }
@@ -402,7 +439,8 @@ async function decide(id: string, decision: 'APPROVED' | 'REJECTED') {
 
         await refresh();
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not record that decision.';
+        error.value = serverErrorMessage(cause)
+            ?? t('managePages.availabilityReviews.decisionError');
     } finally {
         busy.value = null;
     }
@@ -416,7 +454,8 @@ async function remove(id: string) {
         await request(`/api/availability/vetoes/${id}`, { method: 'DELETE' });
         await refresh();
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string }).statusMessage ?? 'Could not delete that.';
+        error.value = serverErrorMessage(cause)
+            ?? t('managePages.availabilityReviews.deleteError');
     } finally {
         busy.value = null;
     }

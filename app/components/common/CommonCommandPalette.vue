@@ -9,7 +9,7 @@
                 class="palette_dialog"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Command palette"
+                :aria-label="t('common.a11y.commandPalette')"
                 @keydown.tab="trapFocus"
             >
                 <div class="palette_search">
@@ -23,7 +23,7 @@
                         v-model="palette.query.value"
                         class="palette_input"
                         type="text"
-                        placeholder="Go to…"
+                        :placeholder="t('common.a11y.paletteGoTo')"
                         autocomplete="off"
                         spellcheck="false"
                         role="combobox"
@@ -81,7 +81,7 @@
                                 v-if="result.entry.run"
                                 class="palette_result-kind"
                                 name="material-symbols:bolt-outline"
-                                aria-label="Action"
+                                :aria-label="t('common.a11y.paletteAction')"
                             />
                         </li>
                     </template>
@@ -103,7 +103,10 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { useCommandPalette } from '~/composables/commandPalette';
+
+const { t } = useT();
 
 /**
  * Ctrl+K / ⌘K navigation.

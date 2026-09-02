@@ -1,6 +1,6 @@
 <template>
-    <CommonPage title="My account">
-        <p class="intro">Your own display preferences. Nothing here is visible to anyone else.</p>
+    <CommonPage :title="t('my.account.pageTitle')">
+        <p class="intro">{{ t('my.account.intro') }}</p>
 
         <p
             v-if="loadError"
@@ -13,19 +13,43 @@
             @submit.prevent="save"
         >
             <section class="panel_group">
-                <h2>Dates and numbers</h2>
-                <p class="panel_hint">
-                    A BCP-47 tag (e.g. <code>de-DE</code>, <code>en-GB</code>) your own dates and
-                    numbers are shown in. Overrides the institution's default, which in turn
-                    overrides your browser's own language setting. Leave empty to use whichever of
-                    those applies.
-                </p>
+                <h2>{{ t('my.account.localeHead') }}</h2>
+                <!--
+                    `<i18n-t>` so the two example tags stay `<code>` elements
+                    inside ONE translatable sentence. Split into "A BCP-47 tag
+                    (e.g. ", a tag, ", ", a tag and the rest, the sentence would
+                    exist only in English word order.
+
+                    THE ONE SENTENCE IN THIS SLICE THAT WAS NOT EXTRACTED
+                    VERBATIM, and deliberately: it said this field affects
+                    "dates and numbers", which stopped being true when issue
+                    #19's `resolveLanguage()` began deriving the MESSAGE
+                    LANGUAGE from the same value (`shared/language.ts`). Typing
+                    `fr-FR` now flips the whole UI from German to English, so
+                    the old wording was a false statement about a control, not
+                    merely copy somebody could improve. It names both axes now.
+                    The error text below is unchanged: it never claimed the app
+                    is translated into whatever tag you type.
+                -->
+                <i18n-t
+                    class="panel_hint"
+                    keypath="my.account.localeHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #germanTag>
+                        <code>de-DE</code>
+                    </template>
+                    <template #britishTag>
+                        <code>en-GB</code>
+                    </template>
+                </i18n-t>
 
                 <label class="panel_field">
-                    <span>Your locale</span>
+                    <span>{{ t('my.account.localeLabel') }}</span>
                     <input
                         v-model="localeInput"
-                        placeholder="e.g. de-DE, leave empty to inherit"
+                        :placeholder="t('my.account.localePlaceholder')"
                         type="text"
                     >
                 </label>
@@ -38,19 +62,26 @@
             </section>
 
             <section class="panel_group">
-                <h2>Timezone</h2>
-                <p class="panel_hint">
-                    Display and export only: an IANA zone name (e.g. <code>Europe/Berlin</code>,
-                    <code>America/New_York</code>). It never changes where a session is drawn on the
-                    grid or how "today" is decided; the institution's own timezone governs all of
-                    that. Leave empty to leave it unset.
-                </p>
+                <h2>{{ t('my.account.timezoneHead') }}</h2>
+                <i18n-t
+                    class="panel_hint"
+                    keypath="my.account.timezoneHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #berlin>
+                        <code>Europe/Berlin</code>
+                    </template>
+                    <template #newYork>
+                        <code>America/New_York</code>
+                    </template>
+                </i18n-t>
 
                 <label class="panel_field">
-                    <span>Your timezone</span>
+                    <span>{{ t('my.account.timezoneLabel') }}</span>
                     <input
                         v-model="timezoneInput"
-                        placeholder="e.g. Europe/Berlin, leave empty to leave unset"
+                        :placeholder="t('my.account.timezonePlaceholder')"
                         type="text"
                     >
                 </label>
@@ -67,13 +98,13 @@
                     :disabled="saving || !dirty"
                     native-type="submit"
                     type="primary"
-                >{{ saving ? 'Saving…' : 'Save' }}</CommonButton>
+                >{{ saving ? t('common.action.saving') : t('common.action.save') }}</CommonButton>
 
                 <p
                     v-if="saved"
                     class="panel_saved"
                     role="status"
-                >Saved.</p>
+                >{{ t('my.account.saved') }}</p>
                 <p
                     v-if="saveError"
                     class="note note--error"
@@ -82,18 +113,15 @@
             </div>
         </form>
 
-        <ApiTokensPanel/>
-        <DataExportPanel/>
     </CommonPage>
 </template>
 
 <script setup lang="ts">
-import ApiTokensPanel from '~/components/my/ApiTokensPanel.vue';
-import DataExportPanel from '~/components/my/DataExportPanel.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonPage from '~/components/common/CommonPage.vue';
 import { isUsableLocale } from '#shared/locale';
 import { isUsableTimeZone } from '#shared/timezone';
+import { useT } from '~/composables/i18n';
 
 /**
  * A signed-in Person's own display preferences (issue #17's `locale`,
@@ -101,7 +129,9 @@ import { isUsableTimeZone } from '#shared/timezone';
  * (the global auth middleware already requires that for every non-anonymous
  * route): this is self-service over the caller's own row, nobody else's.
  */
-useHead({ title: 'My account' });
+const { t } = useT();
+
+useHead(() => ({ title: t('my.account.pageTitle') }));
 
 const request = useRequestFetch();
 
@@ -112,7 +142,7 @@ const settings = useAsyncData('me:settings', () => request<MeSettings>('/api/me/
 await settings;
 
 const loadError = computed(() => (settings.error.value
-    ? 'Could not load your account settings. Nothing has been changed.'
+    ? t('my.account.loadError')
     : ''));
 
 const storedLocale = computed(() => settings.data.value?.locale ?? null);
@@ -141,14 +171,14 @@ async function save() {
     const trimmedTimezone = timezoneInput.value.trim();
 
     if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
-        localeError.value = 'Not a recognised locale. Try a tag like "de-DE" or "en-GB".';
+        localeError.value = t('my.account.localeError');
         saving.value = false;
 
         return;
     }
 
     if (trimmedTimezone && !isUsableTimeZone(trimmedTimezone)) {
-        timezoneError.value = 'Not a recognised timezone. Try a zone name like "Europe/Berlin".';
+        timezoneError.value = t('my.account.timezoneError');
         saving.value = false;
 
         return;
@@ -163,8 +193,8 @@ async function save() {
         saved.value = true;
     }
     catch (error) {
-        saveError.value = (error as { statusMessage?: string }).statusMessage
-            ?? 'Could not save. Nothing has been changed.';
+        saveError.value = serverErrorMessage(error)
+            ?? t('my.account.saveError');
     }
     finally {
         saving.value = false;

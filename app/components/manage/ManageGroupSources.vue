@@ -1,20 +1,28 @@
 <template>
     <section class="sources">
         <header class="sources_head">
-            <h2>Built from other groups</h2>
+            <h2>{{ t('manageUi.groupSources.title') }}</h2>
             <span
                 v-if="busy"
                 class="sources_state"
-            >Working…</span>
+            >{{ t('manageUi.shared.working') }}</span>
         </header>
 
-        <p class="sources_help">
-            For a track taught across cohorts: two semesters’ Management students in
-            one room. Name the groups it draws from, then copy their members in.
-            <strong>Members are copied, not linked</strong>: the group stays as it is
-            until you regenerate, so a solve today and a solve tomorrow see the same
-            people.
-        </p>
+        <!--
+            `<i18n-t>` so the emphasised half stays a `<strong>` inside one
+            translatable sentence: German reorders the clause, and three text
+            nodes around the emphasis could not be moved by a translator.
+        -->
+        <i18n-t
+            class="sources_help"
+            keypath="manageUi.groupSources.help"
+            scope="global"
+            tag="p"
+        >
+            <template #emphasis>
+                <strong>{{ t('manageUi.groupSources.helpEmphasis') }}</strong>
+            </template>
+        </i18n-t>
 
         <p
             v-if="error"
@@ -37,7 +45,7 @@
                     class="sources_remove"
                     :disabled="busy"
                     type="button"
-                    :aria-label="`Remove ${nameOf(row.sourceGroupId)}`"
+                    :aria-label="t('manageUi.shared.removeAria', { label: nameOf(row.sourceGroupId) })"
                     @click="remove(row.sourceGroupId)"
                 >
                     <Icon
@@ -52,20 +60,24 @@
             v-else
             class="sources_empty"
         >
-            This is an ordinary group: its members are whoever you put in it.
+            {{ t('manageUi.groupSources.empty') }}
         </p>
 
         <label
             v-if="!readonly"
             class="sources_add"
         >
-            <span class="sr-only">Add a source group</span>
+            <span class="sr-only">{{ t('manageUi.groupSources.addLabel') }}</span>
             <select
                 :disabled="busy || !available.length"
                 :value="''"
                 @change="add($event)"
             >
-                <option value="">{{ available.length ? 'Draw from another group…' : 'Nothing left to add' }}</option>
+                <option value="">{{
+                    available.length
+                        ? t('manageUi.groupSources.addOption')
+                        : t('manageUi.shared.nothingLeft')
+                }}</option>
                 <option
                     v-for="option in available"
                     :key="option.value"
@@ -86,19 +98,30 @@
             class="sources_drift"
             :class="{ 'sources_drift--stale': isStale }"
         >
+            <!--
+                `person`/`people` are vue-i18n PLURAL FORMS of one whole
+                sentence, not a noun patched in beside its count: German
+                pluralises by stem, and a word split across mustaches has no key.
+            -->
             <p class="sources_drift-line">
                 <template v-if="!drift.generatedAt">
-                    Never copied: this group holds {{ drift.memberCount }}
-                    {{ drift.memberCount === 1 ? 'person' : 'people' }}, its sources hold
-                    {{ drift.expectedCount }}.
+                    {{ t('manageUi.groupSources.driftNever', {
+                        count: drift.memberCount,
+                        expected: drift.expectedCount,
+                    }, drift.memberCount) }}
                 </template>
                 <template v-else-if="!isStale">
-                    {{ drift.memberCount }} {{ drift.memberCount === 1 ? 'person' : 'people' }},
-                    matching the sources as of {{ generatedLabel }}.
+                    {{ t('manageUi.groupSources.driftCurrent', {
+                        count: drift.memberCount,
+                        date: generatedLabel,
+                    }, drift.memberCount) }}
                 </template>
                 <template v-else>
-                    The sources have moved on since {{ generatedLabel }}:
-                    {{ drift.added }} to add, {{ drift.removed }} to remove.
+                    {{ t('manageUi.groupSources.driftStale', {
+                        date: generatedLabel,
+                        added: drift.added,
+                        removed: drift.removed,
+                    }) }}
                 </template>
             </p>
 
@@ -107,13 +130,18 @@
                 :disabled="busy"
                 type="primary"
                 @click="regenerate"
-            >{{ drift.generatedAt ? 'Regenerate members' : 'Copy members in' }}</CommonButton>
+            >{{
+                drift.generatedAt
+                    ? t('manageUi.groupSources.regenerate')
+                    : t('manageUi.groupSources.copyIn')
+            }}</CommonButton>
         </div>
     </section>
 </template>
 
 <script setup lang="ts">
 import type { EntityRow } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 import { indentedOptions } from '~/utils/groupTree';
 
 /**
@@ -146,6 +174,8 @@ interface Drift {
     added: number;
     removed: number;
 }
+
+const { t } = useT();
 
 const request = useRequestFetch();
 
@@ -202,8 +232,8 @@ async function save(next: SourceRow[]) {
         await request(`/api/groups/${props.groupId}/sources`, { method: 'PUT', body: next });
         await refresh();
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not save the source groups.';
+        error.value = serverErrorMessage(cause)
+            ?? t('manageUi.groupSources.saveError');
     } finally {
         busy.value = false;
     }
@@ -232,8 +262,8 @@ async function regenerate() {
         await request(`/api/group-sources/${props.groupId}/regenerate`, { method: 'POST', body: {} });
         await refresh();
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not copy the members in.';
+        error.value = serverErrorMessage(cause)
+            ?? t('manageUi.groupSources.copyError');
     } finally {
         busy.value = false;
     }

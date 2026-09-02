@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
         const personId = identity.actorPersonId;
 
         if (!personId) {
-            throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+            throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
         }
 
         const removed = await tx.personUnavailability.deleteMany({
@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (removed.count === 0) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         setResponseStatus(event, 204);

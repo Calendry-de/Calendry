@@ -251,7 +251,7 @@ try {
         for (const placed of result.sessions.slice(0, 6)) {
             line(`      ${placed.offeringId.slice(0, 14)}…  week=${placed.startSlot?.week}`
                 + ` day=${placed.startSlot?.day} block=${placed.startSlot?.block}`
-                + ` room=${(placed.roomId || 'none').slice(-12)}`
+                + ` room=${(placed.roomId || '—').slice(-12)}`
                 + ` lecturers=[${placed.lecturerIds.length}] groups=[${placed.groupIds.length}]`);
         }
     }

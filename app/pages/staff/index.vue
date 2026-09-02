@@ -1,16 +1,16 @@
 <template>
     <div class="staff_page">
         <header class="staff_header">
-            <h1>Calendry staff</h1>
+            <h1>{{ t('staff.brand.heading') }}</h1>
             <CommonButton
                 type="secondary"
                 :disabled="loggingOut"
                 @click="logout"
-            >{{ loggingOut ? 'Signing out…' : 'Sign out' }}</CommonButton>
+            >{{ loggingOut ? t('staff.tenants.signOutBusy') : t('staff.tenants.signOut') }}</CommonButton>
         </header>
 
         <section class="staff_section">
-            <h2>Tenants</h2>
+            <h2>{{ t('staff.tenants.heading') }}</h2>
 
             <p
                 v-if="listError"
@@ -24,12 +24,13 @@
             >
                 <thead>
                     <tr>
-                        <th>Slug</th>
-                        <th>Name</th>
-                        <th>Timezone</th>
-                        <th>Federation</th>
-                        <th>Created</th>
-                        <th>Erase</th>
+                        <th>{{ t('common.field.slug') }}</th>
+                        <th>{{ t('common.field.name') }}</th>
+                        <th>{{ t('common.field.timezone') }}</th>
+                        <th>{{ t('staff.tenants.column.federation') }}</th>
+                        <th>{{ t('staff.tenants.column.locale') }}</th>
+                        <th>{{ t('common.field.created') }}</th>
+                        <th>{{ t('staff.tenants.column.erase') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -50,7 +51,7 @@
                                     <option
                                         :selected="!tenant.federation"
                                         value=""
-                                    >(none)</option>
+                                    >{{ t('staff.tenants.noFederationOption') }}</option>
                                     <option
                                         v-for="federation in federations"
                                         :key="federation.id"
@@ -59,6 +60,38 @@
                                     >{{ federation.name }}</option>
                                 </select>
                             </td>
+                            <td>
+                                <!--
+                                    A free-text BCP-47 tag, not a select: the
+                                    column accepts any tag `Intl` recognises
+                                    (`fr-FR` and `ja-JP` are storable and
+                                    meaningful, see shared/language.ts), so a
+                                    two-option dropdown would narrow in the UI
+                                    what the schema deliberately does not.
+                                    Saved on an explicit button rather than on
+                                    change, because a half-typed tag
+                                    (`de-`) is refused by the route and would
+                                    otherwise error on every keystroke.
+                                -->
+                                <div class="staff_locale">
+                                    <CommonInputText
+                                        :disabled="savingLocaleTenantId === tenant.id"
+                                        :input-attrs="{ 'aria-label': t('staff.tenants.localeAriaLabel', { slug: tenant.slug }), autocomplete: 'off' }"
+                                        :model-value="localeDraft(tenant)"
+                                        :placeholder="t('staff.tenants.localePlaceholder')"
+                                        @update:model-value="localeDrafts[tenant.id] = $event ?? ''"
+                                    />
+
+                                    <CommonButton
+                                        size="S"
+                                        type="secondary"
+                                        :disabled="savingLocaleTenantId === tenant.id || !localeChanged(tenant)"
+                                        @click="saveLocale(tenant)"
+                                    >{{ savingLocaleTenantId === tenant.id
+                                        ? t('common.action.saving')
+                                        : t('staff.tenants.localeSave') }}</CommonButton>
+                                </div>
+                            </td>
                             <td>{{ new Date(tenant.createdAt).toLocaleDateString() }}</td>
                             <td>
                                 <CommonButton
@@ -66,7 +99,7 @@
                                     size="S"
                                     type="destructive"
                                     @click="startErase(tenant.id)"
-                                >Erase…</CommonButton>
+                                >{{ t('staff.tenants.eraseAction') }}</CommonButton>
                             </td>
                         </tr>
 
@@ -80,12 +113,10 @@
                         <tr v-if="erasingTenantId === tenant.id">
                             <td
                                 class="staff_erase"
-                                colspan="6"
+                                colspan="7"
                             >
                                 <p class="staff_erase_warning" role="alert">
-                                    This deletes every Person, login, Group, Room, Offering,
-                                    Session, Constraint and audit trail entry '{{ tenant.slug }}'
-                                    owns, immediately and permanently. Type the slug to confirm.
+                                    {{ t('staff.tenants.eraseWarning', { slug: tenant.slug }) }}
                                 </p>
 
                                 <div class="staff_erase_row">
@@ -93,19 +124,21 @@
                                         v-model="eraseConfirmInput"
                                         :disabled="erasing"
                                         :placeholder="tenant.slug"
-                                    >Confirm slug</CommonInputText>
+                                    >{{ t('staff.tenants.confirmSlugLabel') }}</CommonInputText>
 
                                     <CommonButton
                                         :disabled="erasing || eraseConfirmInput !== tenant.slug"
                                         type="destructive"
                                         @click="confirmErase(tenant)"
-                                    >{{ erasing ? 'Erasing…' : `Erase '${tenant.slug}' permanently` }}</CommonButton>
+                                    >{{ erasing
+                                        ? t('staff.tenants.erasingBusy')
+                                        : t('staff.tenants.erasePermanently', { slug: tenant.slug }) }}</CommonButton>
 
                                     <CommonButton
                                         :disabled="erasing"
                                         type="secondary"
                                         @click="cancelErase"
-                                    >Cancel</CommonButton>
+                                    >{{ t('common.action.cancel') }}</CommonButton>
                                 </div>
 
                                 <p
@@ -117,16 +150,49 @@
                         </tr>
                     </template>
                     <tr v-if="tenants.length === 0">
-                        <td colspan="6">No tenants yet.</td>
+                        <td colspan="7">{{ t('staff.tenants.empty') }}</td>
                     </tr>
                 </tbody>
             </table>
+
+            <!--
+                `<i18n-t>` rather than a key either side of each `<code>`: the
+                sentence carries two code samples inside its grammar, and
+                German reorders clauses. Wording deliberately tracks
+                `managePages.display.localeHint` and `my.account.localeHint`,
+                the two places that already say what this column does.
+            -->
+            <i18n-t
+                class="staff_note"
+                keypath="staff.tenants.localeHint"
+                scope="global"
+                tag="p"
+            >
+                <template #germanTag>
+                    <code>de-DE</code>
+                </template>
+                <template #britishTag>
+                    <code>en-GB</code>
+                </template>
+            </i18n-t>
 
             <p
                 v-if="federationAssignError"
                 class="staff_note staff_note--error"
                 role="alert"
             >{{ federationAssignError }}</p>
+
+            <p
+                v-if="localeError"
+                class="staff_note staff_note--error"
+                role="alert"
+            >{{ localeError }}</p>
+
+            <p
+                v-if="localeSuccess"
+                class="staff_note staff_note--success"
+                role="status"
+            >{{ localeSuccess }}</p>
 
             <p
                 v-if="eraseSuccess"
@@ -136,12 +202,24 @@
         </section>
 
         <section class="staff_section">
-            <h2>Federations</h2>
+            <h2>{{ t('staff.federations.heading') }}</h2>
 
-            <p class="staff_note">
-                Same effect as the <code>provision:federation</code> CLI.
-                Attach or detach a Tenant from the Federation column above.
-            </p>
+            <!--
+                `<i18n-t>` rather than a key either side of the `<code>`:
+                German reorders clauses, so a sentence split at the CLI name is
+                one no translator can fix without editing this template. The
+                slot name matches the placeholder.
+            -->
+            <i18n-t
+                class="staff_note"
+                keypath="staff.federations.cliNote"
+                tag="p"
+                scope="global"
+            >
+                <template #cli>
+                    <code>provision:federation</code>
+                </template>
+            </i18n-t>
 
             <p
                 v-if="federationsListError"
@@ -155,10 +233,10 @@
             >
                 <thead>
                     <tr>
-                        <th>Slug</th>
-                        <th>Name</th>
-                        <th>Member tenants</th>
-                        <th>Created</th>
+                        <th>{{ t('common.field.slug') }}</th>
+                        <th>{{ t('common.field.name') }}</th>
+                        <th>{{ t('staff.federations.column.members') }}</th>
+                        <th>{{ t('common.field.created') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -168,11 +246,12 @@
                     >
                         <td>{{ federation.slug }}</td>
                         <td>{{ federation.name }}</td>
-                        <td>{{ federation.tenants.map((t) => t.slug).join(', ') || '(none)' }}</td>
+                        <td>{{ federation.tenants.map((member) => member.slug).join(', ')
+                            || t('staff.federations.noMembers') }}</td>
                         <td>{{ new Date(federation.createdAt).toLocaleDateString() }}</td>
                     </tr>
                     <tr v-if="federations.length === 0">
-                        <td colspan="4">No federations yet.</td>
+                        <td colspan="4">{{ t('staff.federations.empty') }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -183,17 +262,17 @@
             >
                 <CommonInputText
                     v-model="federationForm.slug"
-                    placeholder="Slug"
+                    :placeholder="t('common.field.slug')"
                     :disabled="creatingFederation"
                     :input-attrs="{ required: true, autocomplete: 'off' }"
-                >Slug</CommonInputText>
+                >{{ t('common.field.slug') }}</CommonInputText>
 
                 <CommonInputText
                     v-model="federationForm.name"
-                    placeholder="Federation name"
+                    :placeholder="t('staff.federations.namePlaceholder')"
                     :disabled="creatingFederation"
                     :input-attrs="{ required: true }"
-                >Name</CommonInputText>
+                >{{ t('common.field.name') }}</CommonInputText>
 
                 <p
                     v-if="createFederationError"
@@ -211,16 +290,23 @@
                     native-type="submit"
                     type="primary"
                     :disabled="creatingFederation"
-                >{{ creatingFederation ? 'Creating…' : 'Create federation' }}</CommonButton>
+                >{{ creatingFederation ? t('common.action.creating') : t('staff.federations.submit') }}</CommonButton>
             </form>
         </section>
 
         <section class="staff_section">
-            <h2>Create a tenant</h2>
+            <h2>{{ t('staff.createTenant.heading') }}</h2>
 
-            <p class="staff_note">
-                Same effect as the <code>provision:tenant</code> CLI.
-            </p>
+            <i18n-t
+                class="staff_note"
+                keypath="staff.createTenant.cliNote"
+                tag="p"
+                scope="global"
+            >
+                <template #cli>
+                    <code>provision:tenant</code>
+                </template>
+            </i18n-t>
 
             <form
                 class="staff_form"
@@ -228,44 +314,49 @@
             >
                 <CommonInputText
                     v-model="form.slug"
-                    placeholder="Slug"
+                    :placeholder="t('common.field.slug')"
                     :disabled="creating"
                     :input-attrs="{ required: true, autocomplete: 'off' }"
-                >Slug</CommonInputText>
+                >{{ t('common.field.slug') }}</CommonInputText>
 
                 <CommonInputText
                     v-model="form.name"
-                    placeholder="Institution name"
+                    :placeholder="t('staff.createTenant.namePlaceholder')"
                     :disabled="creating"
                     :input-attrs="{ required: true }"
-                >Name</CommonInputText>
+                >{{ t('common.field.name') }}</CommonInputText>
 
                 <CommonInputText
                     v-model="form.adminEmail"
-                    placeholder="Admin email"
+                    :placeholder="t('staff.createTenant.adminEmail')"
                     input-type="email"
                     :disabled="creating"
                     :input-attrs="{ required: true }"
-                >Admin email</CommonInputText>
+                >{{ t('staff.createTenant.adminEmail') }}</CommonInputText>
 
                 <CommonInputText
                     v-model="form.adminName"
-                    placeholder="Admin name"
+                    :placeholder="t('staff.createTenant.adminName')"
                     :disabled="creating"
                     :input-attrs="{ required: true }"
-                >Admin name</CommonInputText>
+                >{{ t('staff.createTenant.adminName') }}</CommonInputText>
 
                 <CommonInputText
                     v-model="form.federationSlug"
-                    placeholder="(optional)"
+                    :placeholder="t('staff.createTenant.optionalPlaceholder')"
                     :disabled="creating"
-                >Federation slug</CommonInputText>
+                >{{ t('staff.createTenant.federationSlug') }}</CommonInputText>
 
+                <!--
+                    `placeholder="UTC"` stays a literal: it is an IANA zone
+                    name, an example of the value this field takes, not copy
+                    this repo authored about it.
+                -->
                 <CommonInputText
                     v-model="form.timezone"
                     placeholder="UTC"
                     :disabled="creating"
-                >Timezone</CommonInputText>
+                >{{ t('common.field.timezone') }}</CommonInputText>
 
                 <p
                     v-if="createError"
@@ -283,7 +374,7 @@
                     native-type="submit"
                     type="primary"
                     :disabled="creating"
-                >{{ creating ? 'Creating…' : 'Create tenant' }}</CommonButton>
+                >{{ creating ? t('common.action.creating') : t('staff.createTenant.submit') }}</CommonButton>
             </form>
         </section>
     </div>
@@ -293,6 +384,7 @@
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonInputText from '~/components/common/CommonInputText.vue';
 import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
+import { useT } from '~/composables/i18n';
 
 /**
  * Staff tenant list + creation (issue #76), plus Federation list, creation
@@ -309,7 +401,12 @@ import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
  * simply trying the fetch and redirecting to `/staff/login` on 401/403.
  */
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Staff: tenants' });
+
+const { t } = useT();
+
+// A getter, so the tab title follows a language change instead of freezing at
+// whatever was active when this page first mounted.
+useHead(() => ({ title: t('staff.tenants.pageTitle') }));
 
 interface StaffTenant {
     id: string;
@@ -317,6 +414,8 @@ interface StaffTenant {
     name: string;
     timezone: string;
     createdAt: string;
+    /** `TenantDisplaySettings.defaultLocale`, flattened by the list route. */
+    defaultLocale: string | null;
     federation: { id: string; slug: string; name: string } | null;
 }
 
@@ -345,7 +444,7 @@ if (error.value) {
 }
 
 const tenants = computed(() => data.value?.rows ?? []);
-const listError = computed(() => (error.value ? 'Could not load tenants.' : ''));
+const listError = computed(() => (error.value ? t('staff.tenants.loadError') : ''));
 
 /**
  * Federation list, issue #64's UI half. A SEPARATE `useAsyncData` rather
@@ -361,7 +460,9 @@ const federationsData = await useAsyncData(
 );
 
 const federations = computed(() => federationsData.data.value?.rows ?? []);
-const federationsListError = computed(() => (federationsData.error.value ? 'Could not load federations.' : ''));
+const federationsListError = computed(() => (
+    federationsData.error.value ? t('staff.federations.loadError') : ''
+));
 
 const loggingOut = ref(false);
 
@@ -423,8 +524,14 @@ async function createTenant() {
         });
 
         createdInfo.value = result.initialPassword
-            ? `Created '${result.tenant.slug}'. Initial admin password (shown once): ${result.initialPassword}`
-            : `Created '${result.tenant.slug}'. Reused the existing account for ${result.person.email}; its password is unchanged.`;
+            ? t('staff.createTenant.createdWithPassword', {
+                slug: result.tenant.slug,
+                password: result.initialPassword,
+            })
+            : t('staff.createTenant.createdReusedAccount', {
+                slug: result.tenant.slug,
+                email: result.person.email,
+            });
 
         form.slug = '';
         form.name = '';
@@ -438,12 +545,12 @@ async function createTenant() {
         // federation's member list just changed too.
         await federationsData.refresh();
     } catch (caught) {
-        const statusCode = (caught as { statusCode?: number; data?: { statusMessage?: string } })?.statusCode;
-        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+        const statusCode = (caught as { statusCode?: number })?.statusCode;
+        const stated = serverErrorMessage(caught);
 
         createError.value = statusCode === 409
-            ? (statusMessage ?? `A tenant with slug '${form.slug}' already exists.`)
-            : (statusMessage ?? 'Could not create the tenant.');
+            ? (stated ?? t('staff.createTenant.conflict', { slug: form.slug }))
+            : (stated ?? t('staff.createTenant.error'));
     } finally {
         creating.value = false;
     }
@@ -475,17 +582,17 @@ async function createFederation() {
         });
 
         createFederationInfo.value = result.alreadyExisted
-            ? `Federation '${result.federation.slug}' already existed; nothing created.`
-            : `Created federation '${result.federation.slug}'.`;
+            ? t('staff.federations.alreadyExisted', { slug: result.federation.slug })
+            : t('staff.federations.created', { slug: result.federation.slug });
 
         federationForm.slug = '';
         federationForm.name = '';
 
         await federationsData.refresh();
     } catch (caught) {
-        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+        const stated = serverErrorMessage(caught);
 
-        createFederationError.value = statusMessage ?? 'Could not create the federation.';
+        createFederationError.value = stated ?? t('staff.federations.error');
     } finally {
         creatingFederation.value = false;
     }
@@ -493,6 +600,88 @@ async function createFederation() {
 
 const assigningTenantId = ref('');
 const federationAssignError = ref('');
+
+// --- default locale --------------------------------------------------------
+
+/**
+ * Per-tenant edit buffer for `TenantDisplaySettings.defaultLocale`, written
+ * through `PATCH /api/staff/tenants/:id/locale` (a SECURITY DEFINER function
+ * on the ordinary connection, never the owner connection: see
+ * `server/utils/staffTenantLocale.ts`).
+ *
+ * A MAP KEYED BY TENANT ID rather than a `ref` per row seeded by a watcher:
+ * Vue does not flush watchers during SSR (CLAUDE.md), so a
+ * `watch(data, seed, { immediate: true })` would run once before the fetch
+ * resolved and never again. `localeDraft()` reads through to the AWAITED row
+ * whenever this map holds no entry for it, so first render, a `refresh()`
+ * after a save, and a value another operator changed all show the stored
+ * value with no seeding step to get wrong.
+ */
+const localeDrafts = reactive<Record<string, string | undefined>>({});
+const savingLocaleTenantId = ref('');
+const localeError = ref('');
+const localeSuccess = ref('');
+
+function localeDraft(tenant: StaffTenant): string {
+    return localeDrafts[tenant.id] ?? tenant.defaultLocale ?? '';
+}
+
+/**
+ * Whether this row's buffer differs from what is stored, which is what the
+ * Save button is enabled on. Empty input and a null column are the SAME
+ * state: "no tenant default, defer to Accept-Language" (the column's schema
+ * comment), so clearing an already-empty field is not a change to save.
+ */
+function localeChanged(tenant: StaffTenant): boolean {
+    return localeDraft(tenant).trim() !== (tenant.defaultLocale ?? '');
+}
+
+async function saveLocale(tenant: StaffTenant) {
+    if (savingLocaleTenantId.value) {
+        return;
+    }
+
+    savingLocaleTenantId.value = tenant.id;
+    localeError.value = '';
+    localeSuccess.value = '';
+
+    // Empty input CLEARS the default, so it is sent as an explicit `null`,
+    // never as `''`: the route validates with `isUsableLocale()`, which
+    // refuses the empty string, and the key must be PRESENT for the route to
+    // act at all.
+    const draft = localeDraft(tenant).trim();
+    const defaultLocale = draft === '' ? null : draft;
+
+    try {
+        const result = await $fetch<{ defaultLocale: string | null }>(
+            `/api/staff/tenants/${tenant.id}/locale`,
+            { method: 'PATCH', body: { defaultLocale } },
+        );
+
+        // ONE KEY PER STATE, not one sentence interpolating "none": a cleared
+        // default is a different fact than a set one, and a translator must
+        // be able to phrase each on its own.
+        localeSuccess.value = result.defaultLocale === null
+            ? t('staff.tenants.localeCleared', { slug: tenant.slug })
+            : t('staff.tenants.localeSaved', { slug: tenant.slug, locale: result.defaultLocale });
+
+        /*
+         * Buffer set back to `undefined` so the row reads through to the
+         * refreshed row again rather than pinning whatever was typed.
+         * `undefined` rather than `delete`, which eslint's
+         * `no-dynamic-delete` refuses and which `localeDraft()`'s `??` reads
+         * identically anyway.
+         */
+        localeDrafts[tenant.id] = undefined;
+        await refresh();
+    } catch (caught) {
+        const stated = serverErrorMessage(caught);
+
+        localeError.value = stated ?? t('staff.tenants.localeError', { slug: tenant.slug });
+    } finally {
+        savingLocaleTenantId.value = '';
+    }
+}
 
 // --- erasure (issue #84) ---------------------------------------------------
 
@@ -531,16 +720,28 @@ async function confirmErase(tenant: StaffTenant) {
             body: { confirmSlug: eraseConfirmInput.value },
         });
 
-        eraseSuccess.value = `Erased '${tenant.slug}': ${result.personCount} `
-            + `${result.personCount === 1 ? 'person' : 'people'} and ${result.accountsErased} `
-            + `now-ownerless login${result.accountsErased === 1 ? '' : 's'} removed.`;
+        /*
+         * TWO INDEPENDENT COUNTS, so two plural messages folded into one
+         * carrier sentence (i18n/CONVENTIONS.md § "Pluralisation"): vue-i18n
+         * chooses a form from ONE count, and this sentence agrees with two.
+         * What it must not be is the version this replaced, which flipped
+         * `person`/`people` and an `s` inside the template literal: German has
+         * no `-s` plural, and a word assembled from a ternary has no key at
+         * all. The conjunction stays inside `eraseSuccess`, so a translator can
+         * move both clauses.
+         */
+        eraseSuccess.value = t('staff.tenants.eraseSuccess', {
+            slug: tenant.slug,
+            people: t('staff.tenants.erasePeopleCount', result.personCount),
+            logins: t('staff.tenants.eraseLoginCount', result.accountsErased),
+        });
 
         cancelErase();
         await refresh();
     } catch (caught) {
-        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+        const stated = serverErrorMessage(caught);
 
-        eraseError.value = statusMessage ?? `Could not erase '${tenant.slug}'.`;
+        eraseError.value = stated ?? t('staff.tenants.eraseError', { slug: tenant.slug });
     } finally {
         erasing.value = false;
     }
@@ -560,9 +761,10 @@ async function setTenantFederation(tenant: StaffTenant, federationId: string | n
         await refresh();
         await federationsData.refresh();
     } catch (caught) {
-        const statusMessage = (caught as { data?: { statusMessage?: string } })?.data?.statusMessage;
+        const stated = serverErrorMessage(caught);
 
-        federationAssignError.value = statusMessage ?? `Could not update '${tenant.slug}''s federation.`;
+        federationAssignError.value = stated
+            ?? t('staff.tenants.federationUpdateError', { slug: tenant.slug });
     } finally {
         assigningTenantId.value = '';
     }
@@ -622,6 +824,13 @@ async function setTenantFederation(tenant: StaffTenant, federationId: string | n
         &--success {
             color: $success300;
         }
+    }
+
+    &_locale {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-width: 260px;
     }
 
     &_erase {

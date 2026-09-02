@@ -1,10 +1,8 @@
 <template>
     <section class="export">
-        <h2>Your data</h2>
+        <h2>{{ t('exports.self.heading') }}</h2>
         <p class="export_hint">
-            Everything Calendry holds about you: profile, roles, group memberships, sessions,
-            unavailability, preferences, exam requests, API tokens, calendar links and your own
-            audit trail. A GDPR Right to Access request, self-service.
+            {{ t('exports.self.hint') }}
         </p>
 
         <div class="export_actions">
@@ -12,26 +10,33 @@
                 href="/api/me/export?format=json"
                 icon="material-symbols:data-object"
                 type="secondary"
-            >Download JSON</CommonButton>
+            >{{ t('common.action.downloadJson') }}</CommonButton>
 
             <CommonButton
                 href="/api/me/export?format=xlsx"
                 icon="material-symbols:table-outline"
                 type="secondary"
-            >Download Excel</CommonButton>
+            >{{ t('common.action.downloadExcel') }}</CommonButton>
         </div>
     </section>
 </template>
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * `GET /api/me/export` (issue #84), self-service: no fetch of its own to
  * manage: both buttons are plain links to a GET route that answers with
  * `content-disposition: attachment`, so the browser downloads the file
  * without navigating away. No permission gate, matching the route itself.
+ *
+ * Copy is the `exports` namespace even though the component sits in
+ * `components/my/` (i18n/CONVENTIONS.md's ownership table names it
+ * explicitly): the more specific entry wins, so one screen's export copy is
+ * not split across two namespaces.
  */
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

@@ -26,7 +26,7 @@
                 icon="material-symbols:add"
                 :to="`/manage/${entity.key}/new`"
                 type="secondary"
-            >New {{ entity.label.toLowerCase() }}</CommonButton>
+            >{{ t('managePages.entity.createAction', { entity: entity.label }) }}</CommonButton>
         </template>
 
         <ManageSaveAsTemplate
@@ -78,6 +78,7 @@ import { useEntityForm } from '~/composables/entityForm';
 import { useEntityRelations } from '~/composables/entityRelations';
 import { useEntityPermissions } from '~/composables/entityList';
 import { findManageEntity } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 
 definePageMeta({
     middleware: 'manage',
@@ -85,7 +86,13 @@ definePageMeta({
 });
 
 const route = useRoute();
-const entity = findManageEntity(route.params.entity as string)!;
+const { t } = useT();
+
+// The middleware has already rejected an unknown section; this is the type
+// narrowing, not a second guard. `t` is what resolves the registry's copy
+// (issue #19); the middleware could not pass one, so it checked the wordless
+// `findManageSection` instead.
+const entity = findManageEntity(route.params.entity as string, t)!;
 const id = route.params.id as string;
 
 const { canCreate, canUpdate, canDelete } = useEntityPermissions(entity);
@@ -117,18 +124,19 @@ await Promise.all([form.ready, relations.ready]);
  * `isFieldLocked` and `tests/form-reference-wave.test.ts`.
  */
 if (form.loadError.value) {
-    const cause = form.loadError.value as { statusCode?: number; statusMessage?: string };
+    const cause = form.loadError.value as { statusCode?: number };
 
     throw createError({
         statusCode: cause.statusCode ?? 404,
-        statusMessage: cause.statusMessage ?? `This ${entity.label.toLowerCase()} could not be loaded.`,
+        message: serverErrorMessage(form.loadError.value)
+            ?? t('managePages.entity.loadFailed', { entity: entity.label }),
         fatal: true,
     });
 }
 
 const title = computed(() => (form.row.value ? entity.title(form.row.value) : entity.label));
 
-useHead({ title: () => title.value });
+useHead(() => ({ title: title.value }));
 
 const confirming = ref(false);
 const deleteError = ref('');
@@ -151,7 +159,7 @@ async function confirmDelete() {
     // The dialog stays open holding the reason. A 409 here is the database
     // refusing to orphan real references, and that is information the user needs,
     // not a failure to swallow.
-    deleteError.value = form.formError.value || 'Could not delete.';
+    deleteError.value = form.formError.value || t('managePages.entity.deleteFailed');
     confirming.value = true;
 }
 </script>

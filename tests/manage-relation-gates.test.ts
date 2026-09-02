@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MANAGE_ENTITIES, entityPermission, relationOptionResources, relationReadRequirement } from '../app/utils/manageRegistry';
+import { entityPermission, manageEntities, relationOptionResources, relationReadRequirement } from '../app/utils/manageRegistry';
 import { resourcePermissions, satisfiesPermissionRequirement } from '#shared/permissions';
 
 /**
@@ -26,7 +26,13 @@ import { resourcePermissions, satisfiesPermissionRequirement } from '#shared/per
  *               everyone and looks exactly like a relation nobody configured
  */
 describe('relation option waves are covered by their own gate', () => {
-    const relations = MANAGE_ENTITIES.flatMap((entity) => (entity.relations ?? []).map((def) => ({
+    /*
+     * `(key) => key`: the registry takes a translator since issue #19 and
+     * every assertion here is about permission keys, which is the case
+     * `i18n/CONVENTIONS.md` says to stub the translator for.
+     */
+    const registry = manageEntities((key) => key);
+    const relations = registry.flatMap((entity) => (entity.relations ?? []).map((def) => ({
         entity,
         def,
         id: `${entity.key}/${def.key}`,
@@ -65,7 +71,7 @@ describe('relation option waves are covered by their own gate', () => {
             // The full-catalogue holder must see everything. If they cannot,
             // the derivation invented a permission.
             const everything = new Set(
-                MANAGE_ENTITIES.flatMap((entity) => (['read', 'create', 'update', 'delete'] as const)
+                registry.flatMap((entity) => (['read', 'create', 'update', 'delete'] as const)
                     .map((action) => entityPermission(entity, action)))
                     .concat(['access_role.manage', 'person_access_role.assign']),
             );

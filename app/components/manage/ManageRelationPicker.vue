@@ -5,7 +5,7 @@
             <span
                 v-if="busy"
                 class="picker_state"
-            >Saving…</span>
+            >{{ t('common.action.saving') }}</span>
             <span
                 v-else-if="saved"
                 class="picker_state picker_state--ok"
@@ -14,7 +14,7 @@
                     name="material-symbols:check-small"
                     aria-hidden="true"
                 />
-                Saved
+                {{ t('manageUi.picker.saved') }}
             </span>
         </header>
 
@@ -62,7 +62,9 @@
                     v-if="def.extraReference"
                     class="picker_row-extra"
                 >
-                    <span class="sr-only">{{ def.label }} role</span>
+                    <span class="sr-only">{{
+                        t('manageUi.picker.extraRoleLabel', { label: def.label })
+                    }}</span>
                     <select
                         :disabled="readonly || busy"
                         :value="(row[def.extraReference.key] as string) ?? ''"
@@ -112,7 +114,9 @@
                     class="picker_remove"
                     :disabled="busy"
                     type="button"
-                    :aria-label="`Remove ${labelFor(String(row[def.valueKey]))}`"
+                    :aria-label="t('manageUi.shared.removeAria', {
+                        label: labelFor(String(row[def.valueKey])),
+                    })"
                     @click="$emit('remove', String(row[def.valueKey]))"
                 >
                     <Icon
@@ -145,7 +149,7 @@
         <p
             v-else
             class="picker_empty"
-        >None assigned.</p>
+        >{{ t('manageUi.picker.noneAssigned') }}</p>
 
         <!--
             SEARCH, for a resource that can hold thousands of rows. The list is
@@ -157,7 +161,7 @@
             class="picker_search"
         >
             <label class="picker_search-field">
-                <span class="sr-only">Search {{ def.label.toLowerCase() }}</span>
+                <span class="sr-only">{{ t('manageUi.picker.searchLabel', { label: def.label }) }}</span>
                 <Icon
                     class="picker_search-icon"
                     name="material-symbols:search"
@@ -171,7 +175,7 @@
                     :aria-expanded="showResults"
                     autocomplete="off"
                     :disabled="busy"
-                    :placeholder="`Search ${def.label.toLowerCase()}…`"
+                    :placeholder="t('manageUi.picker.searchPlaceholder', { label: def.label })"
                     role="combobox"
                     type="text"
                     @keydown.down.prevent="moveActive(1)"
@@ -183,7 +187,7 @@
                     v-if="term"
                     class="picker_search-clear"
                     type="button"
-                    aria-label="Clear search"
+                    :aria-label="t('manageUi.picker.clearSearch')"
                     @click="clearSearch"
                 >
                     <Icon
@@ -207,15 +211,17 @@
             <p
                 v-else-if="!term.trim()"
                 class="picker_hint"
-            >Type a name to search. {{ rows.length ? 'Everyone already assigned is listed above.' : '' }}</p>
+            >{{ t('manageUi.picker.searchHint') }} <template
+                v-if="rows.length"
+            >{{ t('manageUi.picker.searchHintAssigned') }}</template></p>
             <p
                 v-else-if="searching"
                 class="picker_hint"
-            >Searching…</p>
+            >{{ t('manageUi.picker.searching') }}</p>
             <p
                 v-else-if="!results.length"
                 class="picker_hint"
-            >No matches for “{{ term.trim() }}”.</p>
+            >{{ t('manageUi.picker.noMatches', { term: term.trim() }) }}</p>
 
             <ul
                 v-else
@@ -241,7 +247,7 @@
                         <span
                             v-if="option.taken"
                             class="picker_result-taken"
-                        >Already added</span>
+                        >{{ t('manageUi.picker.alreadyAdded') }}</span>
                     </button>
                 </li>
             </ul>
@@ -254,20 +260,24 @@
             <p
                 v-if="results.length && total > results.length"
                 class="picker_hint"
-            >Showing {{ results.length }} of {{ total }} matches. Keep typing to narrow it.</p>
+            >{{ t('manageUi.picker.showingCount', { shown: results.length, total }) }}</p>
         </div>
 
         <label
             v-else-if="!readonly"
             class="picker_add"
         >
-            <span class="sr-only">Add to {{ def.label }}</span>
+            <span class="sr-only">{{ t('manageUi.picker.addToLabel', { label: def.label }) }}</span>
             <select
                 :disabled="busy || !available.length"
                 :value="''"
                 @change="onAdd($event)"
             >
-                <option value="">{{ available.length ? `Add ${def.label.toLowerCase()}…` : 'Nothing left to add' }}</option>
+                <option value="">{{
+                    available.length
+                        ? t('manageUi.picker.addOption', { label: def.label })
+                        : t('manageUi.shared.nothingLeft')
+                }}</option>
                 <option
                     v-for="option in available"
                     :key="option.value"
@@ -289,7 +299,7 @@
         <p
             v-if="!readonly && !def.searchable && !options.length"
             class="picker_hint picker_hint--warn"
-        >{{ def.emptyHint ?? 'Nothing to choose from yet.' }}</p>
+        >{{ def.emptyHint ?? t('manageUi.shared.nothingToChoose') }}</p>
     </div>
 </template>
 
@@ -297,6 +307,7 @@
 import type { EntityRow, RelationDef } from '~/utils/manageRegistry';
 import type { RelationRow } from '~/composables/entityRelations';
 import { indentedOptions } from '~/utils/groupTree';
+import { useT } from '~/composables/i18n';
 
 /**
  * One relation, edited as a set.
@@ -340,6 +351,8 @@ const props = defineProps<{
      */
     searchParams?: Record<string, string>;
 }>();
+
+const { t } = useT();
 
 const emit = defineEmits<{
     add: [value: string];
@@ -504,8 +517,8 @@ async function runSearch(query: string) {
         // Named as a failure, never as an empty result. "No matches" for a
         // request that never completed is the exact lie this codebase keeps
         // finding in its own empty states.
-        searchError.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not search right now.';
+        searchError.value = serverErrorMessage(cause)
+            ?? t('manageUi.picker.searchFailed');
     } finally {
         if (ticket === sequence) {
             searching.value = false;

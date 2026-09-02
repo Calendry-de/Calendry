@@ -68,7 +68,7 @@ export function requireIdentity(event: H3Event): RequestIdentity {
     if (!identity) {
         throw createError({
             statusCode: 401,
-            statusMessage: 'No tenant context on this request.',
+            message: 'No tenant context on this request.',
         });
     }
 
@@ -98,7 +98,7 @@ export async function withRequestTenant<T>(
     if (identity.kind === 'staff') {
         throw createError({
             statusCode: 403,
-            statusMessage: 'A staff session cannot access tenant-scoped routes.',
+            message: 'A staff session cannot access tenant-scoped routes.',
         });
     }
 
@@ -123,7 +123,7 @@ export function requireTenantScopedIdentity(event: H3Event): TenantScopedIdentit
     if (identity.kind === 'staff') {
         throw createError({
             statusCode: 403,
-            statusMessage: 'A staff session cannot hold tenant permissions.',
+            message: 'A staff session cannot hold tenant permissions.',
         });
     }
 
@@ -147,7 +147,7 @@ export function requireStaffIdentity(event: H3Event): StaffIdentity {
     if (identity.kind !== 'staff') {
         throw createError({
             statusCode: 403,
-            statusMessage: 'Staff identity required.',
+            message: 'Staff identity required.',
         });
     }
 

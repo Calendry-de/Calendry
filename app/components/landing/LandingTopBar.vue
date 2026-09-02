@@ -11,10 +11,10 @@
 
             <nav
                 class="topbar_nav"
-                aria-label="Landing page"
+                :aria-label="t('landing.topbar.navLabel')"
             >
                 <NuxtLink
-                    v-for="entry in SECTIONS"
+                    v-for="entry in sections"
                     :key="entry.href"
                     class="topbar_link"
                     :to="entry.href"
@@ -30,19 +30,21 @@
                 <NuxtLink
                     class="topbar_link topbar_link--persistent"
                     to="/login"
-                >Sign in</NuxtLink>
+                >{{ t('landing.action.signIn') }}</NuxtLink>
                 <CommonButton
                     class="topbar_cta"
                     type="primary"
                     size="S"
                     href="/#contact"
-                >Get in touch</CommonButton>
+                >{{ t('landing.action.getInTouch') }}</CommonButton>
             </div>
         </div>
     </header>
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * The public page's own bar: a floating capsule rather than a full-width shelf.
  *
@@ -69,13 +71,18 @@
  * two-line nav is broken. There is deliberately no hamburger, because the
  * drawer would hold five anchors into a page the reader can already scroll.
  */
-const SECTIONS = [
-    { href: '/#what', label: 'What it does' },
-    { href: '/#built', label: 'What works' },
-    { href: '/#next', label: 'Roadmap' },
-    { href: '/#under-the-hood', label: 'Technical' },
-    { href: '/pricing', label: 'Pricing' },
-] as const;
+const { t } = useT();
+
+// A `computed`, not a module constant: the labels are messages now, so the list
+// has to be rebuilt when the language changes rather than resolved once at
+// import time, before any i18n instance exists.
+const sections = computed(() => [
+    { href: '/#what', label: t('landing.topbar.nav.whatItDoes') },
+    { href: '/#built', label: t('landing.topbar.nav.whatWorks') },
+    { href: '/#next', label: t('landing.topbar.nav.roadmap') },
+    { href: '/#under-the-hood', label: t('landing.topbar.nav.technical') },
+    { href: '/pricing', label: t('landing.topbar.nav.pricing') },
+]);
 </script>
 
 <style scoped lang="scss">

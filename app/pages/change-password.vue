@@ -1,6 +1,6 @@
 <template>
     <CommonBox>
-        <h1 class="cp_title">Choose a new password</h1>
+        <h1 class="cp_title">{{ t('auth.changePassword.heading') }}</h1>
 
         <form
             class="cp_form"
@@ -8,13 +8,13 @@
         >
             <p class="cp_lead">
                 {{ forced
-                    ? 'This account was reset by an administrator. Set a new password to continue.'
-                    : 'Enter your current password and a new one.' }}
+                    ? t('auth.changePassword.leadForced')
+                    : t('auth.changePassword.lead') }}
             </p>
 
             <CommonInputText
                 v-model="email"
-                placeholder="Email"
+                :placeholder="t('auth.changePassword.emailPlaceholder')"
                 input-type="email"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'username', required: true }"
@@ -22,7 +22,7 @@
 
             <CommonInputText
                 v-model="currentPassword"
-                placeholder="Current password"
+                :placeholder="t('auth.changePassword.currentPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'current-password', required: true }"
@@ -30,13 +30,13 @@
 
             <CommonInputText
                 v-model="newPassword"
-                placeholder="New password"
+                :placeholder="t('auth.changePassword.newPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'new-password', required: true, minlength: 12 }"
             />
 
-            <p class="cp_hint">At least 12 characters, and different from the current one.</p>
+            <p class="cp_hint">{{ t('auth.changePassword.hint') }}</p>
 
             <p
                 v-if="error"
@@ -49,22 +49,26 @@
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Saving…' : 'Change password' }}</CommonButton>
+            >{{ busy ? t('common.action.saving') : t('auth.changePassword.submit') }}</CommonButton>
 
             <CommonButton
                 type="link"
                 :disabled="busy"
                 @click="navigateTo('/login')"
-            >Back to sign in</CommonButton>
+            >{{ t('auth.changePassword.backToSignIn') }}</CommonButton>
         </form>
     </CommonBox>
 </template>
 
 <script setup lang="ts">
-import { LOGIN_ERROR } from '~/composables/session';
+import { LOGIN_ERROR_KEY } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Change password' });
+
+const { t } = useT();
+
+useHead(() => ({ title: t('auth.changePassword.pageTitle') }));
 
 const route = useRoute();
 
@@ -104,8 +108,8 @@ async function submit() {
         // 422 is the only case worth naming: it is about the new password, not
         // about whether the account exists.
         error.value = status === 422
-            ? ((e as { statusMessage?: string }).statusMessage ?? 'That password cannot be used.')
-            : LOGIN_ERROR;
+            ? (serverErrorMessage(e) ?? t('auth.error.passwordRejected'))
+            : t(LOGIN_ERROR_KEY);
         currentPassword.value = '';
     } finally {
         busy.value = false;

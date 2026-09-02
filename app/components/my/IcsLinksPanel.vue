@@ -1,12 +1,7 @@
 <template>
     <section class="links">
-        <h2>Calendar links</h2>
-        <p class="links_hint">
-            A link an external calendar app (Google Calendar, Outlook, Apple Calendar…)
-            re-fetches on its own schedule, never downloaded once and forgotten. Unlike
-            an API token this address stays visible here so you can re-copy it any time;
-            deleting a link stops it immediately.
-        </p>
+        <h2>{{ t('my.icsLinks.head') }}</h2>
+        <p class="links_hint">{{ t('my.icsLinks.hint') }}</p>
 
         <p
             v-if="loadError"
@@ -38,7 +33,7 @@
                         size="S"
                         type="secondary"
                         @click="copy(row.id, row.url)"
-                    >{{ copiedId === row.id ? 'Copied' : 'Copy' }}</CommonButton>
+                    >{{ copiedId === row.id ? t('my.icsLinks.copied') : t('my.icsLinks.copy') }}</CommonButton>
                 </div>
 
                 <CommonButton
@@ -47,14 +42,14 @@
                     size="S"
                     type="destructive"
                     @click="remove(row.id)"
-                >{{ deletingId === row.id ? 'Deleting…' : 'Delete' }}</CommonButton>
+                >{{ deletingId === row.id ? t('common.action.deleting') : t('common.action.delete') }}</CommonButton>
             </li>
         </ul>
 
         <p
             v-else-if="linksData.status.value === 'success'"
             class="links_empty"
-        >No calendar links yet.</p>
+        >{{ t('my.icsLinks.emptyHint') }}</p>
 
         <p
             v-if="deleteError"
@@ -66,7 +61,7 @@
             v-if="!creating"
             type="secondary"
             @click="startCreate"
-        >Create a calendar link</CommonButton>
+        >{{ t('my.icsLinks.startCreate') }}</CommonButton>
 
         <form
             v-else
@@ -74,10 +69,10 @@
             @submit.prevent="create"
         >
             <label class="links_field">
-                <span>Name</span>
+                <span>{{ t('my.icsLinks.nameLabel') }}</span>
                 <input
                     v-model="form.name"
-                    placeholder="e.g. Phone"
+                    :placeholder="t('my.icsLinks.namePlaceholder')"
                     type="text"
                 >
             </label>
@@ -86,7 +81,7 @@
                 v-if="canTargetGroups"
                 class="links_scope"
             >
-                <legend>Whose schedule</legend>
+                <legend>{{ t('my.icsLinks.subjectLegend') }}</legend>
 
                 <label class="links_scope-option">
                     <input
@@ -94,7 +89,7 @@
                         type="radio"
                         value="OWN"
                     >
-                    <span>My own schedule</span>
+                    <span>{{ t('my.icsLinks.subjectOwn') }}</span>
                 </label>
 
                 <label class="links_scope-option">
@@ -103,14 +98,14 @@
                         type="radio"
                         value="GROUPS"
                     >
-                    <span>Specific group(s)</span>
+                    <span>{{ t('my.icsLinks.subjectGroupsOption') }}</span>
                 </label>
 
                 <label
                     v-if="form.subject === 'GROUPS'"
                     class="links_field links_field--indent"
                 >
-                    <span>Groups</span>
+                    <span>{{ t('my.icsLinks.groupsLabel') }}</span>
                     <select
                         v-model="form.groupIds"
                         multiple
@@ -127,7 +122,7 @@
             </fieldset>
 
             <fieldset class="links_scope">
-                <legend>What it streams</legend>
+                <legend>{{ t('my.icsLinks.scopeLegend') }}</legend>
 
                 <label class="links_scope-option">
                     <input
@@ -135,14 +130,14 @@
                         type="radio"
                         value="ALL"
                     >
-                    <span>Every term, rolling window</span>
+                    <span>{{ t('my.icsLinks.scopeAllOption') }}</span>
                 </label>
 
                 <label
                     v-if="form.scope === 'ALL'"
                     class="links_field links_field--narrow links_field--indent"
                 >
-                    <span>Weeks ahead</span>
+                    <span>{{ t('my.icsLinks.weeksAheadLabel') }}</span>
                     <input
                         v-model.number="form.weeksAhead"
                         max="52"
@@ -157,19 +152,19 @@
                         type="radio"
                         value="TERM"
                     >
-                    <span>One term, in full</span>
+                    <span>{{ t('my.icsLinks.scopeTermOption') }}</span>
                 </label>
 
                 <label
                     v-if="form.scope === 'TERM'"
                     class="links_field links_field--indent"
                 >
-                    <span>Term</span>
+                    <span>{{ t('my.icsLinks.termLabel') }}</span>
                     <select
                         v-model="form.termId"
                         :selected="form.termId"
                     >
-                        <option value="">Choose a term…</option>
+                        <option value="">{{ t('my.icsLinks.termPlaceholder') }}</option>
                         <option
                             v-for="term in terms"
                             :key="term.id"
@@ -191,12 +186,12 @@
                     :disabled="creatingBusy || !canSubmit"
                     native-type="submit"
                     type="primary"
-                >{{ creatingBusy ? 'Creating…' : 'Create' }}</CommonButton>
+                >{{ creatingBusy ? t('common.action.creating') : t('common.action.create') }}</CommonButton>
 
                 <CommonButton
                     type="secondary"
                     @click="cancelCreate"
-                >Cancel</CommonButton>
+                >{{ t('common.action.cancel') }}</CommonButton>
             </div>
         </form>
     </section>
@@ -204,6 +199,7 @@
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
+import { useT } from '~/composables/i18n';
 
 interface IcsLinkRow {
     id: string;
@@ -243,6 +239,8 @@ interface GroupOption {
  * the client inferring it from `groups` being non-empty: a tenant with zero
  * Groups would otherwise look ungated.
  */
+const { t } = useT();
+
 const request = useRequestFetch();
 
 const linksData = useAsyncData(
@@ -267,35 +265,42 @@ const links = computed(() => linksData.data.value ?? []);
 const terms = computed(() => contextData.data.value?.terms ?? []);
 const groups = computed(() => contextData.data.value?.groups ?? []);
 const canTargetGroups = computed(() => contextData.data.value?.canTargetGroups ?? false);
-const loadError = computed(() => (linksData.error.value ? 'Could not load your calendar links.' : ''));
+const loadError = computed(() => (linksData.error.value ? t('my.icsLinks.loadError') : ''));
 
 function scopeLabel(row: IcsLinkRow): string {
     if (row.scope === 'ALL') {
-        const weeks = row.weeksAhead ?? 0;
-
-        return `All terms · next ${weeks} week${weeks === 1 ? '' : 's'}`;
+        // ONE plural message, count and all: `week${n === 1 ? '' : 's'}` is a
+        // word split across an expression, so it had no key at all, and German
+        // does not pluralise by adding an `-s`.
+        return t('my.icsLinks.scopeRolling', { count: row.weeksAhead ?? 0 });
     }
 
-    const term = terms.value.find((t) => t.id === row.termId);
+    const term = terms.value.find((option) => option.id === row.termId);
 
-    return term ? `Term: ${term.name}` : 'One term';
+    return term
+        ? t('my.icsLinks.scopeTerm', { term: term.name })
+        : t('my.icsLinks.scopeTermUnknown');
 }
 
 function subjectLabel(row: IcsLinkRow): string {
     if (!row.groupIds.length) {
-        return 'My own schedule';
+        return t('my.icsLinks.subjectOwn');
     }
 
-    const names = row.groupIds.map((id) => groups.value.find((g) => g.id === id)?.name ?? 'Unknown group');
+    const names = row.groupIds.map((id) => groups.value.find((g) => g.id === id)?.name
+        ?? t('my.icsLinks.unknownGroup'));
 
-    return `Group: ${names.join(', ')}`;
+    return t('my.icsLinks.subjectGroups', { groups: names.join(', ') });
 }
 
-/** The server's sentence, or a generic one. Same extraction the account form uses. */
+/**
+ * The server's sentence, or a generic one. Same extraction the account form uses.
+ *
+ * `statusMessage` stays ENGLISH by decision (issue #19 deferred the server's
+ * 218 of them); the app-authored fallback beside it is the half that is keyed.
+ */
 function messageOf(error: unknown): string {
-    const e = error as { statusMessage?: string; data?: { statusMessage?: string } };
-
-    return e.data?.statusMessage ?? e.statusMessage ?? 'Could not complete that.';
+    return serverErrorMessage(error) ?? t('my.icsLinks.genericError');
 }
 
 const creating = ref(false);

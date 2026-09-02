@@ -22,7 +22,9 @@
                     aria-hidden="true"
                 />
                 <span class="crow_name">{{ heading }}</span>
-                <span class="crow_state-word">{{ row.isEnabled ? 'On' : 'Off' }}</span>
+                <span class="crow_state-word">{{
+                    row.isEnabled ? t('manageUi.constraintRow.on') : t('manageUi.constraintRow.off')
+                }}</span>
             </p>
 
             <label
@@ -58,17 +60,25 @@
                 <span
                     class="crow_tag"
                     :class="`crow_tag--sev-${severity.toLowerCase()}`"
-                >{{ severity === 'HARD' ? 'Hard' : 'Soft' }}</span>
+                >{{
+                    severity === 'HARD'
+                        ? t('manageUi.constraintRow.severityHard')
+                        : t('manageUi.constraintRow.severitySoft')
+                }}</span>
 
                 <span
                     class="crow_tag"
                     :class="`crow_tag--${type.evaluator}`"
-                >{{ type.evaluator === 'app' ? 'Checked as you edit' : 'Solver' }}</span>
+                >{{
+                    type.evaluator === 'app'
+                        ? t('manageUi.shared.evaluatorApp')
+                        : t('manageUi.shared.evaluatorSolver')
+                }}</span>
 
                 <span
                     v-if="superseded"
                     class="crow_tag crow_tag--superseded"
-                >Superseded</span>
+                >{{ t('manageUi.constraintRow.supersededTag') }}</span>
 
                 <!--
                     NEVER REPLACES THE TOGGLE: issue #8 is a suggestion, not
@@ -79,7 +89,7 @@
                 <span
                     v-if="lessRelevant"
                     class="crow_tag crow_tag--low-relevance"
-                >Less common for schools</span>
+                >{{ t('manageUi.constraintRow.lessRelevantTag') }}</span>
             </span>
         </div>
 
@@ -88,14 +98,21 @@
             <template v-else>{{ type.description }}</template>
         </p>
 
-        <p
+        <!--
+            `<i18n-t>` so the replacement's name stays a `<strong>` inside one
+            translatable sentence; German puts the clause elsewhere.
+        -->
+        <i18n-t
             v-if="superseded"
             class="crow_superseded-note"
+            keypath="manageUi.constraintRow.supersededNote"
+            scope="global"
+            tag="p"
         >
-            Replaced by <strong>{{ supersededBy }}</strong>. It still applies while it is on, and
-            can still be turned off, but it cannot be recreated once removed, because a rule's
-            type is fixed when it is created.
-        </p>
+            <template #replacement>
+                <strong>{{ supersededBy }}</strong>
+            </template>
+        </i18n-t>
 
         <div class="crow_foot">
             <button
@@ -104,7 +121,7 @@
                 type="button"
                 @click="open = !open"
             >
-                <span class="crow_scope-label">Applies to</span>
+                <span class="crow_scope-label">{{ t('manageUi.shared.appliesTo') }}</span>
                 <span class="crow_scope-value">{{ scopeSummary }}</span>
                 <Icon
                     aria-hidden="true"
@@ -127,7 +144,7 @@
                 v-if="severity === 'SOFT' && !canUpdate"
                 class="crow_weight crow_weight--static"
             >
-                <span>Weight</span>
+                <span>{{ t('common.field.weight') }}</span>
                 <strong>{{ row.weight ?? 0 }}</strong>
             </p>
 
@@ -135,7 +152,7 @@
                 v-else-if="severity === 'SOFT'"
                 class="crow_weight"
             >
-                <span>Weight</span>
+                <span>{{ t('common.field.weight') }}</span>
                 <input
                     :disabled="busy"
                     min="0"
@@ -162,21 +179,30 @@
             class="crow_panel"
         >
             <fieldset class="crow_scopes">
-                <legend>Session kinds</legend>
+                <legend>{{ t('manageUi.constraintRow.kindsLegend') }}</legend>
 
-                <p class="crow_hint">
-                    Nothing selected means <strong>every kind</strong>, the tenant-wide rule.
-                    Selecting kinds narrows this rule to them.
-                </p>
+                <!--
+                    `<i18n-t>` so the emphasis stays markup inside one sentence:
+                    the fail-open reading is the whole point of the hint and must
+                    not be split across three text nodes.
+                -->
+                <i18n-t
+                    class="crow_hint"
+                    keypath="manageUi.constraintRow.kindsHint"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #everyKind>
+                        <strong>{{ t('manageUi.constraintRow.everyKindEmphasis') }}</strong>
+                    </template>
+                </i18n-t>
 
                 <p
                     v-if="scopeRequired"
                     class="crow_hint crow_hint--warn"
                     role="status"
                 >
-                    This rule needs at least one kind. Its type already has a tenant-wide version,
-                    so clearing them all would make this a second rule applying everywhere, which
-                    the server refuses.
+                    {{ t('manageUi.constraintRow.scopeRequired') }}
                 </p>
 
                 <!--
@@ -189,19 +215,18 @@
                     v-else-if="!canReadKinds"
                     class="crow_hint crow_hint--warn"
                 >
-                    You do not have permission to read session kinds, so they cannot be listed here.
-                    Any kinds this rule is already scoped to are shown by id above.
+                    {{ t('manageUi.constraintRow.kindsUnreadable') }}
                 </p>
 
                 <p
                     v-else-if="!kinds.length"
                     class="crow_hint crow_hint--warn"
-                >No session kinds exist yet, so there is nothing to scope to.</p>
+                >{{ t('manageUi.shared.noKinds') }}</p>
 
                 <p
                     v-else-if="!canUpdate"
                     class="crow_hint"
-                >{{ scopedKindIds.length ? '' : 'Not narrowed: this rule applies to every kind.' }}</p>
+                >{{ scopedKindIds.length ? '' : t('manageUi.constraintRow.notNarrowed') }}</p>
 
                 <div
                     v-if="kinds.length"
@@ -239,7 +264,7 @@
                 v-if="paramControls.length"
                 class="crow_params"
             >
-                <legend>Parameters</legend>
+                <legend>{{ t('manageUi.shared.paramsLegend') }}</legend>
 
                 <template
                     v-for="control in paramControls"
@@ -267,7 +292,7 @@
             <p
                 v-else
                 class="crow_hint"
-            >This rule takes no parameters.</p>
+            >{{ t('manageUi.shared.noParams') }}</p>
         </div>
     </li>
 </template>
@@ -276,6 +301,7 @@
 import type { ConstraintTypeDef } from '#shared/constraintTypes';
 import ManageField from '~/components/manage/ManageField.vue';
 import ManageWeekdayPicker from '~/components/manage/ManageWeekdayPicker.vue';
+import { useT } from '~/composables/i18n';
 import { constraintParamControls } from '~/utils/constraintFields';
 
 /** The shape this row reads. Kept local so the row depends on data, not on a fetch. */
@@ -347,6 +373,8 @@ const emit = defineEmits<{
  * constrain each other, and it is not persisted. Holding it in the grid would
  * make the grid the owner of thirteen booleans it never reads.
  */
+const { t } = useT();
+
 const open = ref(false);
 
 /**
@@ -371,9 +399,11 @@ const kindName = (id: string) => props.kinds.find((kind) => kind.id === id)?.nam
 
 const scopeNames = computed(() => scopedKindIds.value.map(kindName));
 
+// The comma list is PUNCTUATION over tenant-named kinds, which are never
+// translated; only the fallback is copy.
 const scopeSummary = computed(() => (scopeNames.value.length
     ? scopeNames.value.join(', ')
-    : 'Every session kind'));
+    : t('manageUi.constraintRow.everySessionKind')));
 
 function paramValue(key: string): unknown {
     return (props.row.params ?? {})[key] ?? null;

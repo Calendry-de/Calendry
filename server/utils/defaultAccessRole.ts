@@ -53,7 +53,7 @@ export async function applyDefaultAccessRole(tx: Tx, tenantId: string, personId:
     if (!role) {
         throw createError({
             statusCode: 409,
-            statusMessage: 'This tenant\'s default access role no longer exists. '
+            message: 'This tenant\'s default access role no longer exists. '
                 + 'An administrator must choose a new one under Manage → Access defaults '
                 + 'before another Person can be created.',
         });

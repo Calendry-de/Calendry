@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ACCOUNTS, TEST_PASSWORD, seed, teardown } from './helpers/seed';
 import { api, login } from './helpers/client';
-import { MANAGE_ENTITIES, personOptionLabel, relationOptionsUrl } from '../app/utils/manageRegistry';
+import { manageEntities, personOptionLabel, relationOptionsUrl } from '../app/utils/manageRegistry';
 import type { RelationDef } from '../app/utils/manageRegistry';
 import { RESOURCES } from '../server/utils/resources';
 
@@ -135,7 +135,10 @@ describe('resolving rows by id', () => {
 });
 
 describe('the declaration and the route agree', () => {
-    const relations = MANAGE_ENTITIES.flatMap((entity) => (entity.relations ?? []).map(
+    // `(key) => key`: this block checks `searchable`/`indentTree` and the
+    // resource each relation names, never a word of copy, which is the case
+    // `i18n/CONVENTIONS.md` says to stub the translator for.
+    const relations = manageEntities((key) => key).flatMap((entity) => (entity.relations ?? []).map(
         (def) => ({ entity: entity.key, def }),
     ));
 

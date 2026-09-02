@@ -7,7 +7,7 @@
             <table class="rate_table">
                 <thead>
                     <tr>
-                        <th scope="col">Tier</th>
+                        <th scope="col">{{ t('landing.rateTable.tierHeading') }}</th>
                         <th scope="col">{{ table.basisLabel }}</th>
                         <th
                             scope="col"
@@ -44,6 +44,7 @@
 
 <script setup lang="ts">
 import type { RateTable } from '~/utils/pricingContent';
+import { useT } from '~/composables/i18n';
 
 /**
  * One rate table.
@@ -71,6 +72,8 @@ import type { RateTable } from '~/utils/pricingContent';
 defineProps<{
     table: RateTable;
 }>();
+
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

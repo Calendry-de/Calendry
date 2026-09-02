@@ -121,6 +121,29 @@ export function boardCacheKey(options: { tenantId: string; roomIds: string[] }):
 }
 
 /**
+ * `ResourceConfig.afterWrite` for any entity a cached schedule/board/ics
+ * response embeds BY VALUE rather than by id: a Room's `name`/`code`, a
+ * Person's name, a Group's `name`/`parentGroupId`, an Offering's
+ * `title`/`code`/`color`, a SessionKind's `name`/`color`, a Term's `name`, or
+ * a TimeGrid's blocks/breaks. `appendEvent()` (Session mutations) is the only
+ * OTHER thing that invalidates this cache, so a write to any of THESE tables
+ * — through the generic `/api/[resource]` scaffold, never through
+ * `appendEvent` — used to leave the cached response showing the old value
+ * for up to `SCHEDULE_CACHE_TTL_SECONDS` (its backstop TTL): a TimeGrid edit
+ * was the reported case, but a renamed Room or Offering is the identical bug.
+ *
+ * `null` `termId`: none of these entities is scoped to one Term the way a
+ * Generation is (a Room, Person, Offering, etc. can appear in any number of
+ * Terms' schedules), so which buckets are affected is exactly what is not
+ * cheaply known here. Dropping every bucket for the tenant is the same
+ * over-invalidate-rather-than-under-invalidate choice this file's own header
+ * comment already makes.
+ */
+export async function invalidateScheduleCacheOnWrite({ tenantId }: { tenantId: string }): Promise<void> {
+    await invalidateScheduleCache(tenantId, null);
+}
+
+/**
  * The single invalidation entry point, called from `appendEvent()`. `termId`
  * is the affected Generation's own `termId`, `null` for a tenant-wide one.
  */

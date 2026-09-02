@@ -65,7 +65,7 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
             detail: { reason: 'no_acting_person', identityKind: identity.kind },
         });
 
-        throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+        throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
     }
 
     let held = event.context.permissions as Set<string> | undefined;
@@ -133,7 +133,7 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
         // hard to use. Cross-TENANT access still reports 404 (see dbErrors).
         throw createError({
             statusCode: 403,
-            statusMessage: `Missing permission '${permission}'.`,
+            message: `Missing permission '${permission}'.`,
         });
     }
 }
@@ -160,7 +160,7 @@ export async function requireAnyPermission(
     if (permissions.length === 0) {
         throw createError({
             statusCode: 500,
-            statusMessage: 'No permission declared for this route.',
+            message: 'No permission declared for this route.',
         });
     }
 
@@ -187,6 +187,6 @@ export async function requireAnyPermission(
     // admin reading the message would configure the wrong role.
     throw createError({
         statusCode: 403,
-        statusMessage: `Missing permission '${permissions.join("' or '")}'.`,
+        message: `Missing permission '${permissions.join("' or '")}'.`,
     });
 }

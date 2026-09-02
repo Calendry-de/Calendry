@@ -4,13 +4,14 @@
         <template v-if="state === 'idle'">
             <CommonButton
                 type="secondary"
+                :disabled="preflightIssues.length > 0"
                 @click="startRun"
             >
                 <Icon
                     name="material-symbols:auto-awesome-outline"
                     aria-hidden="true"
                 />
-                Generate schedule
+                {{ t('schedule.solver.generate') }}
             </CommonButton>
 
             <button
@@ -18,7 +19,7 @@
                 class="solver_advanced-toggle"
                 :aria-expanded="showAdvanced"
                 @click="showAdvanced = !showAdvanced"
-            >{{ showAdvanced ? 'Hide' : 'Advanced' }}</button>
+            >{{ showAdvanced ? t('schedule.solver.hide') : t('schedule.solver.advanced') }}</button>
 
             <!-- Exposed rather than defaulted because the feedback loop needs
                  it: a run ending on `move_budget` is saying it had more to do. -->
@@ -27,7 +28,7 @@
                 class="solver_advanced"
             >
                 <label class="solver_field">
-                    <span>Move budget</span>
+                    <span>{{ t('schedule.solver.moveBudget') }}</span>
                     <input
                         v-model.number="maxMoves"
                         type="number"
@@ -37,7 +38,7 @@
                     >
                 </label>
                 <label class="solver_field">
-                    <span>Time budget (s)</span>
+                    <span>{{ t('schedule.solver.timeBudget') }}</span>
                     <input
                         v-model.number="maxWallSeconds"
                         type="number"
@@ -45,8 +46,35 @@
                         max="600"
                     >
                 </label>
-                <p class="solver_hint">Whichever is reached first ends the run.</p>
+                <p class="solver_hint">{{ t('schedule.solver.budgetHint') }}</p>
             </div>
+
+            <!--
+                BLOCKS THE BUTTON RATHER THAN LETTING IT FAIL: every issue here is
+                one `POST /api/solver/runs` would 422 on anyway (same check, same
+                function), surfaced before the click instead of 68ms after it.
+            -->
+            <ul
+                v-if="preflightIssues.length > 0"
+                class="solver_preflight"
+            >
+                <li class="solver_preflight-summary">
+                    {{ t('schedule.solver.preflightBlocked', { count: preflightIssues.length }, preflightIssues.length) }}
+                </li>
+                <li
+                    v-for="issue in preflightIssues"
+                    :key="`${issue.constraintId}-${issue.code}`"
+                    class="solver_preflight-issue"
+                >
+                    <p class="solver_preflight-message">{{ issue.message }}</p>
+                    <p class="solver_preflight-fix">
+                        {{ issue.fixHint }}
+                        <NuxtLink :to="`/manage/constraints/${issue.constraintId}`">
+                            {{ t('schedule.solver.preflightFix') }}
+                        </NuxtLink>
+                    </p>
+                </li>
+            </ul>
         </template>
 
         <!-- STARTING: nothing is known yet, so nothing is claimed. -->
@@ -58,7 +86,7 @@
                 name="material-symbols:progress-activity"
                 aria-hidden="true"
             />
-            Starting…
+            {{ t('schedule.solver.starting') }}
         </p>
 
         <!-- RUNNING / CANCELLING -->
@@ -72,14 +100,14 @@
                         name="material-symbols:progress-activity"
                         aria-hidden="true"
                     />
-                    {{ state === 'cancelling' ? 'Cancelling…' : 'Solving' }}
+                    {{ state === 'cancelling' ? t('schedule.solver.cancelling') : t('schedule.solver.solving') }}
                 </span>
 
                 <CommonButton
                     v-if="state === 'running'"
                     type="secondary-black"
                     @click="confirmCancel = true"
-                >Cancel</CommonButton>
+                >{{ t('common.action.cancel') }}</CommonButton>
             </div>
 
             <!--
@@ -116,28 +144,31 @@
                     :aria-valuenow="Math.round(budgetFraction * 100)"
                     aria-valuemin="0"
                     aria-valuemax="100"
-                    aria-label="Move budget used"
+                    :aria-label="t('schedule.solver.budgetLabel')"
                 >
                     <span
                         class="solver_budget-fill"
                         :style="{ width: '100%', transform: `scaleX(${Math.min(1, budgetFraction)})` }"
                     />
                 </div>
-                <p class="solver_hint">move budget {{ Math.round(budgetFraction * 100) }}% used, {{ budgetCaption }}</p>
+                <p class="solver_hint">{{ t('schedule.solver.budgetUsed', {
+                    percent: Math.round(budgetFraction * 100),
+                    caption: budgetCaption,
+                }) }}</p>
 
                 <div
                     v-if="confirmCancel"
                     class="solver_confirm"
                 >
-                    <span>Cancel this run? Its work is discarded and no proposal is produced.</span>
+                    <span>{{ t('schedule.solver.confirmCancel') }}</span>
                     <CommonButton
                         type="destructive"
                         @click="doCancel"
-                    >Cancel run</CommonButton>
+                    >{{ t('schedule.solver.cancelRun') }}</CommonButton>
                     <CommonButton
                         type="link"
                         @click="confirmCancel = false"
-                    >Keep solving</CommonButton>
+                    >{{ t('schedule.solver.keepSolving') }}</CommonButton>
                 </div>
             </div>
         </div>
@@ -159,7 +190,7 @@
                 v-if="canReadGenerations && generationStatus === 'READY'"
                 type="primary"
                 @click="openReview"
-            >Review</CommonButton>
+            >{{ t('schedule.solver.review') }}</CommonButton>
             <!--
                 Every other case says WHICH case it is. This branch used to read
                 "Discarded." for anything that was not APPLIED, including a
@@ -175,13 +206,13 @@
             <CommonButton
                 type="link"
                 @click="dismiss"
-            >Dismiss</CommonButton>
+            >{{ t('schedule.solver.dismiss') }}</CommonButton>
         </div>
 
         <!-- FAILED / CANCELLED -->
         <div
             v-else
-            class="solver_done"
+            class="solver_done solver_done--failed"
         >
             <p class="solver_status solver_status--failed">
                 <Icon
@@ -190,10 +221,35 @@
                 />
                 {{ failedSummary }}
             </p>
+
+            <!-- A 68ms rejection and a 30s timeout look identical without this. -->
+            <p
+                v-if="failedElapsedLabel"
+                class="solver_hint"
+            >{{ failedElapsedLabel }}</p>
+
+            <NuxtLink
+                v-if="failedSubjectLink"
+                :to="failedSubjectLink"
+                class="solver_hint"
+            >{{ failedSubjectLabel }}</NuxtLink>
+            <p
+                v-else-if="failedSubjectLabel"
+                class="solver_hint"
+            >{{ failedSubjectLabel }}</p>
+
+            <details
+                v-if="run?.errorDetail"
+                class="solver_technical"
+            >
+                <summary>{{ t('schedule.solver.technicalDetails') }}</summary>
+                <pre class="solver_technical-detail">{{ run.errorDetail }}</pre>
+            </details>
+
             <CommonButton
                 type="secondary"
                 @click="dismiss"
-            >Try again</CommonButton>
+            >{{ t('common.action.retry') }}</CommonButton>
         </div>
 
         <p
@@ -205,14 +261,19 @@
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
-import { useSolverRun } from '~/composables/solverRun';
+import { elapsedMs, formatDuration, manageLinkForSubject, useSolverRun } from '~/composables/solverRun';
 import { useHasPermission } from '~/composables/session';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '~~/shared/solverBudget';
+import { useT } from '~/composables/i18n';
 
 const props = defineProps<{ termId: string }>();
 
+const { t } = useT();
+
 const termId = computed(() => props.termId);
-const { run, state, trend, error, adoptedNotice, start, cancel, dismiss } = useSolverRun(termId);
+const {
+    run, state, trend, error, adoptedNotice, preflightIssues, start, cancel, dismiss,
+} = useSolverRun(termId);
 
 const showAdvanced = ref(false);
 const confirmCancel = ref(false);
@@ -248,23 +309,28 @@ const canReadGenerations = useHasPermission('generation.read');
  */
 const doneHint = computed(() => {
     if (!canReadGenerations.value) {
-        return 'A proposal was produced. Reviewing it needs the generation.read permission.';
+        return t('schedule.solver.doneHintNoPermission');
     }
 
     if (generationStatus.value === 'APPLIED') {
-        return 'Applied.';
+        return t('schedule.solver.doneHintApplied');
     }
 
     if (generationStatus.value === 'SUPERSEDED') {
-        return 'Discarded.';
+        return t('schedule.solver.doneHintDiscarded');
     }
 
     if (generationStatus.value === null) {
-        return 'Could not read the proposal\u2019s status.';
+        return t('schedule.solver.doneHintStatusUnknown');
     }
 
-    // Mirrors the discard route's own 409 wording, so the two agree.
-    return `The proposal is ${generationStatus.value.toLowerCase()} and is not awaiting a decision.`;
+    /*
+     * Mirrors the discard route's own 409 wording, so the two agree. The
+     * STATUS itself stays as the wire sends it (lowercased): it is a
+     * GenerationStatus enum value, not app-authored prose, and this branch
+     * exists precisely for a status this build does not recognise.
+     */
+    return t('schedule.solver.doneHintOtherStatus', { status: generationStatus.value.toLowerCase() });
 });
 
 async function startRun() {
@@ -333,8 +399,8 @@ watch(() => run.value?.generationId, async (generationId) => {
 
 const objectiveLabel = computed(() => (
     run.value?.bestObjective === null || run.value?.bestObjective === undefined
-        ? 'objective -'
-        : `objective ${run.value.bestObjective.toLocaleString()}`
+        ? t('schedule.solver.objectiveNone')
+        : t('schedule.solver.objective', { value: run.value.bestObjective.toLocaleString() })
 ));
 
 const trendLabel = computed(() => {
@@ -343,8 +409,8 @@ const trendLabel = computed(() => {
     }
 
     return trend.value.improving
-        ? '↓ improving'
-        : `no improvement for ${Math.round(trend.value.flatForMs / 1000)}s`;
+        ? t('schedule.solver.trendImproving')
+        : t('schedule.solver.trendFlat', { seconds: Math.round(trend.value.flatForMs / 1000) });
 });
 
 function compact(n: number): string {
@@ -359,7 +425,10 @@ function compact(n: number): string {
     return String(n);
 }
 
-const movesLabel = computed(() => `${compact(Number(run.value?.movesEvaluated ?? 0))} moves`);
+const movesLabel = computed(() => t(
+    'schedule.solver.moves',
+    { moves: compact(Number(run.value?.movesEvaluated ?? 0)) },
+));
 
 const elapsedLabel = computed(() => `${Math.round((run.value?.elapsedMillis ?? 0) / 1000)}s`);
 
@@ -370,14 +439,14 @@ const budgetCaption = computed(() => {
     const moves = run.value?.maxMoves ? compact(Number(run.value.maxMoves)) : '-';
     const seconds = run.value?.maxWallMillis ? Math.round(run.value.maxWallMillis / 1000) : '-';
 
-    return `ends at ${moves} moves or ${seconds}s, whichever first`;
+    return t('schedule.solver.budgetCaption', { moves, seconds });
 });
 
 const doneSummary = computed(() => {
-    const parts = ['Proposal ready'];
+    const parts = [t('schedule.solver.proposalReady')];
 
     if (doneMeta.value?.placements !== undefined) {
-        parts.push(`${doneMeta.value.placements} placements`);
+        parts.push(t('schedule.solver.placements', { count: doneMeta.value.placements }));
     }
 
     if (doneMeta.value?.hardViolations !== undefined) {
@@ -392,7 +461,7 @@ const doneSummary = computed(() => {
          * this counts `hardViolations` only, so dropping it would report a
          * clean-but-imperfect proposal as having nothing wrong with it.
          */
-        parts.push(`${n} hard violation${n === 1 ? '' : 's'}`);
+        parts.push(t('schedule.solver.hardViolations', { count: n }, n));
     }
 
     return parts.join(' · ');
@@ -400,7 +469,7 @@ const doneSummary = computed(() => {
 
 const failedSummary = computed(() => {
     if (run.value?.status === 'CANCELLED') {
-        return 'Run cancelled: no proposal was produced.';
+        return t('schedule.solver.runCancelled');
     }
 
     /**
@@ -409,12 +478,44 @@ const failedSummary = computed(() => {
      * went wrong with the search.
      */
     if (run.value?.status === 'SUCCEEDED') {
-        return 'The run succeeded, but its result could not be retrieved from the solver. '
-            + 'Nothing was lost from the schedule; run it again to get a proposal.';
+        return t('schedule.solver.resultLost');
     }
 
-    return run.value?.errorDetail || 'The run failed.';
+    /*
+     * `errorDetail`/`parsedError.message` are the SERVER's own diagnostic
+     * prose, persisted on the row: deferred by issue #19 and therefore still
+     * English. Only the app-authored fallback around them is translated.
+     * `parsedError.message` is preferred when it parsed: it is the solver's
+     * message with the `"3 INVALID_ARGUMENT: constraint '<uuid>':"` prefix
+     * already stripped, which is why the full raw string still needs a place
+     * to go (`solver_technical` below) rather than being replaced outright.
+     */
+    return run.value?.parsedError?.message || run.value?.errorDetail || t('schedule.solver.runFailed');
 });
+
+/**
+ * The created → finished delta, so an instant validation rejection ("Failed
+ * 68ms after it was created") reads as nothing like a solver that ran for a
+ * while and then timed out. `elapsedMs`/`formatDuration` live in
+ * `~/composables/solverRun` (pure, unit-tested there): this app has no
+ * component-mounting test harness (see `tests/preference-weight-multiplier
+ * .test.ts`'s own note on that), so the DECIDING logic lives where it can be
+ * tested and this stays thin `t()` glue around it.
+ */
+const failedElapsedLabel = computed(() => {
+    const current = run.value;
+    const ms = current ? elapsedMs(current) : null;
+
+    return ms === null ? null : t('schedule.solver.failedElapsed', { duration: formatDuration(ms) });
+});
+
+const failedSubjectLabel = computed(() => {
+    const parsed = run.value?.parsedError;
+
+    return parsed ? t('schedule.solver.failedAbout', { name: parsed.subjectName ?? parsed.subjectId }) : null;
+});
+
+const failedSubjectLink = computed(() => manageLinkForSubject(run.value?.parsedError));
 </script>
 
 <style scoped lang="scss">
@@ -607,6 +708,82 @@ const failedSummary = computed(() => {
         flex-wrap: wrap;
         gap: var(--space-5);
         align-items: center;
+
+        &--failed {
+            // A failure reads worse laid out as a single wide row: reasons and
+            // a technical disclosure want to stack, not fight for width.
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    }
+
+    /*
+     * Full-width, in flow below the button/advanced-toggle row: unlike
+     * `_advanced`/`_panel`, this is what the tenant needs to read BEFORE
+     * clicking anything, not a transient report while something runs.
+     */
+    &_preflight {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-3);
+
+        width: 100%;
+        margin: 0;
+        padding: var(--space-4) var(--space-5);
+        border: 1px solid $error500;
+        border-radius: var(--radius-lg);
+
+        list-style: none;
+
+        background: $surface1;
+    }
+
+    &_preflight-summary {
+        font-size: var(--font-size-xs);
+        font-weight: 600;
+        color: $content2;
+    }
+
+    &_preflight-issue {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        font-size: var(--font-size-xs);
+    }
+
+    &_preflight-message {
+        color: $content2;
+    }
+
+    &_preflight-fix {
+        color: $content5;
+
+        a {
+            color: inherit;
+            text-decoration: underline;
+        }
+    }
+
+    &_technical {
+        font-size: var(--font-size-xs);
+        color: $content5;
+
+        summary {
+            cursor: pointer;
+        }
+    }
+
+    &_technical-detail {
+        overflow-x: auto;
+
+        margin: var(--space-2) 0 0;
+        padding: var(--space-3);
+        border-radius: var(--radius-sm);
+
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+
+        background: $surface3;
     }
 
     /*

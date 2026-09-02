@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         // Sequential, because `tx` is one shared connection; concurrent queries on it

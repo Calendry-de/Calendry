@@ -33,7 +33,12 @@ import { isSidebarPlace, navPlaces } from '../app/utils/navPlaces';
  * composable's computed, where no test could reach them.
  */
 describe('sidebar grouping covers the navigation registry', () => {
-    const places = navPlaces();
+    // `navPlaces()` takes `t` as a parameter rather than calling `useT()`,
+    // which is what keeps it callable from plain Node (see `NavTranslate` in
+    // that module). This test measures PATHS and sections, never copy, so the
+    // translator returns the key itself: no message catalogue, no vue-i18n,
+    // and nothing here to update when a label's wording changes.
+    const places = navPlaces((key) => key);
     const sidebarPaths = places.filter(isSidebarPlace).map((entry) => entry.to as string);
     const groupedPaths = NAV_GROUPS.flatMap((group) => group.paths);
 

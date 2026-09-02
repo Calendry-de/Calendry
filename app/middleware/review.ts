@@ -38,6 +38,9 @@ import { useSession } from '~/composables/session';
  * Every API route re-checks inside its own tenant transaction.
  */
 export default defineNuxtRouteMiddleware(() => {
+    // `$t`, not `useT()`: route middleware is not a component setup. See
+    // `app/plugins/i18n.ts` for why that is safe with respect to language.
+    const { $t } = useNuxtApp();
     const session = useSession();
 
     if (session.value?.permissions.includes('generation.read')) {
@@ -46,7 +49,15 @@ export default defineNuxtRouteMiddleware(() => {
 
     return abortNavigation(createError({
         statusCode: 403,
-        statusMessage: 'You do not have permission to review schedule proposals. It needs: generation.read.',
+        /*
+         * ITS OWN KEY, not shared with `/my`'s or `/schedule`'s denial. The
+         * three sentences are near-identical in English and say different
+         * things: this one names one permission inline, `/my`'s interpolates
+         * whichever keys that page needs, and `/schedule`'s explains the
+         * difference between two. Merging them because the English looks
+         * similar would erase the distinction in every language at once.
+         */
+        message: $t('errors.review.denied'),
         data: { missing: ['generation.read'] },
     }));
 });

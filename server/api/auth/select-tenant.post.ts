@@ -58,13 +58,13 @@ export default defineEventHandler(async (event) => {
     const token = getCookie(event, SESSION_COOKIE);
 
     if (!token) {
-        throw createError({ statusCode: 401, statusMessage: 'Not authenticated.' });
+        throw createError({ statusCode: 401, message: 'Not authenticated.' });
     }
 
     const session = await resolveSessionToken(token);
 
     if (!session) {
-        throw createError({ statusCode: 401, statusMessage: 'Session expired or revoked.' });
+        throw createError({ statusCode: 401, message: 'Session expired or revoked.' });
     }
 
     const identities = await listAccountIdentities(session.account_id);
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
     if (!target) {
         // 403, not 404: the tenant may well exist, but this account has no
         // Person there. Reporting "not found" would be a lie.
-        throw createError({ statusCode: 403, statusMessage: 'No identity in that tenant.' });
+        throw createError({ statusCode: 403, message: 'No identity in that tenant.' });
     }
 
     await setSessionActivePerson(session.session_id, target.person_id);

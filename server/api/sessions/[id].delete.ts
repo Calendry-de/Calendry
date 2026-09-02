@@ -68,13 +68,13 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (session.offeringId !== null) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'This Session belongs to an Offering, so deleting it would leave that '
+                message: 'This Session belongs to an Offering, so deleting it would leave that '
                     + "Offering's frequency unmet and the next solve would place it again. Only an "
                     + 'Event (a Session with no Offering) can be deleted here.',
                 data: { offeringId: session.offeringId },

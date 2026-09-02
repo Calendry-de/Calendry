@@ -15,7 +15,9 @@
             "Schedule" over three chips reads as a tenant with almost nothing in
             it. Taken from the server's answer, never from the permission.
         -->
-        <h1 class="schedule_sr">{{ data.scope.value === 'own' ? 'Your schedule' : 'Schedule' }}</h1>
+        <h1 class="schedule_sr">{{ data.scope.value === 'own'
+            ? t('schedule.page.headingOwn')
+            : t('schedule.page.heading') }}</h1>
 
         <!--
             TWO ELEMENTS FOR ONE SENTENCE, and the split is load-bearing.
@@ -40,7 +42,6 @@
         <ScheduleToolbar
             ref="toolbar"
             v-model:filters-open="filtersOpen"
-            v-model:row-height="rowHeight"
             v-model:show-violations="showViolations"
             v-model:term-id="filters.termId.value"
             :terms="data.terms.value"
@@ -56,7 +57,6 @@
             :active-days="data.grid.value?.activeDays ?? []"
             :slot-date-of="data.slotDateOf"
             @toggle-create="editing.toggleCreating"
-            @jump-today="jumpToToday"
         />
 
         <ScheduleFilterPanel
@@ -82,7 +82,20 @@
                 name="material-symbols:touch-app-outline"
                 aria-hidden="true"
             />
-            Pick a slot for <strong>{{ sessionLabel(editing.selected.value) }}</strong>. Press Escape to cancel.
+            <!--
+                `<i18n-t>` rather than text-strong-text: German moves the verb
+                to the end of the clause, so the session's name has to be a
+                placeholder the translator can position, not a fixed middle.
+            -->
+            <i18n-t
+                keypath="schedule.page.placingHint"
+                tag="span"
+                scope="global"
+            >
+                <template #label>
+                    <strong>{{ sessionLabel(editing.selected.value) }}</strong>
+                </template>
+            </i18n-t>
         </p>
 
         <p
@@ -94,7 +107,7 @@
                 name="material-symbols:add-circle-outline"
                 aria-hidden="true"
             />
-            Pick a slot for the new event. Press Escape to cancel.
+            {{ t('schedule.page.creatingHint') }}
         </p>
 
         <!--
@@ -136,7 +149,7 @@
             <button
                 type="button"
                 class="schedule_error-dismiss"
-                aria-label="Dismiss this error"
+                :aria-label="t('schedule.page.dismissError')"
                 @click="editing.error.value = ''"
             >
                 <Icon
@@ -167,22 +180,21 @@
                 v-if="data.loadError.value.retryable"
                 type="secondary"
                 @click="data.refreshAll"
-            >Try again</CommonButton>
+            >{{ t('common.action.retry') }}</CommonButton>
         </div>
 
         <ScheduleEmptyState
             v-else-if="!data.pending.value && !data.grid.value"
-            title="No time grid configured"
+            :title="t('schedule.page.noGridTitle')"
         >
-            A schedule needs a TimeGrid: how long a block is, how many run per day,
-            and which days this institution teaches on. Nothing is assumed on your behalf.
+            {{ t('schedule.page.noGridBody') }}
         </ScheduleEmptyState>
 
         <ScheduleEmptyState
             v-else-if="!data.pending.value && !data.terms.value.length"
-            title="No terms yet"
+            :title="t('schedule.page.noTermsTitle')"
         >
-            Create a term to place sessions into.
+            {{ t('schedule.page.noTermsBody') }}
         </ScheduleEmptyState>
 
         <!--
@@ -211,7 +223,38 @@
                     :total-weeks="data.totalWeeks.value"
                     :range-label="weekRangeLabel"
                     :loading="data.pending.value"
-                />
+                >
+                    <!--
+                        ISSUE #109. Was a full text button filed among Add
+                        Event/Proposals/the solver control in the toolbar's
+                        actions group, the most-clicked-but-least-costly action
+                        sitting shoulder to shoulder with the most consequential
+                        ones. Icon-only beside the arrows it steps the same
+                        value as: what it does is legible from where it sits.
+                        Gated on a resolved Term alone, same as the toolbar's
+                        other term-scoped actions, not on today actually
+                        falling inside the visible term/week, which
+                        `jumpToToday` decides at CLICK time with a graceful
+                        fallback (nearest boundary week) rather than by hiding
+                        the control.
+                    -->
+                    <template
+                        v-if="data.resolvedTermId.value"
+                        #trailing
+                    >
+                        <button
+                            type="button"
+                            class="schedule_today"
+                            :aria-label="t('schedule.weekNav.today')"
+                            @click="jumpToToday"
+                        >
+                            <Icon
+                                name="material-symbols:today-outline"
+                                aria-hidden="true"
+                            />
+                        </button>
+                    </template>
+                </ScheduleWeekNav>
 
                 <!-- Wheel-to-step is bound here, on the agenda and on the week
                      stepper, never on the page: over the tray or the violations
@@ -236,7 +279,9 @@
                     :slot-date-of="data.slotDateOf"
                     :term-start="data.term.value?.startDate ?? null"
                     :tenant-timezone="data.tenantTimezone.value"
-                    :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
+                    :target-verb="editing.creating.value
+                        ? t('schedule.page.targetVerbCreate')
+                        : t('schedule.page.targetVerbMove')"
                     @select="onSelect"
                     @place="placeAt"
                     @wheel="stepWeekOnWheel"
@@ -271,7 +316,9 @@
                     :person-name="data.lookup.person"
                     :show-group="!filters.groupId.value"
                     :show-person="!filters.personId.value"
-                    :target-verb="editing.creating.value ? 'Add event at' : 'Move to'"
+                    :target-verb="editing.creating.value
+                        ? t('schedule.page.targetVerbCreate')
+                        : t('schedule.page.targetVerbMove')"
                     @wheel="stepWeekOnWheel"
                     @select="onSelect"
                     @place="placeAt"
@@ -364,7 +411,9 @@ import ScheduleAgenda from '~/components/schedule/ScheduleAgenda.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 import ScheduleEmptyState from '~/components/schedule/ScheduleEmptyState.vue';
 import ScheduleEventForm from '~/components/schedule/ScheduleEventForm.vue';
-import { blockTime, formatSlotDate, sessionLabel, weekdayName } from '~/composables/schedule';
+import { blockTime, formatSlotDate, joinAnd, sessionLabel, weekdayName } from '~/composables/schedule';
+import { autoRowHeight } from '~/composables/gridGeometry';
+import { useT } from '~/composables/i18n';
 import type { ScheduleAction } from '~/composables/scheduleEditing';
 import { useViewerLocale } from '~/composables/locale';
 import ScheduleGrid from '~/components/schedule/ScheduleGrid.vue';
@@ -391,7 +440,12 @@ import { useWheelStep } from '~/composables/wheelStep';
  *   useScheduleData:     server state and everything derived from it
  *   useScheduleEditing:  selection, placement mode, mutations
  */
-useHead({ title: 'Schedule' });
+const { t } = useT();
+
+// A getter, not a plain string: `useHead` re-evaluates it, so the tab title
+// follows a language change rather than freezing at whatever was active when
+// this page first mounted.
+useHead(() => ({ title: t('schedule.page.pageTitle') }));
 
 // UX only. Every one of these is re-checked server-side; a client that forges
 // them reaches an endpoint that returns 403.
@@ -606,9 +660,9 @@ async function saveEventDetails(patch: Record<string, unknown>) {
         await $fetch(`/api/sessions/${target.id}/details`, { method: 'POST', body: patch });
         await data.refreshAll();
     } catch (caught: unknown) {
-        const detail = (caught as { data?: { statusMessage?: string } }).data;
+        const detail = serverErrorMessage(caught);
 
-        editing.error.value = detail?.statusMessage ?? 'Could not save that change.';
+        editing.error.value = detail ?? t('schedule.page.saveFailed');
     }
 }
 
@@ -629,9 +683,9 @@ async function saveLecturers(personIds: string[]) {
         await $fetch(`/api/sessions/${target.id}/lecturers`, { method: 'POST', body: { personIds } });
         await data.refreshAll();
     } catch (caught: unknown) {
-        const detail = (caught as { data?: { statusMessage?: string } }).data;
+        const detail = serverErrorMessage(caught);
 
-        editing.error.value = detail?.statusMessage ?? 'Could not save that change.';
+        editing.error.value = detail ?? t('schedule.page.saveFailed');
     }
 }
 
@@ -652,9 +706,9 @@ async function saveSubstitute(personId: string) {
         await $fetch(`/api/sessions/${target.id}/substitute`, { method: 'POST', body: { personId } });
         await data.refreshAll();
     } catch (caught: unknown) {
-        const detail = (caught as { data?: { statusMessage?: string } }).data;
+        const detail = serverErrorMessage(caught);
 
-        editing.error.value = detail?.statusMessage ?? 'Could not cover that session.';
+        editing.error.value = detail ?? t('schedule.page.coverFailed');
     }
 }
 
@@ -670,9 +724,9 @@ async function removeSubstitute() {
         await $fetch(`/api/sessions/${target.id}/substitute`, { method: 'DELETE', body: {} });
         await data.refreshAll();
     } catch (caught: unknown) {
-        const detail = (caught as { data?: { statusMessage?: string } }).data;
+        const detail = serverErrorMessage(caught);
 
-        editing.error.value = detail?.statusMessage ?? 'Could not remove that substitution.';
+        editing.error.value = detail ?? t('schedule.page.uncoverFailed');
     }
 }
 
@@ -688,11 +742,11 @@ async function deleteSelectedEvent() {
         editing.clearSelection();
         await data.refreshAll();
     } catch (caught: unknown) {
-        const detail = (caught as { data?: { statusMessage?: string } }).data;
+        const detail = serverErrorMessage(caught);
 
         // Surfaced in the same place every other editing failure is, rather
         // than as a toast that outlives the screen it refers to.
-        editing.error.value = detail?.statusMessage ?? 'Could not delete that event.';
+        editing.error.value = detail ?? t('schedule.page.deleteFailed');
     }
 }
 
@@ -720,30 +774,29 @@ const filters = useScheduleFilters();
 
 /**
  * The schedule page's own view/session settings, held as ONE JSON cookie
- * rather than one cookie per field (term (#73), density, violations panel).
+ * rather than one cookie per field (term (#73), violations panel).
  *
  * A cookie rather than `localStorage`, for the reason `useFirstVisit` sets
  * out: every one of these has to be legible on the SERVER, never swapped in
  * after hydration. `termId` decides WHICH term's data the awaited SSR fetch
  * below asks for, so reading it client-only would render the wrong term's
- * whole schedule and then replace it once hydration catches up. `density`
- * decides the grid's row height in the first HTML the same way: client-only
- * would render every visit at 60px and then jump to the stored value. The
+ * whole schedule and then replace it once hydration catches up. The
  * violations panel is the same story one step smaller: a timetabler keeps it
  * open all day, and it closed on every return from the proposals list.
  *
- * First-party, functional, and holding exactly these three fields: no
+ * Row height used to live here too (`density`), a manual Compact/Comfortable/
+ * Spacious choice. It no longer does: `autoRowHeight()` derives it from the
+ * TimeGrid's own block length, so there is nothing left for a reader to
+ * remember between visits.
+ *
+ * First-party, functional, and holding exactly these two fields: no
  * identifier, no timestamp, nothing that distinguishes one reader from
  * another.
  */
 interface ScheduleSettings {
-    density: number;
     violationsOpen: boolean;
     termId: string;
 }
-
-/** The grid's own row-height steps (DESIGN.md). */
-const DENSITIES = [44, 60, 84];
 
 const COOKIE_YEAR = 60 * 60 * 24 * 365;
 
@@ -752,21 +805,21 @@ const COOKIE_YEAR = 60 * 60 * 24 * 365;
  * only knew one or two of these fields, or otherwise not shaped like
  * `ScheduleSettings`. Every read of the cookie goes through this, never
  * `settingsCookie.value` directly, so a garbled or partial cookie degrades
- * to defaults FIELD BY FIELD: a bad `density` cannot blank the toolbar's
- * `<select>`, and a missing `termId` cannot throw out a valid `density`.
+ * to defaults FIELD BY FIELD: a bad `termId` cannot throw out a valid
+ * `violationsOpen`, and vice versa. An older cookie may still carry a
+ * `density` field; it is simply not read any more.
  */
 function coerceScheduleSettings(raw: unknown): ScheduleSettings {
     const value = (raw && typeof raw === 'object' ? raw : {}) as Partial<ScheduleSettings>;
 
     return {
-        density: DENSITIES.includes(Number(value.density)) ? Number(value.density) : 60,
         violationsOpen: value.violationsOpen === true,
         termId: typeof value.termId === 'string' ? value.termId : '',
     };
 }
 
 const settingsCookie = useCookie<ScheduleSettings>('calendry-schedule-settings', {
-    default: () => ({ density: 60, violationsOpen: false, termId: '' }),
+    default: () => ({ violationsOpen: false, termId: '' }),
     sameSite: 'lax',
     path: '/',
     maxAge: COOKIE_YEAR,
@@ -837,16 +890,13 @@ const selectedPlacement = computed(() => (
 ));
 
 /**
- * PAGE-LOCAL because neither value reaches the API query, and PERSISTED via
- * `scheduleSettings` above, because that is a different question from being
- * addressable.
+ * Derived, not chosen: one BLOCK's pixel height, scaled from the resolved
+ * TimeGrid's own `blockLengthMinutes` (see `autoRowHeight`). A 3.5-hour lab
+ * block draws tall, a 45-minute lecture block draws compact, both from the
+ * grid the tenant already configured. Falls back to a 45-minute assumption
+ * before a Term resolves, matching the old default preset.
  */
-const rowHeight = computed<number>({
-    get: () => scheduleSettings.value.density,
-    set: (value) => {
-        patchScheduleSettings({ density: DENSITIES.includes(value) ? value : 60 });
-    },
-});
+const rowHeight = computed<number>(() => autoRowHeight(data.grid.value?.blockLengthMinutes ?? 45));
 
 const showViolations = computed<boolean>({
     get: () => scheduleSettings.value.violationsOpen,
@@ -868,15 +918,13 @@ const activeFilterCount = computed(() => [
     filters.groupId.value, filters.roomId.value, filters.personId.value,
 ].filter(Boolean).length);
 
-/**
- * Naive English pluralization, matching the rest of this app's chrome. i18n is a
- * decided-and-deliberately-unstarted card, not an oversight; when it lands, this
- * is one of the strings it takes over, and pretending otherwise here would mean
- * shipping a plural-rules engine for one sentence.
+/*
+ * `plural(count, noun)` used to live here, with a comment naming i18n as its
+ * eventual owner. i18n has landed, so it is gone: the two sentences it served
+ * are whole plural messages now (`schedule.page.hardViolationCount` /
+ * `softViolationCount`), which is the only form that survives a language with
+ * no `-s` plural.
  */
-function plural(count: number, noun: string): string {
-    return `${count} ${noun}${count === 1 ? '' : 's'}`;
-}
 
 /**
  * What an edit COST, named at the moment it lands.
@@ -902,18 +950,18 @@ function violationClause(sessionId: string): string {
         // "violations", matching the toolbar, the inspector, the panel and the
         // solver summary. "Nothing flagged" was a fifth word for one quantity,
         // mine, from the pass that added this sentence.
-        return ' No violations.';
+        return t('schedule.page.noViolations');
     }
 
     const hard = rows.filter((row) => row.severity === 'HARD').length;
     const soft = rows.length - hard;
 
     const parts = [
-        ...(hard ? [plural(hard, 'hard violation')] : []),
-        ...(soft ? [plural(soft, 'soft violation')] : []),
+        ...(hard ? [t('schedule.page.hardViolationCount', { count: hard }, hard)] : []),
+        ...(soft ? [t('schedule.page.softViolationCount', { count: soft }, soft)] : []),
     ];
 
-    return ` ${parts.join(' and ')} recorded.`;
+    return t('schedule.page.violationsRecorded', { clauses: joinAnd(parts, t) });
 }
 
 function describeAction(action: ScheduleAction): string {
@@ -925,27 +973,45 @@ function describeAction(action: ScheduleAction): string {
             // per-day break override moves the boundary it actually moves.
             const at = grid
                 ? blockTime(grid, action.blockIndex, action.dayOfWeek).start
-                : `block ${action.blockIndex + 1}`;
+                : t('schedule.page.blockFallback', { block: action.blockIndex + 1 });
 
-            return `Moved ${action.label} to ${weekdayName(action.dayOfWeek, locale.value)} ${at}.`;
+            return t('schedule.page.movedTo', {
+                label: action.label,
+                day: weekdayName(action.dayOfWeek, locale.value),
+                time: at,
+            });
         }
         case 'swap':
-            return `Swapped ${action.label} with ${action.partnerLabel}.`;
+            return t('schedule.page.swapped', {
+                label: action.label,
+                partner: action.partnerLabel,
+            });
         case 'lock':
             return action.locked
-                ? `Locked ${action.label} in place. The next solve will leave it alone.`
-                : `Unlocked ${action.label}. The next solve may move it.`;
+                ? t('schedule.page.locked', { label: action.label })
+                : t('schedule.page.unlocked', { label: action.label });
         case 'rooms':
             return action.roomCount === 0
-                ? `Removed every room from ${action.label}.`
-                : `Rooms updated for ${action.label}.`;
+                ? t('schedule.page.roomsCleared', { label: action.label })
+                : t('schedule.page.roomsUpdated', { label: action.label });
     }
 }
 
 const announcement = computed(() => {
     const action = editing.lastAction.value;
 
-    return action ? describeAction(action) + violationClause(action.sessionId) : '';
+    if (!action) {
+        return '';
+    }
+
+    /*
+     * JOINED WITH A SPACE rather than concatenated, because the clause no
+     * longer carries a leading one: a message that begins with a space is
+     * unusable to a translator (and invisible in a diff), so the separator
+     * lives at the join and `filter(Boolean)` keeps it out when the clause is
+     * absent, which is what the caller-cannot-read-violations branch returns.
+     */
+    return [describeAction(action), violationClause(action.sessionId)].filter(Boolean).join(' ');
 });
 
 /**
@@ -1077,7 +1143,7 @@ function reconcileFilters() {
         && data.terms.value.length
         && !data.terms.value.some((term) => term.id === filters.termId.value)) {
         filters.termId.value = '';
-        filterNotice.value = 'That term no longer exists. Showing the current one.';
+        filterNotice.value = t('schedule.page.termGone');
 
         return;
     }
@@ -1087,23 +1153,23 @@ function reconcileFilters() {
     if (filters.groupId.value && data.groups.value.length
         && !data.groups.value.some((group) => group.id === filters.groupId.value)) {
         filters.groupId.value = '';
-        dropped.push('group');
+        dropped.push(t('schedule.page.filterGroup'));
     }
 
     if (filters.roomId.value && data.rooms.value.length
         && !data.rooms.value.some((room) => room.id === filters.roomId.value)) {
         filters.roomId.value = '';
-        dropped.push('room');
+        dropped.push(t('schedule.page.filterRoom'));
     }
 
     if (filters.personId.value && data.people.value.length
         && !data.people.value.some((person) => person.id === filters.personId.value)) {
         filters.personId.value = '';
-        dropped.push('person');
+        dropped.push(t('schedule.page.filterPerson'));
     }
 
     if (dropped.length) {
-        filterNotice.value = `Could not apply the ${dropped.join(' and ')} filter from this link. Showing everything.`;
+        filterNotice.value = t('schedule.page.filtersDropped', { filters: joinAnd(dropped, t) });
     }
 }
 
@@ -1353,6 +1419,52 @@ watch(
             position: static;
             overflow: visible;
             max-height: none;
+        }
+    }
+
+    /*
+     * MATCHES `ScheduleWeekNav`'s OWN `.weeknav_step` BY EYE, DELIBERATELY
+     * DUPLICATED rather than shared: this button is slotted content, so Vue's
+     * scoped CSS attaches it to THIS component, not `ScheduleWeekNav`'s scope
+     * `.weeknav_step` is defined under. Keep the two in sync by hand if either
+     * changes; there is no third caller yet to justify extracting a shared
+     * class.
+     */
+    &_today {
+        cursor: pointer;
+
+        display: flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+
+        min-width: 44px;
+        min-height: 44px;
+        border: 0;
+        border-radius: var(--radius-lg);
+
+        color: $content6;
+
+        background: none;
+
+        transition: background 140ms cubic-bezier(0.16, 1, 0.3, 1),
+            color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        @include hover() {
+            &:hover {
+                color: $content1;
+                background: varToRgba('primary500', 0.12);
+            }
+        }
+
+        &:focus-visible {
+            outline: 2px solid $primary600;
+            outline-offset: 1px;
         }
     }
 

@@ -24,6 +24,7 @@ defineRouteMeta({
                                             name: { type: 'string' },
                                             timezone: { type: 'string' },
                                             createdAt: { type: 'string', format: 'date-time' },
+                                            defaultLocale: { type: 'string', nullable: true, description: 'TenantDisplaySettings.defaultLocale, or null when the tenant has no default (an absent settings row reads the same as a null column).' },
                                             federation: {
                                                 type: 'object',
                                                 nullable: true,
@@ -62,9 +63,31 @@ export default defineEventHandler(async (event) => {
             name: true,
             timezone: true,
             createdAt: true,
+            /*
+             * So the panel can SHOW the current default locale beside the
+             * control that changes it (`PATCH /api/staff/tenants/:id/locale`).
+             * A staff editor that could only write a value it cannot read is
+             * the "no data and fetch failed render identically" trap one step
+             * removed: an operator would not be able to tell "no default set"
+             * from "the field just does not display it".
+             */
+            displaySettings: { select: { defaultLocale: true } },
             federation: { select: { id: true, slug: true, name: true } },
         },
     });
 
-    return { rows: tenants };
+    /*
+     * FLATTENED to a nullable `defaultLocale`, never exposed as the settings
+     * relation: an ABSENT singleton and a row whose column is NULL both mean
+     * "no tenant default, defer to Accept-Language" (the column's own schema
+     * comment, and `resolveLocale()`'s contract), so a shape that let a
+     * caller distinguish them would be inviting it to act on a difference
+     * that does not exist.
+     */
+    return {
+        rows: tenants.map(({ displaySettings, ...tenant }) => ({
+            ...tenant,
+            defaultLocale: displaySettings?.defaultLocale ?? null,
+        })),
+    };
 });

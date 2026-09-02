@@ -176,7 +176,7 @@ export async function accountScope(tx: Tx, tenantId: string, accountId: string):
     const own = resolved.find((identity) => identity.tenantId === tenantId);
 
     if (!account || !own) {
-        throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        throw createError({ statusCode: 404, message: 'Not found.' });
     }
 
     const otherTenantIds = new Set(
@@ -258,7 +258,7 @@ export function assertSoleTenant(scope: AccountScope, action: string): void {
 
     throw createError({
         statusCode: 409,
-        statusMessage: `This login is also used at ${scope.otherTenantCount} other `
+        message: `This login is also used at ${scope.otherTenantCount} other `
             + `institution${scope.otherTenantCount === 1 ? '' : 's'}, so ${action} here would `
             + 'change their access too. Detach it from this institution instead, or ask an '
             + 'operator to run `bun run reset:password`.',
@@ -285,7 +285,7 @@ export function assertDetachable(scope: AccountScope): void {
 
     throw createError({
         statusCode: 409,
-        statusMessage: 'This institution holds the login’s only identity. Detaching it would '
+        message: 'This institution holds the login’s only identity. Detaching it would '
             + 'leave a working password nobody can see or revoke. Attach it to a different '
             + 'person, or delete the login.',
         data: { field: 'personId' },
@@ -322,7 +322,7 @@ export async function resolveAttachablePerson(
     if (!person) {
         throw createError({
             statusCode: 422,
-            statusMessage: 'No such person in this institution.',
+            message: 'No such person in this institution.',
             data: { field: 'personId' },
         });
     }
@@ -330,7 +330,7 @@ export async function resolveAttachablePerson(
     if (person.accountLink && person.accountLink.accountId !== accountId) {
         throw createError({
             statusCode: 409,
-            statusMessage: `${person.givenName} ${person.familyName} already has a login. `
+            message: `${person.givenName} ${person.familyName} already has a login. `
                 + 'A person answers to exactly one account, so two credentials for one identity '
                 + 'would make every audit entry ambiguous.',
             data: { field: 'personId' },
@@ -340,7 +340,7 @@ export async function resolveAttachablePerson(
     if (!person.isActive) {
         throw createError({
             statusCode: 422,
-            statusMessage: `${person.givenName} ${person.familyName} is deactivated. `
+            message: `${person.givenName} ${person.familyName} is deactivated. `
                 + 'Sign-in resolves identities through active people only, so this login would '
                 + 'authenticate and then belong to no institution.',
             data: { field: 'personId' },

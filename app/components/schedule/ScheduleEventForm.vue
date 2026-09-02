@@ -4,14 +4,17 @@
         class="evform"
         role="dialog"
         aria-modal="false"
-        :aria-label="`New event on ${weekdayName(target.dayOfWeek)}`"
+        :aria-label="t('schedule.eventForm.dialogLabel', { day: weekdayName(target.dayOfWeek) })"
     >
         <header class="evform_head">
             <div>
-                <h2>New event</h2>
+                <h2>{{ t('schedule.eventForm.title') }}</h2>
                 <p class="evform_when">
-                    {{ weekdayName(target.dayOfWeek) }}, week {{ week }} ·
-                    {{ blockTime(grid, target.blockIndex, target.dayOfWeek).start }}
+                    {{ t('schedule.eventForm.when', {
+                        day: weekdayName(target.dayOfWeek),
+                        week,
+                        time: blockTime(grid, target.blockIndex, target.dayOfWeek).start,
+                    }) }}
                 </p>
             </div>
 
@@ -19,7 +22,7 @@
                 icon="material-symbols:close"
                 type="transparent"
                 @click="$emit('cancel')"
-            >Cancel</CommonButton>
+            >{{ t('common.action.cancel') }}</CommonButton>
         </header>
 
         <!--
@@ -29,28 +32,41 @@
             field on this form.
         -->
         <p class="evform_note">
-            An event stands on its own: no recurring demand behind it. It occupies this
-            room and block, and no solve will move or remove it.
+            {{ t('schedule.eventForm.note') }}
             <br>
-            Marking a range of DATES instead (a holiday, a break, an exam period) is
-            <NuxtLink to="/manage/calendar-periods">an academic-calendar period</NuxtLink>, not an event.
+            <!--
+                `<i18n-t>` rather than a sentence split around the link:
+                German moves "ist" to the end of the clause, so the link has to
+                be a placeholder the translator can put where the grammar needs
+                it, not a fixed middle third.
+            -->
+            <i18n-t
+                keypath="schedule.eventForm.noteCalendar"
+                tag="span"
+                scope="global"
+            >
+                <template #link>
+                    <NuxtLink to="/manage/calendar-periods">{{
+                        t('schedule.eventForm.noteCalendarLink') }}</NuxtLink>
+                </template>
+            </i18n-t>
         </p>
 
         <div class="evform_grid">
             <label class="evform_field evform_field--wide">
-                <span>Name<i>*</i></span>
+                <span>{{ t('schedule.eventForm.name') }}<i>*</i></span>
                 <input
                     ref="titleInput"
                     v-model="title"
                     :disabled="busy"
                     maxlength="200"
-                    placeholder="Open day, exam sitting, staff meeting…"
+                    :placeholder="t('schedule.eventForm.namePlaceholder')"
                     type="text"
                 >
             </label>
 
             <label class="evform_field">
-                <span>Kind<i>*</i></span>
+                <span>{{ t('schedule.eventForm.kind') }}<i>*</i></span>
                 <select
                     v-if="kinds.length"
                     v-model="kindId"
@@ -59,7 +75,7 @@
                     <option
                         disabled
                         value=""
-                    >Choose…</option>
+                    >{{ t('schedule.eventForm.choose') }}</option>
                     <option
                         v-for="kind in kinds"
                         :key="kind.id"
@@ -80,13 +96,13 @@
                     class="evform_blocked"
                 >
                     {{ kindsReadable
-                        ? 'This tenant has no session kinds yet. One is required, and they are managed under Session kinds.'
-                        : 'Session kinds could not be read, and an event needs one. Ask for the session-kind read permission.' }}
+                        ? t('schedule.eventForm.noKinds')
+                        : t('schedule.eventForm.kindsUnreadable') }}
                 </p>
             </label>
 
             <label class="evform_field">
-                <span>Length (blocks)</span>
+                <span>{{ t('schedule.eventForm.length') }}</span>
                 <input
                     v-model.number="durationBlocks"
                     :disabled="busy"
@@ -98,12 +114,12 @@
             </label>
 
             <label class="evform_field">
-                <span>Room</span>
+                <span>{{ t('schedule.eventForm.room') }}</span>
                 <select
                     v-model="roomId"
                     :disabled="busy"
                 >
-                    <option value="">(none)</option>
+                    <option value="">{{ t('schedule.eventForm.roomNone') }}</option>
                     <option
                         v-for="room in rooms"
                         :key="room.id"
@@ -146,11 +162,8 @@
                 type="checkbox"
             >
             <span>
-                Locked
-                <em>
-                    An event is already exempt from solves because it has no offering;
-                    this additionally stops a manual re-place.
-                </em>
+                {{ t('schedule.eventForm.locked') }}
+                <em>{{ t('schedule.eventForm.lockedHelp') }}</em>
             </span>
         </label>
 
@@ -165,7 +178,7 @@
                 :disabled="!kinds.length || !kindId || !title.trim() || busy"
                 type="primary"
                 @click="submit"
-            >{{ busy ? 'Creating…' : 'Create event' }}</CommonButton>
+            >{{ busy ? t('common.action.creating') : t('schedule.eventForm.create') }}</CommonButton>
         </footer>
     </div>
 </template>
@@ -173,6 +186,7 @@
 <script setup lang="ts">
 import { type TimeGrid, blockTime, weekdayName } from '~/composables/schedule';
 import { useOverlay } from '~/composables/overlay';
+import { useT } from '~/composables/i18n';
 import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 import type { RelationDef } from '~/utils/manageRegistry';
 
@@ -209,6 +223,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ cancel: []; created: [] }>();
+
+const { t } = useT();
 
 /**
  * Claiming the keyboard makes the page's own Escape handler stand down, which
@@ -292,13 +308,13 @@ const groupIds = ref<string[]>([]);
  */
 const groupRelation: RelationDef = {
     key: 'groups',
-    label: 'Groups',
-    help: 'Nesting propagates: choosing a cohort also covers its seminars.',
+    label: t('schedule.relation.groupsLabel'),
+    help: t('schedule.relation.groupsHelp'),
     resource: 'groups',
     valueKey: 'groupId',
     indentTree: true,
     optionLabel: (row) => String(row.name),
-    emptyHint: 'No groups available in this term.',
+    emptyHint: t('schedule.relation.groupsEmptyHint'),
 };
 
 /** The picker reads join-shaped rows; the draft holds plain ids. */
@@ -364,8 +380,6 @@ async function submit() {
 
         emit('created');
     } catch (caught: unknown) {
-        const data = (caught as { data?: { statusMessage?: string; message?: string } }).data;
-
         /*
          * The server's message names the grid and its real shape: "…is not a
          * slot in 'Standard week', which has 3 blocks on days 1, 2, 3, 4, 5, 6".
@@ -373,7 +387,7 @@ async function submit() {
          * is a correction to what is on screen, not a notification about
          * something that happened elsewhere.
          */
-        error.value = data?.statusMessage ?? data?.message ?? 'Could not create the event.';
+        error.value = serverErrorMessage(caught) ?? t('schedule.eventForm.createFailed');
     } finally {
         busy.value = false;
     }

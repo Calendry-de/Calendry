@@ -37,7 +37,7 @@ export default defineEventHandler(async (event) => {
     if (raw && typeof raw === 'object' && 'weightMultiplier' in raw) {
         throw createError({
             statusCode: 400,
-            statusMessage: 'A preference weight can only be set by an administrator. '
+            message: 'A preference weight can only be set by an administrator. '
                 + 'Send only preferredDays, preferredBlocks and preferredRoomFeatureIds.',
             data: { field: 'weightMultiplier' },
         });
@@ -51,7 +51,7 @@ export default defineEventHandler(async (event) => {
         const personId = identity.actorPersonId;
 
         if (!personId) {
-            throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+            throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
         }
 
         const limits = await tenantGridLimits(tx, identity.tenantId);
@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
         if (outOfRange.length) {
             throw createError({
                 statusCode: 400,
-                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1}; the largest time grid `
+                message: `Blocks must be between 0 and ${limits.blocksPerDay - 1}; the largest time grid `
                     + `in this tenant has ${limits.blocksPerDay} blocks per day.`,
                 data: { field: 'preferredBlocks' },
             });

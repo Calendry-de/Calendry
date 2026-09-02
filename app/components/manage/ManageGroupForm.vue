@@ -14,7 +14,7 @@
                 <label
                     class="parent_label"
                     :for="controlId"
-                >Parent group</label>
+                >{{ t('manageUi.groupForm.parentLabel') }}</label>
 
                 <p
                     v-if="readonly"
@@ -33,7 +33,7 @@
                     <option
                         :selected="!draft.parentGroupId"
                         value=""
-                    >Top level</option>
+                    >{{ t('manageUi.groupForm.topLevel') }}</option>
                     <option
                         v-for="option in parentOptions"
                         :key="option.value"
@@ -52,12 +52,14 @@
                     v-else
                     class="parent_hint"
                 >
-                    Nesting propagates booking conflicts both ways: a session for
-                    this group blocks its parents and its children.
+                    {{ t('manageUi.groupForm.nestingHint') }}
+                    <!--
+                        ONE plural message, verb included: the sentence used to
+                        build `group{{ 's' }}` and `is`/`are` inline, and a word
+                        split across mustaches has no key at all.
+                    -->
                     <template v-if="mode === 'edit' && excludedCount">
-                        {{ excludedCount }} group{{ excludedCount === 1 ? '' : 's' }} nested beneath this
-                        one {{ excludedCount === 1 ? 'is' : 'are' }} not listed, since moving a group under its own
-                        descendant would create a cycle.
+                        {{ t('manageUi.groupForm.excludedHint', { count: excludedCount }, excludedCount) }}
                     </template>
                 </p>
             </div>
@@ -99,6 +101,7 @@ import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageGroupApplyPlan from '~/components/manage/ManageGroupApplyPlan.vue';
 import ManageGroupAvailability from '~/components/manage/ManageGroupAvailability.vue';
 import ManageGroupSources from '~/components/manage/ManageGroupSources.vue';
+import { useT } from '~/composables/i18n';
 import { descendantIds, indentedOptions } from '~/utils/groupTree';
 
 /**
@@ -124,6 +127,8 @@ defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 
+const { t } = useT();
+
 const controlId = useId();
 
 /** All groups, fetched by the form composable because the field declares the reference. */
@@ -142,7 +147,7 @@ const currentParentLabel = computed(() => {
     const id = draft.value.parentGroupId;
 
     if (!id) {
-        return 'Top level';
+        return t('manageUi.groupForm.topLevel');
     }
 
     return allGroups.value.find((row) => String(row.id) === String(id))?.name as string ?? '-';

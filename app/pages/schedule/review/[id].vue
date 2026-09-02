@@ -53,7 +53,7 @@
                         name="material-symbols:arrow-back"
                         aria-hidden="true"
                     />
-                    All proposals
+                    {{ t('schedule.review.back') }}
                 </NuxtLink>
 
                 <!--
@@ -71,9 +71,11 @@
                         resolve it: the largest type on the page still ordered a
                         review of something already settled.
                     -->
-                    <template v-if="preview">{{ isDecidable ? 'Review proposal' : 'Proposal' }}
-                        v{{ preview.generation.version }}</template>
-                    <template v-else>Proposal</template>
+                    <template v-if="preview">{{ isDecidable
+                        ? t('schedule.review.headingReview')
+                        : t('schedule.review.heading') }}
+                        {{ t('schedule.text.version', { version: preview.generation.version }) }}</template>
+                    <template v-else>{{ t('schedule.review.heading') }}</template>
                     <!--
                         The term was never named on this screen, though the
                         composable has resolved it all along. A department head
@@ -83,15 +85,23 @@
                     <span
                         v-if="term"
                         class="review_term"
-                    >for {{ term.name }}</span>
+                    >{{ t('schedule.review.termFor', { term: term.name }) }}</span>
                 </h1>
 
                 <p
                     v-if="preview"
                     class="review_sub"
                 >
-                    {{ preview.generation.source === 'SOLVER' ? 'Solver proposal' : preview.generation.source }}
-                    <span v-if="computedAgo">· computed {{ computedAgo }}</span>
+                    <!--
+                        The SOURCE is a wire enum, so anything this build does
+                        not recognise renders as the raw value rather than as a
+                        sentence claiming to know what it was.
+                    -->
+                    {{ preview.generation.source === 'SOLVER'
+                        ? t('schedule.review.sourceSolver')
+                        : preview.generation.source }}
+                    <span v-if="computedAgo">· {{
+                        t('schedule.review.computed', { ago: computedAgo }) }}</span>
                     <!--
                         The staleness notice beside this button tells the reviewer
                         to press it; for two sequential round trips it then
@@ -111,7 +121,7 @@
                             :class="{ 'review_refresh-spin': refreshing }"
                             aria-hidden="true"
                         />
-                        {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+                        {{ refreshing ? t('schedule.review.refreshing') : t('schedule.review.refresh') }}
                     </button>
                 </p>
             </div>
@@ -139,20 +149,20 @@
                             name="material-symbols:published-with-changes"
                             aria-hidden="true"
                         />
-                        Apply…
+                        {{ t('schedule.review.apply') }}
                     </CommonButton>
                     <CommonButton
                         type="link"
                         :disabled="busy || confirmDiscard"
                         @click="openConfirm('discard')"
-                    >Discard</CommonButton>
+                    >{{ t('schedule.review.discard') }}</CommonButton>
                 </template>
                 <!-- Static text, not disabled buttons: a disabled control reads
                      as "unavailable right now" rather than "not yours". -->
                 <p
                     v-else
                     class="review_readonly"
-                >You can review this proposal but not apply it.</p>
+                >{{ t('schedule.review.readonly') }}</p>
             </div>
 
         </header>
@@ -193,7 +203,7 @@
             <CommonButton
                 type="secondary"
                 :to="scheduleUrl"
-            >Open the schedule</CommonButton>
+            >{{ t('schedule.review.openSchedule') }}</CommonButton>
         </div>
 
         <!--
@@ -219,16 +229,16 @@
                 aria-hidden="true"
             />
             <span>
-                <strong v-if="outcome.action === 'applied'">Applied.</strong>
-                <strong v-else>Discarded.</strong>
+                <strong v-if="outcome.action === 'applied'">{{ t('schedule.review.appliedStrong') }}</strong>
+                <strong v-else>{{ t('schedule.review.discardedStrong') }}</strong>
                 {{ outcome.action === 'applied'
-                    ? `v${outcome.version} is now this term's schedule.`
-                    : `v${outcome.version} stays on record and can no longer be applied.` }}
+                    ? t('schedule.review.appliedDetail', { version: outcomeVersion })
+                    : t('schedule.review.discardedDetail', { version: outcomeVersion }) }}
             </span>
             <CommonButton
                 type="secondary"
                 :to="scheduleUrl"
-            >Open the schedule</CommonButton>
+            >{{ t('schedule.review.openSchedule') }}</CommonButton>
         </div>
         </Transition>
 
@@ -238,14 +248,14 @@
             role="status"
         >
             <CommonLoader class="review_spinner" />
-            Writing placements. A large proposal takes a few seconds.
+            {{ t('schedule.review.writingPlacements') }}
         </p>
 
         <p
             v-if="discarding"
             class="review_note"
             role="status"
-        >Discarding…</p>
+        >{{ t('schedule.review.discarding') }}</p>
 
         <p
             v-if="actionError"
@@ -273,11 +283,12 @@
             class="review_confirm review_confirm--apply"
             @keydown.esc="closeConfirm"
         >
-            <p class="review_confirm-title">Replace this term's timetable?</p>
+            <p class="review_confirm-title">{{ t('schedule.review.confirmApplyTitle') }}</p>
             <p class="review_confirm-detail">{{ consequence }}</p>
             <p class="review_confirm-detail">
-                Every locked session is left alone, and v{{ preview.generation.version }} stays on
-                record; the schedule it replaces remains as an earlier version.
+                {{ t('schedule.review.confirmApplyNote', {
+                    version: t('schedule.text.version', { version: preview.generation.version }),
+                }) }}
             </p>
             <div class="review_confirm-actions">
                 <CommonButton
@@ -286,12 +297,12 @@
                     :disabled="busy"
                     :aria-busy="applying"
                     @click="doApply"
-                >{{ applying ? 'Applying…' : 'Apply this proposal' }}</CommonButton>
+                >{{ applying ? t('schedule.review.applying') : t('schedule.review.applyConfirm') }}</CommonButton>
                 <CommonButton
                     type="link"
                     :disabled="busy"
                     @click="closeConfirm"
-                >Keep reviewing</CommonButton>
+                >{{ t('schedule.review.keepReviewing') }}</CommonButton>
             </div>
         </div>
         </Transition>
@@ -302,10 +313,9 @@
             class="review_confirm"
             @keydown.esc="closeConfirm"
         >
-            <p class="review_confirm-title">Discard this proposal?</p>
+            <p class="review_confirm-title">{{ t('schedule.review.confirmDiscardTitle') }}</p>
             <p class="review_confirm-detail">
-                It stays on record but can no longer be applied. Nothing on the
-                current schedule changes.
+                {{ t('schedule.review.confirmDiscardNote') }}
             </p>
             <div class="review_confirm-actions">
                 <CommonButton
@@ -314,12 +324,12 @@
                     :disabled="busy"
                     :aria-busy="discarding"
                     @click="doDiscard"
-                >{{ discarding ? 'Discarding…' : 'Discard it' }}</CommonButton>
+                >{{ discarding ? t('schedule.review.discarding') : t('schedule.review.discardConfirm') }}</CommonButton>
                 <CommonButton
                     type="link"
                     :disabled="busy"
                     @click="closeConfirm"
-                >Keep it</CommonButton>
+                >{{ t('schedule.review.keepIt') }}</CommonButton>
             </div>
         </div>
         </Transition>
@@ -351,11 +361,11 @@
                     v-if="loadError.retryable"
                     type="secondary"
                     @click="refresh"
-                >Try again</CommonButton>
+                >{{ t('common.action.retry') }}</CommonButton>
                 <CommonButton
                     type="link"
                     :to="scheduleUrl"
-                >Back to the schedule</CommonButton>
+                >{{ t('schedule.review.backToSchedule') }}</CommonButton>
             </div>
         </div>
 
@@ -365,7 +375,7 @@
             v-else-if="!preview?.run"
             class="review_empty"
         >
-            Nothing to review: this Generation was not produced by a solver run.
+            {{ t('schedule.review.noRun') }}
         </p>
 
         <template v-else>
@@ -383,8 +393,8 @@
             >
                 <div class="review_evidence-head">
                     <h2 class="review_grid-title">{{ view === 'list'
-                        ? 'What this proposal changes'
-                        : 'Where the sessions land' }}</h2>
+                        ? t('schedule.review.evidenceList')
+                        : t('schedule.review.evidenceGrid') }}</h2>
 
                     <!--
                         THE VIEW SWITCH, and the default is the redesign.
@@ -400,7 +410,7 @@
                     <div
                         class="review_views"
                         role="group"
-                        aria-label="Evidence view"
+                        :aria-label="t('schedule.review.viewsLabel')"
                     >
                         <button
                             type="button"
@@ -408,14 +418,14 @@
                             :class="{ 'review_view--on': view === 'list' }"
                             :aria-pressed="view === 'list'"
                             @click="view = 'list'"
-                        >By offering</button>
+                        >{{ t('schedule.review.viewList') }}</button>
                         <button
                             type="button"
                             class="review_view"
                             :class="{ 'review_view--on': view === 'grid' }"
                             :aria-pressed="view === 'grid'"
                             @click="view = 'grid'"
-                        >Week grid</button>
+                        >{{ t('schedule.review.viewGrid') }}</button>
                     </div>
                 </div>
 
@@ -447,10 +457,9 @@
                         name="material-symbols:delete-outline"
                         aria-hidden="true"
                     />
-                    {{ preview.plan.deleted }}
-                    session{{ preview.plan.deleted === 1 ? '' : 's' }} will be removed. The
-                    solver could not place these; applying deletes them rather than leaving
-                    them where it rejected them.
+                    {{ t('schedule.review.destructive', {
+                        count: preview.plan.deleted,
+                    }, preview.plan.deleted) }}
                 </p>
 
                 <ScheduleReviewChanges
@@ -470,7 +479,7 @@
                 -->
                 <div class="review_controls">
                     <label class="review_field">
-                        <span>Week</span>
+                        <span>{{ t('schedule.review.week') }}</span>
                         <select
                             v-model.number="termWeek"
                             class="review_select"
@@ -480,12 +489,12 @@
                                 :key="week.termWeek"
                                 :value="week.termWeek"
                                 :selected="week.termWeek === termWeek"
-                            >Week {{ week.termWeek }}{{ week.label }}</option>
+                            >{{ week.label }}</option>
                         </select>
                     </label>
 
                     <label class="review_field">
-                        <span>Group</span>
+                        <span>{{ t('schedule.review.group') }}</span>
                         <select
                             v-model="groupId"
                             class="review_select"
@@ -493,7 +502,7 @@
                             <option
                                 value=""
                                 :selected="groupId === ''"
-                            >All groups</option>
+                            >{{ t('schedule.review.allGroups') }}</option>
                             <option
                                 v-for="group in groups"
                                 :key="group.id"
@@ -504,7 +513,7 @@
                     </label>
 
                     <label class="review_field">
-                        <span>Room</span>
+                        <span>{{ t('schedule.review.room') }}</span>
                         <select
                             v-model="roomId"
                             class="review_select"
@@ -512,7 +521,7 @@
                             <option
                                 value=""
                                 :selected="roomId === ''"
-                            >All rooms</option>
+                            >{{ t('schedule.review.allRooms') }}</option>
                             <option
                                 v-for="room in rooms"
                                 :key="room.id"
@@ -529,7 +538,7 @@
                         "what does this do to Dr. X?" was unanswerable.
                     -->
                     <label class="review_field">
-                        <span>Person</span>
+                        <span>{{ t('schedule.review.person') }}</span>
                         <select
                             v-model="personId"
                             class="review_select"
@@ -537,7 +546,7 @@
                             <option
                                 value=""
                                 :selected="personId === ''"
-                            >Anyone</option>
+                            >{{ t('schedule.review.anyone') }}</option>
                             <option
                                 v-for="person in people"
                                 :key="person.id"
@@ -555,7 +564,7 @@
                         there is a lot to read in one block.
                     -->
                     <label class="review_field">
-                        <span>Density</span>
+                        <span>{{ t('schedule.review.density') }}</span>
                         <select
                             v-model.number="rowHeight"
                             class="review_select review_select--narrow"
@@ -565,7 +574,7 @@
                                 :key="option.value"
                                 :value="option.value"
                                 :selected="option.value === rowHeight"
-                            >{{ option.label }}</option>
+                            >{{ t(option.labelKey) }}</option>
                         </select>
                     </label>
 
@@ -574,7 +583,7 @@
                             v-model="changesOnly"
                             type="checkbox"
                         >
-                        <span>Changes only</span>
+                        <span>{{ t('schedule.review.changesOnly') }}</span>
                     </label>
                 </div>
 
@@ -591,13 +600,13 @@
                     v-if="offeringId"
                     class="review_drill"
                 >
-                    <span>Showing {{ lookup.offering(offeringId) }} only</span>
+                    <span>{{ t('schedule.review.drill', { offering: lookup.offering(offeringId) }) }}</span>
                     <button
                         type="button"
                         class="review_drill-clear"
                         @click="offeringId = ''"
                     >
-                        Show the whole week
+                        {{ t('schedule.review.drillClear') }}
                         <Icon
                             name="material-symbols:close"
                             aria-hidden="true"
@@ -609,7 +618,7 @@
                     v-if="weekPending"
                     class="review_note"
                     role="status"
-                >Loading week {{ termWeek }}…</p>
+                >{{ t('schedule.review.loadingWeek', { week: termWeek }) }}</p>
 
                 <template v-if="grid">
                     <!--
@@ -683,6 +692,8 @@ import ScheduleReviewSummary from '~/components/schedule/ScheduleReviewSummary.v
 import { applyConsequence, useGenerationReview } from '~/composables/generationReview';
 import { scheduleLinkForTerm } from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
+import { useT } from '~/composables/i18n';
+import type { MessageKey } from '~~/i18n/keys';
 
 /**
  * Gated on `generation.read`, the one permission everything this page reads
@@ -695,6 +706,7 @@ definePageMeta({ middleware: 'review' });
 
 const route = useRoute();
 const generationId = String(route.params.id);
+const { t } = useT();
 
 const {
     preview, grid, groups, rooms, people, lookup, term, loadError, weekCount,
@@ -740,10 +752,15 @@ const confirmFocusEl = ref<{ $el?: HTMLElement } | null>(null);
  * reviewer is reading four lines per chip (action, offering, room, and where it
  * moved from) and deciding whether to accept them.
  */
-const DENSITIES = [
-    { value: 60, label: 'Compact' },
-    { value: 84, label: 'Comfortable' },
-    { value: 112, label: 'Spacious' },
+/*
+ * KEYS, not resolved labels: this is a module-scope constant, evaluated once
+ * at import time, so a resolved string would freeze whichever language the
+ * first render happened in.
+ */
+const DENSITIES: { value: number; labelKey: MessageKey }[] = [
+    { value: 60, labelKey: 'schedule.review.densityCompact' },
+    { value: 84, labelKey: 'schedule.review.densityComfortable' },
+    { value: 112, labelKey: 'schedule.review.densitySpacious' },
 ];
 
 const rowHeight = ref(84);
@@ -753,9 +770,14 @@ await ready;
 
 useHead({
     title: computed(() => (preview.value
-        ? `Proposal v${preview.value.generation.version}`
-        : 'Proposal')),
+        ? t('schedule.review.pageTitleVersion', {
+            version: t('schedule.text.version', { version: preview.value.generation.version }),
+        })
+        : t('schedule.review.pageTitle'))),
 });
+
+/** The applied/discarded version, spelled the way every other `v…` here is. */
+const outcomeVersion = computed(() => t('schedule.text.version', { version: outcome.value?.version ?? 0 }));
 
 const isDecidable = computed(() => preview.value?.generation.status === 'READY');
 
@@ -797,13 +819,14 @@ const terminal = computed(() => {
         return { kind: 'neutral', icon: 'material-symbols:info-outline', title: '', detail: '' };
     }
 
+    const version = t('schedule.text.version', { version: generation?.version ?? 0 });
+
     if (status === 'APPLIED' && generation?.isCurrent) {
         return {
             kind: 'current',
             icon: 'material-symbols:check-circle-outline',
-            title: 'This is the current schedule',
-            detail: `v${generation.version} was applied and is what this term runs on.`
-                + ' Nothing here is awaiting a decision.',
+            title: t('schedule.review.terminalCurrentTitle'),
+            detail: t('schedule.review.terminalCurrentDetail', { version }),
         };
     }
 
@@ -811,9 +834,8 @@ const terminal = computed(() => {
         return {
             kind: 'neutral',
             icon: 'material-symbols:history',
-            title: 'Applied, and since replaced',
-            detail: `v${generation.version} was applied, then a later proposal took over.`
-                + ' It is a record now.',
+            title: t('schedule.review.terminalReplacedTitle'),
+            detail: t('schedule.review.terminalReplacedDetail', { version }),
         };
     }
 
@@ -821,27 +843,32 @@ const terminal = computed(() => {
         return {
             kind: 'neutral',
             icon: 'material-symbols:do-not-disturb-on-outline',
-            title: 'No longer applicable',
-            detail: 'This proposal was discarded or superseded. It stays on record'
-                + ' and can no longer be applied.',
+            title: t('schedule.review.terminalSupersededTitle'),
+            detail: t('schedule.review.terminalSupersededDetail'),
         };
     }
 
+    /*
+     * The status this build does not recognise is NAMED rather than explained
+     * away, which is why it is interpolated raw (lowercased) instead of being
+     * mapped: a generic sentence here is how "This proposal is undefined"
+     * shipped once already.
+     */
     return {
         kind: 'neutral',
         icon: 'material-symbols:info-outline',
-        title: `This proposal is ${status.toLowerCase()}`,
-        detail: 'It is not awaiting a decision.',
+        title: t('schedule.review.terminalOtherTitle', { status: status.toLowerCase() }),
+        detail: t('schedule.review.terminalOtherDetail'),
     };
 });
 
 const consequence = computed(() => (preview.value
-    ? applyConsequence(preview.value.plan, preview.value.violations.proposed.hard)
+    ? applyConsequence(preview.value.plan, preview.value.violations.proposed.hard, t)
     : ''));
 
 const emptyMessage = computed(() => (changesOnly.value
-    ? 'Nothing changes in this week.'
-    : 'No placements in this week.'));
+    ? t('schedule.review.weekEmptyChanges')
+    : t('schedule.review.weekEmptyAll')));
 
 /**
  * The DAY-level counterpart, for the agenda only.
@@ -854,8 +881,8 @@ const emptyMessage = computed(() => (changesOnly.value
  * that can replace the grid rather than sit inside it.
  */
 const dayEmptyMessage = computed(() => (changesOnly.value
-    ? 'Nothing changes on this day.'
-    : 'No placements on this day.'));
+    ? t('schedule.review.dayEmptyChanges')
+    : t('schedule.review.dayEmptyAll')));
 
 /**
  * The term-level totals, and only the non-zero ones.
@@ -876,15 +903,15 @@ const totals = computed(() => {
     const parts: { kind: string; value: number; label: string }[] = [];
 
     if (plan.deleted > 0) {
-        parts.push({ kind: 'deleted', value: plan.deleted, label: 'removed' });
+        parts.push({ kind: 'deleted', value: plan.deleted, label: t('schedule.review.totalRemoved') });
     }
 
     if (plan.created > 0) {
-        parts.push({ kind: 'created', value: plan.created, label: 'added' });
+        parts.push({ kind: 'created', value: plan.created, label: t('schedule.review.totalAdded') });
     }
 
     if (plan.moved > 0) {
-        parts.push({ kind: 'moved', value: plan.moved, label: 'moved' });
+        parts.push({ kind: 'moved', value: plan.moved, label: t('schedule.review.totalMoved') });
     }
 
     /**
@@ -904,7 +931,7 @@ const totals = computed(() => {
         parts.push({
             kind: 'collateral',
             value: collateral,
-            label: 'of those moves were not asked for',
+            label: t('schedule.review.totalCollateral'),
         });
     }
 
@@ -930,22 +957,29 @@ const weekOptions = computed(() => {
         : summary.map((week) => week.termWeek);
 
     if (!weeks.length) {
-        return [{ termWeek: 1, label: '' }];
+        return [{ termWeek: 1, label: t('schedule.review.weekOptionPlain', { week: 1 }) }];
     }
 
+    /*
+     * THE WHOLE OPTION IS ONE MESSAGE. The template used to render
+     * `Week {{ termWeek }}{{ label }}` over a `label` of `': 3 changes'`,
+     * so "Week", the colon, the count and the `-s` flip were four fragments
+     * of one phrase and none of them had a key. Each variant is now a whole
+     * message carrying its own week number.
+     */
     return weeks.map((termWeek) => {
         const week = byWeek.get(termWeek);
         const changed = week ? week.created + week.moved + week.deleted : 0;
 
         if (!week) {
-            return { termWeek, label: ': untouched' };
+            return { termWeek, label: t('schedule.review.weekOptionUntouched', { week: termWeek }) };
         }
 
         return {
             termWeek,
             label: changed
-                ? `: ${changed} change${changed === 1 ? '' : 's'}`
-                : ': no changes',
+                ? t('schedule.review.weekOptionChanges', { week: termWeek, count: changed }, changed)
+                : t('schedule.review.weekOptionNoChanges', { week: termWeek }),
         };
     });
 });
@@ -979,12 +1013,12 @@ const computedAgo = computed(() => {
     const minutes = Math.floor((now.value - new Date(at).getTime()) / 60_000);
 
     if (minutes < 1) {
-        return 'just now';
+        return t('schedule.review.justNow');
     }
 
     return minutes < 60
-        ? `${minutes} minute${minutes === 1 ? '' : 's'} ago`
-        : `over ${Math.floor(minutes / 60)}h ago, refresh before applying`;
+        ? t('schedule.review.minutesAgo', { count: minutes }, minutes)
+        : t('schedule.review.hoursAgo', { hours: Math.floor(minutes / 60) });
 });
 
 /**

@@ -19,7 +19,11 @@ import type { PermissionRequirement } from '#shared/permissions';
  *
  * `/my/account` is deliberately ABSENT: it needs no permission at all (any
  * signed-in Person may set their own locale) and does not carry
- * `middleware: 'my'` for that reason.
+ * `middleware: 'my'` for that reason. So is `/my/data-export`, which exports
+ * the caller's own row and nobody else's. `/my/api-tokens` used to be a third
+ * such page and is NOT any more: minting a bearer credential is now gateable
+ * (`api_token.manage_own`), so it gained both an entry here and the
+ * middleware.
  */
 export const MY_SECTION_PERMISSIONS: Record<string, PermissionRequirement> = {
     '/my/availability': ['availability.manage_own'],
@@ -34,6 +38,20 @@ export const MY_SECTION_PERMISSIONS: Record<string, PermissionRequirement> = {
      * decide whether to offer the group picker.
      */
     '/my/calendar-links': [['ics_link.generate', 'ics_link.generate_own']],
+    /**
+     * ONE KEY, and the page's own fetches need nothing wider: it calls
+     * `GET/POST /api/me/api-tokens` and `DELETE /api/me/api-tokens/:id`, all
+     * three gated on exactly this key, and reads the caller's held
+     * permissions for the minting checkboxes out of the session it already
+     * has (`useSession()`), never from `/api/persons` or the role routes. So
+     * the gate implies every request the page makes, which is the rule a
+     * `Promise.all` blanking a whole page comes from (CLAUDE.md § "A page
+     * must not depend on permissions its own gate doesn't imply").
+     *
+     * The page carried NO `middleware: 'my'` until this key existed, which
+     * was correct while any signed-in Person could mint a token; it does now.
+     */
+    '/my/api-tokens': ['api_token.manage_own'],
 };
 
 /**

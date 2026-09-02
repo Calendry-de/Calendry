@@ -2,8 +2,9 @@ import type { ComputedRef, Ref } from 'vue';
 import type { ResolvedNavEntry } from '~/composables/navigation';
 import type { NavSection } from '~/utils/navPlaces';
 import { useNavEntries } from '~/composables/navigation';
-import { NAV_SECTION_LABELS } from '~/utils/navPlaces';
+import { navSectionLabel } from '~/utils/navPlaces';
 import { useOverlay } from '~/composables/overlay';
+import { useT } from '~/composables/i18n';
 import { fuzzyScoreEntry, highlightRuns } from '~/utils/fuzzy';
 
 export interface PaletteResult {
@@ -31,6 +32,7 @@ export interface PaletteResult {
 export function useCommandPalette() {
     const entries = useNavEntries();
     const { claim, release } = useOverlay('command-palette');
+    const { t } = useT();
 
     const open = useState('calendry.palette.open', () => false);
     const query = useState('calendry.palette.query', () => '');
@@ -66,7 +68,7 @@ export function useCommandPalette() {
             return {
                 entry: row.entry,
                 section: row.entry.section,
-                sectionLabel: NAV_SECTION_LABELS[row.entry.section],
+                sectionLabel: navSectionLabel(row.entry.section, t),
                 runs: highlightRuns(row.entry.label, row.indices),
                 startsSection,
             };

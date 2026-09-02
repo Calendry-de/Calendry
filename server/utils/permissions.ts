@@ -38,9 +38,9 @@ export function crudPermission(resource: string, action: CrudAction): readonly s
         // prefix rule would gate this action on a permission nobody chose.
         throw createError({
             statusCode: 500,
-            statusMessage: `Resource '${resource}' declares no permission for '${action}'.`,
+            message: `Resource '${resource}' declares no permission for '${action}'.`,
         });
     }
 
-    throw createError({ statusCode: 404, statusMessage: `Unknown resource '${resource}'.` });
+    throw createError({ statusCode: 404, message: `Unknown resource '${resource}'.` });
 }

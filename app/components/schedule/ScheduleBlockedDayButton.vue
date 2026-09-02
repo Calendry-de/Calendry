@@ -14,7 +14,7 @@
             icon="material-symbols:event-busy-outline"
             type="transparent"
             @click="open = !open"
-        >I can't teach this week</CommonButton>
+        >{{ t('schedule.blockedDay.open') }}</CommonButton>
 
         <!--
             ANCHORED, not in flow: the toolbar's height is invariant
@@ -25,14 +25,24 @@
             v-if="open"
             class="blockday_panel"
             role="dialog"
-            aria-label="Declare a day you cannot teach"
+            :aria-label="t('schedule.blockedDay.dialogLabel')"
         >
-            <p class="blockday_help">
-                Pick a day in the week you're viewing.
-                <strong>This is submitted for approval</strong>, not applied
-                immediately, because a declared day is a hard rule for the scheduler,
-                so it is reviewed first.
-            </p>
+            <!--
+                `<i18n-t>` rather than three text nodes around a `<strong>`:
+                German reorders the clause, so the emphasised phrase has to be
+                able to move within the sentence. One message, one `{emphasis}`
+                placeholder, and the slot name matches it.
+            -->
+            <i18n-t
+                keypath="schedule.blockedDay.help"
+                tag="p"
+                class="blockday_help"
+                scope="global"
+            >
+                <template #emphasis>
+                    <strong>{{ t('schedule.blockedDay.helpEmphasis') }}</strong>
+                </template>
+            </i18n-t>
 
             <div class="blockday_days">
                 <button
@@ -50,12 +60,12 @@
             </div>
 
             <label class="blockday_field">
-                <span class="sr-only">Reason (optional)</span>
+                <span class="sr-only">{{ t('schedule.blockedDay.reason') }}</span>
                 <input
                     v-model="reason"
                     :disabled="busy"
                     maxlength="500"
-                    placeholder="Reason (optional)"
+                    :placeholder="t('schedule.blockedDay.reason')"
                     type="text"
                 >
             </label>
@@ -69,18 +79,18 @@
                 v-if="submitted"
                 class="blockday_submitted"
                 role="status"
-            >Submitted, waiting for a decision.</p>
+            >{{ t('schedule.blockedDay.submitted') }}</p>
 
             <div class="blockday_actions">
                 <CommonButton
                     :disabled="!selected || busy"
                     type="primary"
                     @click="submit"
-                >{{ busy ? 'Sending…' : 'Submit' }}</CommonButton>
+                >{{ busy ? t('schedule.blockedDay.sending') : t('schedule.blockedDay.submit') }}</CommonButton>
                 <CommonButton
                     type="secondary"
                     @click="open = false"
-                >Close</CommonButton>
+                >{{ t('common.action.close') }}</CommonButton>
             </div>
         </div>
     </div>
@@ -90,6 +100,7 @@
 import { isoDate } from '#shared/academicCalendar';
 import { weekdayName } from '~/composables/schedule';
 import { useHasPermission } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 
 /**
  * "I cannot teach this day": issue #2. A lecturer declares a single date's
@@ -106,6 +117,8 @@ const props = defineProps<{
     activeDays: number[];
     slotDateOf: (week: number, dayOfWeek: number) => Date | null;
 }>();
+
+const { t } = useT();
 
 const canManageOwn = useHasPermission('availability.manage_own');
 const request = useRequestFetch();
@@ -150,8 +163,8 @@ async function submit() {
         selected.value = '';
         reason.value = '';
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not submit that.';
+        error.value = serverErrorMessage(cause)
+            ?? t('schedule.blockedDay.submitFailed');
     } finally {
         busy.value = false;
     }

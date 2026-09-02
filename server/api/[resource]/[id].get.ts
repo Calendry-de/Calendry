@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
         const row = await mapDbErrors(() => delegate(tx, config.model).findFirst({ where, include: config.include }));
 
         if (!row) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         return row;

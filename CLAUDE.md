@@ -513,14 +513,24 @@ Three kinds of change are **themselves migrations**:
 Owed by any tenant provisioned before them: `account.read`, `account.manage`,
 `tenant.read`, `tenant.update`, `generation.read`, `session.read_own`,
 `screen.read`, `screen.manage`, `exam.request_own`, `exam.review`,
-`session.assign_lecturer`, the `member` role, and a `group_veto` constraint
-row.
+`session.assign_lecturer`, `api_token.manage_own`, the `member` role, and a
+`group_veto` constraint row.
 
 **`exam.request_own` is the one that wants granting to LECTURERS, not just to
 `tenant-admin`.** `grant:permissions --all-missing` repairs the admin role only,
 which for every other key on this list is the whole intent; this one is useless
 there and inert everywhere else until somebody adds it to the role real
 lecturers hold.
+
+**`api_token.manage_own` is the one that is owed to `tenant-admin` AND NOWHERE
+ELSE by default**, and the only entry on this list that is a deliberate
+NARROWING rather than a non-regression: any signed-in Person could mint a
+bearer token before it existed, and the point of the key is that an institution
+now decides who may automate. So it has NO inclusive backfill script, unlike
+`ics_link.generate_own` and `dashboard.view`, whose reach was never meant to
+change; `grant:permissions --role tenant-admin --all-missing` is the whole
+repair, and widening it further is a tenant's decision to make per role.
+§ "API tokens gain a permission" (DECISIONS.md).
 
 Production image and CI specifics: § "Bootstrap & deploy".
 

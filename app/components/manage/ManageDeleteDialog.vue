@@ -9,18 +9,27 @@
                 class="confirm_box"
                 role="alertdialog"
                 aria-modal="true"
-                :aria-label="`Delete ${subject}`"
+                :aria-label="t('manageUi.deleteDialog.aria', { subject })"
             >
-                <h2>Delete {{ entityLabel.toLowerCase() }}?</h2>
+                <h2>{{ t('manageUi.deleteDialog.heading', { entity: entityLabel }) }}</h2>
 
-                <p>
-                    <strong>{{ subject }}</strong> will be removed permanently.
-                    This cannot be undone.
-                </p>
+                <!--
+                    `<i18n-t>` so the row's own title stays a `<strong>` inside
+                    one translatable sentence: German puts the verb elsewhere,
+                    and a subject glued to two text nodes cannot be reordered.
+                -->
+                <i18n-t
+                    keypath="manageUi.deleteDialog.body"
+                    scope="global"
+                    tag="p"
+                >
+                    <template #subject>
+                        <strong>{{ subject }}</strong>
+                    </template>
+                </i18n-t>
 
                 <p class="confirm_note">
-                    If anything still references it (a session, an offering, a child
-                    group), the database refuses the delete and nothing is lost.
+                    {{ t('manageUi.deleteDialog.note') }}
                 </p>
 
                 <p
@@ -35,12 +44,12 @@
                         type="secondary"
                         :disabled="busy"
                         @click="$emit('cancel')"
-                    >Cancel</CommonButton>
+                    >{{ t('common.action.cancel') }}</CommonButton>
                     <CommonButton
                         type="destructive"
                         :disabled="busy"
                         @click="$emit('confirm')"
-                    >{{ busy ? 'Deleting…' : 'Delete' }}</CommonButton>
+                    >{{ busy ? t('common.action.deleting') : t('common.action.delete') }}</CommonButton>
                 </div>
             </div>
         </div>
@@ -48,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { useOverlay } from '~/composables/overlay';
 
 /**
@@ -69,6 +79,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>();
+
+const { t } = useT();
 
 const { claim, release } = useOverlay('manage-delete');
 

@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
     const offeringId = getRouterParam(event, 'id');
 
     if (!offeringId) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing offering id.' });
+        throw createError({ statusCode: 400, message: 'Missing offering id.' });
     }
 
     const body = await readValidatedBody(event, bodySchema.parse);

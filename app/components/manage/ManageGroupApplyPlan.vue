@@ -4,13 +4,13 @@
         class="apply"
     >
         <header class="apply_head">
-            <h2>Curriculum plans</h2>
+            <h2>{{ t('manageUi.groupApplyPlan.title') }}</h2>
         </header>
 
         <p
             v-if="applications.length"
             class="apply_help"
-        >Already has:</p>
+        >{{ t('manageUi.groupApplyPlan.alreadyHas') }}</p>
 
         <ul
             v-if="applications.length"
@@ -27,12 +27,19 @@
                     :disabled="busy"
                     type="secondary"
                     @click="advance(application.advance)"
-                >Advance to {{ application.advance.planName }} ({{ application.advance.termName }})</CommonButton>
+                >{{ t('manageUi.groupApplyPlan.advance', {
+                    plan: application.advance.planName,
+                    term: application.advance.termName,
+                }) }}</CommonButton>
             </li>
         </ul>
 
         <p class="apply_help">
-            {{ applications.length ? 'Apply another plan:' : 'Gives this group every offering in the chosen plan, for the term below: it creates whichever ones don’t exist yet and attaches this group to whichever already do, so two groups taking the same subject in one term share one offering rather than duplicating it.' }}
+            {{
+                applications.length
+                    ? t('manageUi.groupApplyPlan.applyAnother')
+                    : t('manageUi.groupApplyPlan.introHint')
+            }}
         </p>
 
         <p
@@ -43,12 +50,12 @@
 
         <div class="apply_controls">
             <label class="apply_field">
-                <span>Plan</span>
+                <span>{{ t('manageUi.groupApplyPlan.planLabel') }}</span>
                 <select
                     v-model="planId"
                     :disabled="busy"
                 >
-                    <option value="">Choose a plan…</option>
+                    <option value="">{{ t('manageUi.groupApplyPlan.planPlaceholder') }}</option>
                     <option
                         v-for="plan in plans"
                         :key="plan.id"
@@ -58,12 +65,12 @@
             </label>
 
             <label class="apply_field">
-                <span>Term</span>
+                <span>{{ t('manageUi.shared.termLabel') }}</span>
                 <select
                     v-model="termId"
                     :disabled="busy"
                 >
-                    <option value="">Choose a term…</option>
+                    <option value="">{{ t('manageUi.shared.termPlaceholder') }}</option>
                     <option
                         v-for="term in terms"
                         :key="term.id"
@@ -76,7 +83,7 @@
                 :disabled="busy || !planId || !termId"
                 type="primary"
                 @click="apply(planId, termId)"
-            >{{ busy ? 'Applying…' : 'Apply' }}</CommonButton>
+            >{{ busy ? t('manageUi.shared.applying') : t('manageUi.groupApplyPlan.apply') }}</CommonButton>
         </div>
 
         <p
@@ -87,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * The action that makes an `OfferingPlan` actually do something: pick a
  * Plan and a Term, and this Group gets that plan's whole course load: real
@@ -119,6 +128,8 @@ interface AppliedOffering { id: string; title: string; action: 'created' | 'atta
 interface AdvanceTarget { planId: string; planName: string; termId: string; termName: string }
 interface Application { planId: string; planName: string; termId: string; termName: string; advance: AdvanceTarget | null }
 
+const { t } = useT();
+
 const canApply = useHasPermission('offering_plan.apply');
 const request = useRequestFetch();
 
@@ -150,23 +161,46 @@ const busy = ref(false);
 const error = ref('');
 const summary = ref('');
 
+/**
+ * What one apply actually did, as a sentence.
+ *
+ * GRAMMAR, NOT PUNCTUATION (i18n/CONVENTIONS.md § "Assembled sentences"), and
+ * built the way that section prescribes for exactly this shape:
+ *
+ *   - each clause is ONE plural message, verb and noun together, never a count
+ *     with an `-s` patched onto the word beside it: German pluralises by stem;
+ *   - the conjunction is a PAIRWISE FOLD through `listJoin` (`"{list} and
+ *     {next}"`), so it stays translatable at any list length rather than being
+ *     a bare `' and '` fragment;
+ *   - the two ways the sentence can END (with or without the "already had this
+ *     group" aside) are two whole messages, because that aside sits inside the
+ *     final full stop and a translator has to be able to move it.
+ *
+ * The alternative, one message per combination, would be six messages whose
+ * two counts cannot both be pluralised in one vue-i18n string anyway.
+ */
 function describe(offerings: AppliedOffering[]): string {
     const created = offerings.filter((o) => o.action === 'created').length;
     const attached = offerings.filter((o) => o.action === 'attached').length;
     const already = offerings.filter((o) => o.action === 'already-attached').length;
 
     if (!created && !attached) {
-        return 'This group already has every offering in this plan for this term.';
+        return t('manageUi.groupApplyPlan.nothingToDo');
     }
 
     const parts = [
-        ...(created ? [`created ${created} offering${created === 1 ? '' : 's'}`] : []),
-        ...(attached ? [`joined this group to ${attached} existing offering${attached === 1 ? '' : 's'}`] : []),
+        ...(created ? [t('manageUi.shared.partCreated', { count: created }, created)] : []),
+        ...(attached ? [t('manageUi.groupApplyPlan.partAttached', { count: attached }, attached)] : []),
     ];
 
-    const alreadyClause = already ? ` (${already} already had this group)` : '';
+    const list = parts.reduce((joined, next) => t(
+        'manageUi.shared.listJoin',
+        { list: joined, next },
+    ));
 
-    return `Done: ${parts.join(' and ')}${alreadyClause}.`;
+    return already
+        ? t('manageUi.groupApplyPlan.doneWithAlready', { parts: list, count: already })
+        : t('manageUi.groupApplyPlan.done', { parts: list });
 }
 
 async function apply(applyPlanId: string, applyTermId: string) {
@@ -189,11 +223,7 @@ async function apply(applyPlanId: string, applyTermId: string) {
         termId.value = '';
         await refreshApplications();
     } catch (cause) {
-        // h3 nests a custom `data` one level inside the response body; see
-        // `useEntityForm`'s own comment on this, verified against a live error.
-        const body = (cause as { data?: { statusMessage?: string } }).data;
-
-        error.value = body?.statusMessage ?? 'Could not apply this plan.';
+        error.value = serverErrorMessage(cause) ?? t('manageUi.shared.applyError');
     } finally {
         busy.value = false;
     }

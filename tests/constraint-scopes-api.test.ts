@@ -68,7 +68,7 @@ describe('a variant of a type that already has a default', () => {
         const res = await create({});
 
         expect(res.status).toBe(422);
-        expect(String(res.body.statusMessage)).toContain('at least one session kind');
+        expect(String(res.body.message)).toContain('at least one session kind');
     });
 
     it('writes nothing when refused', async () => {
@@ -119,7 +119,7 @@ describe('scopes are editable after creation', () => {
         // Guarding create alone would let the same illegal state be reached in
         // two requests instead of one.
         expect(res.status).toBe(422);
-        expect(String(res.body.statusMessage)).toContain('second tenant-wide');
+        expect(String(res.body.message)).toContain('second tenant-wide');
 
         const scopes = await ownerDb.constraintScope.count({ where: { constraintId: created.body.id } });
 

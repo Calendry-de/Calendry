@@ -48,13 +48,13 @@ export default defineEventHandler(async (event) => {
             });
 
             if (!generation) {
-                throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+                throw createError({ statusCode: 404, message: 'Not found.' });
             }
 
             if (generation.status === 'INFEASIBLE' || generation.status === 'FAILED') {
                 throw createError({
                     statusCode: 409,
-                    statusMessage: `Generation is ${generation.status} and has no placements to apply.`,
+                    message: `Generation is ${generation.status} and has no placements to apply.`,
                 });
             }
 

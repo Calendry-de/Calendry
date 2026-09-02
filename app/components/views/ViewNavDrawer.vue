@@ -11,7 +11,7 @@
                 class="drawer_panel"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Navigation"
+                :aria-label="t('nav.shell.navigation')"
                 @keydown.esc.prevent="close"
                 @keydown.tab="trapFocus"
             >
@@ -21,7 +21,7 @@
                         ref="closeRef"
                         class="drawer_close"
                         type="button"
-                        aria-label="Close menu"
+                        :aria-label="t('nav.shell.closeMenu')"
                         @click="close"
                     >
                         <Icon
@@ -33,7 +33,7 @@
 
                 <nav
                     class="drawer_nav"
-                    aria-label="Sections"
+                    :aria-label="t('nav.shell.sections')"
                 >
                     <!--
                         A link OR a button, because `NavEntry` sets exactly one
@@ -85,7 +85,7 @@
                         aria-hidden="true"
                     />
                     <span class="drawer_label">Search</span>
-                    <span class="drawer_hint">Jump to any section</span>
+                    <span class="drawer_hint">{{ t('nav.shell.jumpToSection') }}</span>
                 </button>
             </div>
         </div>
@@ -93,9 +93,12 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import type { ResolvedNavEntry } from '~/composables/navigation';
 import { useHeaderNav } from '~/composables/navigation';
 import { useOverlay } from '~/composables/overlay';
+
+const { t } = useT();
 
 /**
  * The narrow-viewport navigation, opened from `ViewMenu`'s menu button.

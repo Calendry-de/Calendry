@@ -1,5 +1,8 @@
 import type { Ref } from 'vue';
+import { useT } from '~/composables/i18n';
 import type { SolverMode } from '#shared/solverMode';
+import type { ConstraintIssue } from '#shared/constraintTypes';
+import type { ResolvedSolverError } from '#shared/solverErrorParsing';
 
 /**
  * The solver run in flight, for one Term.
@@ -41,6 +44,14 @@ export interface SolverRunRow {
     elapsedMillis: number | null;
     terminationReason: string | null;
     errorDetail: string | null;
+    /**
+     * `errorDetail`, parsed and its subject resolved to a display name
+     * server-side (`server/utils/solverErrorMapping.ts`). `null` when there is
+     * no `errorDetail`, or when it does not match the one shape the solver's
+     * own rejections take (`shared/solverErrorParsing.ts`): a message this app
+     * has never seen falls back to being shown raw, not hidden.
+     */
+    parsedError?: ResolvedSolverError | null;
     /** Set when a SUCCEEDED run's result could not be recovered. */
     resultLostAt?: string | null;
     generationId: string | null;
@@ -53,6 +64,10 @@ export interface SolverRunRow {
      */
     scope?: unknown;
     createdAt: string;
+    /** Null until `StartRun` acks (or forever, for a run that never got that far). */
+    startedAt?: string | null;
+    /** Null while the run is still active. */
+    finishedAt?: string | null;
 }
 
 /** The six states the control renders. Derived, never stored. */
@@ -77,6 +92,61 @@ const STALL_AFTER_MS = 12_000;
  */
 export function clientPollMs(ageMs: number): number {
     return ageMs < 10_000 ? 1_000 : 2_500;
+}
+
+/** `68ms`/`3.2s`: whichever reads better at that magnitude. */
+export function formatDuration(ms: number): string {
+    return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+/**
+ * The created → finished delta for a terminal run, so an instant validation
+ * rejection ("failed 68ms after it was created") reads as nothing like a
+ * solver that ran for a while and then timed out.
+ *
+ * Computed from the row's OWN timestamps, not `elapsedMillis`: that field is
+ * the solver's own figure, `null` for a run that failed before the solver
+ * ever answered a `GetStatus` (a pre-flight-shaped rejection, or a transport
+ * failure), which is exactly the case this exists to describe.
+ *
+ * `null` for a run that has not finished, or whose timestamps do not make
+ * sense (clock skew, a row from before both columns existed).
+ */
+export function elapsedMs(run: Pick<SolverRunRow, 'createdAt' | 'finishedAt'>): number | null {
+    if (!run.finishedAt) {
+        return null;
+    }
+
+    const ms = new Date(run.finishedAt).getTime() - new Date(run.createdAt).getTime();
+
+    return Number.isFinite(ms) && ms >= 0 ? ms : null;
+}
+
+/**
+ * Which `subjectType`s a solver error's `parsedError` can name that also have
+ * a `/manage/<resource>/:id` edit page. `session` and `person` are
+ * deliberately absent: a Session is the schedule grid itself, not a `/manage`
+ * entity, and a Person's edit page is not where anyone would look to fix a
+ * SOLVER rejection naming them.
+ */
+const MANAGE_RESOURCE_BY_SUBJECT: Record<string, string> = {
+    constraint: 'constraints',
+    offering: 'offerings',
+    room: 'rooms',
+    group: 'groups',
+};
+
+/** The `/manage/...` edit link for a resolved solver error's subject, or `null` when there is none. */
+export function manageLinkForSubject(
+    parsed: Pick<ResolvedSolverError, 'subjectType' | 'subjectId'> | null | undefined,
+): string | null {
+    if (!parsed) {
+        return null;
+    }
+
+    const resource = MANAGE_RESOURCE_BY_SUBJECT[parsed.subjectType];
+
+    return resource ? `/manage/${resource}/${parsed.subjectId}` : null;
 }
 
 /**
@@ -160,10 +230,20 @@ export interface StartOptions {
 }
 
 export function useSolverRun(termId: Ref<string>) {
+    const { t } = useT();
+
     const run = ref<SolverRunRow | null>(null);
     const starting = ref(false);
     const cancelling = ref(false);
     const error = ref<string | null>(null);
+    /**
+     * Why this tenant's enabled constraints would block a run, checked BEFORE
+     * anyone clicks: `GET /api/solver/preflight`, the same check
+     * `POST /api/solver/runs` runs before creating a row. Kept separate from
+     * `error` (a start ATTEMPT that failed) because this is not a failure, it
+     * is the reason the button is disabled.
+     */
+    const preflightIssues = ref<ConstraintIssue[]>([]);
     /** Set when a POST loses the one-active-run race and we adopt the winner. */
     const adopted = ref(false);
     /** What the losing POST asked for, so the adoption notice can name both. */
@@ -246,6 +326,33 @@ export function useSolverRun(termId: Ref<string>) {
     }
 
     /**
+     * Refresh `preflightIssues` for the CURRENT tenant (not per-term; see
+     * `preflightConstraints`'s own comment for why a constraint's params are
+     * tenant-wide configuration).
+     *
+     * Best-effort like `adopt()`: no permission or an unreachable API leaves
+     * the last known list rather than inventing a "nothing wrong" answer, and
+     * an empty issue list is only ever a POSITIVE claim when the fetch
+     * actually returned one.
+     */
+    async function checkPreflight() {
+        if (!termId.value) {
+            return;
+        }
+
+        try {
+            const result = await $fetch<{ issues: ConstraintIssue[] }>(
+                `/api/solver/preflight?termId=${encodeURIComponent(termId.value)}`,
+            );
+
+            preflightIssues.value = result.issues;
+        } catch {
+            // No permission, or the endpoint is unavailable. Leave the button
+            // exactly as it was rather than claiming certainty either way.
+        }
+    }
+
+    /**
      * Pick up whatever is already running for this term, started by anyone.
      *
      * Solving is a TENANT activity, not a per-user one: a run someone else
@@ -315,6 +422,12 @@ export function useSolverRun(termId: Ref<string>) {
             schedule(500);
         } catch (e) {
             const status = (e as { statusCode?: number }).statusCode;
+            const data = (e as { data?: {
+                error?: string;
+                issues?: ConstraintIssue[];
+                runId?: string;
+                parsedError?: ResolvedSolverError | null;
+            } }).data;
 
             /**
              * 409 means the one-active-run index rejected this because a run
@@ -329,8 +442,33 @@ export function useSolverRun(termId: Ref<string>) {
                 requestedMode.value = options.mode ?? 'rebuild';
                 await adopt();
                 adopted.value = true;
+            } else if (data?.error === 'SOLVER_PRECONDITION_FAILED' && data.issues) {
+                /**
+                 * The button should have been disabled already (`preflightIssues`
+                 * is checked on mount and refreshed after every dismiss), so
+                 * reaching this is a RACE: something changed between that check
+                 * and this click. Refreshed rather than merely stashed in
+                 * `error`, so the idle view's issue list (the thing a person can
+                 * actually act on) is exactly what blocked THIS click.
+                 */
+                preflightIssues.value = data.issues;
+            } else if (data?.runId) {
+                /**
+                 * A `solver_run` row WAS created and then marked FAILED
+                 * (`SolverRejectedError`, or a transport failure): fetch it and
+                 * render the FAILED state, with its parsed reason and raw
+                 * detail, rather than leaving `run` null and showing nothing
+                 * but a floating error string with no run to look at.
+                 */
+                try {
+                    const fetched = await $fetch<{ run: SolverRunRow }>(`/api/solver/runs/${data.runId}`);
+
+                    run.value = fetched.run;
+                } catch {
+                    error.value = serverErrorMessage(e) ?? t('schedule.solver.startFailed');
+                }
             } else {
-                error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not start a run.';
+                error.value = serverErrorMessage(e) ?? t('schedule.solver.startFailed');
             }
         } finally {
             starting.value = false;
@@ -352,7 +490,7 @@ export function useSolverRun(termId: Ref<string>) {
             schedule(500);
         } catch (e) {
             cancelling.value = false;
-            error.value = (e as { statusMessage?: string }).statusMessage ?? 'Could not cancel the run.';
+            error.value = serverErrorMessage(e) ?? t('schedule.solver.cancelFailed');
         }
     }
 
@@ -363,6 +501,9 @@ export function useSolverRun(termId: Ref<string>) {
         watchedRunId.value = null;
         error.value = null;
         adopted.value = false;
+        // The tenant may have just fixed the constraint the FAILED run named;
+        // re-check rather than leaving the button disabled on stale news.
+        void checkPreflight();
     }
 
     /**
@@ -372,8 +513,14 @@ export function useSolverRun(termId: Ref<string>) {
      * from the truth. Live run state is not first-render state: idle is the
      * correct thing to show until the browser has actually asked.
      */
-    onMounted(() => void adopt());
-    watch(termId, () => void adopt());
+    onMounted(() => {
+        void adopt();
+        void checkPreflight();
+    });
+    watch(termId, () => {
+        void adopt();
+        void checkPreflight();
+    });
 
     onBeforeUnmount(() => {
         stopped = true;
@@ -398,19 +545,17 @@ export function useSolverRun(termId: Ref<string>) {
 
         if (joined === requestedMode.value) {
             return joined === 'repair'
-                ? 'A repair was already running for this term.'
-                : 'A run was already in progress for this term.';
+                ? t('schedule.solver.adoptedRepair')
+                : t('schedule.solver.adoptedRebuild');
         }
 
         return joined === 'rebuild'
-            ? 'A full rebuild was already running for this term, so this is showing that '
-                + 'instead of a repair: it replaces the whole timetable, not just the clashes.'
-            : 'A repair was already running for this term, so this is showing that instead of '
-                + 'a full rebuild: it only moves what it must.';
+            ? t('schedule.solver.adoptedRebuildInsteadOfRepair')
+            : t('schedule.solver.adoptedRepairInsteadOfRebuild');
     });
 
     return {
-        run, state, trend, error, adopted, adoptedNotice, isActive,
+        run, state, trend, error, adopted, adoptedNotice, isActive, preflightIssues,
         start, cancel, dismiss,
     };
 }

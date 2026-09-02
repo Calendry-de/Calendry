@@ -1,17 +1,15 @@
 <template>
     <section class="items">
         <header class="items_head">
-            <h2>Offerings in this plan</h2>
+            <h2>{{ t('manageUi.offeringPlanItems.title') }}</h2>
             <span
                 v-if="busy"
                 class="items_state"
-            >Working…</span>
+            >{{ t('manageUi.shared.working') }}</span>
         </header>
 
         <p class="items_help">
-            Applied to a Group, each one below becomes a real Offering for the Term
-            you choose, read fresh from its template at that moment, so editing a
-            template here changes what the NEXT apply creates, never one already made.
+            {{ t('manageUi.offeringPlanItems.help') }}
         </p>
 
         <p
@@ -35,7 +33,7 @@
                     class="items_remove"
                     :disabled="busy"
                     type="button"
-                    :aria-label="`Remove ${nameOf(row.templateId)}`"
+                    :aria-label="t('manageUi.shared.removeAria', { label: nameOf(row.templateId) })"
                     @click="remove(row.templateId)"
                 >
                     <Icon
@@ -50,20 +48,24 @@
             v-else
             class="items_empty"
         >
-            Nothing in this plan yet. Add a template below.
+            {{ t('manageUi.offeringPlanItems.empty') }}
         </p>
 
         <label
             v-if="!readonly"
             class="items_add"
         >
-            <span class="sr-only">Add an offering template</span>
+            <span class="sr-only">{{ t('manageUi.offeringPlanItems.addLabel') }}</span>
             <select
                 :disabled="busy || !available.length"
                 :value="''"
                 @change="add($event)"
             >
-                <option value="">{{ available.length ? 'Add a template…' : 'Every template is already in this plan' }}</option>
+                <option value="">{{
+                    available.length
+                        ? t('manageUi.offeringPlanItems.addOption')
+                        : t('manageUi.offeringPlanItems.allAdded')
+                }}</option>
                 <option
                     v-for="option in available"
                     :key="option.id"
@@ -75,6 +77,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * A plan's ordered item list: see `OfferingPlanItem`'s own schema comment
  * for why order is stored rather than computed, and `items.put.ts` for why
@@ -93,6 +97,8 @@ const props = defineProps<{
 
 interface ItemRow { templateId: string }
 interface TemplateOption { id: string; name: string }
+
+const { t } = useT();
 
 const request = useRequestFetch();
 
@@ -136,8 +142,8 @@ async function save(next: ItemRow[]) {
         await request(`/api/offering-plan-items/${props.planId}`, { method: 'PUT', body: next });
         await refresh();
     } catch (cause) {
-        error.value = (cause as { statusMessage?: string })?.statusMessage
-            ?? 'Could not save this plan’s offerings.';
+        error.value = serverErrorMessage(cause)
+            ?? t('manageUi.offeringPlanItems.error');
     } finally {
         busy.value = false;
     }

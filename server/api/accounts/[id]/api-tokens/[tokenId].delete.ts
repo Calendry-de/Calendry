@@ -32,7 +32,7 @@ export default defineEventHandler(async (event) => {
         }));
 
         if (deleted.count === 0) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         await auditAccount({

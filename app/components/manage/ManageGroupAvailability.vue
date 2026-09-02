@@ -1,11 +1,9 @@
 <template>
     <section class="avail">
-        <h3 class="avail_heading">Availability within a term</h3>
+        <h3 class="avail_heading">{{ t('manageUi.groupAvailability.heading') }}</h3>
 
         <p class="avail_help">
-            Leave a term blank to make this group available for all of it. Setting dates
-            restricts placement to that range, for a cohort that runs the first half of a
-            term, or joins late.
+            {{ t('manageUi.groupAvailability.help') }}
         </p>
 
         <!--
@@ -43,22 +41,25 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
+            <!--
+                The bold lead and the explanation that follows it are two
+                COMPLETE sentences, so each is its own message and the space
+                between them is punctuation (i18n/CONVENTIONS.md § "Assembled
+                sentences"): nothing of one sentence's grammar crosses into the
+                other, and one `<i18n-t>` per variant would key three messages
+                whose whole content is `{lead} {body}`.
+            -->
             <span v-if="!rulesReadable">
-                <strong>Saved.</strong>
-                Whether the scheduler honours these dates depends on a rule this account
-                cannot read, so this panel cannot say. The dates themselves are stored
-                either way.
+                <strong>{{ t('manageUi.groupAvailability.savedLead') }}</strong>
+                {{ t('manageUi.groupAvailability.unreadableBody') }}
             </span>
             <span v-else-if="vetoRule">
-                <strong>Saved, but not yet enforced.</strong>
-                “{{ vetoRule.name }}” is switched off, so the scheduler currently ignores
-                these dates. Enable it under Constraints to make them binding.
+                <strong>{{ t('manageUi.groupAvailability.notEnforcedLead') }}</strong>
+                {{ t('manageUi.groupAvailability.disabledBody', { rule: vetoRule.name }) }}
             </span>
             <span v-else>
-                <strong>Saved, but not yet enforced.</strong>
-                This institution has no “group availability” rule configured, so the
-                scheduler currently ignores these dates. An administrator needs to add it
-                before they take effect.
+                <strong>{{ t('manageUi.groupAvailability.notEnforcedLead') }}</strong>
+                {{ t('manageUi.groupAvailability.missingBody') }}
             </span>
         </p>
 
@@ -71,7 +72,7 @@
         <p
             v-if="!terms.length"
             class="avail_empty"
-        >No terms defined yet, so there is nothing to narrow.</p>
+        >{{ t('manageUi.groupAvailability.noTerms') }}</p>
 
         <ul
             v-else
@@ -93,7 +94,7 @@
 
                 <template v-else>
                     <label class="avail_field">
-                        <span class="avail_field-label">Available from</span>
+                        <span class="avail_field-label">{{ t('manageUi.groupAvailability.fromLabel') }}</span>
                         <input
                             class="avail_input"
                             :max="isoOf(term.endDate)"
@@ -105,7 +106,7 @@
                     </label>
 
                     <label class="avail_field">
-                        <span class="avail_field-label">Available to</span>
+                        <span class="avail_field-label">{{ t('manageUi.groupAvailability.toLabel') }}</span>
                         <input
                             class="avail_input"
                             :max="isoOf(term.endDate)"
@@ -137,10 +138,12 @@
 
 <script setup lang="ts">
 import { blackedOutWeeks, weekCountOf } from '#shared/academicCalendar';
+import { useT } from '~/composables/i18n';
 import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
 
 const locale = useViewerLocale();
+const { t } = useT();
 
 /**
  * A Group's per-Term availability window.
@@ -309,7 +312,7 @@ async function save(): Promise<void> {
     } catch (cause) {
         const message = (cause as { data?: { message?: string } }).data?.message;
 
-        error.value = message ?? 'Could not save the availability window.';
+        error.value = message ?? t('manageUi.groupAvailability.saveError');
     }
 }
 
@@ -318,16 +321,19 @@ function describe(term: TermRow): string {
     const window = draft.value[term.id];
 
     if (!window?.availableFrom && !window?.availableTo) {
-        return 'All term';
+        return t('manageUi.groupAvailability.allTerm');
     }
 
+    // The en-dash between two formatted dates is PUNCTUATION between finished
+    // values, not grammar, so it stays in code; the same join renders in the
+    // template above for the term's own span.
     if (window.availableFrom && window.availableTo) {
         return `${formatDate(window.availableFrom, locale.value)} – ${formatDate(window.availableTo, locale.value)}`;
     }
 
     return window.availableFrom
-        ? `From ${formatDate(window.availableFrom, locale.value)}`
-        : `Until ${formatDate(window.availableTo, locale.value)}`;
+        ? t('manageUi.groupAvailability.fromDate', { date: formatDate(window.availableFrom, locale.value) })
+        : t('manageUi.groupAvailability.untilDate', { date: formatDate(window.availableTo, locale.value) });
 }
 
 /**
@@ -340,7 +346,7 @@ function preview(term: TermRow): string {
     const window = draft.value[term.id];
 
     if (!window?.availableFrom && !window?.availableTo) {
-        return 'Available every week of this term.';
+        return t('manageUi.groupAvailability.previewAll');
     }
 
     const start = new Date(term.startDate);
@@ -353,17 +359,18 @@ function preview(term: TermRow): string {
     const free = total - blocked.length;
 
     if (!blocked.length) {
-        return `These dates cover all ${total} weeks, so nothing is narrowed.`;
+        return t('manageUi.groupAvailability.previewNothingNarrowed', { total });
     }
 
     if (!free) {
-        return `Blocks every week of this term: no session could be placed.`;
+        return t('manageUi.groupAvailability.previewBlocksAll');
     }
 
-    // Week numbers are 1-based for a human, 0-based on the wire.
+    // Week numbers are 1-based for a human, 0-based on the wire. The comma
+    // list is punctuation between finished numbers, so it stays in code.
     const names = blocked.map((index) => index + 1).join(', ');
 
-    return `${free} of ${total} weeks available. Blocked: week ${names}.`;
+    return t('manageUi.groupAvailability.previewSome', { free, total, weeks: names });
 }
 </script>
 

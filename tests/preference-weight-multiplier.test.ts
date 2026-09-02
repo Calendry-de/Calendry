@@ -24,9 +24,21 @@ import {
  *     an out-of-range attempt) are decided by `describeWeightMultiplier` and
  *     `isWeightMultiplierInRange`, both asserted here, and the overridden state
  *     is asserted again over real HTTP against the rendered staff page in
- *     `person-availability-api.test.ts`. They live in `shared/` because
- *     `app/utils/availabilityLabels.ts` imports `~/composables/schedule`, which
- *     resolves only inside Nuxt and is therefore unreachable from a unit test.
+ *     `person-availability-api.test.ts`. They live in `shared/` because the
+ *     server's write path needs the same predicate and the same bounds, so
+ *     there is one clamp rather than two kept in agreement by hand.
+ *
+ *     THIS PARAGRAPH USED TO CLAIM something different and false: that
+ *     `app/utils/availabilityLabels.ts` "imports `~/composables/schedule`,
+ *     which resolves only inside Nuxt and is therefore unreachable from a unit
+ *     test". `vitest.config.ts` aliases `~` to `./app`, so that module imports
+ *     and runs perfectly well here, as `tests/availability-labels-render.test.ts`
+ *     now demonstrates by calling `describeWindow()` directly against a real
+ *     TimeGrid. Corrected under issue #19, and worth naming rather than quietly
+ *     deleting: a false claim about what CANNOT be tested is how coverage gets
+ *     skipped for years, and it is exactly the "a tracked-gap entry can drift
+ *     from the code silently" trap CLAUDE.md warns about, wearing a test
+ *     comment as a disguise.
  *
  * The gap that remains is the input's own keystroke handling, which is the part
  * least able to be wrong in a way the server would not also catch.

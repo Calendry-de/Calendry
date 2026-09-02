@@ -33,7 +33,7 @@ export default defineEventHandler(async (event) => {
         const personId = identity.actorPersonId;
 
         if (!personId) {
-            throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
+            throw createError({ statusCode: 403, message: 'No acting Person on this session.' });
         }
 
         /*
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
         if (body.date && (body.days.length || body.weeks.length)) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'Name a single date, or a recurring day/week pattern, not both.',
+                message: 'Name a single date, or a recurring day/week pattern, not both.',
                 data: { field: 'date' },
             });
         }

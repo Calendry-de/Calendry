@@ -110,7 +110,7 @@ describe('the Events-only boundary', () => {
         const res = await api(`/api/sessions/${created.id}`, { method: 'DELETE', cookie });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('belongs to an Offering');
+        expect(String(res.body.message)).toContain('belongs to an Offering');
 
         // The refusal must not be a partial delete: the row and its event log
         // both stay intact.

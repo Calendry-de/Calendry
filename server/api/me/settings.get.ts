@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     if (!identity.actorPersonId) {
         // Only an `account` identity has one (CLAUDE.md's three-principal
         // model); a screen or the poller has no "my settings" to have.
-        throw createError({ statusCode: 403, statusMessage: 'No acting person on this request.' });
+        throw createError({ statusCode: 403, message: 'No acting person on this request.' });
     }
 
     const person = await tx.person.findUnique({

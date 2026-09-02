@@ -26,12 +26,14 @@
                         name="material-symbols:groups-outline"
                         aria-hidden="true"
                     />
+                    <!--
+                        ONE plural message: `institution{{ 's' }}` was a word
+                        split across mustaches, which has no key at all.
+                    -->
                     <span>
-                        This login is also used at {{ otherTenantCount }}
-                        other institution{{ otherTenantCount === 1 ? '' : 's' }}.
-                        Its address, activation and password belong to all of them, so this
-                        institution can only change who it acts as here. Removing it from this
-                        institution detaches it; it keeps working elsewhere.
+                        {{ t('manageUi.accountForm.sharedNote', {
+                            count: otherTenantCount,
+                        }, otherTenantCount) }}
                     </span>
                 </p>
 
@@ -50,7 +52,7 @@
                         class="field_label"
                         :for="personControlId"
                     >
-                        Acts as
+                        {{ t('manageUi.accountForm.actsAsLabel') }}
                         <span
                             class="field_required"
                             aria-hidden="true"
@@ -73,7 +75,7 @@
                         <option
                             :selected="!draft.personId"
                             value=""
-                        >Choose a person</option>
+                        >{{ t('manageUi.accountForm.choosePerson') }}</option>
                         <option
                             v-for="person in options"
                             :key="person.id"
@@ -92,17 +94,14 @@
                         v-else-if="!readonly && candidatesLoaded && options.length === 0"
                         class="field_hint field_hint--warn"
                     >
-                        Everybody in this institution already has a login, or there is nobody
-                        here yet. Add a person under People first, since a login has to act as one.
+                        {{ t('manageUi.accountForm.noCandidates') }}
                     </p>
 
                     <p
                         v-else-if="!readonly"
                         class="field_hint"
                     >
-                        Who this credential signs in as. Only people without a login are listed:
-                        one person answers to exactly one account, so audit entries stay
-                        unambiguous.
+                        {{ t('manageUi.accountForm.personHint') }}
                     </p>
 
                     <!--
@@ -111,15 +110,24 @@
                         person is not here", which is the least diagnosable answer
                         a picker can give.
                     -->
-                    <p
+                    <!--
+                        `<i18n-t>` so the shell command stays a `<code>`
+                        element: it is an IDENTIFIER, never translated, and must
+                        not become part of the message.
+                    -->
+                    <i18n-t
                         v-if="!readonly && atCandidateLimit"
                         class="field_hint field_hint--warn"
+                        keypath="manageUi.accountForm.candidateLimit"
+                        scope="global"
+                        tag="p"
                     >
-                        Showing the first {{ CANDIDATE_LIMIT }} people without a login; there are
-                        more. Until this picker can search, issue the login from a terminal:
-                        <code>bun run create:account -- --tenant &lt;slug&gt; --email &lt;email&gt;
-                        --attach</code>
-                    </p>
+                        <template #limit>{{ CANDIDATE_LIMIT }}</template>
+                        <template #command>
+                            <code>bun run create:account -- --tenant &lt;slug&gt; --email &lt;email&gt;
+                            --attach</code>
+                        </template>
+                    </i18n-t>
                 </div>
 
                 <!--
@@ -142,7 +150,7 @@
                         class="field_label"
                         :for="passwordControlId"
                     >
-                        Initial password
+                        {{ t('manageUi.accountForm.initialPassword') }}
                         <span
                             class="field_required"
                             aria-hidden="true"
@@ -163,14 +171,18 @@
                             icon="material-symbols:casino-outline"
                             type="secondary"
                             @click="draft.password = randomPassword()"
-                        >Generate</CommonButton>
+                        >{{ t('manageUi.accountForm.generate') }}</CommonButton>
 
                         <CommonButton
                             v-if="canCopy"
                             icon="material-symbols:content-copy-outline"
                             type="secondary"
                             @click="copy(String(draft.password ?? ''))"
-                        >{{ copied ? 'Copied' : 'Copy' }}</CommonButton>
+                        >{{
+                            copied
+                                ? t('manageUi.accountForm.copied')
+                                : t('manageUi.accountForm.copy')
+                        }}</CommonButton>
                     </div>
 
                     <p
@@ -183,9 +195,7 @@
                         v-else
                         class="field_hint field_hint--warn"
                     >
-                        Copy it now. Only a hash is stored, so this exact value is never
-                        readable again, though a new one can be issued from this login’s page
-                        at any time. At least {{ PASSWORD_MIN_LENGTH }} characters.
+                        {{ t('manageUi.accountForm.passwordHint', { min: PASSWORD_MIN_LENGTH }) }}
                     </p>
                 </div>
 
@@ -201,14 +211,10 @@
                     class="account_attach"
                     role="status"
                 >
-                    <p class="account_attach_head">This address already has a login.</p>
+                    <p class="account_attach_head">{{ t('manageUi.accountForm.attachHead') }}</p>
 
                     <p class="account_attach_body">
-                        It can be attached to {{ selectedPersonLabel }} instead of creating a
-                        second one. They would sign in with the password they already have, which
-                        this institution never sees, and because the login would then be
-                        shared, its address, activation and password could no longer be changed
-                        from here.
+                        {{ t('manageUi.accountForm.attachBody', { person: selectedPersonLabel }) }}
                     </p>
 
                     <label class="account_attach_confirm">
@@ -217,13 +223,13 @@
                             type="checkbox"
                             @change="draft.attachExisting = ($event.target as HTMLInputElement).checked"
                         >
-                        <span>Attach the existing login instead of creating one</span>
+                        <span>{{ t('manageUi.accountForm.attachConfirm') }}</span>
                     </label>
 
                     <p
                         v-if="draft.attachExisting"
                         class="account_attach_body"
-                    >Press Create again to attach it.</p>
+                    >{{ t('manageUi.accountForm.attachPrompt') }}</p>
                 </div>
             </template>
         </ManageEntityForm>
@@ -240,15 +246,15 @@
             v-if="mode === 'edit' && canUpdate"
             class="account_ops"
         >
-            <h2 class="account_ops_title">Credential</h2>
+            <h2 class="account_ops_title">{{ t('manageUi.accountForm.credentialTitle') }}</h2>
 
             <dl class="account_facts">
                 <div>
-                    <dt>Last sign-in</dt>
+                    <dt>{{ t('manageUi.accountForm.lastSignIn') }}</dt>
                     <dd>{{ lastLogin }}</dd>
                 </div>
                 <div>
-                    <dt>Active sessions</dt>
+                    <dt>{{ t('manageUi.accountForm.activeSessions') }}</dt>
                     <dd>{{ activeSessions }}</dd>
                 </div>
             </dl>
@@ -269,7 +275,9 @@
                 class="account_issued"
                 role="status"
             >
-                <p class="account_issued_head">New password issued. Sessions revoked: {{ issuedRevoked }}.</p>
+                <p class="account_issued_head">{{
+                    t('manageUi.accountForm.issuedHead', { count: issuedRevoked })
+                }}</p>
 
                 <div class="account_issued_value">
                     <code>{{ issued }}</code>
@@ -279,11 +287,15 @@
                         icon="material-symbols:content-copy-outline"
                         type="secondary"
                         @click="copy(issued)"
-                    >{{ copied ? 'Copied' : 'Copy' }}</CommonButton>
+                    >{{
+                        copied
+                            ? t('manageUi.accountForm.copied')
+                            : t('manageUi.accountForm.copy')
+                    }}</CommonButton>
                 </div>
 
                 <p class="account_issued_note">
-                    Shown once. They will be asked to choose their own at the next sign-in.
+                    {{ t('manageUi.accountForm.issuedNote') }}
                 </p>
             </div>
 
@@ -299,14 +311,14 @@
                     icon="material-symbols:lock-reset"
                     type="secondary"
                     @click="resetPassword"
-                >Issue a new password</CommonButton>
+                >{{ t('manageUi.accountForm.issuePassword') }}</CommonButton>
 
                 <CommonButton
                     :disabled="busy"
                     icon="material-symbols:logout"
                     type="secondary"
                     @click="revokeSessions"
-                >Sign out everywhere</CommonButton>
+                >{{ t('manageUi.accountForm.signOutEverywhere') }}</CommonButton>
 
                 <CommonButton
                     v-if="!isSoleTenant"
@@ -314,20 +326,22 @@
                     icon="material-symbols:link-off"
                     type="destructive"
                     @click="detach"
-                >Remove from this institution</CommonButton>
+                >{{ t('manageUi.accountForm.detach') }}</CommonButton>
             </div>
 
             <p class="account_ops_hint">
+                <!--
+                    Three COMPLETE sentences: which of the first two applies
+                    depends on the login, the third always does, so each is its
+                    own message and the space between them is punctuation.
+                -->
                 <template v-if="isSoleTenant">
-                    Issuing a password revokes every session this login holds and requires a
-                    change at the next sign-in.
+                    {{ t('manageUi.accountForm.opsHintSole') }}
                 </template>
                 <template v-else>
-                    Only this institution’s link can be changed here; issuing a password would
-                    change how the login behaves at the others too.
+                    {{ t('manageUi.accountForm.opsHintShared') }}
                 </template>
-                Signing out reaches every institution the login is used at, which is allowed
-                because its holder can sign straight back in with the password they know.
+                {{ t('manageUi.accountForm.opsHintCommon') }}
             </p>
 
             <!--
@@ -340,7 +354,7 @@
                 holder's to delegate from.
             -->
             <section class="account_tokens">
-                <h3 class="account_tokens_title">API tokens</h3>
+                <h3 class="account_tokens_title">{{ t('manageUi.accountForm.tokensTitle') }}</h3>
 
                 <p
                     v-if="tokensOpError"
@@ -362,16 +376,24 @@
 
                             <dl class="account_facts">
                                 <div>
-                                    <dt>Created</dt>
+                                    <dt>{{ t('common.field.created') }}</dt>
                                     <dd>{{ formatWhen(tokenRow.createdAt) }}</dd>
                                 </div>
                                 <div>
-                                    <dt>Last used</dt>
-                                    <dd>{{ tokenRow.lastUsedAt ? formatWhen(tokenRow.lastUsedAt) : 'Never' }}</dd>
+                                    <dt>{{ t('manageUi.accountForm.lastUsed') }}</dt>
+                                    <dd>{{
+                                        tokenRow.lastUsedAt
+                                            ? formatWhen(tokenRow.lastUsedAt)
+                                            : t('common.value.never')
+                                    }}</dd>
                                 </div>
                                 <div>
-                                    <dt>Expires</dt>
-                                    <dd>{{ tokenRow.expiresAt ? formatWhen(tokenRow.expiresAt) : 'Never' }}</dd>
+                                    <dt>{{ t('common.field.expires') }}</dt>
+                                    <dd>{{
+                                        tokenRow.expiresAt
+                                            ? formatWhen(tokenRow.expiresAt)
+                                            : t('common.value.never')
+                                    }}</dd>
                                 </div>
                             </dl>
 
@@ -386,14 +408,18 @@
                             size="S"
                             type="destructive"
                             @click="revokeToken(tokenRow.id)"
-                        >{{ revokingTokenId === tokenRow.id ? 'Revoking…' : 'Revoke' }}</CommonButton>
+                        >{{
+                            revokingTokenId === tokenRow.id
+                                ? t('manageUi.accountForm.revoking')
+                                : t('manageUi.accountForm.revoke')
+                        }}</CommonButton>
                     </li>
                 </ul>
 
                 <p
                     v-else-if="tokensData.status.value === 'success'"
                     class="account_ops_hint"
-                >No API tokens.</p>
+                >{{ t('manageUi.accountForm.noTokens') }}</p>
             </section>
         </section>
     </div>
@@ -404,6 +430,7 @@ import type { useEntityForm } from '~/composables/entityForm';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import { PASSWORD_MIN_LENGTH, randomPassword } from '#shared/password';
 import { CANDIDATE_LIMIT } from '#shared/accounts';
+import { useT } from '~/composables/i18n';
 
 /**
  * Account's detail: the shared form, plus the two things a login has that no
@@ -437,6 +464,8 @@ const props = defineProps<{
 defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
+
+const { t } = useT();
 
 const request = useRequestFetch();
 const router = useRouter();
@@ -483,7 +512,7 @@ const lastLogin = computed(() => {
 
     // Never signed in and "we do not know" are the same fact here, and both are
     // worth saying out loud rather than rendering as an empty cell.
-    return value ? new Date(value).toLocaleString() : 'Never';
+    return value ? new Date(value).toLocaleString() : t('common.value.never');
 });
 
 /**
@@ -573,7 +602,7 @@ const options = computed<Candidate[]>(() => {
             id: current,
             // The row carries one display name, not its parts. Put in
             // `givenName` so `personLabel` renders it unchanged.
-            givenName: row.value?.personName ?? 'Currently attached person',
+            givenName: row.value?.personName ?? t('manageUi.accountForm.currentPerson'),
             familyName: '',
             email: null,
             isActive: true,
@@ -663,9 +692,7 @@ const revokedNotice = ref('');
 
 /** The server's sentence, or a generic one. Same extraction the form composable uses. */
 function messageOf(error: unknown): string {
-    const e = error as { statusMessage?: string; data?: { statusMessage?: string; message?: string } };
-
-    return e.data?.statusMessage ?? e.statusMessage ?? e.data?.message ?? 'Could not complete that.';
+    return serverErrorMessage(error) ?? t('manageUi.accountForm.opFailed');
 }
 
 async function run(action: () => Promise<void>) {
@@ -722,10 +749,18 @@ function revokeSessions() {
             { method: 'POST' },
         );
 
+        /*
+         * ONE plural message rather than the `session(s)` this used to print:
+         * a parenthesised `(s)` is a hand-built plural, and German pluralises
+         * by stem, so it can never be translated as written.
+         */
         revokedNotice.value = result.sessionsRevoked === 0
-            ? 'There were no active sessions to revoke.'
-            : `${result.sessionsRevoked} session(s) revoked. `
-                + 'The login still works: they can sign back in with their own password.';
+            ? t('manageUi.accountForm.noSessionsRevoked')
+            : t(
+                'manageUi.accountForm.sessionsRevoked',
+                { count: result.sessionsRevoked },
+                result.sessionsRevoked,
+            );
     });
 }
 

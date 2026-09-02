@@ -9,6 +9,18 @@ export default defineConfig({
         // a vendored submodule with 93 tests of its own.
         include: ['tests/**/*.test.ts'],
 
+        /*
+         * Forces `Accept-Language: en-GB` on every request the suite makes,
+         * so the app renders the English catalogue rather than the `de-DE`
+         * default `FALLBACK_LOCALE` now names (issue #19). Without it, ~200
+         * English copy assertions across 49 files would compare against
+         * German and report "page did not render its content", which is
+         * indistinguishable from a blanked page or a permissions bug. The file
+         * explains why it patches `fetch` once instead of touching 51 call
+         * sites.
+         */
+        setupFiles: ['tests/helpers/setup.ts'],
+
         // The integration suites share one set of fixture ids and each
         // `beforeAll` re-seeds them, so in parallel they race on unique ids.
         fileParallelism: false,

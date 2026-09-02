@@ -2,8 +2,8 @@
     <CommonAppShell
         :back-label="entity.plural"
         :back-to="`/manage/${entity.key}`"
-        :description="`Create a new ${entity.label.toLowerCase()} in this institution.`"
-        :title="`New ${entity.label.toLowerCase()}`"
+        :description="t('managePages.entity.newDescription', { entity: entity.label })"
+        :title="t('managePages.entity.newTitle', { entity: entity.label })"
     >
         <ManageTemplateStarter
             v-if="entity.startFromTemplate"
@@ -42,6 +42,7 @@ import { useEntityForm } from '~/composables/entityForm';
 import { useEntityRelations } from '~/composables/entityRelations';
 import { useEntityPermissions } from '~/composables/entityList';
 import { findManageEntity } from '~/utils/manageRegistry';
+import { useT } from '~/composables/i18n';
 
 definePageMeta({
     middleware: 'manage',
@@ -49,9 +50,20 @@ definePageMeta({
 });
 
 const route = useRoute();
-const entity = findManageEntity(route.params.entity as string)!;
+const { t } = useT();
 
-useHead({ title: `New ${entity.label}` });
+// The middleware has already rejected an unknown section; this is the type
+// narrowing, not a second guard. `t` is what resolves the registry's copy
+// (issue #19); the middleware could not pass one, so it checked the wordless
+// `findManageSection` instead.
+const entity = findManageEntity(route.params.entity as string, t)!;
+
+// NO `.toLowerCase()` on the entity name, here or in the title above: German
+// capitalises every noun, so a lowercased "Räume" renders "räume". One message
+// with a named placeholder, per i18n/CONVENTIONS.md § "Never case-transform
+// user-facing text". The name itself arrives already translated from
+// `manageEntities(t)`.
+useHead(() => ({ title: t('managePages.entity.newTitle', { entity: entity.label }) }));
 
 const { canCreate } = useEntityPermissions(entity);
 

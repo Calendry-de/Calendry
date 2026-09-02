@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
         if (identity.kind !== 'account') {
             throw createError({
                 statusCode: 403,
-                statusMessage: 'Calendar links are managed with a signed-in session, not with a token or device key.',
+                message: 'Calendar links are managed with a signed-in session, not with a token or device key.',
             });
         }
 
@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
         }));
 
         if (deleted.count === 0) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         return { deleted: id };

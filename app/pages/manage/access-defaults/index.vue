@@ -1,14 +1,10 @@
 <template>
     <CommonAppShell
-        description="Whether a newly created Person is granted an access role automatically."
-        title="Access defaults"
+        :description="t('managePages.accessDefaults.description')"
+        :title="t('managePages.accessDefaults.pageTitle')"
     >
         <p class="intro">
-            Off by default. Granting a role to somebody is normally a deliberate
-            decision made on their own page; this setting reverses that for every
-            new Person at once, so choose it deliberately too. Every grant it makes
-            is marked as coming from this default, distinct from a role assigned by
-            hand.
+            {{ t('managePages.accessDefaults.intro') }}
         </p>
 
         <p
@@ -17,13 +13,26 @@
             role="alert"
         >{{ loadError }}</p>
 
-        <p
+        <!--
+            `<i18n-t>` so the two permission keys stay INSIDE one sentence: they
+            are the sentence's objects, and German puts them elsewhere in the
+            clause. The keys themselves are identifiers, not copy, so they are
+            literals here rather than messages.
+        -->
+        <i18n-t
             v-else-if="!canEdit"
             class="note"
+            keypath="managePages.accessDefaults.readOnly"
+            scope="global"
+            tag="p"
         >
-            You can see this setting but not change it. Changing it needs both
-            <code>tenant.update</code> and <code>person_access_role.assign</code>.
-        </p>
+            <template #tenantUpdate>
+                <code>tenant.update</code>
+            </template>
+            <template #assign>
+                <code>person_access_role.assign</code>
+            </template>
+        </i18n-t>
 
         <form
             class="panel"
@@ -33,14 +42,14 @@
                 class="panel_field"
                 :for="selectId"
             >
-                <span>Default access role for new People</span>
+                <span>{{ t('managePages.accessDefaults.roleLabel') }}</span>
 
                 <select
                     :id="selectId"
                     v-model="form.defaultAccessRoleId"
                     :disabled="!canEdit"
                 >
-                    <option :value="null">None: grant nothing automatically</option>
+                    <option :value="null">{{ t('managePages.accessDefaults.roleNone') }}</option>
                     <option
                         v-for="role in roles"
                         :key="role.id"
@@ -53,10 +62,7 @@
                 v-if="form.defaultAccessRoleId"
                 class="panel_hint"
             >
-                Every Person created from now on will hold this role immediately,
-                including through bulk creation, once that exists. Deleting this
-                role while it is the default is refused; choose a different default
-                (or None) first.
+                {{ t('managePages.accessDefaults.roleHint') }}
             </p>
 
             <div
@@ -67,13 +73,13 @@
                     :disabled="saving || !dirty"
                     native-type="submit"
                     type="primary"
-                >{{ saving ? 'Saving…' : 'Save' }}</CommonButton>
+                >{{ saving ? t('common.action.saving') : t('common.action.save') }}</CommonButton>
 
                 <p
                     v-if="saved"
                     class="panel_saved"
                     role="status"
-                >Saved.</p>
+                >{{ t('managePages.accessDefaults.saved') }}</p>
                 <p
                     v-if="saveError"
                     class="note note--error"
@@ -87,6 +93,7 @@
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
 import CommonAppShell from '~/components/common/CommonAppShell.vue';
+import { useT } from '~/composables/i18n';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
@@ -104,14 +111,16 @@ definePageMeta({
             if (!held.has('tenant.read')) {
                 return abortNavigation(createError({
                     statusCode: 403,
-                    statusMessage: 'Viewing access defaults needs tenant.read.',
+                    message: 'Viewing access defaults needs tenant.read.',
                 }));
             }
         },
     ],
 });
 
-useHead({ title: 'Access defaults' });
+const { t } = useT();
+
+useHead(() => ({ title: t('managePages.accessDefaults.pageTitle') }));
 
 const selectId = useId();
 // Both, not either: see index.put.ts's own note on why writing this needs
@@ -139,7 +148,7 @@ await Promise.all([settings, rolesData]);
 const roles = computed(() => rolesData.data.value?.rows ?? []);
 
 const loadError = computed(() => (settings.error.value || rolesData.error.value
-    ? 'Could not load access defaults. Nothing has been changed.'
+    ? t('managePages.accessDefaults.loadError')
     : ''));
 
 const form = reactive({
@@ -164,8 +173,8 @@ async function save() {
         saved.value = true;
     }
     catch (error) {
-        saveError.value = (error as { statusMessage?: string }).statusMessage
-            ?? 'Could not save. Nothing has been changed.';
+        saveError.value = serverErrorMessage(error)
+            ?? t('managePages.accessDefaults.saveError');
     }
     finally {
         saving.value = false;

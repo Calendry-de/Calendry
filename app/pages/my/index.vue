@@ -1,6 +1,6 @@
 <template>
-    <CommonPage title="My settings">
-        <p class="intro">Things you set for yourself. Nobody else's data is reachable from here.</p>
+    <CommonPage :title="t('my.index.pageTitle')">
+        <p class="intro">{{ t('my.index.intro') }}</p>
 
         <!--
             A NAMED landmark. The page carried two `<nav>` elements: the
@@ -9,38 +9,63 @@
             them anonymous.
         -->
         <nav
-            class="cards"
-            aria-label="My settings sections"
+            class="groups"
+            :aria-label="t('my.index.sectionsLabel')"
         >
-            <NuxtLink
-                v-for="entry in entries"
-                :key="entry.id"
-                class="cards_card"
-                :to="entry.to!"
+            <!--
+                GROUPED, through the same `groupNavEntries()` the sidebar and
+                the dashboard use, so the headings a reader sees here cannot
+                disagree with the ones in the nav beside them. The hub was a
+                flat wall of cards in which "API tokens" and "Export my data"
+                had no home at all: both were panels stacked under the locale
+                form on `/my/account`, whose own card reads "Your own display
+                locale".
+            -->
+            <section
+                v-for="group in groups"
+                :key="group.id"
+                class="groups_group"
             >
-                <Icon
-                    class="cards_icon"
-                    :name="entry.icon"
-                    aria-hidden="true"
-                />
                 <!--
-                    An `h2`, not a `span`: the page rendered an `h1` and nothing
-                    else, so browsing by heading (how a screen-reader user skims)
-                    found no structure below the title.
+                    `h2` for the group and `h3` for each card, so heading
+                    navigation reflects the actual nesting. The cards were
+                    `h2` when the page was flat.
                 -->
-                <h2 class="cards_label">{{ entry.label }}</h2>
-                <span class="cards_hint">{{ entry.description }}</span>
-            </NuxtLink>
+                <h2 class="groups_heading">{{ group.label }}</h2>
+
+                <div class="cards">
+                    <NuxtLink
+                        v-for="entry in group.entries"
+                        :key="entry.id"
+                        class="cards_card"
+                        :to="entry.to!"
+                    >
+                        <Icon
+                            class="cards_icon"
+                            :name="entry.icon"
+                            aria-hidden="true"
+                        />
+                        <h3 class="cards_label">{{ entry.label }}</h3>
+                        <span class="cards_hint">{{ entry.description }}</span>
+                    </NuxtLink>
+                </div>
+            </section>
         </nav>
     </CommonPage>
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
 import { useNavEntries } from '~/composables/navigation';
+import { groupNavEntries } from '~/utils/navGroups';
 
 definePageMeta({ middleware: 'my' });
 
-useHead({ title: 'My settings' });
+const { t } = useT();
+
+// A getter, so the tab title follows a language change rather than freezing at
+// whatever was active when this page first mounted.
+useHead(() => ({ title: t('my.index.pageTitle') }));
 
 /*
  * Projected from the nav registry rather than listed again, for the reason the
@@ -48,6 +73,15 @@ useHead({ title: 'My settings' });
  * permission filter is already applied there.
  */
 const entries = computed(() => useNavEntries().value.filter((entry) => entry.section === 'my'));
+
+/*
+ * `groupNavEntries` drops any destination no `NAV_GROUPS` entry claims, which
+ * is deliberate and is why `tests/nav-groups.test.ts` exists: a `/my` page
+ * added without a group would vanish from this hub while staying reachable in
+ * the header and in Ctrl+K, and nothing would say so. That test covers this
+ * page now too, since both read the same registry.
+ */
+const groups = computed(() => groupNavEntries(entries.value, t));
 </script>
 
 <style scoped lang="scss">
@@ -65,6 +99,22 @@ const entries = computed(() => useNavEntries().value.filter((entry) => entry.sec
  * orphan card on a third row. `auto-fit` collapses empty tracks instead, so a
  * two-entry section does not leave a phantom column.
  */
+.groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+
+    &_heading {
+        margin: 0 0 var(--space-s);
+
+        font-size: var(--font-size-label);
+        font-weight: 600;
+        color: rgb(var(--textSoft));
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+}
+
 .cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

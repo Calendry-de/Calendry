@@ -532,20 +532,24 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
-     * A NEW tenant is provisioned preferring its best rooms; an existing row is
-     * never rewritten. `defaultConstraintRow` seeds params from the catalogue
-     * defaults, so this pins the product's opinion in the one place it lives.
+     * A NEW tenant is provisioned preferring its best rooms, but NOT enabled:
+     * `rankThreshold` is `required` with deliberately no default ("premium" is
+     * per-institution), so `defaultEnabled: true` (2026-08-31, tuned to match
+     * the `test` tenant's live settings) seeded every OTHER tenant a row that
+     * was enabled and unsendable — `validateConstraint`/`toWireConstraint`
+     * both refuse it, and the real solver rejected it with `INVALID_ARGUMENT`
+     * on the very first run, the identical shape of bug this file's
+     * `minimize_block_usage`/`minimize_specifc_day` cases document above.
+     * `defaultConstraintRow` still seeds the DIRECTION (`invert: true`, the
+     * product's stated preference) so enabling the rule needs only a
+     * threshold, not a rebuild of the row from scratch.
      */
-    it('provisions a new tenant with the room-rank direction set, and enabled', () => {
+    it('provisions a new tenant with the room-rank direction set, but not enabled', () => {
         const type = findConstraintType('minimize_high_ranking_rooms')!;
         const seeded = defaultConstraintRow(type);
 
         expect(seeded.params).toEqual({ invert: true });
-
-        // `defaultEnabled: true` (2026-08-31), tuned to match the `test`
-        // tenant's live settings: a per-type opt-in, not the structural-only
-        // default every OTHER unlisted solver-steering type still gets.
-        expect(seeded.isEnabled).toBe(true);
+        expect(seeded.isEnabled).toBe(false);
     });
 
     it('carries weight for SOFT types and zeroes it for HARD ones', () => {

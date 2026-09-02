@@ -1,0 +1,258 @@
+{
+    "meta": {
+        "title": "Stundenplanung für Schulen und Hochschulen",
+        "description": "Calendry ist eine Plattform für die Stundenplanung an Schulen und Hochschulen, ausgelegt auf mehrere Institutionen: eine Anwendung, die den Stundenplan verwaltet und zeigt, dazu ein Solver-Dienst, der Stundenpläne vorschlägt, über die ein Mensch entscheidet. In aktiver Entwicklung."
+    },
+    "action": {
+        "getInTouch": "Kontakt aufnehmen",
+        "signIn": "Anmelden"
+    },
+    "hero": {
+        "statusLabel": "In aktiver Entwicklung",
+        "title": "Stundenplanung für Schulen und Hochschulen.",
+        "lead": "Räume, Klassen, Personal und Lehrveranstaltungen eines Semesters an einem Ort – und ein Solver, der einen Stundenplan vorschlägt, über den Sie entscheiden.",
+        "secondaryAction": "Was heute funktioniert"
+    },
+    "topbar": {
+        "navLabel": "Startseite",
+        "nav": {
+            "whatItDoes": "Was es kann",
+            "whatWorks": "Was funktioniert",
+            "roadmap": "Roadmap",
+            "technical": "Technik",
+            "pricing": "Preise"
+        }
+    },
+    "audience": {
+        "line": "Für die Menschen, die den Stundenplan wirklich bauen: Sekretariat, Stundenplanverantwortliche und Fachbereichsleitungen – und für die Lehrkräfte, die mit dem Ergebnis leben müssen."
+    },
+    "section": {
+        "what": {
+            "title": "Ein Stundenplan, den Sie verwalten – und einer, den Sie anfordern",
+            "lead": "Zwei Hälften. Diese Anwendung speichert und zeigt den Stundenplan und alles, woraus er besteht; ein eigener Solver-Dienst berechnet aus Ihren Regeln mögliche Termine und gibt sie zurück, damit ein Mensch sie annimmt oder verwirft."
+        },
+        "built": {
+            "title": "Was heute funktioniert",
+            "lead": "Keine Demo. Alles Folgende ist umgesetzt, läuft gegen eine echte Datenbank und ist von den Integrationstests dieses Repositorys abgedeckt."
+        },
+        "next": {
+            "title": "Was noch nicht gebaut ist – offen gesagt",
+            "lead": "Calendry entsteht in Phasen, und jeder Punkt hier ist eine Phase, kein Versprechen mit einem Datum daran. Wo eine Entscheidung noch offen ist, steht dabei, welche."
+        },
+        "why": {
+            "title": "Entscheidungen, zu denen wir stehen",
+            "lead": "Software für Stundenplanung scheitert auf bestimmte, wiederkehrende Weisen. Das sind die Entscheidungen dagegen. Jede davon ist ein Grundsatz, auf dem der Code tatsächlich aufbaut, kein Slogan."
+        },
+        "contact": {
+            "title": "Erzählen Sie uns von Ihrer Institution",
+            "lead": "Calendry wird für echte Stundenpläne gebaut, deshalb ist das nützliche Gespräch das über Ihren: wie viele Räume und Klassen, wie Ihre Woche aussieht und was heute schiefgeht."
+        },
+        "underTheHood": {
+            "title": "Für technisch Interessierte"
+        }
+    },
+    "callout": {
+        "builtText": "Wenn das schon den Großteil dessen abdeckt, was Ihre Woche braucht, ist der nächste sinnvolle Schritt ein Gespräch über Ihre Institution."
+    },
+    "feature": {
+        "model": {
+            "title": "Ein Ort für alles, woraus ein Stundenplan besteht",
+            "body": "Räume, Klassen und Jahrgänge, Personal und Lernende, Lehrveranstaltungen, Semester und Ihr eigenes Blockraster für den Tag. Ihr Vokabular bleibt Ihres: Rollenbezeichnungen, Terminarten und Raumausstattung legen Sie selbst fest, Sie müssen nichts in eine feste Liste übersetzen. Sie markieren, welche Ihrer Terminarten Prüfungen sind – so finden die Prüfungsregeln sie darüber und nicht über den Namen, den Sie ihnen gerade gegeben haben."
+        },
+        "editing": {
+            "title": "Einen Stundenplan ändern, ohne dass unbemerkt etwas kaputtgeht",
+            "body": "Verschieben Sie einen Termin, tauschen Sie zwei, oder fixieren Sie einen, damit ihn nichts mehr anfasst. Kollidiert eine Änderung mit etwas – ein doppelt belegter Raum, eine Klasse an zwei Orten gleichzeitig –, lässt Calendry sie zu und hält die Kollision als abfragbaren Zustand fest. Es blockiert Sie nicht, und es vergisst nichts."
+        },
+        "solver": {
+            "title": "Einen Stundenplan anfordern und ihn dann beurteilen",
+            "body": "Starten Sie einen Planungslauf und sehen Sie ihm zu; brechen Sie ihn ab, wenn Sie es sich anders überlegen. Am Ende erhalten Sie einen Planvorschlag, gezeigt gegen den Stundenplan, den Sie schon haben: was er ändern würde und was er nicht erfüllen konnte. Nichts wird übernommen, bis Sie es übernehmen."
+        },
+        "people": {
+            "title": "Jede Person sieht ihren eigenen Ausschnitt",
+            "body": "Die Berechtigungsrollen Ihrer Institution stellen Sie selbst zusammen. Wer den Stundenplan lesen darf, wer einen Termin verschieben darf und wer den Solver starten darf, sind damit getrennte Fragen. Lehrkräfte tragen ihre eigenen Sperrzeiten und ihre bevorzugten Lehrtage selbst ein; die Verwaltung prüft, was sie angeben."
+        }
+    },
+    "roadmap": {
+        "builtPrefix": "Funktioniert: ",
+        "nextPrefix": "Noch nicht gebaut: "
+    },
+    "built": {
+        "cluster": {
+            "runningTerm": "Ein Semester betreiben",
+            "askingForTimetable": "Einen Stundenplan anfordern",
+            "whoCanReachWhat": "Wer worauf zugreifen darf",
+            "moreThanOneInstitution": "Mehr als eine Institution"
+        },
+        "schedule": {
+            "title": "Stundenplan ansehen und bearbeiten",
+            "note": "Wochenraster am Rechner, Tagesansicht am Telefon. Verschieben, tauschen und fixieren, wobei Kollisionen festgehalten und nicht abgelehnt werden, und jede Änderung wird mit der handelnden Person an ein Protokoll angehängt. Die Lehrkraft eines fixierten Termins lässt sich von Hand dauerhaft überschreiben."
+        },
+        "manage": {
+            "title": "Verwaltungsseiten für die zentralen Objekte",
+            "note": "Räume, Gruppen, Personen, Lehrveranstaltungen, Semester, das Blockraster des Tages mit seinen Pausen, dazu eine Strg+K-Palette, die zu jedem davon springt. Eine Lehrveranstaltung kann festlegen, dass ein Termin mehrere Räume gleichzeitig braucht – für einen Jahrgang, der in keinen einzelnen Saal passt –, und die Planung belegt die Kombination. Eine Klasse lässt sich aus anderen Klassen zusammensetzen, etwa für einen Zweig, den zwei Jahrgänge gemeinsam hören."
+        },
+        "calendar": {
+            "title": "Zeiträume im akademischen Kalender",
+            "note": "Ferien, unterrichtsfreie Zeiten und Prüfungswochen, mit einer Vorschau darauf, welche Wochen ihre Einordnung ändern, bevor Sie speichern. Zwei Daten ergeben nicht offensichtlich vier Prüfungswochen – und manchmal doch."
+        },
+        "events": {
+            "title": "Einzeltermine neben wiederkehrenden Lehrveranstaltungen",
+            "note": "Legen Sie einen Termin an, der zu keiner Lehrveranstaltung gehört – einen Tag der offenen Tür etwa oder einen Gastvortrag –, mit eigenem Raum, eigenen Gruppen und eigenen Personen."
+        },
+        "icalExport": {
+            "title": "Den eigenen Stundenplan als Kalenderdatei herunterladen",
+            "note": "Eine .ics-Datei mit Ihren eigenen Terminen eines Semesters, die sich in der Kalender-App öffnet, die Sie schon benutzen. Echte UTC-Zeiten, umgerechnet aus der Ortszeit der Institution, statt deren Uhrzeiten einfach so verschickt."
+        },
+        "personSearch": {
+            "title": "Eine Person über den Namen finden",
+            "note": "Beim Zuordnen von Personen wird die Institution während der Eingabe durchsucht, statt sie vollständig aufzulisten. Die bereits zugeordneten Personen bleiben sichtbar, während Sie die nächste suchen."
+        },
+        "exams": {
+            "title": "Eine Lehrkraft beantragt eine Prüfung, die Verwaltung entscheidet",
+            "note": "Beantragen Sie eine Prüfung zu einer Lehrveranstaltung, die Sie leiten, und sehen Sie, wie weit der Antrag ist. In keinen Stundenplan gelangt er, solange ihn niemand genehmigt – denn eine Prüfung ist ein Raum und eine Stunde, die der Plan erst finden muss."
+        },
+        "availability": {
+            "title": "Verfügbarkeiten selbst eintragen",
+            "note": "Eine Lehrkraft gibt an, wann sie nicht unterrichten kann und welche Tage, Zeiten und Raumarten sie lieber hätte; die Verwaltung genehmigt oder lehnt jede Angabe ab. Dass dieser Bereich ausschließlich die eigenen Daten erreicht, ist sein eigentlicher Zweck."
+        },
+        "solverIntegration": {
+            "title": "Solver-Anbindung, durchgängig",
+            "note": "Planungslauf starten, das Ergebnis behalten, auch wenn der Solver neu startet, den Planvorschlag gegen den aktuellen Stundenplan prüfen und ihn dann übernehmen oder verwerfen. Ein Lauf, der erfolgreich endet und dabei Regeln verletzt, wird trotzdem angeboten – mit der Liste der Regelverstöße, statt weggeworfen zu werden. Eine von Hand erzeugte Kollision lässt sich reparieren, ohne das ganze Semester neu zu planen: Die Reparatur verschiebt so wenig wie möglich und liefert dennoch einen Planvorschlag zur Prüfung."
+        },
+        "constraints": {
+            "title": "Regeln, die jede Institution selbst einstellt",
+            "note": "Dreißig Regeltypen, pro Institution einzeln aktiviert und gewichtet: Doppelbelegung, Anzahl der Termine, Sperrzeiten, Online-Anteil, Raumrang und Prüfungszeiträume, dazu die Form eines Tages – Leerlauf zwischen Terminen, Unterricht ohne Pause, wie lang der Tag wird und ob er über Gebäude hinweg führt. Räume lassen sich institutionsweit reservieren, auf die tatsächlich anwesende Gruppe zuschneiden und für eine Klasse über die Woche hinweg gleich halten."
+        },
+        "federation": {
+            "title": "Gemeinsame Räume im Verbund",
+            "note": "Institutionen in einem Verbund können einen Hörsaal gemeinsam nutzen und sehen dessen Belegung durch die anderen, ohne deren Stundenpläne zu sehen."
+        },
+        "determinism": {
+            "title": "Reproduzierbare Läufe",
+            "note": "Gleiche Eingaben und gleicher Startwert ergeben einen bytegleichen Stundenplan, solange der Lauf an seinem Zugbudget endete und nicht an einer Uhr – was der Lauf selbst mitteilt."
+        },
+        "auth": {
+            "title": "Anmeldung und Berechtigungsrollen je Institution",
+            "note": "Ein Zugang kann in mehreren Institutionen handeln und wählt bei der Anmeldung, in welcher. Rollen werden in der Oberfläche aus einem festen Katalog von Berechtigungen zusammengestellt, je Institution."
+        },
+        "tenancy": {
+            "title": "Datenmodell und API für mehrere Institutionen",
+            "note": "Institutionen sind in der Datenbank selbst getrennt, nicht nur im Anwendungscode. Eine Abfrage ohne Institutionskontext liefert nichts zurück statt alles."
+        }
+    },
+    "next": {
+        "import": {
+            "title": "Import aus CSV und Excel",
+            "note": "Für Institutionen, die mit Tabellen aus vielen Jahren ankommen. Ob die Spaltenzuordnung geführt wird oder eine feste Vorlage vorgibt, ist noch nicht entschieden."
+        },
+        "export": {
+            "title": "Ein Kalender-Abo, nicht nur ein Download",
+            "note": "Der einmalige .ics-Download ist gebaut. Eine dauerhafte URL, die Ihre Kalender-App von selbst abruft, ist eine andere, schwierigere Frage. Ein Abo-Link ist selbst ein Zugangsschlüssel, und er braucht dieselbe Antwort wie die Frage, ob Lernende einen Stundenplan ohne Zugang ansehen dürfen."
+        },
+        "notifications": {
+            "title": "Benachrichtigungen zustellen",
+            "note": "Calendry ermittelt bereits, wen eine Änderung betrifft. Versendet wird noch nichts, die Antwort landet also derzeit auf einem Bildschirm statt in einem Postfach."
+        },
+        "eventEdit": {
+            "title": "Einen Einzeltermin nach dem Anlegen bearbeiten",
+            "note": "Seine Zeit lässt sich verschieben, sein Raum, seine Gruppen und seine Personen nicht ändern. Einen Fehler zu korrigieren heißt, ihn zu löschen und neu anzulegen."
+        },
+        "candidates": {
+            "title": "Mehrere Planvorschläge zur Auswahl",
+            "note": "Braucht einen Entwurf, bevor es Code braucht: Vorschläge, die sich nur unwesentlich unterscheiden, wären schlechter als ein einziges Ergebnis. Möglicherweise wird es gar nicht gebaut."
+        },
+        "i18n": {
+            "title": "Eine übersetzte Oberfläche",
+            "note": "Läuft gerade, Deutsch zuerst, auf dem Mechanismus, der den Anfang gefahrlos gemacht hat: Die Sprache wird einmal auf dem Server bestimmt, und die Oberfläche wird Abschnitt für Abschnitt herausgezogen, damit keine Seite im Browser halb übersetzt dasteht."
+        }
+    },
+    "principle": {
+        "warn": {
+            "title": "Warnen, nie blockieren",
+            "body": "Wer einen Stundenplan bearbeitet, weiß meist etwas, das die Regeln nicht wissen. Deshalb ist eine Änderung erlaubt, die eine harte Regel verletzt, und der Verstoß wird zu abfragbarem Zustand am Stundenplan. Nächste Woche noch auffindbar, und keine Meldung, die Sie weggeklickt haben."
+        },
+        "groups": {
+            "title": "Verschachtelte Gruppen kollidieren wirklich",
+            "body": "Wer einen Studiengang belegt, blockiert dessen Jahrgänge, und wer einen Jahrgang belegt, blockiert den Studiengang. Die Kollisionsprüfung geht die gesamte Verwandtschaft nach oben und nach unten durch, über eine gepflegte transitive Hülle, statt nur die zwei Namen zu vergleichen, die ihr übergeben wurden."
+        },
+        "isolation": {
+            "title": "Trennung in der Datenbank, nicht im Code",
+            "body": "Jede institutionsbezogene Tabelle ist durch Row-Level-Security geschützt, und die Anwendung verbindet sich mit einer Rolle, die nichts besitzt. Ein Fehler führt dazu, dass man keine Zeilen sieht, und das fällt auf – nicht dazu, dass man die von jemand anderem sieht, und das fällt nicht auf."
+        },
+        "time": {
+            "title": "Nichts an der Zeit ist fest verdrahtet",
+            "body": "Tage pro Woche, Blöcke pro Tag, Blocklänge und die ungleichen Pausen zwischen den Blöcken kommen aus dem Zeitraster der jeweiligen Institution. Es gibt kein angenommenes Montag bis Freitag und nirgends eine Ersatzform. Eine Institution ohne Zeitraster bekommt eine leere Ansicht, keine Vermutung."
+        },
+        "events": {
+            "title": "Jede Änderung ist ein Ereignis",
+            "body": "Anlegen, Verschieben, Tauschen, Löschen und Fixieren werden an ein Protokoll angehängt, aufsetzend auf dem Planvorschlag, von dem sie ausgingen, samt der Person, die es getan hat. Für das Zurücklesen dieser Historie gibt es noch keine Ansicht. Das Protokoll wird ordentlich geführt, bevor es etwas gibt, das es anzeigt."
+        }
+    },
+    "techLead": {
+        "figure": "27.000 Termine, platziert in rund 350 Millisekunden.",
+        "note": "Das ist eine synthetische Instanz in der Größe einer großen Universität. Das Semester der Entwicklungsdatenbank läuft in etwa vier Sekunden vollständig bis zur Konvergenz. Beide Zahlen kommen aus einem Benchmark und nicht aus einer Verkaufspräsentation, und beide werden sich verschieben, während der Regelsatz wächst."
+    },
+    "technical": {
+        "app": {
+            "title": "Die Anwendung",
+            "body": "Nuxt und TypeScript über PostgreSQL. Die Trennung der Institutionen setzen Row-Level-Security-Policies durch; die Historie des Stundenplans ist ein rein anfügendes Ereignisprotokoll, das auf einem versionierten Snapshot aufsetzt."
+        },
+        "solver": {
+            "title": "Der Solver",
+            "body": "Ein eigener, zustandsloser Rust-Dienst, erreichbar über gRPC gegen ein gemeinsames Schema. Hybrides konstruktives Platzieren, danach lokale Suche in großen Nachbarschaften mit Simulated Annealing, über dreißig Regeltypen. Er hält keine Datenbank: Jeder Lauf ist ein vollständiger Snapshot, den die Anwendung ihm schickt."
+        }
+    },
+    "contact": {
+        "nameLabel": "Ihr Name",
+        "namePlaceholder": "Vor- und Nachname",
+        "institutionLabel": "Institution",
+        "institutionPlaceholder": "Schule, Hochschule oder Verbund",
+        "messageLabel": "Was möchten Sie wissen?",
+        "optional": "optional",
+        "messagePlaceholder": "Wie viele Räume, wie viele Klassen, was Sie heute einsetzen …",
+        "messageCount": "{used} / {max}",
+        "submit": "E-Mail an uns öffnen",
+        "opened": "In Ihrem E-Mail-Programm sollte sich ein Entwurf an {email} geöffnet haben. Ist nichts passiert, ist in Ihrem Browser kein Mail-Programm hinterlegt. Schreiben Sie uns dann bitte direkt.",
+        "asideTitle": "Warum das eine E-Mail ist und kein Registrierungsformular",
+        "asideBody": "Eine Selbstregistrierung gibt es nicht, und Calendry kann noch keine E-Mails verschicken: Der Versand von Benachrichtigungen steht oben auf der Liste, er liegt nicht hinter uns. Ein Formular, das Ihnen ein Häkchen zeigt und Ihre Nachricht nirgendwo ablegt, wäre schlechter, als das offen zu sagen. Deshalb schreibt diese Schaltfläche eine Nachricht in Ihrem eigenen E-Mail-Programm, und Sie senden sie von Ihrem eigenen Konto.",
+        "asideContact": "Oder schreiben Sie an {link}. Konten für eine bestehende Institution legt deren Administration an.",
+        "error": {
+            "name": "Sagen Sie uns, wer Sie sind – sonst hat eine Antwort kein Ziel.",
+            "institution": "Um welche Schule oder Hochschule geht es?",
+            "messageTooLong": "Bitte unter {max} Zeichen bleiben. Der Rest passt in die E-Mail selbst."
+        },
+        "mailSubject": "Anfrage zu Calendry",
+        "mailSubjectForInstitution": "Anfrage zu Calendry: {institution}",
+        "mailBodyName": "Name: {name}",
+        "mailBodyInstitution": "Institution: {institution}"
+    },
+    "footer": {
+        "note": "Stundenplanung für Schulen und Hochschulen, ausgelegt auf mehrere Institutionen. Offen entwickelt, eine geprüfte Phase nach der anderen.",
+        "navLabel": "Fußzeile"
+    },
+    "rateTable": {
+        "tierHeading": "Stufe"
+    },
+    "scenario": {
+        "total": "{amount} pro Jahr",
+        "complexity": "Komplexität {tier}, Faktor {multiplier}x bei {count} Lehrkräften"
+    },
+    "calculator": {
+        "institutionLegend": "Ihre Institution",
+        "studentsLabel": "Lernende",
+        "studentsHint": "Grundstufe {tier}. Für Lernende fällt nie etwas an.",
+        "lecturersLabel": "Lehrkräfte ({band})",
+        "lecturersHint": "{sessions}, je {rate}",
+        "complexityLegend": "Komplexitätswert",
+        "seatsLegend": "Zugänge und Leistungen",
+        "adminSeatsLabel": "Zugänge für Verwaltung und Planung",
+        "adminSeatsHint": "Nur Personen, die bearbeiten, fixieren oder den Solver starten",
+        "supportLabel": "Support",
+        "federationLabel": "Verbund",
+        "standalone": "Eigenständig",
+        "federationMember": "Verbundmitglied",
+        "totalLabel": "Gesamt pro Jahr",
+        "tierLine": "Komplexität {score}, Stufe {tier}, Faktor {multiplier}x auf die Zwischensumme der Lehrkräfte",
+        "examplesLabel": "Beispiel laden"
+    }
+}

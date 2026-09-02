@@ -95,6 +95,6 @@ export default defineEventHandler((event) => {
     const headerToken = getRequestHeader(event, CSRF_HEADER);
 
     if (!cookieToken || !headerToken || headerToken !== cookieToken) {
-        throw createError({ statusCode: 403, statusMessage: 'Missing or invalid CSRF token.' });
+        throw createError({ statusCode: 403, message: 'Missing or invalid CSRF token.' });
     }
 });

@@ -6,7 +6,7 @@
         <div
             class="agenda_days"
             role="tablist"
-            aria-label="Day"
+            :aria-label="t('schedule.agenda.dayTablist')"
         >
             <button
                 v-for="day in grid.activeDays"
@@ -44,8 +44,11 @@
                 <button
                     type="button"
                     class="agenda_target"
-                    :aria-label="`${targetVerb ?? 'Move to'} ${weekdayName(activeDay)} `
-                        + blockTime(grid, block - 1, activeDay).start"
+                    :aria-label="t('schedule.agenda.targetLabel', {
+                        verb: targetVerb ?? t('schedule.page.targetVerbMove'),
+                        day: weekdayName(activeDay),
+                        time: blockTime(grid, block - 1, activeDay).start,
+                    })"
                     @click="$emit('place', { dayOfWeek: activeDay, blockIndex: block - 1 })"
                 >
                     <span class="agenda_target-time">
@@ -57,7 +60,9 @@
                             name="material-symbols:add-circle-outline"
                             aria-hidden="true"
                         />
-                        {{ targetVerb ?? 'Move to' }} this block
+                        {{ t('schedule.agenda.targetVerbBlock', {
+                            verb: targetVerb ?? t('schedule.page.targetVerbMove'),
+                        }) }}
                     </span>
                 </button>
             </li>
@@ -66,7 +71,7 @@
         <p
             v-else-if="!daySessions.length"
             class="agenda_empty"
-        >Nothing scheduled on {{ weekdayName(activeDay) }}.</p>
+        >{{ t('schedule.agenda.nothingScheduled', { day: weekdayName(activeDay) }) }}</p>
 
         <ol
             v-else
@@ -109,6 +114,7 @@ import type { PlacedScheduleSession, TimeGrid, Violation } from '~/composables/s
 import type { DisplaySettings } from '#shared/sessionColor';
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import ScheduleSessionChip from './ScheduleSessionChip.vue';
+import { useT } from '~/composables/i18n';
 
 const props = defineProps<{
     grid: TimeGrid;
@@ -133,6 +139,8 @@ defineEmits<{
     select: [sessionId: string];
     place: [target: { dayOfWeek: number; blockIndex: number }];
 }>();
+
+const { t } = useT();
 
 /**
  * Opens on the SELECTED session's day, not on Monday. Both presentations are

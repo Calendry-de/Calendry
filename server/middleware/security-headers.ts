@@ -12,23 +12,19 @@ export default defineEventHandler(event => {
     headers.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     headers.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-    // Dev-only allowance so impeccable live mode can load. Guarded by NODE_ENV.
-    const __impeccableLiveDev =
-        process.env.NODE_ENV === 'development' ? ' http://localhost:8400' : '';
-
     const cspDirectives = [
         "default-src 'self'",
         // unsafe-inline and unsafe-eval are required by Nuxt's hydration and
         // Vue's runtime compiler respectively. challenges.cloudflare.com is
         // Turnstile's widget script (issue #79), loaded from login.vue only
         // once the failed-attempt threshold is reached.
-        `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com${__impeccableLiveDev}`,
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: https:",
         "font-src 'self' data:",
         // ws:/wss: for Vite's dev-server HMR socket. challenges.cloudflare.com
         // is Turnstile's own client-side verification traffic.
-        `connect-src 'self' ws: wss: https://challenges.cloudflare.com${__impeccableLiveDev}`,
+        "connect-src 'self' ws: wss: https://challenges.cloudflare.com",
         // Turnstile renders its challenge in an iframe, and no frame-src existed
         // before issue #79 because nothing on this site framed anything.
         "frame-src https://challenges.cloudflare.com",

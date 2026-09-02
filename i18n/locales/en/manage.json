@@ -1,0 +1,478 @@
+{
+    "person": {
+        "label": "Person",
+        "plural": "People",
+        "description": "Everyone the timetable places or notifies.",
+        "keywords": "people, staff, student, lecturer, teacher, roster, directory",
+        "column": {
+            "familyName": "Family name",
+            "givenName": "Given name",
+            "email": "Email"
+        },
+        "field": {
+            "givenName": { "label": "Given name" },
+            "familyName": { "label": "Family name" },
+            "email": { "label": "Email" },
+            "externalRef": {
+                "label": "External reference",
+                "help": "Stable id from an external SIS or LDAP, used to reconcile imports."
+            },
+            "timezone": {
+                "help": "Display and export only. It never affects grid placement or \"same day\" logic."
+            }
+        },
+        "relation": {
+            "roles": {
+                "label": "Scheduling roles",
+                "help": "What this person can be scheduled AS: Lecturer, Auditor. Not permissions.",
+                "emptyHint": "No roles defined yet."
+            },
+            "accessRoles": {
+                "label": "Access roles",
+                "help": "What this person may DO in Calendry. Distinct from the scheduling roles above, which are vocabulary and grant nothing.",
+                "emptyHint": "No access roles defined yet.",
+                "emptyWarning": "No access role assigned. This person can sign in and will be shown an empty application: no schedule, no navigation."
+            },
+            "groups": {
+                "label": "Group memberships",
+                "help": "Which cohorts and seminars this person belongs to.",
+                "emptyHint": "No groups defined yet."
+            }
+        }
+    },
+    "role": {
+        "label": "Role",
+        "plural": "Roles",
+        "description": "Scheduling vocabulary: Lecturer, Auditor. Not permissions.",
+        "keywords": "role, lecturer, auditor, vocabulary, title",
+        "column": {
+            "key": "Key"
+        },
+        "field": {
+            "key": {
+                "label": "Key",
+                "help": "Stable identifier used by imports and constraints. Cannot be changed later."
+            }
+        }
+    },
+    "room": {
+        "label": "Room",
+        "plural": "Rooms",
+        "description": "Physical and virtual spaces sessions can be placed in.",
+        "keywords": "room, space, hall, lab, venue, building, capacity",
+        "column": {
+            "capacity": "Capacity",
+            "examCapacity": "Exam capacity",
+            "location": "Location"
+        },
+        "field": {
+            "capacity": {
+                "label": "Capacity",
+                "help": "Seats. Leave it 0 for no limit: an online room, or one nobody has measured."
+            },
+            "examCapacity": {
+                "label": "Exam capacity",
+                "help": "Seats available for an exam sitting, if fewer than the normal capacity: exam spacing and invigilation often use more room per person. Leave unset to fall back to this room's normal capacity."
+            },
+            "location": { "label": "Location" },
+            "ranking": {
+                "label": "Ranking",
+                "help": "Desirability, HIGHER = more premium. The \"Steer room choice by rank\" constraint reads this to bias placement toward one end of the scale."
+            },
+            "isVirtual": { "label": "Virtual" }
+        },
+        "relation": {
+            "equipment": {
+                "label": "Equipment in this room",
+                "help": "What this room provides. Offerings requiring it can only be placed here, and a count is what an offering asking for a minimum is measured against. Left blank, this room answers presence only.",
+                "quantity": "Count",
+                "emptyHint": "No equipment defined yet."
+            }
+        }
+    },
+    "equipment": {
+        "label": "Equipment",
+        "plural": "Equipment",
+        "description": "Feature tags rooms provide and offerings require.",
+        "keywords": "equipment, feature, projector, lab, tag, facility",
+        "column": {
+            "key": "Key"
+        },
+        "field": {
+            "key": {
+                "label": "Key",
+                "help": "Stable identifier used by imports. Cannot be changed later."
+            }
+        }
+    },
+    "group": {
+        "label": "Group",
+        "plural": "Groups",
+        "description": "Cohorts and their nested sub-groups.",
+        "keywords": "group, cohort, class, section, seminar, nesting, hierarchy, tree",
+        "column": {
+            "expectedSize": "Expected size"
+        },
+        "field": {
+            "expectedSize": {
+                "label": "Expected size",
+                "help": "Advisory headcount for room-capacity checks. Membership remains the source of truth."
+            },
+            "parentGroupId": {
+                "label": "Parent group",
+                "emptyHint": "No other groups to nest under yet."
+            },
+            "curriculumPlanId": {
+                "label": "Curriculum plan",
+                "help": "The plan this group is meant to follow: an intent, set before it has any offerings. Lets the plan’s own \"roll out to several groups\" panel pre-select this group instead of it being picked by hand every time. Not the same as which plan this group already has offerings from; see the \"Curriculum plans\" panel below for that.",
+                "emptyHint": "No curriculum plans defined yet."
+            }
+        },
+        "relation": {
+            "terms": {
+                "label": "Available in terms",
+                "help": "Leave empty to make this group available in every term. Adding terms restricts it to those, which is what narrows the group pickers on offerings in other terms.",
+                "emptyHint": "Available in every term."
+            }
+        }
+    },
+    "timeGrid": {
+        "label": "Time grid",
+        "plural": "Time grids",
+        "description": "Block length, blocks per day, and which days this institution teaches on.",
+        "keywords": "time grid, timegrid, blocks, periods, slots, days, schedule shape",
+        "column": {
+            "blocksPerDay": "Blocks/day",
+            "blockLengthMinutes": "Block length",
+            "activeDays": "Days",
+            "isDefault": "Default"
+        },
+        "field": {
+            "blockLengthMinutes": { "label": "Block length (minutes)" },
+            "blocksPerDay": { "label": "Blocks per day" },
+            "startHour": { "label": "Start hour" },
+            "startMinute": { "label": "Start minute" },
+            "breakMinutes": { "label": "Default gap between blocks (minutes)" },
+            "breaks": { "label": "Named breaks" },
+            "activeDays": { "label": "Teaching days" },
+            "isDefault": { "label": "Default grid" }
+        }
+    },
+    "sessionKind": {
+        "label": "Session kind",
+        "plural": "Session kinds",
+        "description": "Your own vocabulary: lecture, lab, seminar. Nothing here is built in.",
+        "keywords": "kind, type, lecture, lab, seminar, exam, vocabulary, category",
+        "column": {
+            "key": "Key",
+            "type": "Type",
+            "requiresGroup": "Has groups"
+        },
+        "field": {
+            "key": {
+                "label": "Key",
+                "help": "Stable identifier used by imports and constraints. Cannot be changed later."
+            },
+            "type": {
+                "label": "What it is",
+                "help": "Decides which rules reach this kind. {examHelp}"
+            },
+            "color": {
+                "help": "Tints this kind on the schedule. Chips stay legible without it: colour is never the only cue."
+            },
+            "requiresGroup": {
+                "label": "Carries groups",
+                "help": "Whether sessions of this kind are expected to have Groups assigned. Lets a group-based constraint be rejected when aimed at a kind that has none."
+            }
+        }
+    },
+    "offering": {
+        "label": "Offering",
+        "plural": "Offerings",
+        "description": "What must be scheduled: the recurring demand sessions are placed from.",
+        "keywords": "offering, course, module, subject, demand, curriculum, lecture",
+        "startFromTemplate": {
+            "fallback": "Template"
+        },
+        "column": {
+            "title": "Title",
+            "frequency": "Sessions",
+            "durationBlocks": "Blocks"
+        },
+        "field": {
+            "title": { "label": "Title" },
+            "color": {
+                "help": "Tints every session of this offering. Leave it empty to inherit the session kind's colour: empty means inherit, not grey."
+            },
+            "termId": {
+                "label": "Term",
+                "emptyHint": "Create a term first: an offering has to belong to one."
+            },
+            "kindId": {
+                "label": "Kind",
+                "emptyHint": "Create a session kind first: lecture, lab, seminar, whatever you call them."
+            },
+            "frequency": {
+                "label": "Sessions per term",
+                "help": "Exactly this many sessions must exist. Enforced as a hard constraint."
+            },
+            "durationBlocks": {
+                "label": "Length in blocks",
+                "help": "How many consecutive TimeGrid blocks one session occupies."
+            },
+            "schedulingPattern": {
+                "label": "How the sessions spread",
+                "help": "A weekly slot for the whole term, or the whole course in a short block. Recorded either way; it changes a timetable only once an administrator enables the matching rule.",
+                "option": {
+                    "notDecided": "Not decided",
+                    "distributed": "Spread across the term",
+                    "block": "Concentrated into a window"
+                }
+            },
+            "requiredRoleId": {
+                "label": "Required role",
+                "help": "Scheduling role a lecturer must hold to lead this. Leave unset if it does not matter.",
+                "emptyHint": "No roles defined yet."
+            },
+            "requiredLecturerCount": {
+                "label": "Lecturers needed at once",
+                "help": "Leave blank to require exactly one, chosen by the solver from “Who leads it” below. Set higher only for genuine co-teaching: the list below is a candidate pool, not a guaranteed roster."
+            },
+            "requiredRoomCount": {
+                "label": "Rooms needed at once",
+                "help": "One for almost everything. Above one, a session occupies that many rooms simultaneously and their capacities are ADDED: 120 students fit two 60-seat halls. Use it for a cohort too large for any single room, not for a practical where each room must hold everyone. At most {max}."
+            },
+            "requiredCapacity": {
+                "label": "Required room capacity",
+                "help": "Leave unset to derive it from the attached groups. Compared against the SUM of the capacities when more than one room is needed at once.",
+                "derived": {
+                    "noGroups": "No groups attached, so nothing can be derived: every room would qualify.",
+                    "noSize": "The attached groups have neither members nor an expected size, so nothing can be derived: every room would qualify.",
+                    "basisMembership": "{count} enrolled person | {count} enrolled people",
+                    "basisExpected": "expected sizes",
+                    "line": "If left blank: {capacity}, from {count} attached group ({source}). | If left blank: {capacity}, from {count} attached groups ({source}).",
+                    "warning": "Warning: only {capacity} of an expected {estimate} are enrolled, so this may be incomplete."
+                }
+            },
+            "allowOnline": {
+                "label": "May be scheduled online",
+                "help": "Lets the solver place this in a virtual room. Online delivery is a virtual room, not a session flag."
+            },
+            "notes": { "label": "Notes" },
+            "createdFromTemplateId": { "label": "Started from template" }
+        },
+        "relation": {
+            "groups": {
+                "label": "Groups this is for",
+                "help": "Nesting propagates: assigning a cohort also blocks its seminars. Only groups available in this offering’s term are listed.",
+                "emptyHint": "No groups available in this term."
+            },
+            "lecturers": {
+                "label": "Who leads it",
+                "help": "Eligible to lead it: a candidate pool the solver chooses from, sized by “Lecturers needed at once” above. Optionally state the scheduling role each person fills here.",
+                "emptyHint": "No people defined yet.",
+                "rolePlaceholder": "Any role"
+            },
+            "equipment": {
+                "label": "Equipment it needs",
+                "help": "Restricts placement to rooms providing all of it. A count means at least that many units, so only rooms that state enough qualify.",
+                "quantity": "Count",
+                "emptyHint": "No equipment defined yet."
+            }
+        }
+    },
+    "offeringTemplate": {
+        "label": "Offering template",
+        "plural": "Offering templates",
+        "description": "Reusable offering shapes, such as \"Maths, 4x/week\", a new offering can start from.",
+        "keywords": "template, offering, shape, reuse, preset, copy",
+        "column": {
+            "title": "Offering title",
+            "frequency": "Sessions",
+            "durationBlocks": "Blocks"
+        },
+        "field": {
+            "name": {
+                "label": "Template name",
+                "help": "What you pick this template by, not the title it gives the offering."
+            },
+            "title": {
+                "label": "Offering title",
+                "help": "Leave blank to name each offering individually."
+            },
+            "kindId": {
+                "label": "Kind",
+                "emptyHint": "Create a session kind first: lecture, lesson, whatever you call them."
+            },
+            "frequency": { "label": "Sessions per term" },
+            "durationBlocks": { "label": "Length in blocks" },
+            "schedulingPattern": {
+                "label": "How the sessions spread",
+                "option": {
+                    "notDecided": "Not decided",
+                    "distributed": "Spread across the term",
+                    "block": "Concentrated into a window"
+                }
+            },
+            "requiredRoleId": {
+                "label": "Required role",
+                "help": "The \"lecturer pool\" hint. A specific person is named on the offering itself, not here.",
+                "emptyHint": "No roles defined yet."
+            },
+            "requiredCapacity": { "label": "Required room capacity" },
+            "requiredRoomCount": { "label": "Rooms needed at once" },
+            "requiredLecturerCount": { "label": "Lecturers needed at once" },
+            "allowOnline": { "label": "May be scheduled online" },
+            "notes": { "label": "Notes" }
+        }
+    },
+    "offeringPlan": {
+        "label": "Curriculum plan",
+        "plural": "Curriculum plans",
+        "description": "A cohort’s whole course load, bundled: apply it to a group to create every offering at once.",
+        "keywords": "plan, curriculum, jahrgang, cohort, bundle, template, load",
+        "field": {
+            "nextPlanId": {
+                "label": "Successor plan",
+                "help": "What a Group on this plan moves to next: \"Semester 3\" names \"Semester 4\". Lets a Group advance with no picker: the Term defaults to whichever starts next.",
+                "emptyHint": "No other plans to point at yet."
+            }
+        }
+    },
+    "constraint": {
+        "label": "Constraint",
+        "plural": "Constraints",
+        "description": "The rules a timetable must respect, and the preferences it should weigh.",
+        "keywords": "constraint, rule, hard, soft, penalty, conflict, policy",
+        "column": {
+            "type": "Type",
+            "severity": "Severity",
+            "isEnabled": "Enabled"
+        },
+        "field": {
+            "type": { "label": "Rule" },
+            "severity": { "label": "Severity" },
+            "weight": { "label": "Penalty weight" },
+            "params": { "label": "Parameters" },
+            "scopes": { "label": "Applies to kinds" },
+            "members": { "label": "Related offerings" },
+            "isEnabled": { "label": "Enabled" }
+        }
+    },
+    "screen": {
+        "label": "Screen",
+        "plural": "Screens",
+        "description": "Lobby and corridor displays showing live room occupancy.",
+        "keywords": "screen, screens, display, displays, lobby, kiosk, signage, board, monitor, tv, corridor, occupancy",
+        "column": {
+            "roomSummary": "Shows",
+            "lastSeenAt": "Last seen"
+        },
+        "field": {
+            "name": {
+                "help": "Where the display physically is (e.g. \"Main entrance\", \"B-block corridor\"), so the right one can be revoked without a guess."
+            },
+            "isActive": {
+                "help": "Turning a screen off stops its key working immediately, and is reversible. Deleting it is not."
+            },
+            "roomIds": {
+                "label": "Rooms shown",
+                "emptyHint": "No rooms defined yet."
+            },
+            "key": { "label": "Display address" }
+        }
+    },
+    "term": {
+        "label": "Term",
+        "plural": "Terms",
+        "description": "Academic periods sessions are scheduled within.",
+        "keywords": "term, semester, trimester, academic, year, period",
+        "column": {
+            "startDate": "Starts",
+            "endDate": "Ends"
+        },
+        "field": {
+            "startDate": { "label": "Start date" },
+            "endDate": { "label": "End date" },
+            "timeGridId": {
+                "label": "Time grid",
+                "help": "Which grid this term is scheduled on. Falls back to the tenant default when unset.",
+                "emptyHint": "No time grids configured yet."
+            }
+        }
+    },
+    "calendarPeriod": {
+        "label": "Calendar period",
+        "plural": "Calendar periods",
+        "description": "Holidays, break weeks and exam periods within a term.",
+        "keywords": "calendar, period, holiday, break, exam, vacation, reading week, recess",
+        "column": {
+            "kind": "Kind",
+            "startDate": "Starts",
+            "endDate": "Ends"
+        },
+        "field": {
+            "termId": {
+                "label": "Term",
+                "help": "Which term this period falls in. Cannot be changed afterwards: moving a period to another term is creating a different period.",
+                "emptyHint": "No terms configured yet."
+            },
+            "kind": {
+                "label": "Kind",
+                "help": "An EXAM period claims any week it touches. A BREAK or HOLIDAY claims a week only if it covers the whole of it.",
+                "option": {
+                    "exam": "Exam period",
+                    "break": "Break",
+                    "holiday": "Holiday"
+                }
+            },
+            "startDate": { "label": "Start date" },
+            "endDate": { "label": "End date" },
+            "weekPreview": { "label": "Weeks this reclassifies" }
+        }
+    },
+    "account": {
+        "label": "Login",
+        "plural": "Logins",
+        "description": "How people sign in: credentials, separate from the people they act as.",
+        "keywords": "account, accounts, login, logins, credential, password, sign in, signin, user, users, reset",
+        "column": {
+            "email": "Email",
+            "personName": "Acts as",
+            "mustChangePassword": "Must change",
+            "lastLoginAt": "Last sign-in"
+        },
+        "field": {
+            "email": {
+                "label": "Email",
+                "help": "The sign-in address, and unique across the whole deployment: one credential can act in several institutions."
+            },
+            "personId": { "label": "Acts as" },
+            "password": { "label": "Initial password" },
+            "attachExisting": { "label": "Attach the existing login" },
+            "mustChangePassword": {
+                "label": "Must choose a new password at first sign-in",
+                "help": "A password an administrator knows is a shared secret. This is what makes that temporary: sign-in succeeds but issues no session until it is changed."
+            },
+            "isActive": {
+                "help": "Deactivating blocks sign-in immediately, in every institution this credential is used at. The Person stays on the timetable either way."
+            }
+        }
+    },
+    "accessRole": {
+        "label": "Access role",
+        "plural": "Access roles",
+        "description": "Who may do what: bundles of permissions people are granted.",
+        "keywords": "access, permission, role, admin, rights, authorization, security",
+        "column": {
+            "key": "Key"
+        },
+        "field": {
+            "key": {
+                "label": "Key",
+                "help": "Stable identifier. `create:account --role <key>` and any import address the role by it, so it cannot be changed later."
+            },
+            "permissions": { "label": "Permissions" }
+        }
+    }
+}

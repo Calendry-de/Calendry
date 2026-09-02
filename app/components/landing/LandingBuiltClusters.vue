@@ -5,7 +5,7 @@
             :key="group.cluster"
             class="built_group"
         >
-            <h3 class="built_clusterTitle">{{ group.cluster }}</h3>
+            <h3 class="built_clusterTitle">{{ group.title }}</h3>
 
             <ul class="built_items">
                 <li
@@ -19,7 +19,7 @@
                             :name="DONE_ICON"
                             aria-hidden="true"
                         />
-                        <span class="sr-only">Working: </span>
+                        <span class="sr-only">{{ t('landing.roadmap.builtPrefix') }}</span>
                         {{ item.title }}
                     </h4>
                     <p class="built_note">{{ item.note }}</p>
@@ -31,7 +31,8 @@
 
 <script setup lang="ts">
 import type { BuiltCluster, LandingRoadmapItem } from '~/utils/landingContent';
-import { BUILT_CLUSTERS } from '~/utils/landingContent';
+import { BUILT_CLUSTERS, builtClusterTitle } from '~/utils/landingContent';
+import { useT } from '~/composables/i18n';
 
 /**
  * The built list, grouped into the four questions it answers.
@@ -61,11 +62,17 @@ const props = defineProps<{
     items: LandingRoadmapItem[];
 }>();
 
+const { t } = useT();
+
 const DONE_ICON = 'material-symbols:check-circle';
 
+// `cluster` is the id a row is matched on and `title` is the heading a reader
+// sees. They were one string before issue #19, which is exactly the shape that
+// breaks on translation: the group would stop matching its own rows.
 const groups = computed(() => BUILT_CLUSTERS
     .map((cluster: BuiltCluster) => ({
         cluster,
+        title: builtClusterTitle(cluster, t),
         items: props.items.filter(item => item.cluster === cluster),
     }))
     .filter(group => group.items.length > 0));

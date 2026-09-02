@@ -8,7 +8,7 @@
 
         <template v-else-if="board">
             <header class="board_head">
-                <h1 class="board_title">{{ board.screenName ?? 'Room board' }}</h1>
+                <h1 class="board_title">{{ board.screenName ?? t('screen.board.fallbackName') }}</h1>
                 <p class="board_clock">
                     <span class="board_time">{{ clock }}</span>
                     <span class="board_date">{{ today }}</span>
@@ -25,7 +25,7 @@
                 v-if="board.state === 'no-term'"
                 class="board_note"
                 role="status"
-            >No term is running today.</p>
+            >{{ t('screen.board.noTerm') }}</p>
 
             <ul class="board_rooms">
                 <li
@@ -38,8 +38,17 @@
 
                     <div class="room_state">
                         <template v-if="room.current">
-                            <p class="room_label">Now</p>
+                            <p class="room_label">{{ t('screen.room.nowLabel') }}</p>
                             <p class="room_session">{{ room.current.title }}</p>
+                            <!--
+                                PUNCTUATION, NOT GRAMMAR (i18n/CONVENTIONS.md
+                                § "Assembled sentences"): the pieces joined here
+                                are a clock range and a list of tenant-named
+                                Groups, each already complete and never
+                                translated, so the `–` and the `·` stay in the
+                                template. Keying "{times} · {groups}" would add
+                                a message with nothing in it to translate.
+                            -->
                             <p class="room_meta">
                                 {{ hhmm(room.current.startMinute) }}–{{ hhmm(room.current.endMinute) }}
                                 <template v-if="room.current.groups.length">
@@ -49,17 +58,23 @@
                         </template>
 
                         <template v-else>
-                            <p class="room_label room_label--free">Free</p>
+                            <p class="room_label room_label--free">{{ t('screen.room.freeLabel') }}</p>
+                            <!--
+                                GRAMMAR, unlike the range above: "Next" is a
+                                word placed relative to the time it qualifies,
+                                so the whole clause is ONE message and a
+                                translator can move both values.
+                            -->
                             <p
                                 v-if="room.next"
                                 class="room_meta"
                             >
-                                Next {{ hhmm(room.next.startMinute) }} · {{ room.next.title }}
+                                {{ t('screen.room.next', { time: hhmm(room.next.startMinute), title: room.next.title }) }}
                             </p>
                             <p
                                 v-else
                                 class="room_meta"
-                            >Nothing else today</p>
+                            >{{ t('screen.room.nothingElse') }}</p>
                         </template>
                     </div>
                 </li>
@@ -68,12 +83,14 @@
             <p
                 v-if="!board.rooms.length"
                 class="board_message"
-            >This screen has no rooms to show.</p>
+            >{{ t('screen.board.noRooms') }}</p>
         </template>
     </div>
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * The lobby display.
  *
@@ -115,6 +132,7 @@ interface Board {
 
 definePageMeta({ layout: false });
 
+const { t } = useT();
 const route = useRoute();
 const request = useRequestFetch();
 const key = computed(() => String(route.query.key ?? ''));
@@ -137,7 +155,7 @@ function hhmm(minutes: number): string {
 
 async function load(): Promise<void> {
     if (!key.value) {
-        error.value = 'This display has no key. Open it with the address the screen was set up with.';
+        error.value = t('screen.board.missingKey');
 
         return;
     }
@@ -154,7 +172,7 @@ async function load(): Promise<void> {
          * can act on either is the one walking past, so the wall has to say
          * which it is rather than going blank.
          */
-        error.value = message ?? 'Could not reach the timetable.';
+        error.value = message ?? t('screen.board.unreachable');
     }
 }
 
@@ -176,7 +194,7 @@ onMounted(() => {
     });
 });
 
-useHead({ title: () => board.value?.screenName ?? 'Room board' });
+useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName') });
 </script>
 
 <style scoped lang="scss">

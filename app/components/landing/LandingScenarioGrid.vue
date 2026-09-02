@@ -14,8 +14,9 @@
 </template>
 
 <script setup lang="ts">
-import type { SCENARIOS } from '~/utils/pricingContent';
+import type { PricingScenario } from '~/utils/pricingContent';
 import { computePrice, formatCount, formatEuro } from '~/utils/pricingModel';
+import { useLanguage, useT } from '~/composables/i18n';
 
 /**
  * The worked examples, as tiles with the figure first.
@@ -43,8 +44,14 @@ import { computePrice, formatCount, formatEuro } from '~/utils/pricingModel';
  * count, so they were not reproducible from the published rate card at all.
  */
 const props = defineProps<{
-    items: readonly (typeof SCENARIOS)[number][];
+    items: readonly PricingScenario[];
 }>();
+
+const { t } = useT();
+
+// The figures follow the viewer's FULL locale tag rather than the message
+// language, so a German reader gets `4.000 €` and an English one `€4,000`.
+const { locale } = useLanguage();
 
 const priced = computed(() => props.items.map((item) => {
     const result = computePrice(item.input);
@@ -52,9 +59,12 @@ const priced = computed(() => props.items.map((item) => {
         id: item.id,
         title: item.title,
         shape: item.shape,
-        total: `${ formatEuro(result.total) } a year`,
-        complexity: `Complexity ${ result.complexityTier.id }, `
-            + `${ result.complexityTier.multiplier }x on ${ formatCount(result.lecturerCount) } lecturers`,
+        total: t('landing.scenario.total', { amount: formatEuro(result.total, locale.value) }),
+        complexity: t('landing.scenario.complexity', {
+            tier: result.complexityTier.id,
+            multiplier: result.complexityTier.multiplier,
+            count: formatCount(result.lecturerCount, locale.value),
+        }),
     };
 }));
 </script>

@@ -1,0 +1,142 @@
+{
+    "section": {
+        "schedule": "Schedule",
+        "my": "My settings",
+        "manage": "Manage",
+        "account": "Account"
+    },
+    "group": {
+        "schedule": "Schedule",
+        "mySettings": "My settings",
+        "people": "People",
+        "resources": "Resources",
+        "curriculum": "Curriculum",
+        "accessReview": "Access & review",
+        "accessData": "Access & data"
+    },
+    "place": {
+        "home": {
+            "label": "Home",
+            "description": "Session overview.",
+            "keywords": "home, start, dashboard, overview"
+        },
+        "schedule": {
+            "label": "Schedule",
+            "description": "The week grid: see, select and move sessions.",
+            "keywords": "schedule, timetable, grid, week, calendar, sessions"
+        },
+        "manageProposals": {
+            "label": "Proposals",
+            "description": "Solver-produced schedules awaiting a decision.",
+            "keywords": "proposal, proposals, generation, solver, review, apply, pending"
+        },
+        "my": {
+            "label": "My settings",
+            "description": "Your own availability and teaching preferences.",
+            "keywords": "my, me, self, own, settings, availability, preferences"
+        },
+        "myAvailability": {
+            "label": "My unavailability",
+            "description": "Days and blocks you cannot teach. Submitted for approval.",
+            "keywords": "availability, unavailable, veto, blackout, absence, busy, my"
+        },
+        "myExams": {
+            "label": "My exams",
+            "description": "Ask for an exam on a module you lead. Reviewed before it is placed.",
+            "keywords": "exam, klausur, assessment, request, my"
+        },
+        "myPreferences": {
+            "label": "My teaching preferences",
+            "description": "Days and times you would rather teach. Recorded, not yet used by the scheduler.",
+            "keywords": "preference, preferred, mornings, days, teaching, my"
+        },
+        "myTeachingPattern": {
+            "label": "My teaching pattern",
+            "description": "How each module you lead is placed: spread across the term, or kept together.",
+            "keywords": "pattern, block, distributed, spread, module, offering, teaching, my"
+        },
+        "myAccount": {
+            "label": "My account",
+            "description": "Your own display locale: date and number format, and your language where Calendry is translated.",
+            "keywords": "locale, language, date, format, account, my"
+        },
+        "myCalendarLinks": {
+            "label": "Calendar links",
+            "description": "Subscribe an external calendar app to your schedule, or a Group's.",
+            "keywords": "ics, ical, calendar, subscribe, feed, export, link, external"
+        },
+        "manageDisplay": {
+            "label": "Display",
+            "description": "How the schedule is drawn: colour sources, online marking, fallbacks.",
+            "keywords": "display, colour, color, theme, highlight, online, appearance, palette"
+        },
+        "manageAccessDefaults": {
+            "label": "Access defaults",
+            "description": "Whether a newly created Person is granted an access role automatically.",
+            "keywords": "access, role, default, permission, grant, auto, member"
+        },
+        "manageDataExport": {
+            "label": "Data export",
+            "description": "Download every Person, login, Group, Room, Offering, Session and Constraint this institution owns.",
+            "keywords": "export, download, gdpr, data, backup, right to access, portability"
+        },
+        "manageCurriculumProgression": {
+            "label": "Curriculum progression",
+            "description": "Which curriculum plan each group is on, and advancing every eligible one at once.",
+            "keywords": "phase, progression, advance, curriculum, plan, semester, promote, cohort"
+        },
+        "manageExamReviews": {
+            "label": "Exam review",
+            "description": "Approve or reject exams lecturers have asked for on their own modules.",
+            "keywords": "exam, klausur, review, approve, reject, pending, assessment"
+        },
+        "manageAvailabilityReviews": {
+            "label": "Unavailability review",
+            "description": "Approve or reject unavailability people have declared for themselves.",
+            "keywords": "review, approve, reject, pending, veto, unavailability, blackout"
+        },
+        "manageAvailabilityPreferences": {
+            "label": "Teaching preferences",
+            "description": "View and set anyone’s preferred days and blocks.",
+            "keywords": "preferences, preferred days, mornings, staff, lecturer"
+        },
+        "accountTheme": {
+            "label": "Toggle theme",
+            "description": "Switch between the light and dark ground.",
+            "keywords": "theme, dark, light, appearance, contrast"
+        },
+        "accountSwitchTenant": {
+            "label": "Switch institution",
+            "description": "Move to another tenant you belong to.",
+            "keywords": "switch, tenant, institution, school, university, change"
+        },
+        "accountLogout": {
+            "label": "Sign out",
+            "description": "End this session.",
+            "keywords": "sign out, logout, log off, exit, leave"
+        },
+        "myApiTokens": {
+            "label": "API tokens",
+            "description": "Mint a bearer token for a script, scoped to permissions you already hold.",
+            "keywords": "api, token, skript, automatisierung, schnittstelle, schlüssel"
+        },
+        "myDataExport": {
+            "label": "Export my data",
+            "description": "Download everything this institution holds about you.",
+            "keywords": "export, download, dsgvo, daten, auskunftsrecht, kopie"
+        }
+    },
+    "shell": {
+        "mainNav": "Main",
+        "menu": "Menu",
+        "search": "Search (Ctrl K)",
+        "navigation": "Navigation",
+        "closeMenu": "Close menu",
+        "sections": "Sections",
+        "jumpToSection": "Jump to any section",
+        "switchInstitution": "Switch institution",
+        "switchFailed": "Could not switch institution.",
+        "expandSidebar": "Expand sidebar",
+        "collapseSidebar": "Collapse sidebar"
+    }
+}

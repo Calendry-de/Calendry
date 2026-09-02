@@ -42,12 +42,12 @@ export function canViewSchedule(held: Iterable<string>): boolean {
     return satisfiesPermissionRequirement(new Set(held), SCHEDULE_PERMISSIONS);
 }
 
-/**
- * The sentence a denial says.
- *
- * Names BOTH keys, because a tenant admin reading "needs session.read" would
- * grant the whole institution's timetable to somebody who only ever needed their
- * own: the more privileged of the two, chosen by an error message.
+/*
+ * THE DENIAL SENTENCE IS NOT HERE ANY MORE (issue #19). It was
+ * `SCHEDULE_DENIAL`, a module-level `const`, and module scope has no language:
+ * a constant evaluated at import time can only ever be one. It is now
+ * `errors.schedule.denied`, resolved at its single call site,
+ * `app/middleware/schedule.ts`, which also carries the reasoning for why the
+ * sentence names BOTH read keys. This file keeps only the wordless half:
+ * what the page requires, and whether a set of permissions satisfies it.
  */
-export const SCHEDULE_DENIAL = 'You do not have permission to view the schedule. '
-    + 'It needs session.read (everyone’s) or session.read_own (your own).';

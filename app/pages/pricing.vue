@@ -7,73 +7,62 @@
                 id="pricing"
                 class="pricing_opener"
                 tone="inverse"
-                title="Priced on what your timetable actually is"
-                lead="Not on what kind of institution you are. Two universities the same size pay
-                    different amounts if one of them has a genuinely harder timetable, and that
-                    difference is measured from your own data rather than assumed from a label."
+                :title="t('pricing.page.opener.title')"
+                :lead="t('pricing.page.opener.lead')"
             >
                 <LandingCapabilityGrid :items="BASIS_ITEMS"/>
             </LandingSection>
 
             <LandingSection
                 id="rates"
-                title="The rate card"
-                lead="Three things are banded and the rest are flat. A bill is the base package,
-                    plus each lecturer at their load band, multiplied by your complexity tier, plus
-                    the seats and services you choose."
+                :title="t('pricing.page.rates.title')"
+                :lead="t('pricing.page.rates.lead')"
             >
                 <div class="pricing_tables">
                     <LandingRateTable
-                        v-for="table in RATE_TABLES"
+                        v-for="table in TABLES"
                         :key="table.id"
                         :table="table"
                     />
                 </div>
 
-                <p class="pricing_caveat">{{ RATE_CAVEAT }}</p>
+                <p class="pricing_caveat">{{ t('pricing.caveat.text') }}</p>
             </LandingSection>
 
             <LandingSection
                 id="extras"
-                title="Seats, support and getting started"
                 layout="aside"
-                lead="Everything that is a flat line rather than a band. Only the people who edit
-                    the timetable need a seat; everybody else who reads it is included."
+                :title="t('pricing.page.extras.title')"
+                :lead="t('pricing.page.extras.lead')"
             >
                 <LandingPrincipleList :items="FLAT_ITEMS"/>
             </LandingSection>
 
             <LandingSection
                 id="calculator"
-                title="Move a variable, watch the price move"
-                lead="Every figure below is computed from the rates above. The complexity sliders
-                    are the ones worth dragging: they change a bill by more than doubling your
-                    lecturer count does, without adding a single student."
+                :title="t('pricing.page.calculator.title')"
+                :lead="t('pricing.page.calculator.lead')"
             >
                 <LandingPriceCalculator/>
             </LandingSection>
 
             <LandingSection
                 id="examples"
-                title="Four institutions, four bills"
                 layout="narrow"
-                lead="The pair worth comparing is the large regular university against the medium
-                    scattered one. The smaller institution costs more, and measured complexity is
-                    the only thing that explains it."
+                :title="t('pricing.page.examples.title')"
+                :lead="t('pricing.page.examples.lead')"
             >
-                <LandingScenarioGrid :items="SCENARIOS"/>
+                <LandingScenarioGrid :items="SCENARIO_ITEMS"/>
             </LandingSection>
 
             <LandingSection
                 id="talk"
-                title="Getting an actual number"
-                lead="The rates above will get you close on your own. A real quote needs your
-                    lecturer count, their weekly load, and one look at how scattered the timetable
-                    is, which is the part nobody can estimate from outside."
+                :title="t('pricing.page.talk.title')"
+                :lead="t('pricing.page.talk.lead')"
             >
                 <LandingCallout
-                    text="Accounts are created by an administrator, so there is nothing to sign up for here. Tell us the shape of your institution and we will come back with a figure."
-                    action="Get in touch"
+                    :text="t('pricing.page.talk.calloutText')"
+                    :action="t('pricing.page.talk.calloutAction')"
                     :href="`mailto:${ CONTACT_EMAIL }`"
                 />
             </LandingSection>
@@ -84,11 +73,11 @@
 </template>
 
 <script setup lang="ts">
+import { useLanguage, useT } from '~/composables/i18n';
+import { openGraphLocale } from '#shared/language';
 import type { LandingFeature } from '~/utils/landingContent';
 import { CONTACT_EMAIL } from '~/utils/landingContent';
-import {
-    FLAT_RATES, PRICING_BASIS, RATE_CAVEAT, RATE_TABLES, SCENARIOS,
-} from '~/utils/pricingContent';
+import { flatRates, pricingBasis, pricingScenarios, rateTables } from '~/utils/pricingContent';
 
 /**
  * The public pricing page.
@@ -125,44 +114,56 @@ import {
  * tile grid, callout and footer, so this is the same site rather than a stub
  * bolted on later. The section shapes follow the landing page's rule too, which
  * is that no two neighbouring sections share a layout family.
+ *
+ * EVERY BLOCK BELOW IS A `computed` OVER `t` AND `locale`, never a value read
+ * once at setup: the two axes move independently (issue #19), so a language
+ * change has to re-resolve the copy and a locale change has to re-format the
+ * figures, and a page whose prices froze at first render would be the worse
+ * half of that pair, because a stale price still looks like a price.
  */
 definePageMeta({ layout: 'empty' });
+
+const { t } = useT();
+const { language, locale } = useLanguage();
 
 /**
  * The basis and the flat rates are both rendered through landing components that
  * take `LandingFeature`, so they are mapped rather than duplicated: the figures
  * stay in one module and the shape conversion happens here.
  */
-const BASIS_ITEMS = computed<LandingFeature[]>(() => PRICING_BASIS.map(item => ({
-    id: item.id,
-    title: item.title,
-    body: item.body,
-})));
+const BASIS_ITEMS = computed<LandingFeature[]>(() => pricingBasis(t));
 
-const FLAT_ITEMS = computed<LandingFeature[]>(() => FLAT_RATES.map(row => ({
+const TABLES = computed(() => rateTables(t, locale.value));
+
+const FLAT_ITEMS = computed<LandingFeature[]>(() => flatRates(t, locale.value).map(row => ({
     id: row.id,
-    title: `${ row.tier }: ${ row.price }`,
+    title: t('pricing.format.flatTitle', { tier: row.tier, price: row.price }),
     body: row.basis,
 })));
 
-const title = 'Pricing';
-const description = 'Calendry is priced per institution on measured cost drivers: a base package '
-    + 'by student headcount, a per-lecturer rate by weekly teaching load, and a complexity '
-    + 'multiplier computed from your own schedule. Students are not billed.';
+const SCENARIO_ITEMS = computed(() => pricingScenarios(t, locale.value));
 
-useHead({
-    title,
-    meta: [
-        { name: 'description', content: description },
-        { property: 'og:type', content: 'website' },
-        { property: 'og:site_name', content: 'Calendry' },
-        { property: 'og:title', content: `${ title } | Calendry` },
-        { property: 'og:description', content: description },
-        { property: 'og:locale', content: 'en' },
-        { name: 'twitter:card', content: 'summary' },
-        { name: 'twitter:title', content: `${ title } | Calendry` },
-        { name: 'twitter:description', content: description },
-    ],
+// A getter, not a plain object: `useHead` re-evaluates it, so the tab title and
+// the social-card text follow a language change instead of freezing at whatever
+// was active when this page first rendered.
+useHead(() => {
+    const title = t('pricing.page.title');
+    const description = t('pricing.page.description');
+
+    return {
+        title,
+        meta: [
+            { name: 'description', content: description },
+            { property: 'og:type', content: 'website' },
+            { property: 'og:site_name', content: 'Calendry' },
+            { property: 'og:title', content: `${ title } | Calendry` },
+            { property: 'og:description', content: description },
+            { property: 'og:locale', content: openGraphLocale(language.value) },
+            { name: 'twitter:card', content: 'summary' },
+            { name: 'twitter:title', content: `${ title } | Calendry` },
+            { name: 'twitter:description', content: description },
+        ],
+    };
 });
 </script>
 

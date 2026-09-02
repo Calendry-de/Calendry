@@ -81,7 +81,7 @@ describe('banking a Session', () => {
         const res = await api(`/api/sessions/${SESSION}/bank`, { method: 'POST', cookie, body: '{}' });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('already in the spare bank');
+        expect(String(res.body.message)).toContain('already in the spare bank');
     });
 });
 
@@ -90,7 +90,7 @@ describe('placing a banked Session', () => {
         const res = await api(`/api/sessions/${SESSION}/move`, { method: 'POST', cookie, body: '{}' });
 
         expect(res.status).toBe(400);
-        expect(String(res.body.statusMessage)).toContain('spare bank');
+        expect(String(res.body.message)).toContain('spare bank');
 
         // Refused, not partially applied.
         const row = await ownerDb.session.findUniqueOrThrow({ where: { id: SESSION } });
@@ -165,14 +165,14 @@ describe('a banked Session cannot swap or lock', () => {
         });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('spare bank');
+        expect(String(res.body.message)).toContain('spare bank');
     });
 
     it('LOCK refuses a banked Session', async () => {
         const res = await api(`/api/sessions/${SESSION}/lock`, { method: 'POST', cookie, body: '{}' });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('spare bank');
+        expect(String(res.body.message)).toContain('spare bank');
     });
 });
 
@@ -194,7 +194,7 @@ describe('only Offering-linked Sessions can be banked', () => {
         });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('no Offering');
+        expect(String(res.body.message)).toContain('no Offering');
     });
 });
 
@@ -211,7 +211,7 @@ describe('locked Sessions must be unlocked first', () => {
         const res = await api(`/api/sessions/${SESSION}/bank`, { method: 'POST', cookie, body: '{}' });
 
         expect(res.status).toBe(409);
-        expect(String(res.body.statusMessage)).toContain('Unlock');
+        expect(String(res.body.message)).toContain('Unlock');
     });
 });
 

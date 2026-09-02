@@ -4,14 +4,13 @@
             <div class="footer_left">
                 <p class="footer_wordmark">Calendry</p>
                 <p class="footer_note">
-                    Multi-tenant timetabling for schools and universities. Built in the open, one
-                    verified phase at a time.
+                    {{ t('landing.footer.note') }}
                 </p>
             </div>
 
             <nav
                 class="footer_nav"
-                aria-label="Footer"
+                :aria-label="t('landing.footer.navLabel')"
             >
                 <a
                     class="footer_link"
@@ -20,7 +19,7 @@
                 <NuxtLink
                     class="footer_link"
                     to="/login"
-                >Sign in</NuxtLink>
+                >{{ t('landing.action.signIn') }}</NuxtLink>
             </nav>
         </div>
     </footer>
@@ -28,6 +27,7 @@
 
 <script setup lang="ts">
 import { CONTACT_EMAIL } from '~/utils/landingContent';
+import { useT } from '~/composables/i18n';
 
 /**
  * Deliberately thin. Every link here goes somewhere that exists: there is no
@@ -38,7 +38,11 @@ import { CONTACT_EMAIL } from '~/utils/landingContent';
  * promise of a repository and there is nothing to click. The line stays because
  * it is true of how the project is run, but a public repository URL belongs
  * here the moment one exists.
+ *
+ * The wordmark itself is not copy and is not keyed: "Calendry" is the product's
+ * name in every language.
  */
+const { t } = useT();
 </script>
 
 <style scoped lang="scss">

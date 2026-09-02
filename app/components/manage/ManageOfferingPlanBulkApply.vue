@@ -4,20 +4,19 @@
         class="bulk"
     >
         <header class="bulk_head">
-            <h2>Roll out to several groups</h2>
+            <h2>{{ t('manageUi.bulkApply.title') }}</h2>
         </header>
 
         <p class="bulk_help">
-            Applies this plan to every group below, for one Term, in a single action:
-            the moment a whole term's cohorts move forward together rather than one at a
-            time. Filter by name and add every match at once, rather than picking groups
-            one by one. Reuse still applies: a group that already has an offering from
-            this plan joins it instead of getting a second one.
+            {{ t('manageUi.bulkApply.help') }}
+            <!--
+                ONE plural message with its verbs inside it. This sentence used
+                to interleave three agreements (`group{{ 's' }}`,
+                `names`/`name`, `is`/`are`) across mustaches, and a word split
+                that way has no key a translator can reach.
+            -->
             <template v-if="preSelectedCount">
-                {{ preSelectedCount }} group{{ preSelectedCount === 1 ? '' : 's' }} already
-                {{ preSelectedCount === 1 ? 'names' : 'name' }} this as its curriculum plan and
-                {{ preSelectedCount === 1 ? 'is' : 'are' }} pre-selected below; remove any that
-                don’t belong in this rollout.
+                {{ t('manageUi.bulkApply.preSelected', { count: preSelectedCount }, preSelectedCount) }}
             </template>
         </p>
 
@@ -41,7 +40,7 @@
                     class="bulk_remove"
                     :disabled="busy"
                     type="button"
-                    :aria-label="`Remove ${group.name}`"
+                    :aria-label="t('manageUi.shared.removeAria', { label: group.name })"
                     @click="removeGroup(group.id)"
                 >
                     <Icon
@@ -54,11 +53,11 @@
 
         <div class="bulk_pick">
             <label class="bulk_filter">
-                <span class="sr-only">Filter groups by name</span>
+                <span class="sr-only">{{ t('manageUi.bulkApply.filterLabel') }}</span>
                 <input
                     v-model="filter"
                     type="text"
-                    placeholder="Filter groups by name…"
+                    :placeholder="t('manageUi.bulkApply.filterPlaceholder')"
                     :disabled="busy"
                 >
             </label>
@@ -70,13 +69,17 @@
             >{{ addAllLabel }}</CommonButton>
 
             <label class="bulk_add">
-                <span class="sr-only">Add one group</span>
+                <span class="sr-only">{{ t('manageUi.bulkApply.addOneLabel') }}</span>
                 <select
                     :disabled="busy || !filteredAvailableGroups.length"
                     :value="''"
                     @change="addGroup($event)"
                 >
-                    <option value="">{{ filteredAvailableGroups.length ? 'Or add one…' : 'No matching groups left to add' }}</option>
+                    <option value="">{{
+                        filteredAvailableGroups.length
+                            ? t('manageUi.bulkApply.addOneOption')
+                            : t('manageUi.bulkApply.noneLeft')
+                    }}</option>
                     <option
                         v-for="option in filteredAvailableGroups"
                         :key="option.id"
@@ -88,12 +91,12 @@
 
         <div class="bulk_controls">
             <label class="bulk_field">
-                <span>Term</span>
+                <span>{{ t('manageUi.shared.termLabel') }}</span>
                 <select
                     v-model="termId"
                     :disabled="busy"
                 >
-                    <option value="">Choose a term…</option>
+                    <option value="">{{ t('manageUi.shared.termPlaceholder') }}</option>
                     <option
                         v-for="term in terms"
                         :key="term.id"
@@ -106,7 +109,11 @@
                 :disabled="busy || !termId || !selectedGroups.length"
                 type="primary"
                 @click="apply"
-            >{{ busy ? 'Applying…' : `Apply to ${selectedGroups.length || ''} group${selectedGroups.length === 1 ? '' : 's'}` }}</CommonButton>
+            >{{
+                busy
+                    ? t('manageUi.shared.applying')
+                    : t('manageUi.bulkApply.applyTo', { count: selectedGroups.length }, selectedGroups.length)
+            }}</CommonButton>
         </div>
 
         <p
@@ -117,6 +124,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * The Plan-side complement to `ManageGroupApplyPlan`: that one applies ONE
  * plan to ONE group from the group's own page (including the "advance"
@@ -147,6 +156,8 @@ const props = defineProps<{
 interface GroupRow { id: string; name: string; curriculumPlanId: string | null }
 interface TermRow { id: string; name: string }
 interface AppliedResult { groupId: string; offerings: { id: string; title: string; action: string }[] }
+
+const { t } = useT();
 
 const canApply = useHasPermission('offering_plan.apply');
 const request = useRequestFetch();
@@ -199,8 +210,8 @@ const filteredAvailableGroups = computed(() => {
 });
 
 const addAllLabel = computed(() => (filter.value.trim()
-    ? `Add all ${filteredAvailableGroups.value.length} matching`
-    : `Add all ${filteredAvailableGroups.value.length}`));
+    ? t('manageUi.bulkApply.addAllMatching', { count: filteredAvailableGroups.value.length })
+    : t('manageUi.bulkApply.addAll', { count: filteredAvailableGroups.value.length })));
 
 const termId = ref('');
 const busy = ref(false);
@@ -237,23 +248,39 @@ function removeGroup(id: string) {
     selectedGroupIds.value = selectedGroupIds.value.filter((existing) => existing !== id);
 }
 
+/**
+ * What one rollout actually did, as a sentence.
+ *
+ * Built exactly the way `ManageGroupApplyPlan.describe()` is, and for the
+ * reasons stated there: one plural message per clause (verb and noun
+ * together), the conjunction as a pairwise fold through `shared.listJoin`, and
+ * the two endings as two whole messages. `partCreated` and `listJoin` are the
+ * SAME messages that panel uses, not copies: the clause reads identically in
+ * both places, and two keys holding one sentence drift on the next edit.
+ */
 function describe(results: AppliedResult[]): string {
     const created = results.reduce((sum, r) => sum + r.offerings.filter((o) => o.action === 'created').length, 0);
     const attached = results.reduce((sum, r) => sum + r.offerings.filter((o) => o.action === 'attached').length, 0);
     const already = results.reduce((sum, r) => sum + r.offerings.filter((o) => o.action === 'already-attached').length, 0);
 
     if (!created && !attached) {
-        return `Every one of these ${results.length} group${results.length === 1 ? '' : 's'} already had every offering in this plan for this term.`;
+        return t('manageUi.bulkApply.nothingToDo', { count: results.length }, results.length);
     }
 
     const parts = [
-        ...(created ? [`created ${created} offering${created === 1 ? '' : 's'}`] : []),
-        ...(attached ? [`made ${attached} group-join${attached === 1 ? '' : 's'} to existing offerings`] : []),
+        ...(created ? [t('manageUi.shared.partCreated', { count: created }, created)] : []),
+        ...(attached ? [t('manageUi.bulkApply.partJoined', { count: attached }, attached)] : []),
     ];
 
-    const alreadyClause = already ? ` (${already} were already in place)` : '';
+    const list = parts.reduce((joined, next) => t('manageUi.shared.listJoin', { list: joined, next }));
 
-    return `Done across ${results.length} group${results.length === 1 ? '' : 's'}: ${parts.join(' and ')}${alreadyClause}.`;
+    return already
+        ? t(
+            'manageUi.bulkApply.doneWithAlready',
+            { count: results.length, parts: list, already },
+            results.length,
+        )
+        : t('manageUi.bulkApply.done', { count: results.length, parts: list }, results.length);
 }
 
 async function apply() {
@@ -273,11 +300,7 @@ async function apply() {
 
         summary.value = describe(result.results);
     } catch (cause) {
-        // h3 nests a custom `data` one level inside the response body; see
-        // `useEntityForm`'s own comment on this, verified against a live error.
-        const body = (cause as { data?: { statusMessage?: string } }).data;
-
-        error.value = body?.statusMessage ?? 'Could not apply this plan.';
+        error.value = serverErrorMessage(cause) ?? t('manageUi.shared.applyError');
     } finally {
         busy.value = false;
     }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describeScheduleFailure, statusCodeOf } from '../app/composables/httpError';
+import { englishT } from './helpers/errorMessages';
 
 /**
  * A failure to LOAD the schedule must never be reported as a failure to CONFIGURE
@@ -34,7 +35,7 @@ describe('statusCodeOf', () => {
 describe('describeScheduleFailure', () => {
     it('never blames configuration for a transport failure', () => {
         for (const error of [new TypeError('Failed to fetch'), {}, null, { statusCode: 500 }]) {
-            const failure = describeScheduleFailure(error);
+            const failure = describeScheduleFailure(englishT, error);
 
             expect(failure.title.toLowerCase()).not.toContain('time grid');
             expect(failure.title.toLowerCase()).not.toContain('configured');
@@ -45,16 +46,16 @@ describe('describeScheduleFailure', () => {
     it('offers a retry only where retrying could work', () => {
         // A retry button that cannot succeed invites pressing it repeatedly.
         // an invitation to keep pressing it.
-        expect(describeScheduleFailure({ statusCode: 500 }).retryable).toBe(true);
-        expect(describeScheduleFailure(new TypeError('offline')).retryable).toBe(true);
-        expect(describeScheduleFailure({ statusCode: 401 }).retryable).toBe(false);
-        expect(describeScheduleFailure({ statusCode: 403 }).retryable).toBe(false);
-        expect(describeScheduleFailure({ statusCode: 404 }).retryable).toBe(false);
+        expect(describeScheduleFailure(englishT, { statusCode: 500 }).retryable).toBe(true);
+        expect(describeScheduleFailure(englishT, new TypeError('offline')).retryable).toBe(true);
+        expect(describeScheduleFailure(englishT, { statusCode: 401 }).retryable).toBe(false);
+        expect(describeScheduleFailure(englishT, { statusCode: 403 }).retryable).toBe(false);
+        expect(describeScheduleFailure(englishT, { statusCode: 404 }).retryable).toBe(false);
     });
 
     it('distinguishes the four cases it claims to distinguish', () => {
         const titles = [401, 403, 404, 500]
-            .map((statusCode) => describeScheduleFailure({ statusCode }).title);
+            .map((statusCode) => describeScheduleFailure(englishT, { statusCode }).title);
 
         expect(new Set(titles).size).toBe(4);
     });
@@ -62,6 +63,6 @@ describe('describeScheduleFailure', () => {
     it('reassures that nothing was changed when nothing was', () => {
         // The reader's first question is whether their timetable survived.
         // timetable survived it.
-        expect(describeScheduleFailure({ statusCode: 500 }).detail).toContain('intact');
+        expect(describeScheduleFailure(englishT, { statusCode: 500 }).detail).toContain('intact');
     });
 });

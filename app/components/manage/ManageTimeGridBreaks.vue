@@ -1,16 +1,15 @@
 <template>
     <section class="breaks">
         <header class="breaks_head">
-            <h3>Named breaks</h3>
+            <h3>{{ t('manageUi.timeGridBreaks.title') }}</h3>
             <span
                 v-if="model.length"
                 class="breaks_count"
-            >{{ model.length }} configured</span>
+            >{{ t('manageUi.timeGridBreaks.count', { count: model.length }) }}</span>
         </header>
 
         <p class="breaks_hint">
-            A longer gap at one position: lunch, an afternoon break. Everywhere
-            else keeps the default gap above.
+            {{ t('manageUi.timeGridBreaks.hint') }}
         </p>
 
         <!--
@@ -27,11 +26,21 @@
                 v-for="(brk, i) in model"
                 :key="i"
             >
-                <strong>{{ brk.label || 'Break' }}</strong>
+                <strong>{{ brk.label || t('manageUi.timeGridBreaks.defaultLabel') }}</strong>
+                <!--
+                    Three finished items separated by ` · `, which is
+                    PUNCTUATION, not grammar (i18n/CONVENTIONS.md § "Assembled
+                    sentences"): each piece is its own whole message and the
+                    separator carries no part of any of them.
+                -->
                 <span>
-                    after block {{ brk.afterBlockIndex + 1 }} ·
-                    {{ brk.durationMinutes }} min ·
-                    {{ brk.dayOfWeek === null ? 'all days' : `${weekdayName(brk.dayOfWeek)} only` }}
+                    {{ t('manageUi.timeGridBreaks.staticAfterBlock', { block: brk.afterBlockIndex + 1 }) }} ·
+                    {{ t('manageUi.shared.minutes', { minutes: brk.durationMinutes }) }} ·
+                    {{
+                        brk.dayOfWeek === null
+                            ? t('manageUi.timeGridBreaks.staticAllDays')
+                            : t('manageUi.timeGridBreaks.dayOnly', { day: weekdayName(brk.dayOfWeek) })
+                    }}
                 </span>
             </li>
         </ul>
@@ -46,7 +55,7 @@
                 class="breaks_row"
             >
                 <label class="breaks_field">
-                    <span class="breaks_field-label">After block</span>
+                    <span class="breaks_field-label">{{ t('manageUi.timeGridBreaks.afterBlockLabel') }}</span>
                     <select
                         class="breaks_control"
                         @change="updateBreak(i, { afterBlockIndex: Number(($event.target as HTMLSelectElement).value) })"
@@ -65,7 +74,7 @@
                 </label>
 
                 <label class="breaks_field breaks_field--minutes">
-                    <span class="breaks_field-label">Minutes</span>
+                    <span class="breaks_field-label">{{ t('manageUi.timeGridBreaks.minutesLabel') }}</span>
                     <input
                         class="breaks_control"
                         min="1"
@@ -76,10 +85,10 @@
                 </label>
 
                 <label class="breaks_field breaks_field--grow">
-                    <span class="breaks_field-label">Label</span>
+                    <span class="breaks_field-label">{{ t('manageUi.timeGridBreaks.labelLabel') }}</span>
                     <input
                         class="breaks_control"
-                        placeholder="Break"
+                        :placeholder="t('manageUi.timeGridBreaks.defaultLabel')"
                         type="text"
                         :value="brk.label"
                         @input="updateBreak(i, { label: ($event.target as HTMLInputElement).value })"
@@ -87,7 +96,7 @@
                 </label>
 
                 <label class="breaks_field">
-                    <span class="breaks_field-label">Days</span>
+                    <span class="breaks_field-label">{{ t('manageUi.timeGridBreaks.daysLabel') }}</span>
                     <!-- Bounded to the grid's own teaching days: a
                          break on a day nothing is scheduled is
                          configuration that can never take effect. -->
@@ -99,20 +108,22 @@
                         <option
                             :selected="brk.dayOfWeek === null"
                             value=""
-                        >All days</option>
+                        >{{ t('manageUi.timeGridBreaks.allDaysOption') }}</option>
                         <option
                             v-for="iso in activeDays"
                             :key="iso"
                             :selected="brk.dayOfWeek === iso"
                             :value="iso"
-                        >{{ weekdayName(iso) }} only</option>
+                        >{{ t('manageUi.timeGridBreaks.dayOnly', { day: weekdayName(iso) }) }}</option>
                     </select>
                 </label>
 
                 <button
-                    :aria-label="`Remove the break after block ${brk.afterBlockIndex + 1}`"
+                    :aria-label="t('manageUi.timeGridBreaks.removeAria', {
+                        block: brk.afterBlockIndex + 1,
+                    })"
                     class="breaks_remove"
-                    title="Remove this break"
+                    :title="t('manageUi.timeGridBreaks.removeTitle')"
                     type="button"
                     @click="removeBreak(i)"
                 >
@@ -127,19 +138,20 @@
         <p
             v-else
             class="breaks_empty"
-        >No named breaks: every gap is the default.</p>
+        >{{ t('manageUi.timeGridBreaks.empty') }}</p>
 
         <CommonButton
             v-if="!readonly"
             type="secondary"
             @click="addBreak"
-        >Add a break</CommonButton>
+        >{{ t('manageUi.timeGridBreaks.add') }}</CommonButton>
     </section>
 </template>
 
 <script setup lang="ts">
 import CommonButton from '~/components/common/CommonButton.vue';
 import type { TimeGridBreak } from '#shared/timeGrid';
+import { useT } from '~/composables/i18n';
 import { weekdayName } from '~/composables/schedule';
 
 /**
@@ -164,6 +176,8 @@ const props = defineProps<{
 
 const model = defineModel<TimeGridBreak[]>({ required: true });
 
+const { t } = useT();
+
 function addBreak() {
     // Position defaults to the middle of the day and "all days": the lunch
     // case, which is what someone reaching for this button usually wants.
@@ -183,6 +197,14 @@ function addBreak() {
         // labelled "Lunch": a 10:00 morning break and a 13:00 lunch, because
         // the second one kept this default. A neutral word is one nobody
         // mistakes for a considered answer.
+        /*
+         * NOT a message, deliberately (issue #19). This is a STORED value, not
+         * copy: it is written into the draft, saved, and then rendered to every
+         * viewer of the timetable regardless of their language. Translating it
+         * would make a break's stored name depend on which language its author
+         * happened to be using. The DISPLAY fallback for an empty label, and
+         * this input's placeholder, are messages; the seed is data.
+         */
         label: 'Break',
         dayOfWeek: null,
     }];

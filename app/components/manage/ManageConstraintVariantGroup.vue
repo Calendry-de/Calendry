@@ -13,7 +13,7 @@
             />
             <span class="cvgroup_name">{{ group.type.label }}</span>
             <span class="cvgroup_count">
-                {{ group.entries.length }} identical rules
+                {{ t('manageUi.constraintVariantGroup.count', { count: group.entries.length }) }}
             </span>
             <Icon
                 aria-hidden="true"
@@ -23,11 +23,11 @@
         </button>
 
         <p class="cvgroup_sub">
-            {{ group.type.label }}, narrowed from the tenant-wide rule, applied separately to each of:
+            {{ t('manageUi.constraintVariantGroup.sub', { label: group.type.label }) }}
         </p>
 
         <ul
-            aria-label="Applies to"
+            :aria-label="t('manageUi.shared.appliesTo')"
             class="cvgroup_chips"
         >
             <li
@@ -60,7 +60,9 @@
                 :kinds="kinds"
                 :row="entry.row"
                 :scope-required="true"
-                :subtitle="`${entry.type.label}, narrowed from the tenant-wide rule.`"
+                :subtitle="t('manageUi.constraintVariantGroup.variantSubtitle', {
+                    label: entry.type.label,
+                })"
                 :type="entry.type"
                 @update:enabled="$emit('update:enabled', { row: entry.row, value: $event })"
                 @update:param="$emit('update:param', { row: entry.row, key: $event.key, value: $event.value })"
@@ -72,7 +74,7 @@
                         icon="material-symbols:edit-outline"
                         :to="`/manage/constraints/${entry.row.id}`"
                         type="transparent"
-                    >Edit</CommonButton>
+                    >{{ t('common.action.edit') }}</CommonButton>
                 </template>
             </ManageConstraintRow>
         </ul>
@@ -83,6 +85,7 @@
 import type { ConstraintVariantGroup } from '~/utils/constraintGrouping';
 import type { ConstraintRowData } from '~/components/manage/ManageConstraintRow.vue';
 import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * ONE collapsible entry for several variant rows that share a configuration
@@ -111,6 +114,8 @@ defineEmits<{
     'update:param': [{ row: ConstraintRowData; key: string; value: unknown }];
     'update:scopes': [{ row: ConstraintRowData; kindIds: string[] }];
 }>();
+
+const { t } = useT();
 
 /** Collapsed by default; see the template note above the expanded list. */
 const open = ref(false);

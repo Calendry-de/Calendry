@@ -289,11 +289,35 @@ describe('a declared row is individually addressable', () => {
 });
 
 describe('the hub is navigable by landmark and heading', () => {
-    it('names its nav and gives each destination a heading', async () => {
+    it('names its nav and nests group headings above destination headings', async () => {
         const html = await page('/my');
 
         expect(html).toContain('aria-label="My settings sections"');
-        expect(html).toMatch(/<h2[^>]*class="[^"]*cards_label/);
+
+        /*
+         * ASSERTED AS A TWO-LEVEL NESTING, which is a stronger claim than the
+         * one this test started with.
+         *
+         * It used to require `<h2 class="cards_label">`, because the hub was a
+         * flat wall of cards and a card label was the only thing below the
+         * page's `h1`. The hub now groups its destinations through the same
+         * `groupNavEntries()` the sidebar and the dashboard use, so the
+         * structure a screen-reader user skims is `h1` (page) -> `h2` (group)
+         * -> `h3` (destination), and a card label at `h2` would now claim to
+         * be a sibling of the heading that introduces it.
+         *
+         * Both levels are named here rather than just the one that changed: a
+         * regression in either direction (groups losing their heading, or
+         * cards being promoted back to `h2`) breaks the nesting, and asserting
+         * only the card level is what let the previous shape pass while
+         * saying nothing about the group above it.
+         */
+        expect(html).toMatch(/<h2[^>]*class="[^"]*groups_heading/);
+        expect(html).toMatch(/<h3[^>]*class="[^"]*cards_label/);
+
+        // And the level that moved is genuinely gone, not merely joined: a
+        // card still rendering at `h2` would satisfy both matches above.
+        expect(html).not.toMatch(/<h2[^>]*class="[^"]*cards_label/);
     });
 });
 

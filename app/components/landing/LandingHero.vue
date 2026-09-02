@@ -3,28 +3,27 @@
         <div class="hero_measure">
             <div class="hero_copy">
                 <LandingStatusBadge
-                    label="In active development"
+                    :label="t('landing.hero.statusLabel')"
                     :detail="`v${ version }`"
                 />
 
                 <h1 class="hero_title">
-                    Timetabling for schools and universities.
+                    {{ t('landing.hero.title') }}
                 </h1>
 
                 <p class="hero_lead">
-                    A term's rooms, cohorts, staff and courses in one place, and a solver that
-                    proposes the timetable you judge.
+                    {{ t('landing.hero.lead') }}
                 </p>
 
                 <div class="hero_actions">
                     <CommonButton
                         type="primary"
                         href="#contact"
-                    >Get in touch</CommonButton>
+                    >{{ t('landing.action.getInTouch') }}</CommonButton>
                     <CommonButton
                         type="secondary"
                         href="#built"
-                    >See what works today</CommonButton>
+                    >{{ t('landing.hero.secondaryAction') }}</CommonButton>
                 </div>
             </div>
 
@@ -34,6 +33,8 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
 /**
  * One sentence on what this is, and the product itself.
  *
@@ -61,6 +62,7 @@
  * from the catalogue instead of writing "3": a number stated in prose is a
  * number nothing checks, and this one moves on every release.
  */
+const { t } = useT();
 const config = useRuntimeConfig();
 
 const version = computed(() => config.public.version);

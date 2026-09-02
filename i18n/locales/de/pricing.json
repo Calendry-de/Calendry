@@ -1,0 +1,220 @@
+{
+    "page": {
+        "title": "Preise",
+        "description": "Calendry wird pro Institution nach gemessenen Kostentreibern berechnet: ein Grundpaket nach der Zahl der Lernenden, ein Satz pro Lehrkraft nach wöchentlicher Lehrlast und ein Komplexitätsfaktor, der aus Ihrem eigenen Stundenplan berechnet wird. Für Lernende fällt nichts an.",
+        "opener": {
+            "title": "Der Preis richtet sich danach, wie Ihr Stundenplan tatsächlich aussieht",
+            "lead": "Nicht danach, welche Art von Institution Sie sind. Zwei gleich große Hochschulen zahlen unterschiedlich viel, wenn eine davon einen wirklich schwierigeren Stundenplan hat, und dieser Unterschied wird aus Ihren eigenen Daten gemessen, statt aus einem Etikett abgeleitet."
+        },
+        "rates": {
+            "title": "Die Preisliste",
+            "lead": "Drei Dinge sind gestaffelt, der Rest ist pauschal. Eine Rechnung ist das Grundpaket, dazu jede Lehrkraft in ihrer Laststufe, multipliziert mit Ihrer Komplexitätsstufe, dazu die Zugänge und Leistungen, die Sie wählen."
+        },
+        "extras": {
+            "title": "Zugänge, Support und der Einstieg",
+            "lead": "Alles, was eine Pauschale ist und keine Staffel. Einen Zugang brauchen nur die Personen, die den Stundenplan bearbeiten; alle anderen, die ihn lesen, sind enthalten."
+        },
+        "calculator": {
+            "title": "Eine Größe verschieben und dem Preis zusehen",
+            "lead": "Jede Zahl hier unten ist aus den Sätzen oben berechnet. Die Komplexitätsschieber sind die, die sich zu ziehen lohnen: Sie verändern eine Rechnung stärker als eine Verdopplung der Zahl Ihrer Lehrkräfte, und dafür muss keine einzige lernende Person dazukommen."
+        },
+        "examples": {
+            "title": "Vier Institutionen, vier Rechnungen",
+            "lead": "Das Paar, das sich zu vergleichen lohnt, ist die große Hochschule mit regelmäßigem Plan gegen die mittlere mit zerstreutem Plan. Die kleinere Institution kostet mehr, und die gemessene Komplexität ist das Einzige, was das erklärt."
+        },
+        "talk": {
+            "title": "Wie Sie zu einer echten Zahl kommen",
+            "lead": "Mit den Sätzen oben kommen Sie allein schon recht nah heran. Ein echtes Angebot braucht die Zahl Ihrer Lehrkräfte, deren wöchentliche Last und einen Blick darauf, wie zerstreut der Stundenplan ist – und das ist der Teil, den von außen niemand schätzen kann.",
+            "calloutText": "Konten werden durch die Administration angelegt, hier gibt es also nichts zu registrieren. Beschreiben Sie uns die Form Ihrer Institution, und wir kommen mit einer Zahl zurück.",
+            "calloutAction": "Kontakt aufnehmen"
+        }
+    },
+    "basis": {
+        "measured": {
+            "title": "Gemessen, nicht angenommen",
+            "body": "Der Preis hängt nicht davon ab, ob Sie sich Schule, Fachhochschule oder Universität nennen. Das ist eine Vorannahme und keine Messung, und sie stellt der gut organisierten Institution zu viel und der chaotischen von genau derselben Größe zu wenig in Rechnung. Alles Folgende wird aus Ihren eigenen Daten berechnet."
+        },
+        "lecturers": {
+            "title": "Pro Lehrkraft, gewichtet nach Lehrlast",
+            "body": "Die abgerechnete Einheit ist eine Lehrkraft, gestaffelt danach, wie viele Termine sie pro Woche tatsächlich hält. Termine sind die Einheit, die der Solver wirklich platziert, sie lassen sich nicht auf dem Papier umsortieren, um eine Rechnung zu senken, und sie entsprechen dem, wie Institutionen Lehrlast schon heute beschreiben: jemand unterrichtet acht Stunden pro Woche."
+        },
+        "students": {
+            "title": "Für Lernende fällt überhaupt nichts an",
+            "body": "Unbegrenzt, enthalten. Eine lernende Person liest ihren Stundenplan und bekommt Benachrichtigungen dazu; das auszuliefern kostet fast nichts. Dafür pro Kopf zu kassieren, würde den Preis gegen die Nutzung richten, und ein Stundenplan, den niemand ansehen kann, ist nichts wert."
+        },
+        "complexity": {
+            "title": "Komplexität wird berechnet, ist prüfbar und wird neu bewertet",
+            "body": "Der Faktor ergibt sich aus den Räumen und Gruppen, mit denen jede Lehrkraft zu tun hat, daraus, wie stark ihr Wochenmuster schwankt, und daraus, wie tief Ihre Gruppen verschachtelt sind. Er wird aus dem fertigen Stundenplan abgeleitet, nicht selbst angegeben und nicht vom Vertrieb geschätzt, Ihre eigene IT kann ihn also nachrechnen. Er wird zum Semesterbeginn festgelegt und neu bewertet, wenn das, was Sie tatsächlich durchführen, von diesem Plan abweicht – so folgt der Preis Ihrem Stundenplan, statt für die Laufzeit eines Vertrags eingefroren zu sein."
+        }
+    },
+    "rateTable": {
+        "base": {
+            "title": "Grundpaket",
+            "note": "Eine Gebühr pro Institution, gestaffelt nach der Zahl der Lernenden. Deckt Hosting, Infrastruktur und Standard-Support ab.",
+            "basisLabel": "Lernende",
+            "priceLabel": "Pro Jahr",
+            "extraLabel": "Zuschlag Verbund"
+        },
+        "lecturer": {
+            "title": "Pro Lehrkraft",
+            "note": "Gestaffelt nach den Terminen, die eine Lehrkraft in einer normalen Woche hält.",
+            "basisLabel": "Termine pro Woche",
+            "priceLabel": "Pro Jahr"
+        },
+        "complexity": {
+            "title": "Komplexitätsfaktor",
+            "note": "Wird nur auf die Zwischensumme der Lehrkräfte angewendet, nie auf das Grundpaket.",
+            "basisLabel": "Was das bedeutet",
+            "priceLabel": "Faktor"
+        }
+    },
+    "flat": {
+        "seat": {
+            "tier": "Zugang für Verwaltung und Planung",
+            "basis": "Namentlich benannte Personen, die bearbeiten, fixieren oder den Solver starten. Alle anderen sind enthalten.",
+            "price": "{amount} pro Jahr"
+        },
+        "supportStandard": {
+            "tier": "Standard-Support",
+            "basis": "In jedem Grundpaket enthalten.",
+            "price": "Enthalten"
+        },
+        "supportPriority": {
+            "tier": "Bevorzugter Support",
+            "basis": "Reaktion innerhalb von acht Stunden, ein direkter Kanal und ein Roadmap-Gespräch pro Quartal.",
+            "price": "{amount} pro Jahr"
+        },
+        "supportPartner": {
+            "tier": "Partnerkontingent",
+            "basis": "Rund sechzig Entwicklungsstunden pro Jahr für Funktionen, die Sie festlegen.",
+            "price": "{amount} pro Jahr oder {hourly} pro Stunde"
+        },
+        "onboardingStandard": {
+            "tier": "Standard-Einführung",
+            "basis": "Import über Vorlagen, den Sie selbst durchführen, dazu etwa drei Tage Schulung.",
+            "price": "{from} bis {to} einmalig"
+        },
+        "onboardingFull": {
+            "tier": "Einführung „Happiness Package“",
+            "basis": "Wir bauen den Import aus Ihrem Altsystem, zwei Wochen Intensivschulung, eine namentlich benannte Ansprechperson.",
+            "price": "{from} bis {to} einmalig"
+        },
+        "onboardingFederation": {
+            "tier": "Einführung im Verbund",
+            "basis": "Wird pro Verbund angeboten, weil keine zwei Verbünde denselben Ausgangspunkt haben.",
+            "price": "Auf Anfrage"
+        }
+    },
+    "loadBand": {
+        "light": {
+            "label": "Geringe Last"
+        },
+        "standard": {
+            "label": "Normale Last"
+        },
+        "heavy": {
+            "label": "Hohe Last"
+        }
+    },
+    "complexityTier": {
+        "s": {
+            "meaning": "Weitgehend feste Wochenmuster, wenige Räume und Gruppen pro Lehrkraft"
+        },
+        "m": {
+            "meaning": "Etwas Schwankung, mittlere Streuung"
+        },
+        "l": {
+            "meaning": "Starke Schwankung, weite Streuung, tief verschachtelte Gruppen"
+        },
+        "xl": {
+            "meaning": "Sehr zerstreut, viel Verzahnung über Gruppen und Verbünde hinweg"
+        }
+    },
+    "complexityFactor": {
+        "entanglement": {
+            "label": "Verzahnung",
+            "measure": "Durchschnittliche Zahl der Gruppen pro Termin, nach oben gedeckelt"
+        },
+        "nesting": {
+            "label": "Verschachtelungstiefe",
+            "measure": "Durchschnittliche Tiefe im Gruppenbaum, gemessen an Ihrem tiefsten Baum"
+        },
+        "variance": {
+            "label": "Streuung der Zeitfenster",
+            "measure": "Wie stark sich das Muster einer Lehrkraft von Woche zu Woche verschiebt"
+        },
+        "constraints": {
+            "label": "Regeldichte",
+            "measure": "Gewicht der aktiven Regeln, nach oben gedeckelt"
+        }
+    },
+    "supportTier": {
+        "standard": {
+            "label": "Standard",
+            "detail": "In jedem Grundpaket enthalten"
+        },
+        "priority": {
+            "label": "Bevorzugt",
+            "detail": "Reaktion innerhalb von acht Stunden, direkter Kanal, Roadmap-Gespräch pro Quartal"
+        },
+        "partner": {
+            "label": "Partnerkontingent",
+            "detail": "Rund sechzig Entwicklungsstunden pro Jahr für Arbeit, die Sie festlegen"
+        }
+    },
+    "line": {
+        "base": {
+            "label": "Grundpaket",
+            "detail": "Stufe {tier}, {students} Lernende"
+        },
+        "lecturers": {
+            "label": "Lehrkräfte",
+            "detail": "{lecturers} Lehrkräfte bei Komplexität {multiplier}"
+        },
+        "seats": {
+            "label": "Verwaltungszugänge",
+            "detail": "{seats} zu je {fee}"
+        },
+        "federation": {
+            "label": "Zuschlag Verbund",
+            "detail": "Gestaffelt mit Stufe {tier}",
+            "detailNone": "Kein Verbundmitglied"
+        },
+        "support": {
+            "label": "Support: {tier}"
+        }
+    },
+    "scenario": {
+        "a": {
+            "short": "Klein, unordentlich",
+            "title": "Kleine Fachhochschule",
+            "shape": "{students} Lernende und {lecturers} Lehrkräfte, viele Lehrbeauftragte und ein Stundenplan, den seit Jahren niemand aufgeräumt hat"
+        },
+        "b": {
+            "short": "Groß, regelmäßig",
+            "title": "Große Universität, regelmäßiger Stundenplan",
+            "shape": "{students} Lernende und {lecturers} Lehrkräfte mit klaren, sich wiederholenden Wochenmustern"
+        },
+        "c": {
+            "short": "Mittel, zerstreut",
+            "title": "Mittelgroße Hochschule, zerstreuter Stundenplan",
+            "shape": "{students} Lernende und {lecturers} Lehrkräfte, weit über Räume und verschachtelte Gruppen verteilt"
+        },
+        "d": {
+            "short": "Kleine Schule",
+            "title": "Kleine Schule",
+            "shape": "{students} Lernende und {lecturers} Lehrkräfte mit einem einfachen, festen Wochenmuster"
+        }
+    },
+    "caveat": {
+        "text": "Das sind die Sätze, wie sie heute stehen, und sie sind Planungszahlen und kein unterschriebener Tarif: Sie sind noch nicht an einem vollen Jahr echter Durchführung überprüft. Sie werden sich verschieben, sobald diese Daten vorliegen. Wenn wir Ihnen ein Angebot machen, gilt das Angebot – und wir sagen Ihnen das lieber hier als erst, nachdem Sie ein Budget darauf gebaut haben."
+    },
+    "format": {
+        "rangeClosed": "{from} bis {to}",
+        "rangeOpen": "{from} oder mehr",
+        "rangeClosedWeekly": "{from} bis {to} pro Woche",
+        "rangeOpenWeekly": "{from} oder mehr pro Woche",
+        "multiplier": "{value}x",
+        "flatTitle": "{tier}: {price}"
+    }
+}

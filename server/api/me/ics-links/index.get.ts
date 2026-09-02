@@ -43,7 +43,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     if (identity.kind !== 'account') {
         throw createError({
             statusCode: 403,
-            statusMessage: 'Calendar links are managed with a signed-in session, not with a token or device key.',
+            message: 'Calendar links are managed with a signed-in session, not with a token or device key.',
         });
     }
 

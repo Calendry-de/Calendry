@@ -12,15 +12,15 @@
                 v-if="justChanged"
                 class="login_changed"
                 role="status"
-            >Password changed. Sign in with your new password.</p>
+            >{{ t('auth.login.passwordChanged') }}</p>
             <p
                 v-else
                 class="login_lead"
-            >Sign in to continue.</p>
+            >{{ t('auth.login.lead') }}</p>
 
             <CommonInputText
                 v-model="email"
-                placeholder="Email"
+                :placeholder="t('auth.login.emailPlaceholder')"
                 input-type="email"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'username', required: true, autofocus: true }"
@@ -28,7 +28,7 @@
 
             <CommonInputText
                 v-model="password"
-                placeholder="Password"
+                :placeholder="t('auth.login.passwordPlaceholder')"
                 input-type="password"
                 :disabled="busy"
                 :input-attrs="{ autocomplete: 'current-password', required: true }"
@@ -65,18 +65,33 @@
                 type="primary"
                 width="100%"
                 :disabled="busy"
-            >{{ busy ? 'Signing in…' : 'Sign in' }}</CommonButton>
+            >{{ busy ? t('auth.login.submitBusy') : t('auth.login.submit') }}</CommonButton>
 
             <p class="login_note">
-                Accounts are created by an administrator. There is no self-service sign-up.
+                {{ t('auth.login.noSignup') }}
             </p>
 
-            <p class="login_note">
-                New to Calendry? <NuxtLink
-                    class="login_link"
-                    :to="LANDING_ROUTE"
-                >What it is, and what it does not do yet</NuxtLink>.
-            </p>
+            <!--
+                `<i18n-t>` rather than splitting this into "New to Calendry?",
+                a link label and a full stop. German reorders clauses, so three
+                keys concatenated in English order produce a sentence no
+                translator can fix without editing the template; one message
+                with a `{link}` placeholder lets the link move where the
+                grammar needs it. The slot name matches the placeholder.
+            -->
+            <i18n-t
+                keypath="auth.login.landingPrompt"
+                tag="p"
+                class="login_note"
+                scope="global"
+            >
+                <template #link>
+                    <NuxtLink
+                        class="login_link"
+                        :to="LANDING_ROUTE"
+                    >{{ t('auth.login.landingLinkText') }}</NuxtLink>
+                </template>
+            </i18n-t>
         </form>
 
         <!-- STEP 2: tenant selection, only when the account has several identities -->
@@ -85,7 +100,7 @@
             class="login_form"
         >
             <p class="login_lead">
-                Your account belongs to more than one institution. Choose one to continue.
+                {{ t('auth.login.tenantChoiceLead') }}
             </p>
 
             <CommonButton
@@ -110,13 +125,14 @@
                 type="link"
                 :disabled="busy"
                 @click="cancelSelection"
-            >Use a different account</CommonButton>
+            >{{ t('auth.login.useDifferentAccount') }}</CommonButton>
         </div>
     </CommonBox>
 </template>
 
 <script setup lang="ts">
-import { LOGIN_ERROR, type SessionTenant, fetchSession, useSession } from '~/composables/session';
+import { LOGIN_ERROR_KEY, type SessionTenant, fetchSession, useSession } from '~/composables/session';
+import { useT } from '~/composables/i18n';
 import { useStore } from '~/store';
 import { LANDING_ROUTE, isInternalPath, resolveHomeRoute } from '~/utils/routes';
 import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
@@ -153,7 +169,13 @@ const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api
  * is made, so an ambiguous account genuinely cannot proceed by accident.
  */
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Sign in' });
+
+const { t } = useT();
+
+// A getter, not a plain string: `useHead` re-evaluates it, so the tab title
+// follows a language change instead of freezing at whatever was active when
+// this page first mounted.
+useHead(() => ({ title: t('auth.login.pageTitle') }));
 
 const route = useRoute();
 const session = useSession();
@@ -311,7 +333,7 @@ async function submitCredentials() {
         // returns identical 401s for the first two; distinguishing them in the
         // UI would reintroduce the account-existence oracle that the server
         // deliberately avoids.
-        error.value = LOGIN_ERROR;
+        error.value = t(LOGIN_ERROR_KEY);
         password.value = '';
         failedAttempts.value += 1;
 
@@ -340,7 +362,7 @@ async function chooseTenant(tenantId: string) {
         await $fetch('/api/auth/select-tenant', { method: 'POST', body: { tenantId } });
         await finish();
     } catch {
-        error.value = 'That institution is not available for this account.';
+        error.value = t('auth.error.tenantUnavailable');
     } finally {
         busy.value = false;
     }

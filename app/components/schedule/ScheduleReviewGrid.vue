@@ -3,7 +3,7 @@
         class="rgrid"
         :style="cssVars"
         role="group"
-        aria-label="Proposed week"
+        :aria-label="t('schedule.reviewGrid.regionLabel')"
     >
         <div
             class="rgrid_corner"
@@ -24,8 +24,8 @@
             <span
                 v-if="dayDiffers(day)"
                 class="rgrid_head-note"
-                title="This day has its own break schedule, so its blocks do not start at the times in the left column."
-            >own breaks</span>
+                :title="t('schedule.grid.ownBreaksTitle')"
+            >{{ t('schedule.grid.ownBreaks') }}</span>
         </div>
 
         <!--
@@ -54,7 +54,7 @@
                 <div
                     class="rgrid_gap-time"
                     :style="{ gridRow: row.line, gridColumn: 1 }"
-                >{{ row.minutes }} min</div>
+                >{{ t('schedule.grid.gapMinutes', { minutes: row.minutes }) }}</div>
 
                 <!--
                     One band across every day, because these are the UNIVERSAL
@@ -66,8 +66,8 @@
                     class="rgrid_gap"
                     :style="{ gridRow: row.line, gridColumn: `2 / -1` }"
                 >
-                    <span class="rgrid_gap-label">{{ row.label ?? 'Break' }}</span>
-                    <span class="rgrid_gap-mins">{{ row.minutes }} min</span>
+                    <span class="rgrid_gap-label">{{ row.label ?? t('schedule.grid.break') }}</span>
+                    <span class="rgrid_gap-mins">{{ t('schedule.grid.gapMinutes', { minutes: row.minutes }) }}</span>
                 </div>
             </template>
         </template>
@@ -101,7 +101,7 @@
                         class="rgrid_chip-icon"
                         aria-hidden="true"
                     />
-                    <span class="rgrid_chip-tag-text">{{ DIFF_TAG[item.action] }}</span>
+                    <span class="rgrid_chip-tag-text">{{ diffTag(item.action, t) }}</span>
                 </span>
                 <span class="rgrid_chip-title">{{ lookup.offering(item.offeringId) }}</span>
                 <span
@@ -112,11 +112,12 @@
                 <span
                     v-if="item.action === 'move' && item.previous"
                     class="rgrid_chip-meta rgrid_chip-was"
-                >was {{ weekdayShort(item.previous.dayOfWeek) }}
-                    {{ blockTime(grid, item.previous.blockIndex, item.previous.dayOfWeek).start }}
-                    <template v-if="item.previous.termWeek !== item.placement.termWeek">
-                        (wk {{ item.previous.termWeek }})
-                    </template>
+                >{{ t('schedule.reviewGrid.was', {
+                    day: weekdayShort(item.previous.dayOfWeek),
+                    time: blockTime(grid, item.previous.blockIndex, item.previous.dayOfWeek).start,
+                }) }}<template v-if="item.previous.termWeek !== item.placement.termWeek">
+                    {{ t('schedule.reviewGrid.wasWeek', { week: item.previous.termWeek }) }}
+                </template>
                 </span>
             </article>
         </div>
@@ -128,8 +129,9 @@
 import { blockTime, weekdayName, weekdayShort } from '~/composables/schedule';
 import type { TimeGrid } from '~/composables/schedule';
 import { clusterSlots, useGridGeometry } from '~/composables/gridGeometry';
-import { DIFF_ICON, DIFF_TAG, describePlacement, shownAt } from '~/composables/generationReview';
+import { DIFF_ICON, describePlacement, diffTag, shownAt } from '~/composables/generationReview';
 import type { Placement, ReviewPlacement } from '~/composables/generationReview';
+import { useT } from '~/composables/i18n';
 
 /**
  * The proposed timetable, rendered as a diff.
@@ -163,6 +165,7 @@ const props = defineProps<{
     };
 }>();
 
+const { t } = useT();
 
 /** "Monday 09:00": the shared sentence builder's slot formatter for this grid. */
 const slotLabel = (placement: Placement) => (
@@ -215,7 +218,7 @@ const slots = computed(() => {
             roomId: item.roomId,
             previous: item.previous,
             placement: item.placement,
-            label: describePlacement(item, slotLabel, props.lookup.offering, props.lookup.room),
+            label: describePlacement(item, slotLabel, props.lookup.offering, props.lookup.room, t),
         });
 
         return { key, at };

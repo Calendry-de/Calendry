@@ -22,7 +22,11 @@
  * build the function's parameters, and by `scripts/provision-tenant.ts` to
  * report what was created.
  */
-import { defaultConstraintRow, defaultConstraintTypes } from '../../shared/constraintTypes';
+import {
+    defaultConstraintRow,
+    defaultConstraintTypes,
+    validateConstraint,
+} from '../../shared/constraintTypes';
 
 /**
  * ONE DEFAULT ROW PER LIVE CATALOGUE TYPE: see `scripts/provision-tenant.ts`
@@ -30,6 +34,35 @@ import { defaultConstraintRow, defaultConstraintTypes } from '../../shared/const
  * derived from the catalogue rather than hand-listed.
  */
 export const DEFAULT_CONSTRAINTS = defaultConstraintTypes().map(defaultConstraintRow);
+
+/**
+ * FAIL AT IMPORT TIME, NOT AT SOLVE TIME. `minimize_block_usage` shipped
+ * `defaultEnabled: true` with no default block selection, so every tenant
+ * provisioned before the fix got an `INVALID_ARGUMENT` on its very first
+ * solver run, 68ms after the run was created. `validateConstraint` (the same
+ * function the pre-flight route runs) is run here, eagerly, over every row
+ * this module hands `staff_create_tenant()`: a future catalogue entry seeded
+ * enabled with an unsendable default configuration throws on `bun run dev` /
+ * `provision:tenant` / the app's own boot, not on some tenant's first click of
+ * "Generate schedule".
+ */
+for (const row of DEFAULT_CONSTRAINTS) {
+    if (!row.isEnabled) {
+        continue;
+    }
+
+    const issues = validateConstraint({
+        id: row.type, name: row.name, type: row.type, severity: row.severity, params: row.params,
+    });
+
+    if (issues.length > 0) {
+        throw new Error(
+            `Default constraint row '${row.type}' is seeded isEnabled: true but cannot be sent to the `
+            + `solver: ${issues.map((i) => i.message).join(' ')} Either seed it disabled or give it a `
+            + 'sendable default selection (shared/constraintTypes.ts).',
+        );
+    }
+}
 
 export interface ProvisionTenantInput {
     slug: string;

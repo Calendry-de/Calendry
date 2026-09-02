@@ -48,26 +48,26 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (session.offeringId === null) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'This Session has no Offering, so there is no demand to preserve. '
+                message: 'This Session has no Offering, so there is no demand to preserve. '
                     + 'Delete it instead.',
                 data: { offeringId: session.offeringId },
             });
         }
 
         if (!isPlacedSession(session)) {
-            throw createError({ statusCode: 409, statusMessage: 'This Session is already in the spare bank.' });
+            throw createError({ statusCode: 409, message: 'This Session is already in the spare bank.' });
         }
 
         if (session.isLocked) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'Unlock this session before moving it to the spare bank.',
+                message: 'Unlock this session before moving it to the spare bank.',
             });
         }
 

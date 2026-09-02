@@ -11,11 +11,27 @@ import {
     startRun,
     toWireU64,
 } from '../../../utils/solverClient';
+import { resolveSolverError } from '../../../utils/solverErrorMapping';
+import { preflightConstraints } from '../../../utils/solverPreflight';
 import { assembleSolverInput, encodeInput } from '../../../utils/solverInput';
 import { TermEndedError } from '../../../utils/solverCalendar';
 import { hashScope, resolveScope, toWireScope } from '../../../utils/solverScope';
 import { DEFAULT_MAX_MOVES, DEFAULT_MAX_WALL_MILLIS } from '../../../../shared/solverBudget';
 import { SOLVER_MODES } from '../../../../shared/solverMode';
+import type { ConstraintIssue } from '../../../../shared/constraintTypes';
+
+/**
+ * Sentinel for "pre-flight found issues": thrown INSIDE the claiming
+ * transaction, before the `solver_run` row or its input snapshot are
+ * created, so a tenant with a broken constraint gets a 422 naming it rather
+ * than a `solver_run` row that fails 68ms later for the same reason with
+ * nothing before the solver call able to see it coming.
+ */
+class PreflightFailed extends Error {
+    constructor(readonly issues: ConstraintIssue[]) {
+        super('SOLVER_PRECONDITION_FAILED');
+    }
+}
 
 /**
  * Sentinel for "the one-active-run index rejected this insert".
@@ -33,7 +49,7 @@ const bodySchema = z.object({
      * to matter, and a wall clock only as a backstop. A run that ends on wall
      * clock is NOT replayable (CLAUDE.md), so it should be the exception.
      */
-    maxMoves: z.coerce.number().int().min(1).max(100_000_000_000).optional(),
+    maxMoves: z.coerce.number().int().min(1).max(100_000_000_000_000).optional(),
     maxWallMillis: z.coerce.number().int().min(1).max(600_000).optional(),
     /** 0 = let the solver choose; whatever it picks is echoed back and stored. */
     seed: z.coerce.number().int().min(0).optional(),
@@ -84,7 +100,23 @@ export default defineEventHandler(async (event) => {
         // Checked explicitly so a bad term id is a 404 rather than a foreign-key
         // 500, and so it cannot be used to probe another tenant's term ids.
         if (!term) {
-            throw createError({ statusCode: 404, statusMessage: 'Term not found.' });
+            throw createError({ statusCode: 404, message: 'Term not found.' });
+        }
+
+        /**
+         * PRE-FLIGHT, before anything else in this transaction writes a row.
+         *
+         * `assembleSolverInput` below would ALSO catch a constraint like this
+         * (`toWireConstraint`'s skip-and-report path), but that is silent
+         * narrowing meant for `GET /api/solver/runs`, read only by someone who
+         * goes looking. This is the difference between that and a run that
+         * never happens: nothing is claimed, nothing is sent, and the reason
+         * is in the response body of the click that triggered it.
+         */
+        const issues = await preflightConstraints(tx, identity.tenantId);
+
+        if (issues.length > 0) {
+            throw new PreflightFailed(issues);
         }
 
         /**
@@ -160,6 +192,20 @@ export default defineEventHandler(async (event) => {
         }
     }).catch(async (error) => {
         /**
+         * An enabled constraint cannot be sent to the solver as configured.
+         * No `solver_run` row exists (this throws before `tx.solverRun.create`
+         * runs), so there is nothing to mark FAILED and nothing to clean up:
+         * the request simply never became a run.
+         */
+        if (error instanceof PreflightFailed) {
+            throw createError({
+                statusCode: 422,
+                message: 'One or more enabled constraints cannot be sent to the solver as configured.',
+                data: { error: 'SOLVER_PRECONDITION_FAILED', issues: error.issues },
+            });
+        }
+
+        /**
          * "Now" is past the end of the term, so every Session would be excluded
          * as past and the solver would return an empty placement, which is
          * indistinguishable from a successful solve of an empty problem.
@@ -171,7 +217,7 @@ export default defineEventHandler(async (event) => {
         if (error instanceof TermEndedError) {
             throw createError({
                 statusCode: 422,
-                statusMessage: error.message,
+                message: error.message,
                 data: { termEnd: error.termEnd },
             });
         }
@@ -192,7 +238,7 @@ export default defineEventHandler(async (event) => {
 
         throw createError({
             statusCode: 409,
-            statusMessage: 'A solver run is already active for this term.',
+            message: 'A solver run is already active for this term.',
             data: { activeRun: active },
         });
     });
@@ -256,15 +302,21 @@ export default defineEventHandler(async (event) => {
          *
          * So a transport failure resolves the row to FAILED before returning.
          * The run genuinely never started, and the record says exactly that.
+         *
+         * `parsedError` is resolved in the SAME transaction as the update, so
+         * the immediate 422/502 response can already show the reader the same
+         * parsed reason `GET /api/solver/runs` would show a moment later,
+         * rather than a raw string that only becomes readable on a refresh.
          */
-        await withRequestTenant(event, (tx) => tx.solverRun.update({
-            where: { id: created.id },
-            data: {
-                status: 'FAILED',
-                errorDetail: (error as Error).message.slice(0, 2000),
-                finishedAt: new Date(),
-            },
-        }));
+        const errorDetail = (error as Error).message.slice(0, 2000);
+        const parsedError = await withRequestTenant(event, async (tx) => {
+            await tx.solverRun.update({
+                where: { id: created.id },
+                data: { status: 'FAILED', errorDetail, finishedAt: new Date() },
+            });
+
+            return resolveSolverError(tx, errorDetail);
+        });
 
         /**
          * A solver that ANSWERS, even to reject the input, is reachable, and
@@ -278,15 +330,17 @@ export default defineEventHandler(async (event) => {
         if (error instanceof SolverRejectedError) {
             throw createError({
                 statusCode: 422,
-                statusMessage: `The solver rejected this run: ${error.message}`,
-                data: { runId: created.id, grpcCode: error.code, detail: error.message },
+                message: `The solver rejected this run: ${error.message}`,
+                data: {
+                    runId: created.id, grpcCode: error.code, detail: error.message, parsedError,
+                },
             });
         }
 
         throw createError({
             statusCode: 502,
-            statusMessage: 'Could not reach the solver service. The run was not started.',
-            data: { runId: created.id, detail: (error as Error).message },
+            message: 'Could not reach the solver service. The run was not started.',
+            data: { runId: created.id, detail: (error as Error).message, parsedError },
         });
     }
 });

@@ -14,7 +14,7 @@
                 <label
                     class="next_label"
                     :for="controlId"
-                >Successor plan</label>
+                >{{ t('manageUi.offeringPlanForm.successorLabel') }}</label>
 
                 <p
                     v-if="readonly"
@@ -33,7 +33,7 @@
                     <option
                         :selected="!draft.nextPlanId"
                         value=""
-                    >None</option>
+                    >{{ t('common.value.none') }}</option>
                     <option
                         v-for="option in nextPlanOptions"
                         :key="option.id"
@@ -51,8 +51,7 @@
                 <p
                     v-else
                     class="next_hint"
-                >What a Group on this plan moves to next: "Semester 3" names "Semester 4", so
-                    advancing needs no picker later. Leave unset for a plan nothing follows.</p>
+                >{{ t('manageUi.offeringPlanForm.successorHint') }}</p>
             </div>
 
             <!--
@@ -84,6 +83,7 @@ import type { EntityRow } from '~/utils/manageRegistry';
 import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import ManageOfferingPlanBulkApply from '~/components/manage/ManageOfferingPlanBulkApply.vue';
 import ManageOfferingPlanItems from '~/components/manage/ManageOfferingPlanItems.vue';
+import { useT } from '~/composables/i18n';
 
 /**
  * Curriculum plan's detail: the shared form plus its ordered item list and
@@ -108,6 +108,8 @@ defineEmits<{
 
 const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 
+const { t } = useT();
+
 const controlId = useId();
 
 /** Every plan, fetched by the form composable because the field declares the reference. */
@@ -121,7 +123,7 @@ const currentNextLabel = computed(() => {
     const id = draft.value.nextPlanId as string | null | undefined;
 
     if (!id) {
-        return 'None';
+        return t('common.value.none');
     }
 
     return allPlans.value.find((plan) => String(plan.id) === String(id))?.name as string ?? id;

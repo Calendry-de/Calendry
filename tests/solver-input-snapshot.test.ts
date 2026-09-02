@@ -147,7 +147,7 @@ describe('GET /api/solver/runs/[id]/snapshot', () => {
         const res = await api(`/api/solver/runs/${run.id}/snapshot`, { cookie });
 
         expect(res.status).toBe(404);
-        expect(res.body.statusMessage ?? res.body.message).toMatch(/no snapshot/i);
+        expect(res.body.message).toMatch(/no snapshot/i);
 
         await ownerDb.solverRun.delete({ where: { id: run.id } });
     });

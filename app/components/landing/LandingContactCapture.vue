@@ -7,13 +7,13 @@
         >
             <CommonInputText
                 v-model="draft.name"
-                placeholder="Given and family name"
+                :placeholder="t('landing.contact.namePlaceholder')"
                 :input-attrs="{
                     autocomplete: 'name',
                     'aria-invalid': errors.name ? 'true' : 'false',
                     'aria-describedby': errors.name ? 'contact-error-name' : undefined,
                 }"
-            >Your name</CommonInputText>
+            >{{ t('landing.contact.nameLabel') }}</CommonInputText>
             <p
                 v-if="errors.name"
                 id="contact-error-name"
@@ -30,13 +30,13 @@
 
             <CommonInputText
                 v-model="draft.institution"
-                placeholder="School, university or consortium"
+                :placeholder="t('landing.contact.institutionPlaceholder')"
                 :input-attrs="{
                     autocomplete: 'organization',
                     'aria-invalid': errors.institution ? 'true' : 'false',
                     'aria-describedby': errors.institution ? 'contact-error-institution' : undefined,
                 }"
-            >Institution</CommonInputText>
+            >{{ t('landing.contact.institutionLabel') }}</CommonInputText>
             <p
                 v-if="errors.institution"
                 id="contact-error-institution"
@@ -52,13 +52,13 @@
             </p>
 
             <label class="contact_field">
-                <span class="contact_label">What would you like to know? <span class="contact_optional">optional</span></span>
+                <span class="contact_label">{{ t('landing.contact.messageLabel') }} <span class="contact_optional">{{ t('landing.contact.optional') }}</span></span>
                 <textarea
                     v-model="draft.message"
                     class="contact_textarea"
                     rows="4"
                     :maxlength="MESSAGE_MAX_LENGTH"
-                    placeholder="How many rooms, how many cohorts, what you use today…"
+                    :placeholder="t('landing.contact.messagePlaceholder')"
                     :aria-invalid="errors.message ? 'true' : 'false'"
                     :aria-describedby="errors.message ? 'contact-error-message' : undefined"
                 />
@@ -72,7 +72,7 @@
                     v-if="showCount"
                     class="contact_count"
                     aria-live="polite"
-                >{{ draft.message.length }} / {{ MESSAGE_MAX_LENGTH }}</span>
+                >{{ t('landing.contact.messageCount', { used: draft.message.length, max: MESSAGE_MAX_LENGTH }) }}</span>
             </label>
             <p
                 v-if="errors.message"
@@ -91,7 +91,7 @@
             <CommonButton
                 native-type="submit"
                 type="primary"
-            >Open an email to us</CommonButton>
+            >{{ t('landing.contact.submit') }}</CommonButton>
 
             <p
                 v-if="opened"
@@ -104,34 +104,45 @@
                     aria-hidden="true"
                 />
                 <span>
-                    A draft should have opened in your email app, addressed to
-                    {{ CONTACT_EMAIL }}. If nothing happened, your browser has no mail app
-                    configured. Write to us directly instead.
+                    {{ t('landing.contact.opened', { email: CONTACT_EMAIL }) }}
                 </span>
             </p>
         </form>
 
         <aside class="contact_aside">
-            <h3 class="contact_asideTitle">Why this is an email and not a sign-up form</h3>
+            <h3 class="contact_asideTitle">{{ t('landing.contact.asideTitle') }}</h3>
             <p class="contact_asideBody">
-                There is no self-service sign-up, and Calendry cannot send mail yet: notification
-                delivery is on the list above, not behind us. A form that showed you a tick and
-                filed your message nowhere would be worse than saying so, so this button composes
-                a message in your own email app and you send it from your own account.
+                {{ t('landing.contact.asideBody') }}
             </p>
-            <p class="contact_asideBody">
-                Or write to <a
-                    class="contact_link"
-                    :href="`mailto:${ CONTACT_EMAIL }`"
-                >{{ CONTACT_EMAIL }}</a>. Accounts for an existing institution are created by its
-                administrator.
-            </p>
+
+            <!--
+                `<i18n-t>` rather than "Or write to", a link and a trailing
+                sentence as three keys: German reorders clauses, so an English
+                concatenation order is one a translator cannot fix from the
+                catalogue alone. One message with a `{link}` placeholder lets
+                the address move where the grammar needs it. The slot name
+                matches the placeholder.
+            -->
+            <i18n-t
+                keypath="landing.contact.asideContact"
+                tag="p"
+                class="contact_asideBody"
+                scope="global"
+            >
+                <template #link>
+                    <a
+                        class="contact_link"
+                        :href="`mailto:${ CONTACT_EMAIL }`"
+                    >{{ CONTACT_EMAIL }}</a>
+                </template>
+            </i18n-t>
         </aside>
     </div>
 </template>
 
 <script setup lang="ts">
 import { CONTACT_EMAIL } from '~/utils/landingContent';
+import { useT } from '~/composables/i18n';
 import {
     EMPTY_ENQUIRY,
     type EnquiryDraft,
@@ -150,6 +161,8 @@ import {
  * `mailto:`. See that module's header for why a POST endpoint would have been
  * the dishonest option here.
  */
+const { t } = useT();
+
 const draft = ref<EnquiryDraft>({ ...EMPTY_ENQUIRY });
 const errors = ref<Partial<Record<EnquiryField, string>>>({});
 const opened = ref(false);
@@ -158,7 +171,7 @@ const opened = ref(false);
 const showCount = computed(() => draft.value.message.length > MESSAGE_MAX_LENGTH * 0.75);
 
 function submit() {
-    const validation = validateEnquiry(draft.value);
+    const validation = validateEnquiry(draft.value, t);
 
     errors.value = validation.errors;
 
@@ -175,7 +188,7 @@ function submit() {
     // afterwards. It is also why this cannot be verified from here: the browser
     // reports neither success nor failure, which is what the status line below
     // says out loud rather than asserting delivery.
-    window.location.href = composeEnquiryMailto(draft.value, CONTACT_EMAIL);
+    window.location.href = composeEnquiryMailto(draft.value, CONTACT_EMAIL, t);
     opened.value = true;
 }
 </script>

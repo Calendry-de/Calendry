@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { clientPollMs, deriveState, deriveTrend } from '../app/composables/solverRun';
+import {
+    clientPollMs, deriveState, deriveTrend, elapsedMs, formatDuration, manageLinkForSubject,
+} from '../app/composables/solverRun';
 import type { SolverRunRow } from '../app/composables/solverRun';
 
 /**
@@ -116,5 +118,65 @@ describe('clientPollMs', () => {
         expect(clientPollMs(9_999)).toBe(1_000);
         expect(clientPollMs(10_000)).toBe(2_500);
         expect(clientPollMs(600_000)).toBe(2_500);
+    });
+});
+
+/**
+ * A FAILED run's reason: the deciding logic behind `ScheduleSolverControl
+ * .vue`'s FAILED branch, kept here (pure, no `t()`) because this repo has no
+ * component-mounting harness — see `tests/preference-weight-multiplier
+ * .test.ts`'s own note on that gap and why the split is the answer to it.
+ */
+describe('elapsedMs', () => {
+    it('is null for a run that has not finished', () => {
+        expect(elapsedMs(run({ finishedAt: null }))).toBeNull();
+    });
+
+    it('is the created -> finished delta, distinguishing an instant rejection from a long run', () => {
+        // The bug report's own numbers: created and finished 68ms apart.
+        expect(elapsedMs(run({
+            createdAt: '2026-09-02T14:07:45.943Z',
+            finishedAt: '2026-09-02T14:07:46.011Z',
+        }))).toBe(68);
+    });
+
+    it('is null rather than negative for a corrupt pair of timestamps', () => {
+        expect(elapsedMs(run({
+            createdAt: '2026-09-02T14:07:46.011Z',
+            finishedAt: '2026-09-02T14:07:45.943Z',
+        }))).toBeNull();
+    });
+});
+
+describe('formatDuration', () => {
+    it('shows milliseconds under a second, so a 68ms rejection never rounds to "0s"', () => {
+        expect(formatDuration(68)).toBe('68ms');
+        expect(formatDuration(999)).toBe('999ms');
+    });
+
+    it('shows one decimal of seconds at and above a second', () => {
+        expect(formatDuration(1_000)).toBe('1.0s');
+        expect(formatDuration(3_200)).toBe('3.2s');
+    });
+});
+
+describe('manageLinkForSubject', () => {
+    it('is null with no parsed error', () => {
+        expect(manageLinkForSubject(null)).toBeNull();
+        expect(manageLinkForSubject(undefined)).toBeNull();
+    });
+
+    it('links a constraint subject to its settings edit page', () => {
+        expect(manageLinkForSubject({ subjectType: 'constraint', subjectId: 'c1' }))
+            .toBe('/manage/constraints/c1');
+    });
+
+    it.each(['offering', 'room', 'group'] as const)('links a %s subject too', (subjectType) => {
+        expect(manageLinkForSubject({ subjectType, subjectId: 'x1' })).toBe(`/manage/${subjectType}s/x1`);
+    });
+
+    it('is null for a subject type with no manage edit page (session, person)', () => {
+        expect(manageLinkForSubject({ subjectType: 'session', subjectId: 's1' })).toBeNull();
+        expect(manageLinkForSubject({ subjectType: 'person', subjectId: 'p1' })).toBeNull();
     });
 });

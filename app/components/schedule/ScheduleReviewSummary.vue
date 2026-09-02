@@ -15,14 +15,28 @@
             v-if="violations.proposed.hard > 0"
             class="rev_risk"
         >
+            <!--
+                ONE PLURAL MESSAGE, verb included. This was a numeral, a noun
+                with an `-s` flip and a VERB with the opposite flip, three
+                mustaches for one sentence, and German has neither suffix. The
+                `<strong>` around the count survives as an `<i18n-t>` slot so
+                the numeral can move wherever the translated clause needs it.
+            -->
             <p class="rev_risk-head">
                 <Icon
                     name="material-symbols:error"
                     aria-hidden="true"
                 />
-                <strong>{{ violations.proposed.hard }}</strong>
-                hard-rule issue{{ violations.proposed.hard === 1 ? '' : 's' }}
-                survive{{ violations.proposed.hard === 1 ? 's' : '' }} in this proposal
+                <i18n-t
+                    keypath="schedule.reviewSummary.hardSurviving"
+                    tag="span"
+                    scope="global"
+                    :plural="violations.proposed.hard"
+                >
+                    <template #count>
+                        <strong>{{ violations.proposed.hard }}</strong>
+                    </template>
+                </i18n-t>
             </p>
 
             <ul class="rev_types">
@@ -44,9 +58,11 @@
                 v-if="violations.proposed.unmappable > 0"
                 class="rev_note"
             >
-                {{ locatable }} of {{ violations.proposed.sessionReferences }} session references
-                can be located; {{ violations.proposed.unmappable }} name sessions the solver
-                created and cannot be pinned to a slot.
+                {{ t('schedule.reviewSummary.unmappable', {
+                    locatable,
+                    total: violations.proposed.sessionReferences,
+                    unmappable: violations.proposed.unmappable,
+                }) }}
             </p>
         </div>
 
@@ -58,7 +74,7 @@
                 name="material-symbols:check-circle-outline"
                 aria-hidden="true"
             />
-            Every hard rule the solver checks is satisfied.
+            {{ t('schedule.reviewSummary.clear') }}
         </p>
 
         <!--
@@ -82,11 +98,25 @@
             it qualifies. One paragraph, subordinate clause, no second numeral
             competing for the eye.
         -->
+        <!--
+            The whole sentence is one plural message: the `-s` flip sat in the
+            middle of a clause carrying two interpolations, so neither the noun
+            nor the numeral had a key of its own. "They re-run after applying."
+            stays a SEPARATE key because it is a separate sentence rendered
+            under a separate condition, not a fragment of this one.
+        -->
         <p class="rev_compare">
-            Separately, Calendry's own {{ structuralRuleCount }} structural checks find
-            <strong>{{ violations.current.hard }}</strong>
-            issue{{ violations.current.hard === 1 ? '' : 's' }} on the live schedule (a
-            different rule set), so the two counts are not a like-for-like difference.<template v-if="decidable"> They re-run after applying.</template>
+            <i18n-t
+                keypath="schedule.reviewSummary.compare"
+                tag="span"
+                scope="global"
+                :plural="violations.current.hard"
+            >
+                <template #rules>{{ structuralRuleCount }}</template>
+                <template #count>
+                    <strong>{{ violations.current.hard }}</strong>
+                </template>
+            </i18n-t><template v-if="decidable"> {{ t('schedule.reviewSummary.recheckNote') }}</template>
         </p>
 
         </div>
@@ -96,10 +126,9 @@
                 v-if="plan.skippedLocked"
                 class="rev_fact"
             >
-                <dt>Locked</dt>
+                <dt>{{ t('schedule.reviewSummary.lockedLabel') }}</dt>
                 <dd>
-                    {{ plan.skippedLocked }} session{{ plan.skippedLocked === 1 ? '' : 's' }}
-                    left exactly as they are
+                    {{ t('schedule.reviewSummary.lockedValue', { count: plan.skippedLocked }, plan.skippedLocked) }}
                 </dd>
             </div>
 
@@ -118,17 +147,21 @@
                 v-if="demandShort"
                 class="rev_fact rev_fact--warn"
             >
-                <dt>Incomplete answer</dt>
+                <dt>{{ t('schedule.reviewSummary.demandShortLabel') }}</dt>
                 <dd>
-                    The solver returned {{ demandShort.returned.toLocaleString() }} of the
-                    {{ demandShort.required.toLocaleString() }} placements this run asked it
-                    for, across {{ demandShort.shortOfferings }}
-                    offering{{ demandShort.shortOfferings === 1 ? '' : 's' }}.
+                    {{ t('schedule.reviewSummary.demandShortValue', {
+                        returned: demandShort.returned.toLocaleString(),
+                        required: demandShort.required.toLocaleString(),
+                        count: demandShort.shortOfferings,
+                    }, demandShort.shortOfferings) }}
+                    <!--
+                        The worst of the inline plurals: a noun suffix, a VERB
+                        ("is"/"are") and a PRONOUN used twice ("it"/"them") all
+                        agreeing with one count across five mustaches. One
+                        plural message per form now carries all of it.
+                    -->
                     <template v-if="withheld">
-                        {{ withheld }} existing session{{ withheld === 1 ? '' : 's' }}
-                        {{ withheld === 1 ? 'is' : 'are' }} being kept rather than removed:
-                        the run said nothing about {{ withheld === 1 ? 'it' : 'them' }}, which
-                        is not the same as refusing to place {{ withheld === 1 ? 'it' : 'them' }}.
+                        {{ t('schedule.reviewSummary.withheldValue', { count: withheld }, withheld) }}
                     </template>
                 </dd>
             </div>
@@ -143,12 +176,10 @@
                 v-else-if="unverifiedDeletes"
                 class="rev_fact rev_fact--warn"
             >
-                <dt>Unverified removals</dt>
+                <dt>{{ t('schedule.reviewSummary.unverifiedLabel') }}</dt>
                 <dd>
-                    This run predates the check that confirms the solver answered in full, so
-                    its {{ plan.deleted }} removal{{ plan.deleted === 1 ? '' : 's' }}
-                    cannot be told apart from placements it simply left out. Re-run the solve to
-                    get a proposal that can be checked.
+                    {{ t('schedule.reviewSummary.unverifiedValue', { count: plan.deleted }, plan.deleted) }}
+                    {{ t('schedule.reviewSummary.unverifiedFix') }}
                 </dd>
             </div>
 
@@ -156,20 +187,22 @@
                 v-if="plan.placementsUnmapped"
                 class="rev_fact rev_fact--warn"
             >
-                <dt>Unplaceable</dt>
+                <dt>{{ t('schedule.reviewSummary.unplaceableLabel') }}</dt>
                 <dd>
-                    {{ plan.placementsUnmapped }}
-                    session{{ plan.placementsUnmapped === 1 ? '' : 's' }} this proposal wants
-                    cannot be recorded, and will not be created
+                    {{ t('schedule.reviewSummary.unplaceableValue', {
+                        count: plan.placementsUnmapped,
+                    }, plan.placementsUnmapped) }}
                 </dd>
             </div>
 
             <div class="rev_fact">
-                <dt>Run</dt>
+                <dt>{{ t('schedule.reviewSummary.runLabel') }}</dt>
                 <dd>
-                    {{ terminationSentence(run?.terminationReason ?? null) }}
+                    {{ terminationSentence(run?.terminationReason ?? null, t) }}
                     <template v-if="run?.elapsedMillis">
-                        Took {{ (run.elapsedMillis / 1000).toFixed(1) }}s.
+                        {{ t('schedule.reviewSummary.took', {
+                            seconds: (run.elapsedMillis / 1000).toFixed(1),
+                        }) }}
                     </template>
                 </dd>
             </div>
@@ -184,14 +217,15 @@
                 v-if="run?.objective !== null && run?.objective !== undefined"
                 class="rev_fact"
             >
-                <dt>Score</dt>
+                <dt>{{ t('schedule.reviewSummary.scoreLabel') }}</dt>
                 <dd>
-                    {{ run.objective.toLocaleString() }} (lower is better, and only
-                    comparable with other proposals for the same term).
+                    {{ t('schedule.reviewSummary.scoreValue', {
+                        score: run.objective.toLocaleString(),
+                    }) }}
                     <NuxtLink
                         class="rev_link"
                         to="/schedule/proposals"
-                    >Compare proposals</NuxtLink>
+                    >{{ t('schedule.reviewSummary.compareProposals') }}</NuxtLink>
                 </dd>
             </div>
         </dl>
@@ -202,6 +236,7 @@
 import { STRUCTURAL_CONSTRAINT_TYPES, constraintTypeLabel } from '#shared/constraintTypes';
 import { terminationSentence } from '~/composables/generationReview';
 import type { ReviewPreview } from '~/composables/generationReview';
+import { useT } from '~/composables/i18n';
 
 /**
  * The proposal's risk and provenance, as a strip rather than a dashboard.
@@ -221,6 +256,8 @@ const props = defineProps<{
     /** READY, so "they re-run after applying" is a true statement about a future. */
     decidable: boolean;
 }>();
+
+const { t } = useT();
 
 /**
  * The shortfall, or null when there is nothing to report.

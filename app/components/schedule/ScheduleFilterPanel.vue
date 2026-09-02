@@ -11,17 +11,17 @@
                 class="fpanel_sheet"
                 role="dialog"
                 aria-modal="true"
-                aria-label="Filters"
+                :aria-label="t('schedule.filters.dialogLabel')"
                 @keydown.esc.prevent="close"
                 @keydown.tab="trapFocus"
             >
                 <header class="fpanel_head">
-                    <span class="fpanel_title">Filters</span>
+                    <span class="fpanel_title">{{ t('schedule.filters.title') }}</span>
                     <button
                         ref="closeRef"
                         class="fpanel_close"
                         type="button"
-                        aria-label="Close filters"
+                        :aria-label="t('schedule.filters.close')"
                         @click="close"
                     >
                         <Icon
@@ -44,13 +44,13 @@
                         v-if="showGroupFilter"
                         class="fpanel_field"
                     >
-                        <span>Group</span>
+                        <span>{{ t('schedule.filters.group') }}</span>
                         <select
                             v-model="groupIdModel"
                             class="fpanel_select"
-                            :title="selectedName(groups, groupIdModel, 'All groups')"
+                            :title="selectedName(groups, groupIdModel, t('schedule.filters.allGroups'))"
                         >
-                            <option value="">All groups</option>
+                            <option value="">{{ t('schedule.filters.allGroups') }}</option>
                             <option
                                 v-for="group in groups"
                                 :key="group.id"
@@ -67,20 +67,20 @@
                             v-model="includeNestedModel"
                             type="checkbox"
                         >
-                        <span>Include nested</span>
+                        <span>{{ t('schedule.filters.includeNested') }}</span>
                     </label>
 
                     <label
                         v-if="showRoomFilter"
                         class="fpanel_field"
                     >
-                        <span>Room</span>
+                        <span>{{ t('schedule.filters.room') }}</span>
                         <select
                             v-model="roomIdModel"
                             class="fpanel_select"
-                            :title="selectedName(rooms, roomIdModel, 'All rooms')"
+                            :title="selectedName(rooms, roomIdModel, t('schedule.filters.allRooms'))"
                         >
-                            <option value="">All rooms</option>
+                            <option value="">{{ t('schedule.filters.allRooms') }}</option>
                             <option
                                 v-for="room in rooms"
                                 :key="room.id"
@@ -93,13 +93,13 @@
                         v-if="showPersonFilter"
                         class="fpanel_field"
                     >
-                        <span>Person</span>
+                        <span>{{ t('schedule.filters.person') }}</span>
                         <select
                             v-model="personIdModel"
                             class="fpanel_select"
-                            :title="selectedName(people, personIdModel, 'Anyone')"
+                            :title="selectedName(people, personIdModel, t('schedule.filters.anyone'))"
                         >
-                            <option value="">Anyone</option>
+                            <option value="">{{ t('schedule.filters.anyone') }}</option>
                             <option
                                 v-for="person in people"
                                 :key="person.id"
@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import type { NamedRow, Term } from '~/composables/schedule';
 import { useOverlay } from '~/composables/overlay';
+import { useT } from '~/composables/i18n';
 import ScheduleMiniMonth from './ScheduleMiniMonth.vue';
 
 /**
@@ -143,6 +144,8 @@ const props = defineProps<{
     term: Term | null;
     totalWeeks: number;
 }>();
+
+const { t } = useT();
 
 const open = defineModel<boolean>('open', { required: true });
 const groupIdModel = defineModel<string>('groupId', { required: true });

@@ -259,7 +259,7 @@ export function resolveHolidayRange(
     if (to.getTime() < from.getTime()) {
         throw createError({
             statusCode: 400,
-            statusMessage: 'The end date is before the start date.',
+            message: 'The end date is before the start date.',
             data: { field: 'endDate' },
         });
     }
@@ -278,7 +278,7 @@ export function resolveHolidayRange(
 
         throw createError({
             statusCode: 422,
-            statusMessage: `Those dates fall outside every term, so nothing would be blocked. Terms: ${known}.`,
+            message: `Those dates fall outside every term, so nothing would be blocked. Terms: ${known}.`,
             data: { field: 'startDate' },
         });
     }
@@ -286,7 +286,7 @@ export function resolveHolidayRange(
     if (overlapping.length > 1) {
         throw createError({
             statusCode: 422,
-            statusMessage: 'That range spans more than one term '
+            message: 'That range spans more than one term '
                 + `(${overlapping.map((term) => term.name).join(', ')}). `
                 + 'Enter one absence per term. A single entry counts the weeks of one term only.',
             data: { field: 'endDate' },
@@ -299,7 +299,7 @@ export function resolveHolidayRange(
     if (resolution.weeks.length === 0) {
         throw createError({
             statusCode: 422,
-            statusMessage: `Those dates resolve to no teaching week of ${term.name}.`,
+            message: `Those dates resolve to no teaching week of ${term.name}.`,
             data: { field: 'startDate' },
         });
     }
@@ -453,7 +453,7 @@ export async function replaceRoomFeaturePreferences(tx: Tx, options: {
 
         throw createError({
             statusCode: 400,
-            statusMessage: 'Unknown equipment: '
+            message: 'Unknown equipment: '
                 + equipmentIds.filter((id) => !found.has(id)).join(', '),
             data: { field: 'preferredRoomFeatureIds' },
         });
@@ -487,7 +487,7 @@ export function normaliseWindow(
     if (problems.length) {
         throw createError({
             statusCode: 400,
-            statusMessage: problems.map((problem) => problem.message).join(' '),
+            message: problems.map((problem) => problem.message).join(' '),
             data: { field: problems[0]?.field },
         });
     }
@@ -502,7 +502,7 @@ export function normaliseWindow(
     if (isTotalBlackout(window)) {
         throw createError({
             statusCode: 422,
-            statusMessage: 'That window names no day, block or week, which means "never available at all". '
+            message: 'That window names no day, block or week, which means "never available at all". '
                 + 'Pick at least one day, block or week.',
             data: { field: 'days' },
         });

@@ -14,9 +14,9 @@
                         name="material-symbols:arrow-back"
                         aria-hidden="true"
                     />
-                    Schedule
+                    {{ t('schedule.proposals.back') }}
                 </NuxtLink>
-                <h1>Proposals</h1>
+                <h1>{{ t('schedule.proposals.heading') }}</h1>
                 <!--
                     "one term's" is now a GUARANTEE rather than a hope. This copy
                     already said "a term's timetable" while the handler
@@ -31,9 +31,7 @@
                     baseline, which no solver made.
                 -->
                 <p class="props_sub">
-                    Proposed schedules, mostly the solver's. Applying one replaces that
-                    term's timetable and leaves every other term alone; nothing here
-                    changes anything until you do.
+                    {{ t('schedule.proposals.lead') }}
                 </p>
             </div>
 
@@ -49,12 +47,12 @@
                     v-if="terms.length > 1"
                     class="props_term"
                 >
-                    <span>Term</span>
+                    <span>{{ t('schedule.proposals.term') }}</span>
                     <select v-model="termId">
                         <option
                             value=""
                             :selected="termId === ''"
-                        >All terms</option>
+                        >{{ t('schedule.proposals.allTerms') }}</option>
                         <option
                             v-for="term in terms"
                             :key="term.id"
@@ -67,7 +65,7 @@
                 <div
                     class="props_scope"
                     role="group"
-                    aria-label="Which proposals to show"
+                    :aria-label="t('schedule.proposals.scopeLabel')"
                 >
                     <button
                         v-for="option in SCOPES"
@@ -77,7 +75,7 @@
                         :class="{ 'props_scope-option--active': scope === option.value }"
                         :aria-pressed="scope === option.value"
                         @click="scope = option.value"
-                    >{{ option.label }}</button>
+                    >{{ t(option.labelKey) }}</button>
                 </div>
 
                 <!--
@@ -100,7 +98,9 @@
                             aria-hidden="true"
                         />
                     </template>
-                    {{ listing.pending.value ? 'Refreshing…' : 'Refresh' }}
+                    {{ listing.pending.value
+                        ? t('schedule.proposals.refreshing')
+                        : t('schedule.proposals.refresh') }}
                 </CommonButton>
             </div>
         </header>
@@ -127,11 +127,11 @@
                 name="material-symbols:error"
                 aria-hidden="true"
             />
-            Could not load proposals. Nothing has been changed. Try again.
+            {{ t('schedule.proposals.loadFailed') }}
             <CommonButton
                 type="link"
                 @click="refresh"
-            >Retry</CommonButton>
+            >{{ t('schedule.proposals.retry') }}</CommonButton>
         </p>
 
         <!--
@@ -154,22 +154,43 @@
                 because they had narrowed to a term it had not run for.
             -->
             <h2>{{ emptyTitle }}</h2>
-            <p v-if="activeTermName">
-                Nothing for <strong>{{ activeTermName }}</strong>{{ scope === 'READY' ? ' is awaiting a decision' : ' has been produced yet' }}.
-                Other terms may have proposals; clear the term filter to see them.
-            </p>
+            <!--
+                TWO WHOLE SENTENCES, not one with a clause interpolated. This
+                was `Nothing for <strong>X</strong>{{ ready ? ' is awaiting a
+                decision' : ' has been produced yet' }}.`: half a sentence in a
+                mustache, joined by a leading space, which no translator can
+                reorder. The term name stays a slot so it can move within
+                either sentence.
+            -->
+            <i18n-t
+                v-if="activeTermName"
+                :keypath="scope === 'READY'
+                    ? 'schedule.proposals.emptyTermReady'
+                    : 'schedule.proposals.emptyTermAll'"
+                tag="p"
+                scope="global"
+            >
+                <template #term>
+                    <strong>{{ activeTermName }}</strong>
+                </template>
+            </i18n-t>
             <p v-else-if="scope === 'READY'">
-                Every proposal has been applied or discarded. Generate a schedule from
-                the toolbar on the schedule page to produce a new one.
+                {{ t('schedule.proposals.emptyReady') }}
             </p>
-            <p v-else>
-                The solver has not produced a schedule for this institution yet. Open
-                the schedule, pick a term, and choose <strong>Generate schedule</strong>.
-            </p>
+            <i18n-t
+                v-else
+                keypath="schedule.proposals.emptyAll"
+                tag="p"
+                scope="global"
+            >
+                <template #action>
+                    <strong>{{ t('schedule.proposals.emptyAllAction') }}</strong>
+                </template>
+            </i18n-t>
             <CommonButton
                 type="secondary"
                 to="/schedule"
-            >Go to the schedule</CommonButton>
+            >{{ t('schedule.proposals.goToSchedule') }}</CommonButton>
         </div>
 
         <!--
@@ -190,11 +211,11 @@
             >
                 <div class="props_row-identity">
                     <p class="props_version">
-                        v{{ row.version }}
+                        {{ t('schedule.text.version', { version: row.version }) }}
                         <span
                             class="props_status"
                             :class="`props_status--${row.status.toLowerCase()}`"
-                        >{{ STATUS_LABEL[row.status] ?? row.status.toLowerCase() }}</span>
+                        >{{ statusLabel(row.status) }}</span>
 
                         <!--
                             `isCurrent` was fetched and typed and never rendered,
@@ -215,7 +236,7 @@
                                 name="material-symbols:play-circle-outline"
                                 aria-hidden="true"
                             />
-                            being taught now
+                            {{ t('schedule.proposals.beingTaught') }}
                         </span>
                     </p>
                     <!--
@@ -224,14 +245,16 @@
                         which describes a missing fact rather than the real one.
                     -->
                     <p class="props_meta">
-                        {{ row.isTenantWide ? 'Whole institution' : row.termName ?? 'Term unknown' }} ·
+                        {{ row.isTenantWide
+                            ? t('schedule.proposals.wholeInstitution')
+                            : row.termName ?? t('schedule.proposals.termUnknown') }} ·
                         <time :datetime="row.createdAt">{{ formatDate(row.createdAt, locale) }}</time>
                     </p>
                 </div>
 
                 <dl class="props_stats">
                     <div>
-                        <dt>Sessions</dt>
+                        <dt>{{ t('schedule.proposals.sessions') }}</dt>
                         <dd>{{ row.placements ?? '-' }}</dd>
                     </div>
                     <!--
@@ -246,7 +269,7 @@
                         "Unresolved: 0" invited "nothing wrong with it".
                     -->
                     <div>
-                        <dt>Hard violations</dt>
+                        <dt>{{ t('schedule.proposals.hardViolations') }}</dt>
                         <dd :class="{ 'props_flagged': (row.hardViolations ?? 0) > 0 }">
                             <Icon
                                 v-if="(row.hardViolations ?? 0) > 0"
@@ -268,7 +291,9 @@
                         appear.
                     -->
                     <div>
-                        <dt>Penalty <span class="props_hint">lower is better</span></dt>
+                        <dt>{{ t('schedule.proposals.penalty') }} <span
+                            class="props_hint"
+                        >{{ t('schedule.proposals.penaltyHint') }}</span></dt>
                         <dd>
                             <!--
                                 THE VIEWER'S LOCALE, EXPLICITLY. A bare
@@ -291,7 +316,7 @@
                             <span
                                 v-if="row.bestOf"
                                 class="props_best"
-                            >best of {{ row.bestOf }} on the same input</span>
+                            >{{ t('schedule.proposals.bestOf', { count: row.bestOf }) }}</span>
                         </dd>
                     </div>
                 </dl>
@@ -300,7 +325,9 @@
                     <CommonButton
                         type="secondary-black"
                         :to="`/schedule/review/${row.id}`"
-                    >{{ row.status === 'READY' ? 'Review' : 'Inspect' }}</CommonButton>
+                    >{{ row.status === 'READY'
+                        ? t('schedule.proposals.review')
+                        : t('schedule.proposals.inspect') }}</CommonButton>
                 </div>
             </li>
         </ul>
@@ -316,7 +343,7 @@
             v-if="truncated"
             class="props_truncated"
         >
-            Showing the 100 most recent proposals. Older ones are not listed.
+            {{ t('schedule.proposals.truncated', { limit: LIST_LIMIT }) }}
         </p>
     </div>
 </template>
@@ -325,8 +352,11 @@
 import CommonButton from '~/components/common/CommonButton.vue';
 import { useViewerLocale } from '~/composables/locale';
 import { formatDate } from '~/utils/formatDate';
+import { useT } from '~/composables/i18n';
+import type { MessageKey } from '~~/i18n/keys';
 
 const locale = useViewerLocale();
+const { t } = useT();
 
 /**
  * Gated on `generation.read`, matching the API route behind it and the review
@@ -336,22 +366,43 @@ const locale = useViewerLocale();
  */
 definePageMeta({ middleware: 'review' });
 
-useHead({ title: 'Proposals' });
+// A getter, so the tab title follows a language change.
+useHead(() => ({ title: t('schedule.proposals.pageTitle') }));
 
-const SCOPES = [
-    { value: 'READY' as const, label: 'Awaiting a decision' },
-    { value: 'ALL' as const, label: 'All' },
+/*
+ * KEYS, NOT RESOLVED LABELS. Both of these are module-scope constants,
+ * evaluated once at import time, so a resolved string would freeze whichever
+ * language the first render happened in; the key is resolved at the point of
+ * use instead.
+ */
+const SCOPES: { value: 'READY' | 'ALL'; labelKey: MessageKey }[] = [
+    { value: 'READY', labelKey: 'schedule.proposals.scopeReady' },
+    { value: 'ALL', labelKey: 'schedule.proposals.scopeAll' },
 ];
 
-const STATUS_LABEL: Record<string, string> = {
-    READY: 'awaiting a decision',
-    APPLIED: 'applied',
-    SUPERSEDED: 'discarded or superseded',
-    FAILED: 'failed',
-    INFEASIBLE: 'infeasible',
-    PENDING: 'pending',
-    RUNNING: 'running',
+const STATUS_LABEL_KEY: Record<string, MessageKey> = {
+    READY: 'schedule.proposals.statusReady',
+    APPLIED: 'schedule.proposals.statusApplied',
+    SUPERSEDED: 'schedule.proposals.statusSuperseded',
+    FAILED: 'schedule.proposals.statusFailed',
+    INFEASIBLE: 'schedule.proposals.statusInfeasible',
+    PENDING: 'schedule.proposals.statusPending',
+    RUNNING: 'schedule.proposals.statusRunning',
 };
+
+/**
+ * A GenerationStatus as a word.
+ *
+ * The fallback is the raw status, lowercased, and stays that way deliberately:
+ * this build cannot hold a translation for a status it does not know about, and
+ * naming the unknown value is more use to whoever has to explain it than a
+ * generic "unknown" would be.
+ */
+function statusLabel(status: string): string {
+    const key = STATUS_LABEL_KEY[status];
+
+    return key ? t(key) : status.toLowerCase();
+}
 
 interface GenerationRow {
     id: string;
@@ -452,10 +503,14 @@ const activeTermName = computed(() => (
 
 const emptyTitle = computed(() => {
     if (activeTermName.value) {
-        return scope.value === 'READY' ? 'Nothing awaiting a decision here' : 'No proposals for this term';
+        return scope.value === 'READY'
+            ? t('schedule.proposals.emptyTitleTermReady')
+            : t('schedule.proposals.emptyTitleTermAll');
     }
 
-    return scope.value === 'READY' ? 'Nothing awaiting a decision' : 'No proposals yet';
+    return scope.value === 'READY'
+        ? t('schedule.proposals.emptyTitleReady')
+        : t('schedule.proposals.emptyTitleAll');
 });
 
 const rows = computed(() => {
@@ -650,7 +705,10 @@ watch(rows, (current) => {
         const before = lastStatuses.get(row.id);
 
         if (before && LIVE_STATUSES.includes(before) && !LIVE_STATUSES.includes(row.status)) {
-            finished.push(`v${row.version} is now ${STATUS_LABEL[row.status] ?? row.status.toLowerCase()}`);
+            finished.push(t('schedule.proposals.announceFinished', {
+                version: t('schedule.text.version', { version: row.version }),
+                status: statusLabel(row.status),
+            }));
         }
 
         lastStatuses.set(row.id, row.status);

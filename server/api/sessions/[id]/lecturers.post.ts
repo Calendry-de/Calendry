@@ -107,13 +107,13 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!session) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         if (session.offeringId !== null && !session.isLocked) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'This session belongs to an Offering and is not locked, so its '
+                message: 'This session belongs to an Offering and is not locked, so its '
                     + 'lecturer comes from the next solve, so an override here would be silently '
                     + 'discarded by the next apply. Lock the session first.',
                 data: { field: 'isLocked', offeringId: session.offeringId, isLocked: session.isLocked },
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
         if (!lecturerRole) {
             throw createError({
                 statusCode: 422,
-                statusMessage: "This tenant has no 'lecturer' role configured, so a lecturer "
+                message: "This tenant has no 'lecturer' role configured, so a lecturer "
                     + 'cannot be recorded against a Session.',
             });
         }
@@ -141,7 +141,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (found !== new Set(body.personIds).size) {
-                throw createError({ statusCode: 404, statusMessage: 'Person not found.' });
+                throw createError({ statusCode: 404, message: 'Person not found.' });
             }
         }
 

@@ -101,7 +101,7 @@ export default defineEventHandler(async (event) => {
         const captchaOk = await verifyTurnstileToken(body.turnstileToken);
 
         if (!captchaOk) {
-            throw createError({ statusCode: 400, statusMessage: 'CAPTCHA verification required.' });
+            throw createError({ statusCode: 400, message: 'CAPTCHA verification required.' });
         }
     }
 
@@ -130,7 +130,7 @@ export default defineEventHandler(async (event) => {
             detail: { reason: !account ? 'no_such_account' : !account.isActive ? 'account_inactive' : 'wrong_password' },
         });
 
-        throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
+        throw createError({ statusCode: 401, message: 'Invalid credentials.' });
     }
 
     // A correct guess, whatever happens next (tenant selection, a forced
@@ -187,7 +187,7 @@ export default defineEventHandler(async (event) => {
 
         throw createError({
             statusCode: 403,
-            statusMessage: 'This account is not active in any tenant.',
+            message: 'This account is not active in any tenant.',
         });
     }
 
@@ -211,7 +211,7 @@ export default defineEventHandler(async (event) => {
             detail: { route: 'auth.login', requestedTenantSlug: body.tenantSlug },
         });
 
-        throw createError({ statusCode: 403, statusMessage: 'No identity in that tenant.' });
+        throw createError({ statusCode: 403, message: 'No identity in that tenant.' });
     }
 
     const token = generateSessionToken();

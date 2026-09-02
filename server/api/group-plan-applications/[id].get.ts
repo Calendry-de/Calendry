@@ -45,7 +45,7 @@ export default defineEventHandler(async (event) => {
         });
 
         if (!group) {
-            throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+            throw createError({ statusCode: 404, message: 'Not found.' });
         }
 
         const applications = await deriveGroupPlanApplications(tx, identity.tenantId, [groupId as string]);

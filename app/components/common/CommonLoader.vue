@@ -9,7 +9,7 @@
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
-            aria-label="Loading"
+            :aria-label="t('common.a11y.loading')"
         >
             <path
                 class="loader_c"
@@ -39,6 +39,9 @@
 </template>
 
 <script setup lang="ts">
+import { useT } from '~/composables/i18n';
+
+const { t } = useT();
 /**
  * Loader 13A ("Queue") from the "Calendry logo concepts" design project, and
  * the only loader in the app: four call sites render this one component.

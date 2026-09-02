@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
         : await verifyPassword(body.currentPassword, 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA');
 
     if (!account || !account.isActive || !ok) {
-        throw createError({ statusCode: 401, statusMessage: 'Invalid credentials.' });
+        throw createError({ statusCode: 401, message: 'Invalid credentials.' });
     }
 
     await resetRateLimit('change_password', body.email);
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
     if (await verifyPassword(body.newPassword, account.passwordHash)) {
         throw createError({
             statusCode: 422,
-            statusMessage: 'The new password must be different from the current one.',
+            message: 'The new password must be different from the current one.',
         });
     }
 

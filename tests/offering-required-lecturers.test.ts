@@ -2,7 +2,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { assembleSolverInput } from '../server/utils/solverInput';
 import { RESOURCES } from '../server/utils/resources';
-import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
+import { manageEntities } from '../app/utils/manageRegistry';
+import { englishT } from './helpers/manageMessages';
 
 /**
  * `Offering.requiredLecturerCount`: "Who leads it" is a CANDIDATE POOL, not
@@ -154,7 +155,9 @@ describe('the write schema', () => {
 });
 
 describe('the form', () => {
-    const field = MANAGE_ENTITIES
+    // `englishT`: the assertion below reads the help TEXT, so an identity stub
+    // would check a key name. See `tests/helpers/manageMessages.ts`.
+    const field = manageEntities(englishT)
         .find((entity) => entity.key === 'offerings')!
         .fields.find((f) => f.key === 'requiredLecturerCount');
 
