@@ -73,6 +73,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@iconify-json/material-symbols": "^1.2.90",
+    "@iconify-json/ph": "^1.2.2",
     "@nuxt/devtools": "^4.0.0-alpha.15",
     "@nuxt/eslint": "^1.17.0",
     "@nuxtjs/stylelint-module": "^5.2.1",

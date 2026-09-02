@@ -131,12 +131,14 @@
  */
 @keyframes landingReveal {
     from {
-        transform: translateY(var(--reveal-shift, 12px));
+        transform: translateY(var(--reveal-shift, 64px));
         opacity: 0;
+        filter: blur(var(--reveal-blur, 12px));
     }
 
     to {
         transform: none;
         opacity: 1;
+        filter: blur(0);
     }
 }

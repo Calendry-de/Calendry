@@ -31,5 +31,17 @@
     },
     "schedule": {
         "denied": "You do not have permission to view the schedule. It needs session.read (everyone’s) or session.read_own (your own)."
+    },
+    "page": {
+        "notFound": {
+            "title": "That page is not here",
+            "detail": "The link may be out of date, or the page may never have existed. Nothing is broken on your side."
+        },
+        "unexpected": {
+            "title": "Something went wrong on our side",
+            "detail": "The page could not be rendered. Nothing you were doing has been changed."
+        },
+        "action": "Back to the start",
+        "code": "Error {code}"
     }
 }

@@ -101,6 +101,22 @@ html, body {
 }
 
 /*
+ * THE LANDING PAGE'S MENU OVERLAY LOCKS THE DOCUMENT SCROLL.
+ *
+ * Set as a body class by `LandingTopBar` through `useHead`, rather than by the
+ * component writing `document.body.style` itself: the rule then lives in the
+ * stylesheet with every other rule, and there is nothing to undo by hand if the
+ * component unmounts while the menu is open.
+ *
+ * Global because a scoped stylesheet cannot reach `body`. It is keyed on a
+ * class the landing bar is the only thing that sets, so it reaches that one
+ * surface and nowhere else.
+ */
+.landing-menu-open {
+    overflow: hidden;
+}
+
+/*
  * THE FRAMED SHELL: the content pane scrolls, the page does not.
  *
  * Keyed on a body class that `CommonAppShell` sets through `useHead`, so it

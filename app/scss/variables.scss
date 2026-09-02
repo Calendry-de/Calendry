@@ -156,31 +156,41 @@ $landingBarClearance: 96px;
  * Keyframes live in tokens-root.scss; see the note there for why they are not
  * in this mixin.
  */
-@mixin landingReveal($shift: 12px) {
+@mixin landingReveal($shift: 64px, $blur: 12px) {
     @media (prefers-reduced-motion: no-preference) {
         @supports (animation-timeline: view()) {
             --reveal-shift: #{$shift};
+            --reveal-blur: #{$blur};
 
             animation: landingReveal 1ms linear both;
             animation-timeline: view();
 
-            // Finishes well before the element reaches the middle of the screen:
-            // a reveal still running under the reader's eye is a distraction, not
-            // an entrance.
-            animation-range: entry 5% cover 20%;
+            /*
+             * Finishes well before the element reaches the middle of the
+             * screen: a reveal still running under the reader's eye is a
+             * distraction, not an entrance.
+             *
+             * Widened from `entry 5% cover 20%` when the travel went from 12px
+             * to the system's 64px and gained a blur. The old range was tuned
+             * to a nudge; the same range applied to eight times the distance
+             * makes the element arrive at speed, which reads as a jump rather
+             * than as mass.
+             */
+            animation-range: entry 0% cover 30%;
         }
     }
 
     /*
      * PRINT HAS NO SCROLLPORT, so a view() timeline has nothing to resolve
      * against and the element can print at its 0%-opacity start state. Everything
-     * below the first page would come out blank. This is not hypothetical for
+     * below the first page would come out blank, and now also blurred. This is not hypothetical for
      * this page in particular: it is the page somebody prints to PDF for a
      * procurement pack.
      */
     @media print {
         transform: none;
         opacity: 1;
+        filter: none;
         animation: none;
     }
 }

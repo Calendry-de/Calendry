@@ -149,7 +149,9 @@ withDefaults(defineProps<{
 
         font-size: $fontSizeXl;
         font-weight: 700;
-        line-height: 1.2;
+
+        // The scale's paired leading for this step, replacing a 1.2 literal.
+        line-height: $lineHeightXl;
         color: $content2;
         text-wrap: balance;
     }
@@ -159,7 +161,9 @@ withDefaults(defineProps<{
         margin: $space6 0 0;
 
         font-size: $fontSizeLg;
-        line-height: 1.6;
+
+        // Paired leading, replacing a 1.6 literal.
+        line-height: $lineHeightLg;
         color: $content6;
 
         @include mobileOnly {
