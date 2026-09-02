@@ -196,6 +196,41 @@ const version = computed(() => config.public.version);
 
         letter-spacing: -0.02em;
 
+        /*
+         * THE DARK THEME FLIPS THE GROUND, SO THE GRADIENT FLIPS WITH IT.
+         *
+         * NO `:global()` HERE, and that is the fix for a real bug rather than a
+         * style preference. This was written as `:global(.theme-dark) &`, which
+         * looks like the obvious way to reach a class that lives on `<html>`.
+         * Vue's scoped-CSS transform collapses `:global(X) Y` down to just `X`,
+         * so the rule compiled to a BARE, UNSCOPED `.theme-dark { ... }`:
+         * verified in the served CSS, not assumed.
+         *
+         * That did three things, none of them the intended one. The headline
+         * kept the light-ground gradient in the dark theme, where this band's
+         * ground has flipped light, so it was white on white. The declarations
+         * escaped the component onto `<html>`, painting a background GRADIENT
+         * across every page of the app in dark mode, which the design system
+         * forbids outright. And a stray `color` went with them, overriding the
+         * app's own default ink app-wide.
+         *
+         * A plain descendant needs no `:global()` at all: scoping attaches the
+         * component's attribute to the LAST compound selector and leaves
+         * ancestors alone, so this compiles to
+         * `.theme-dark .hero_title[data-v-…]`. Scoped, and one class more
+         * specific than the base rule, which is what makes it win.
+         *
+         * ONLY `background-image` IS RESTATED. The fallback `color` above is
+         * `$surface1`, a custom property that already swaps with the theme, so
+         * repeating it was both unnecessary and the source of the leaked
+         * `color` declaration.
+         */
+        .theme-dark & {
+            @supports (background-clip: text) or (-webkit-background-clip: text) {
+                background-image: linear-gradient(to right, #000, #666);
+            }
+        }
+
         // 3xl on a tablet, where the copy no longer has a full column to break
         // two lines in. Paired leading moves with it.
         @include mobile {
@@ -208,18 +243,6 @@ const version = computed(() => config.public.version);
         @include mobileOnly {
             font-size: $fontSize2Xl;
             line-height: $lineHeight2Xl;
-        }
-    }
-
-    // The dark theme flips the ground light, so the headline takes the dark
-    // pair. See the note on `_title`'s gradient.
-    :global(.theme-dark) & {
-        &_title {
-            color: $surface1;
-
-            @supports (background-clip: text) or (-webkit-background-clip: text) {
-                background-image: linear-gradient(to right, #000, #666);
-            }
         }
     }
 
