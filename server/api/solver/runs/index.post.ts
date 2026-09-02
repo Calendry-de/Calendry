@@ -21,7 +21,7 @@ import { SOLVER_MODES } from '../../../../shared/solverMode';
  * Sentinel for "the one-active-run index rejected this insert".
  *
  * A bare marker rather than an H3 error because it has to escape the aborted
- * transaction before anything can look up what it collided with — see the catch
+ * transaction before anything can look up what it collided with; see the catch
  * block below.
  */
 class ActiveRunConflict extends Error {}
@@ -45,7 +45,7 @@ const bodySchema = z.object({
     mode: z.enum(SOLVER_MODES).default('rebuild'),
     /**
      * Narrows what is actively placed. Omitted means every active Offering in
-     * the term for a `rebuild` and NOTHING for a `repair` — a repair moves what
+     * the term for a `rebuild` and NOTHING for a `repair`: a repair moves what
      * already exists rather than placing anything.
      */
     offeringIds: z.array(z.string().min(1)).optional(),
@@ -56,8 +56,8 @@ const bodySchema = z.object({
  * Start a solver run for one Term.
  *
  * The SolverInput is assembled from this tenant's real data (solverInput.ts).
- * Whatever that assembly had to narrow — federation-owned rows excluded,
- * multi-room Sessions flattened, constraints not yet mappable — comes back in
+ * Whatever that assembly had to narrow (federation-owned rows excluded,
+ * multi-room Sessions flattened, constraints not yet mappable) comes back in
  * `report` rather than being silently absorbed, because the solver cannot
  * detect an omission and neither can the caller.
  */
@@ -99,7 +99,7 @@ export default defineEventHandler(async (event) => {
             now: new Date(),
         });
 
-        // Scope, policy and movement weight are ONE derivation — see
+        // Scope, policy and movement weight are ONE derivation: see
         // `solverScope.ts` for why they cannot be written out separately here.
         const scope = resolveScope({
             mode: body.mode,
@@ -132,7 +132,7 @@ export default defineEventHandler(async (event) => {
              * Same transaction as the run itself (issue #24): built from the
              * SAME `assembled.input` object `inputHash` above was computed
              * from, so the two can never describe different problems.
-             * gzip over the encoded protobuf, not JSON — see `encodeInput`.
+             * gzip over the encoded protobuf, not JSON; see `encodeInput`.
              */
             await tx.solverInputSnapshot.create({
                 data: {
@@ -145,7 +145,7 @@ export default defineEventHandler(async (event) => {
             return { run, assembled, scope };
         } catch (error) {
             /**
-             * 23505 here can only be solver_run_one_active_per_term — the sole
+             * 23505 here can only be solver_run_one_active_per_term, the sole
              * unique constraint beyond the primary key.
              *
              * NOTHING MAY QUERY THIS TRANSACTION AFTER THIS POINT: a failed statement
@@ -161,7 +161,7 @@ export default defineEventHandler(async (event) => {
     }).catch(async (error) => {
         /**
          * "Now" is past the end of the term, so every Session would be excluded
-         * as past and the solver would return an empty placement — which is
+         * as past and the solver would return an empty placement, which is
          * indistinguishable from a successful solve of an empty problem.
          * Refusing is the honest answer.
          *
@@ -201,7 +201,7 @@ export default defineEventHandler(async (event) => {
      * StartRun is called OUTSIDE the transaction above.
      *
      * Holding a database transaction open across a network call to another
-     * service is how connection pools get exhausted by one slow dependency —
+     * service is how connection pools get exhausted by one slow dependency,
      * and the transaction has already done its job (claiming the term).
      */
     const { run: created, assembled, scope } = claimed;
@@ -219,7 +219,7 @@ export default defineEventHandler(async (event) => {
              * returns the same run rather than launching a second one.
              *
              * THE SCOPE IS PART OF THE PROBLEM AND `inputHash` DOES NOT COVER
-             * IT — `SolverInput` carries no scope; `SolveScope` is a separate
+             * IT. `SolverInput` carries no scope; `SolveScope` is a separate
              * argument. Keying on the input alone was correct only while every
              * run sent the same scope, and a repair is a different scope over an
              * unchanged snapshot: same input, same seed, same key, and the
@@ -267,7 +267,7 @@ export default defineEventHandler(async (event) => {
         }));
 
         /**
-         * A solver that ANSWERS — even to reject the input — is reachable, and
+         * A solver that ANSWERS, even to reject the input, is reachable, and
          * "could not reach" sends the reader to check containers and ports. This cost
          * a real troubleshooting session: an INVALID_ARGUMENT naming the exact
          * Session and slot missing from the grid was reported as a network fault.

@@ -8,7 +8,7 @@ import { estimatedGroupSizes } from '#shared/groupCapacity';
  * The DATABASE is the authority on the hierarchy: `group_closure` is maintained
  * by a write-time trigger, and reparenting into a descendant is rejected by that
  * trigger with a 409 (migration 20260812000100). Nothing here enforces anything.
- * Its only job is to stop the UI OFFERING a move the database will refuse — a
+ * Its only job is to stop the UI OFFERING a move the database will refuse: a
  * select box that lists impossible choices is a worse experience than one that
  * does not, and both end in the same rejection.
  */
@@ -33,8 +33,8 @@ function expectedSizeOf(row: EntityRow): number | null {
 }
 
 /**
- * Every row's displayed size: its own `expectedSize`, or — where a row has
- * none — the sum of its nested groups' estimates, the same derivation the
+ * Every row's displayed size: its own `expectedSize`, or, where a row has
+ * none, the sum of its nested groups' estimates, the same derivation the
  * solver's own capacity check uses for an Offering's attached Group
  * (`estimatedGroupSizes`, `#shared/groupCapacity`). Requires the WHOLE set,
  * same constraint as `buildGroupTree`: a partial page cannot know a group's
@@ -56,7 +56,7 @@ export function estimatedSizes(rows: EntityRow[]): Map<string, number | null> {
  *
  * Rows whose parent is not in the set become roots. That happens legitimately
  * when a search has matched a child but not its parent, and it is why the tree
- * view refuses to render at all on a partial page — see ManageGroupTree.
+ * view refuses to render at all on a partial page. See ManageGroupTree.
  */
 export function buildGroupTree(rows: EntityRow[]): GroupNode[] {
     const nodes = new Map<string, GroupNode>();

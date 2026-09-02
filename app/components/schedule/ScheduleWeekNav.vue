@@ -1,7 +1,7 @@
 <template>
     <!--
         THE WEEK, CENTRED OVER THE WEEK. It sat in the toolbar's left group ahead
-        of four filters — the most-changed control filed among the least-changed
+        of four filters: the most-changed control filed among the least-changed
         ones. Over the grid it governs, the arrows land either side of the thing
         they move.
     -->
@@ -65,7 +65,7 @@ import { useWheelStep } from '~/composables/wheelStep';
 
 /**
  * Week navigation: its own component because it owns three things that belong
- * together — the bounds-aware arrows, the wheel gesture, and the direction the
+ * together: the bounds-aware arrows, the wheel gesture, and the direction the
  * label animates.
  */
 const props = defineProps<{
@@ -119,8 +119,8 @@ const stepOnWheel = useWheelStep({
 <style scoped lang="scss">
 .weeknav {
     /*
-     * NO CARD. It carried `$surface1` at `--radius-xl` — byte-identical chrome
-     * to the toolbar, 14px above it — so at a squint it read as a second toolbar
+     * NO CARD. It carried `$surface1` at `--radius-xl`, byte-identical chrome
+     * to the toolbar, 14px above it, so at a squint it read as a second toolbar
      * row, which is exactly what moving it out of the toolbar was meant to stop.
      * Unframed, it reads as the grid's caption, which is what it is.
      */
@@ -187,7 +187,7 @@ const stepOnWheel = useWheelStep({
      * A FIXED-WIDTH STAGE for the label.
      *
      * The two nodes overlap during the transition, so the container cannot size
-     * to its content without the arrows jumping apart and back on every step —
+     * to its content without the arrows jumping apart and back on every step:
      * the one motion nobody asked for. `min-width` is generous enough for the
      * longest form the label takes.
      */
@@ -196,15 +196,15 @@ const stepOnWheel = useWheelStep({
      * A STAGE THAT CAN GROW.
      *
      * It was a fixed `min-width: 22ch` with `overflow: hidden` and absolutely
-     * positioned children — which meant text longer than 22ch was silently
+     * positioned children, which meant text longer than 22ch was silently
      * CLIPPED mid-word. English fits; "Woche 1 von 19 · 5. Okt – 9. Okt" does
      * not, and German runs ~30% longer as a rule. A control that truncates its
      * own value without saying so is worse than one that shifts a few pixels.
      *
      * Both label nodes now occupy the same GRID AREA instead of being absolute,
      * so the stage sizes to the wider of them and nothing is cut. `min-width`
-     * stays as a floor — that is what stops the arrows twitching between "Week
-     * 9" and "Week 10" — and the box grows past it only when the content
+     * stays as a floor: that is what stops the arrows twitching between "Week
+     * 9" and "Week 10", and the box grows past it only when the content
      * genuinely needs more. `overflow: hidden` is kept for the transition: it
      * clips the ±8px slide, which is the wipe.
      */
@@ -229,7 +229,7 @@ const stepOnWheel = useWheelStep({
     }
 
     /*
-     * A determinate-looking bar would be a lie — the fetch reports no progress.
+     * A determinate-looking bar would be a lie: the fetch reports no progress.
      * A 2px rule that simply appears under the label says "this is being
      * replaced" and nothing more, and it appears on the element whose value is
      * about to change.
@@ -246,7 +246,7 @@ const stepOnWheel = useWheelStep({
 
         width: 40%;
         height: 2px;
-        border-radius: 2px; // Half the 2px height — a pill end, not a scale step.
+        border-radius: 2px; // Half the 2px height: a pill end, not a scale step.
 
         background: $primary500;
 
@@ -274,7 +274,7 @@ const stepOnWheel = useWheelStep({
 }
 
 /*
- * The label travels the way the week did — 4px and 140ms, the house ease.
+ * The label travels the way the week did: 4px and 140ms, the house ease.
  * Present, not noticed: it is a step, not an event, and the authored moment on
  * this screen belongs to placement mode.
  */

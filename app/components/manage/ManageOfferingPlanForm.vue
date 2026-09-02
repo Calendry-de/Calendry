@@ -33,7 +33,7 @@
                     <option
                         :selected="!draft.nextPlanId"
                         value=""
-                    >— None —</option>
+                    >None</option>
                     <option
                         v-for="option in nextPlanOptions"
                         :key="option.id"
@@ -51,7 +51,7 @@
                 <p
                     v-else
                     class="next_hint"
-                >What a Group on this plan moves to next — "Semester 3" names "Semester 4" — so
+                >What a Group on this plan moves to next: "Semester 3" names "Semester 4", so
                     advancing needs no picker later. Leave unset for a plan nothing follows.</p>
             </div>
 
@@ -59,7 +59,7 @@
                 EDIT MODE ONLY, and not for tidiness: the item list is a
                 sub-resource that saves immediately against
                 `/api/offering-plan-items/{id}`, so on the create page there
-                is no id for it to hang off — same reasoning as
+                is no id for it to hang off, same reasoning as
                 `ManageGroupSources` on the Group form.
             -->
             <ManageOfferingPlanItems
@@ -88,7 +88,7 @@ import ManageOfferingPlanItems from '~/components/manage/ManageOfferingPlanItems
 /**
  * Curriculum plan's detail: the shared form plus its ordered item list and
  * bulk-apply action, plus a successor picker no static registry entry can
- * express — a plan cannot name ITSELF, which depends on which row is being
+ * express: a plan cannot name ITSELF, which depends on which row is being
  * edited (there is no such row at all on the create page, so this control
  * only makes a real choice possible in edit mode; on create it just offers
  * every plan, self-exclusion being vacuous before the row has an id).
@@ -121,7 +121,7 @@ const currentNextLabel = computed(() => {
     const id = draft.value.nextPlanId as string | null | undefined;
 
     if (!id) {
-        return '— None —';
+        return 'None';
     }
 
     return allPlans.value.find((plan) => String(plan.id) === String(id))?.name as string ?? id;

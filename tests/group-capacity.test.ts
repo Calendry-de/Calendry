@@ -93,7 +93,7 @@ describe('estimatedGroupSizes', () => {
 
 describe('real membership overrides estimates', () => {
     it('counts distinct people across the closure, not the estimate', () => {
-        // 3 real people beneath a group estimated at 48 — the fact wins.
+        // 3 real people beneath a group estimated at 48: the fact wins.
         const roll = members(['dit-s1', 'p1'], ['dit-s1', 'p2'], ['dit-s2', 'p3']);
 
         expect(deriveCapacity(['itsec'], TREE, roll)).toMatchObject({
@@ -157,12 +157,12 @@ describe('when nothing can be derived', () => {
 
 
 /**
- * Partial enrolment — the risk created by "real membership always wins".
+ * Partial enrolment: the risk created by "real membership always wins".
  *
  * A roll of 4 against an expected 96 is still a fact, and still the answer. But
  * trusting it silently produces a capacity that is catastrophically low, and
  * the tenant discovers it when a room turns out to hold a twentieth of the
- * cohort. So it is REPORTED, never blocked — the same "surface rather than
+ * cohort. So it is REPORTED, never blocked: the same "surface rather than
  * narrow silently" pattern as `offeringsWithNoDerivableCapacity`.
  *
  * The threshold decides only WHETHER to mention it. Both numbers travel with
@@ -178,7 +178,7 @@ describe('partial enrolment is flagged, not blocked', () => {
     it('flags a roll far below the estimate, and still uses the real count', async () => {
         const out = deriveCapacity(['cohort'], one(96), roll(4));
 
-        // The count WINS — this is advisory, not a veto.
+        // The count WINS: this is advisory, not a veto.
         expect(out).toMatchObject({
             capacity: 4, basis: 'membership', estimate: 96, partialEnrolment: true,
         });

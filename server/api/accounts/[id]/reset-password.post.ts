@@ -16,13 +16,13 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  * Issue a new password for a login, revoking every session it holds.
  *
  * AN EXPLICIT VERB, not a PATCH field, so the event log of the request itself
- * says what happened — the same rule Session's `move`/`swap`/`lock` follow. A
+ * says what happened: the same rule Session's `move`/`swap`/`lock` follow. A
  * password arriving inside a general-purpose update body would make "somebody
  * edited an account" and "somebody took over an account" the same request.
  *
  * IDENTICAL EFFECT TO `bun run reset:password`: new hash, every session revoked
  * across every institution, `must_change_password` set. The one difference is
- * who may do it — the CLI answers to whoever holds the database credential, this
+ * who may do it: the CLI answers to whoever holds the database credential, this
  * answers to `account.manage` inside one tenant, which is why it refuses a login
  * that tenant does not solely own.
  *

@@ -102,14 +102,14 @@
                                     class="list_swatch"
                                     :style="{ background: String(row[column.key]) }"
                                 />
-                                <span class="list_swatch-text">{{ row[column.key] ?? '—' }}</span>
+                                <span class="list_swatch-text">{{ row[column.key] ?? '–' }}</span>
                             </template>
                             <template v-else>{{ formatCell(row[column.key], column.format) }}</template>
 
                             <span
                                 v-if="column.key === entity.columns[0]?.key && isShared(row)"
                                 class="list_badge"
-                                title="Owned by a federation — readable here, editable by its owner"
+                                title="Owned by a federation: readable here, editable by its owner"
                             >shared</span>
 
                             <span
@@ -194,7 +194,7 @@ function isSystem(row: EntityRow): boolean {
 
 function formatCell(value: unknown, format: ColumnDef['format']): string {
     if (value === null || value === undefined || value === '') {
-        return '—';
+        return '–';
     }
 
     if (format === 'weekdays') {
@@ -203,11 +203,11 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
         return Array.isArray(value) && value.length
             // Explicit arrow, NOT a bare `.map(weekdayShort)`: the helper now
             // takes an optional locale as its second argument, and a point-free
-            // map would hand it the array INDEX — locale 0 falls through to
+            // map would hand it the array INDEX: locale 0 falls through to
             // English while locale 1 makes Intl throw a RangeError. Caught by
             // the compiler; the arrow is what keeps it caught.
             ? [...value].map(Number).sort((a, b) => a - b).map((iso) => weekdayShort(iso)).join(' ')
-            : '—';
+            : '–';
     }
 
     if (format === 'date') {
@@ -412,7 +412,7 @@ function formatCell(value: unknown, format: ColumnDef['format']): string {
     &_loading {
         display: flex;
         justify-content: center;
-        padding: 60px 0; // Empty-state spacing, hand-tuned — not on the scale.
+        padding: 60px 0; // Empty-state spacing, hand-tuned: not on the scale.
     }
 
     &_pager {

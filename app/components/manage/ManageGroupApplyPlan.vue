@@ -21,7 +21,7 @@
                 :key="`${application.planId}:${application.termId}`"
                 class="apply_history-row"
             >
-                <span>{{ application.planName }} — {{ application.termName }}</span>
+                <span>{{ application.planName }} · {{ application.termName }}</span>
                 <CommonButton
                     v-if="application.advance"
                     :disabled="busy"
@@ -32,7 +32,7 @@
         </ul>
 
         <p class="apply_help">
-            {{ applications.length ? 'Apply another plan:' : 'Gives this group every offering in the chosen plan, for the term below — creating whichever ones don’t exist yet and attaching this group to whichever already do, so two groups taking the same subject in one term share one offering rather than duplicating it.' }}
+            {{ applications.length ? 'Apply another plan:' : 'Gives this group every offering in the chosen plan, for the term below: it creates whichever ones don’t exist yet and attaches this group to whichever already do, so two groups taking the same subject in one term share one offering rather than duplicating it.' }}
         </p>
 
         <p
@@ -89,15 +89,15 @@
 <script setup lang="ts">
 /**
  * The action that makes an `OfferingPlan` actually do something: pick a
- * Plan and a Term, and this Group gets that plan's whole course load — real
+ * Plan and a Term, and this Group gets that plan's whole course load: real
  * Offerings, each already attached to it. Also shows what this Group
- * already has, because "advance" (below) reads directly off that history —
+ * already has, because "advance" (below) reads directly off that history;
  * see `group-plan-applications/[id].get.ts` for how it's reconstructed.
  *
  * ONE ACTION SERVES BOTH ONBOARDING STORIES. A brand-new Group ("this
  * year's Jahrgang 10") applies a plan once, right here on the page it lands
  * on after creation. An EXISTING Group moving into a new Term uses
- * "Advance" instead of re-picking a Plan and Term by hand — it already
+ * "Advance" instead of re-picking a Plan and Term by hand: it already
  * knows both, from the Plan's own `nextPlanId` and the next Term
  * chronologically. There is no Group-level "current term" to switch,
  * because Group is Term-independent by design (TAXONOMY.md): the only thing
@@ -166,7 +166,7 @@ function describe(offerings: AppliedOffering[]): string {
 
     const alreadyClause = already ? ` (${already} already had this group)` : '';
 
-    return `Done — ${parts.join(' and ')}${alreadyClause}.`;
+    return `Done: ${parts.join(' and ')}${alreadyClause}.`;
 }
 
 async function apply(applyPlanId: string, applyTermId: string) {
@@ -189,7 +189,7 @@ async function apply(applyPlanId: string, applyTermId: string) {
         termId.value = '';
         await refreshApplications();
     } catch (cause) {
-        // h3 nests a custom `data` one level inside the response body — see
+        // h3 nests a custom `data` one level inside the response body; see
         // `useEntityForm`'s own comment on this, verified against a live error.
         const body = (cause as { data?: { statusMessage?: string } }).data;
 

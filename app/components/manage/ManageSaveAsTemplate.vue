@@ -19,7 +19,7 @@
                 <input
                     v-model="name"
                     :disabled="busy"
-                    placeholder="e.g. Maths — 4x/week"
+                    placeholder="e.g. Maths, 4x/week"
                     type="text"
                     @keydown.enter="save"
                     @keydown.esc="cancel"
@@ -48,7 +48,7 @@
             <p
                 v-if="justSaved"
                 class="satmpl_ok"
-            >Saved as a template — editing this offering later won't change it.</p>
+            >Saved as a template: editing this offering later won't change it.</p>
         </div>
     </section>
 </template>
@@ -59,7 +59,7 @@ import type { ManageEntity, EntityRow } from '~/utils/manageRegistry';
 /**
  * The reverse of `ManageTemplateStarter`: capture THIS row's current shape
  * into a new template, once, on click. Generic on the same terms that
- * component is — a resource and a builder function the registry supplies —
+ * component is: a resource and a builder function the registry supplies,
  * so this is not Offering-specific despite being Offering's only caller.
  *
  * EDIT-PAGE ONLY, by construction: it needs an existing row to read values
@@ -102,7 +102,11 @@ async function save() {
     error.value = '';
 
     try {
-        await request(`/api/${props.config.resource}`, {
+        // Explicit type argument, not left to infer: an untyped dynamic
+        // `/api/${resource}` URL leads Nuxt's typed-fetch overloads to match
+        // it against a GET-only route pattern and reject `method: 'POST'`,
+        // same as the working pattern in `ManageOfferingPlanBulkApply.vue`.
+        await request<EntityRow>(`/api/${props.config.resource}`, {
             method: 'POST',
             body: { name: trimmed, ...props.config.buildTemplate(props.row) },
         });

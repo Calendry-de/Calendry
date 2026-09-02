@@ -11,7 +11,7 @@ import { classifyPollFailure } from '../server/utils/solverPolling';
  * A solver that ANSWERS is reachable, even when the answer is a refusal.
  *
  * WHY THIS EXISTS. `call()` wrapped every gRPC failure in
- * `SolverUnavailableError` — including `INVALID_ARGUMENT`, which is the solver
+ * `SolverUnavailableError`, including `INVALID_ARGUMENT`, which is the solver
  * replying. The class documented the very distinction it was erasing ("the
  * solver said this run FAILED is a normal outcome, whereas the solver is
  * unreachable means the run never started"), and the implementation made none.
@@ -22,13 +22,13 @@ import { classifyPollFailure } from '../server/utils/solverPolling';
  *     '…-session-3-1' sits at week 0 day 1 block 4, which is not a slot in
  *     this tenant's grid
  *
- * — a message precise enough to fix the data from, delivered under a headline
- * that sent a whole troubleshooting session to inspect container networking
- * that was healthy throughout.
+ * That message was precise enough to fix the data from, yet delivered under a
+ * headline that sent a whole troubleshooting session to inspect container
+ * networking that was healthy throughout.
  *
  * The assertions below are paired on purpose. Testing only that
  * INVALID_ARGUMENT passes through would also pass against a build that stopped
- * classifying anything at all and reported a genuine outage as a data problem —
+ * classifying anything at all and reported a genuine outage as a data problem,
  * which is the same defect pointing the other way, and just as misleading.
  */
 
@@ -81,7 +81,7 @@ describe('SolverRejectedError', () => {
     });
 
     it('is what an INVALID_ARGUMENT becomes, while a real outage stays unavailable', () => {
-        // The discrimination, asserted against the PRODUCTION predicate — the
+        // The discrimination, asserted against the PRODUCTION predicate: the
         // one `call()` actually branches on. Re-implementing the rule here
         // would test this file against itself and pass against any build.
         const classify = (error: unknown) => (isTransportFailure(error) ? 'unavailable' : 'rejected');

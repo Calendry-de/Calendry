@@ -10,7 +10,7 @@ import { logout, useSession } from '~/composables/session';
  * active-route resolution, and the session ACTIONS (theme, switch institution,
  * sign out) that cannot be static data because they close over Nuxt refs.
  *
- * The destinations themselves are `navPlaces()` in `~/utils/navPlaces` — pure,
+ * The destinations themselves are `navPlaces()` in `~/utils/navPlaces`, pure,
  * module-level, and therefore unit-testable. See that module's note.
  */
 export interface ResolvedNavEntry extends NavEntry {
@@ -69,7 +69,7 @@ export function useNavRegistry(): ComputedRef<NavEntry[]> {
  * The registry as this person may see it.
  *
  * Entries whose permission the caller lacks are REMOVED, not disabled. Every
- * consumer — header, sidebar, index, palette — reads this one function, so
+ * consumer (header, sidebar, index, palette) reads this one function, so
  * there is no second place to forget the filter. That is what makes "Ctrl+K
  * never surfaces something you cannot open" structural rather than a promise.
  */
@@ -88,7 +88,7 @@ export function useNavEntries(): ComputedRef<ResolvedNavEntry[]> {
             /*
              * One evaluator, shared with the server and with the manage
              * relations' gates. A local `.every()` was the same rule for the
-             * all-of case and silently wrong for the any-of one — a nested array
+             * all-of case and silently wrong for the any-of one: a nested array
              * is truthy, so `held.has([...])` would have been `false` for
              * everybody and hidden the schedule from the whole institution.
              */
@@ -144,7 +144,7 @@ export function useCanManageAnything(): ComputedRef<boolean> {
 /**
  * `CommonAppShell`'s sidebar source: every reachable destination except
  * 'home' (linking a page to itself is noise) and the 'account' section
- * (theme/switch-tenant/sign-out are actions, not places — `/dashboard`
+ * (theme/switch-tenant/sign-out are actions, not places; `/dashboard`
  * renders those separately, and no other shell page has anywhere to put
  * them). Broader than `useManageSections()` on purpose: the sidebar is the
  * app's one persistent nav, not just the manage area's.

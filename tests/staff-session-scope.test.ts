@@ -4,7 +4,7 @@ import { api, login } from './helpers/client';
 
 /**
  * A browser can legitimately carry BOTH a `calendry_staff_session` cookie and
- * a `calendry_session` cookie at once — a Calendry staff member who is ALSO a
+ * a `calendry_session` cookie at once: a Calendry staff member who is ALSO a
  * signed-in tenant user, in the same browser. Before this fix,
  * `tenantResolver.ts`'s `activeResolver` tried the staff cookie FIRST for
  * EVERY `/api/*` route: `??` short-circuits on the first successful
@@ -12,13 +12,13 @@ import { api, login } from './helpers/client';
  * was never even reached. `withRequestTenant()` correctly refuses
  * `kind === 'staff'`, so the visible symptom was every tenant-scoped route
  * 403ing with "A staff session cannot access tenant-scoped routes" for a
- * request whose tenant cookie was entirely valid — reported live as "the
+ * request whose tenant cookie was entirely valid, reported live as "the
  * frontend tells you you can't access the stuff, even though you have a
  * legitimate normal session cookie".
  *
  * The fix restricts the staff resolver to `/api/staff/*`/`/api/staff-auth/*`
  * paths (`isStaffPath`), so a dual-cookie browser now resolves as `staff` on
- * staff routes and as its tenant identity everywhere else — exactly what
+ * staff routes and as its tenant identity everywhere else, exactly what
  * both cookies actually describe.
  */
 const STAFF_EMAIL = 'dual-cookie-staff@calendry.test';
@@ -47,7 +47,7 @@ async function seedStaffAccount() {
     // regardless of which table it was copied into.
     const template = await ownerDb.account.findFirstOrThrow({ where: { email: ACCOUNTS.adminA } });
 
-    // `mustChangePassword: false` — this fixture is standing in for an
+    // `mustChangePassword: false`: this fixture is standing in for an
     // ALREADY-ONBOARDED staff account, not exercising `provision-staff.ts`'s
     // own forced-reset behavior (that is `scripts/provision-staff.ts`'s own
     // concern, not this suite's).
@@ -110,7 +110,7 @@ describe('a browser holding both a staff and a tenant session cookie', () => {
 
     it('the staff cookie alone cannot reach a tenant-scoped route', async () => {
         // `isStaffPath` is false here, so the staff resolver never even
-        // runs — this now resolves NO identity at all (401 "Authentication
+        // runs, so this now resolves NO identity at all (401 "Authentication
         // required"), not the old 403 "A staff session cannot access
         // tenant-scoped routes" (which required the staff cookie to have
         // resolved first). A plain 401 is the more honest answer for a
@@ -122,9 +122,9 @@ describe('a browser holding both a staff and a tenant session cookie', () => {
     });
 
     it('the tenant cookie alone cannot reach a staff-scoped route', async () => {
-        // Resolves as its (valid) tenant identity — `isStaffPath` only ever
+        // Resolves as its (valid) tenant identity: `isStaffPath` only ever
         // narrows which resolver runs FIRST, it doesn't forbid a tenant
-        // identity from resolving on a staff path — and is refused by
+        // identity from resolving on a staff path, and is refused by
         // `requireStaffIdentity` inside the route handler itself, same as
         // before this fix; this case was never affected by it.
         const res = await api('/api/staff/tenants', { cookie: tenantCookie });

@@ -9,8 +9,8 @@ import type { SolverMode } from '../../shared/solverMode';
  * PURE, AND SEPARATE FROM THE ROUTE, because it is where three things that look
  * independent have to stay consistent: which Offerings are in scope, which lock
  * policy governs everything else, and what a disturbance costs. Deriving them
- * inline meant `LOCK_POLICY_HARD` was written twice — once into the stored JSON
- * and once onto the wire — with nothing to notice if only one changed.
+ * inline meant `LOCK_POLICY_HARD` was written twice, once into the stored JSON
+ * and once onto the wire, with nothing to notice if only one changed.
  */
 
 /**
@@ -54,8 +54,8 @@ export function resolveScope(options: {
      * from either end: a rebuild places the whole term, a repair places nothing
      * and merely stops the term being illegal.
      *
-     * An explicitly empty list is honoured as empty in both modes — `[] ?? x`
-     * is `[]`, not `x` — so a caller can ask for a pure repair by name.
+     * An explicitly empty list is honoured as empty in both modes (`[] ?? x`
+     * is `[]`, not `x`), so a caller can ask for a pure repair by name.
      */
     const fallback = mode === 'repair' ? { real: [], wire: [] } : assembled;
 
@@ -69,7 +69,7 @@ export function resolveScope(options: {
             : 'LOCK_POLICY_HARD',
         // Sent as 0 under LOCK_POLICY_HARD, where the solver ignores it. Zero is
         // a legitimate value of this field ("track disturbance, do not steer"),
-        // not a stand-in for absent — the proto is deliberate about that.
+        // not a stand-in for absent; the proto is deliberate about that.
         minimizeMovementWeight: mode === 'repair' ? REPAIR_MOVEMENT_WEIGHT : 0,
     };
 }
@@ -84,7 +84,7 @@ export function toWireScope(scope: StoredScope): SolveScope {
             : LockPolicy.LOCK_POLICY_HARD,
         minimizeMovementWeight: scope.minimizeMovementWeight,
         /*
-         * NOT YET A CALLER-SET VALUE — `StoredScope` has nothing to carry it,
+         * NOT YET A CALLER-SET VALUE: `StoredScope` has nothing to carry it,
          * because nothing here asks for it yet. Proto's own doc comment: "Zero
          * (the default) asks the solver to freely re-optimize, unchanged from
          * before this field existed." Sending anything else would be inventing
@@ -92,7 +92,7 @@ export function toWireScope(scope: StoredScope): SolveScope {
          */
         minimizeInscopeMovementWeight: 0,
         /*
-         * Same treatment as `minimizeInscopeMovementWeight` above —
+         * Same treatment as `minimizeInscopeMovementWeight` above:
          * `StoredScope` has nothing to carry per-entity overrides yet, and
          * empty is the proto's own documented no-op default ("Empty (the
          * default) leaves both [weights] behaving exactly as they did before
@@ -107,7 +107,7 @@ export function toWireScope(scope: StoredScope): SolveScope {
  * scopes that encode identically are the same request to the solver.
  *
  * WHY THE IDEMPOTENCY KEY NEEDS THIS AT ALL. The key was `<inputHash>:<seed>`,
- * and the input hash covers `SolverInput` — which does NOT carry the scope.
+ * and the input hash covers `SolverInput`, which does NOT carry the scope.
  * That held only while every run sent the same scope, which was true until a
  * repair existed. Without this, a rebuild and a repair of one unchanged term at
  * the same seed are the same key, and the solver's in-memory registry replays

@@ -71,12 +71,12 @@ export default defineEventHandler(async (event) => {
         });
 
         // Warn, don't block: approval already happened above. This is
-        // reported alongside it, not gated on it — the module's teaching plan
+        // reported alongside it, not gated on it: the module's teaching plan
         // being incomplete does not make the exam any less approved.
         const teachingComplete = await assertTeachingComplete(tx, identity.tenantId, request.offeringId);
 
         // Same convention: a preferred room too small for the expected exam
-        // sitting is reported, not refused — `roomId` was only ever a
+        // sitting is reported, not refused: `roomId` was only ever a
         // preference, and the reviewer already chose to grant the request.
         const examCapacity = await assertExamRoomCapacity(tx, identity.tenantId, request.offeringId, request.roomId);
 

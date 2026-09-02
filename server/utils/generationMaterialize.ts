@@ -18,7 +18,7 @@ import type { DemandEntry } from './solverDemand';
  * changed. Placements stay in `solver_run.result` until someone applies.
  *
  * THE PLAN IS SEPARATE so the review screen can answer "what will this do?" with
- * the same code the apply uses — computing it twice would let the preview lie with
+ * the same code the apply uses: computing it twice would let the preview lie with
  * nothing to catch it. It is a SNAPSHOT, not a promise: a manual edit in between
  * legitimately changes the outcome, which is what `computedAt` is for.
  */
@@ -26,7 +26,7 @@ import type { DemandEntry } from './solverDemand';
 /** One placement the solver returned, resolved against what already exists. */
 export interface PlannedPlacement {
     action: 'create' | 'move' | 'unchanged';
-    /** Null when the solver invented this Session — there is no row yet. */
+    /** Null when the solver invented this Session: there is no row yet. */
     sessionId: string | null;
     offeringId: string;
     placement: Placement;
@@ -37,9 +37,9 @@ export interface PlannedPlacement {
      * The FULL Room set, `roomId` included.
      *
      * The wire leaves `PlacedSession.room_ids` empty for an ordinary
-     * single-Room placement — `room_id` is already the complete answer there —
-     * so this normalises both shapes into one list the apply can write without
-     * a branch. Writing only `roomId` would silently drop the extra Rooms of
+     * single-Room placement, since `room_id` is already the complete answer
+     * there. This normalises both shapes into one list the apply can write
+     * without a branch. Writing only `roomId` would silently drop the extra Rooms of
      * every multi-Room placement the solver just learned to produce.
      */
     roomIds: string[];
@@ -48,7 +48,7 @@ export interface PlannedPlacement {
      *
      * FALSE for a Session it moved from OUTSIDE the scope. Such a Session
      * reaches the solver as a movable `PlacementVar`, which deliberately
-     * carries no lecturer/group/attendee snapshot — the search reads those from
+     * carries no lecturer/group/attendee snapshot: the search reads those from
      * the Offering's current definition. So the lists that come back are the
      * OFFERING's, not the Session's, and a Session whose attendees were
      * overridden through `sessions/[id]/details.post.ts` would have that
@@ -72,8 +72,8 @@ export interface Placement {
 export interface PlannedDelete {
     sessionId: string;
     /**
-     * Never NULL in practice — the delete filter requires `inScope.has(...)`,
-     * which an Event's NULL offering can never satisfy — but typed nullable
+     * Never NULL in practice: the delete filter requires `inScope.has(...)`,
+     * which an Event's NULL offering can never satisfy. But it is typed nullable
      * because the column is. Narrowing it here would be a lie the compiler
      * could not check.
      */
@@ -86,7 +86,7 @@ export interface PlanCounts {
     /** Returned with a DIFFERENT placement than it had. */
     moved: number;
     /**
-     * The subset of `moved` the caller did NOT ask for — Sessions of Offerings
+     * The subset of `moved` the caller did NOT ask for: Sessions of Offerings
      * outside the run's scope, which only a `LOCK_POLICY_MINIMIZE_MOVEMENT` run
      * can produce.
      *
@@ -112,7 +112,7 @@ export interface PlanCounts {
      * Deletes this plan REFUSED to make, because the run's own answer for that
      * Offering came back short of what was asked of it.
      *
-     * Not a subset of `deleted` — the complement of it. A Session counted here
+     * Not a subset of `deleted`, but the complement of it. A Session counted here
      * would have been deleted under the old rule and is being kept instead, so
      * the number is the damage this reconciliation prevented. It rides in the
      * APPLY_GENERATION event payload alongside the rest of the counts, because
@@ -122,7 +122,7 @@ export interface PlanCounts {
     deletesWithheld: number;
     skippedLocked: number;
     /**
-     * Placements that cannot be written at all — the Offering is not in this
+     * Placements that cannot be written at all: the Offering is not in this
      * term, or the placement carries no slot.
      *
      * Split out from `violationsUnmapped` in Stage 6a. The two were one counter
@@ -155,7 +155,7 @@ export interface MaterializationPlan {
     placements: PlannedPlacement[];
     deletes: PlannedDelete[];
     /**
-     * Deletes withheld because their Offering's answer was short — kept as rows
+     * Deletes withheld because their Offering's answer was short, kept as rows
      * rather than a count so the review screen can NAME them. "11 sessions kept
      * because the solver's answer was incomplete" is only actionable if a human
      * can see which eleven.
@@ -186,9 +186,9 @@ function samePlacement(a: Placement, b: Placement): boolean {
  *
  * THE THREE-WAY PARTITION:
  *
- *   session_id empty            create — the solver invented this Session
- *   session_id matches a row    move   — same Session, new placement
- *   existing in-scope, absent   DELETE — the solver chose not to place it
+ *   session_id empty            create: the solver invented this Session
+ *   session_id matches a row    move:   same Session, new placement
+ *   existing in-scope, absent   DELETE: the solver chose not to place it
  *
  * That last case is deliberate: leaving unreturned Sessions where they were would
  * mean the applied schedule contains placements the solver rejected while
@@ -198,12 +198,12 @@ function samePlacement(a: Placement, b: Placement): boolean {
  * only if the solver returned everything it was asked for; where it returned
  * FEWER placements for an Offering than the run demanded, its silence about that
  * Offering's Sessions says nothing at all, exactly as an Event's or a banked
- * Session's absence does. `demandLedger` is what makes that distinguishable —
+ * Session's absence does. `demandLedger` is what makes that distinguishable:
  * without it this function cannot tell a refusal from a dropped answer, and it
  * deleted eleven live Sessions per run on the strength of that confusion. See
  * `solverDemand.ts`.
  *
- * LOCKED SESSIONS ARE NEVER TOUCHED — they were sent as immovable fixtures, so the
+ * LOCKED SESSIONS ARE NEVER TOUCHED. They were sent as immovable fixtures, so the
  * answer was computed on the assumption they would not move.
  */
 export async function planMaterialization(tx: Tx, options: {
@@ -214,7 +214,7 @@ export async function planMaterialization(tx: Tx, options: {
     scopeOfferingIds: string[];
     /**
      * What the run put on the wire, from `solver_run.meta.report.demand`. NULL
-     * for a run started before the ledger existed — see `PlanDemand.verified`.
+     * for a run started before the ledger existed; see `PlanDemand.verified`.
      */
     demandLedger?: DemandEntry[] | null;
     /** Set when the tenant belongs to a Federation, so shared Sessions are seen. */
@@ -290,8 +290,8 @@ export async function planMaterialization(tx: Tx, options: {
 
         const offering = offeringById.get(parsed.offeringId);
 
-        // A placement for an Offering this term does not have cannot be written
-        // — the FK would reject it. Counted rather than thrown: one bad
+        // A placement for an Offering this term does not have cannot be written:
+        // the FK would reject it. Counted rather than thrown: one bad
         // placement should not abandon an otherwise good apply.
         if (!offering || !placed.startSlot) {
             placementsUnmapped++;
@@ -308,7 +308,7 @@ export async function planMaterialization(tx: Tx, options: {
         }
 
         /**
-         * A BANKED `current` (issue #22) SHOULD BE UNREACHABLE — a banked
+         * A BANKED `current` (issue #22) SHOULD BE UNREACHABLE. A banked
          * Session is never sent to the solver as existing occupancy
          * (`assembleSolverInput` excludes it), so its output cannot legitimately
          * echo back its id. Counted as unmapped rather than trusted, matching
@@ -351,7 +351,7 @@ export async function planMaterialization(tx: Tx, options: {
             /*
              * KEYED ON SCOPE, not on the run's mode. Under `LOCK_POLICY_HARD` an
              * out-of-scope Session is never returned at all, so this can only be
-             * false under a minimize-movement run — but writing the test as
+             * false under a minimize-movement run, but writing the test as
              * "is it a repair?" would put the run's mode into a function that
              * has never needed it, and would be wrong the moment a rebuild
              * narrows its scope.
@@ -376,7 +376,7 @@ export async function planMaterialization(tx: Tx, options: {
 
     /**
      * Everything in scope that the solver did not return. Locked Sessions and
-     * Sessions of out-of-scope Offerings are excluded — the solver was never
+     * Sessions of out-of-scope Offerings are excluded: the solver was never
      * asked about those and its silence says nothing.
      *
      * SELECTED FIRST, PARTITIONED SECOND. Every candidate is collected here and
@@ -388,7 +388,7 @@ export async function planMaterialization(tx: Tx, options: {
         .filter((s) => {
             /**
              * An EVENT is never deleted by an apply. Stated as its own clause
-             * rather than left to `inScope.has(null)` returning false — that
+             * rather than left to `inScope.has(null)` returning false: that
              * would be an exemption that WORKS but is invisible, and the next
              * person to change `inScope` into something that tolerates null
              * (a list, a predicate, a widened Set) would silently start
@@ -403,11 +403,11 @@ export async function planMaterialization(tx: Tx, options: {
 
             /**
              * A BANKED Session (issue #22) is never deleted by an apply, for
-             * the same reason an Event never is — the solver was never asked
+             * the same reason an Event never is: the solver was never asked
              * about it (`assembleSolverInput` excludes it from what it sends,
              * since it has no placement to send), so its absence from the
              * output says nothing. Without this, cancelling a Session and then
-             * running ANY solve — rebuild or repair — would silently erase the
+             * running ANY solve (rebuild or repair) would silently erase the
              * very record banking exists to keep: exactly the failure
              * "cancel to spare bank" was built to avoid, reintroduced one
              * layer up.
@@ -419,7 +419,7 @@ export async function planMaterialization(tx: Tx, options: {
             return !keptIds.has(s.id) && !s.isLocked && inScope.has(s.offeringId);
         })
         // Narrows `termWeek`/`dayOfWeek`/`blockIndex` to `number` for the
-        // `Placement` object below — the banked check above already excludes
+        // `Placement` object below. The banked check above already excludes
         // these, but a boolean-returning filter does not narrow the array's
         // element type, and `isPlacedSession` is the one predicate that does.
         .filter(isPlacedSession)
@@ -436,7 +436,7 @@ export async function planMaterialization(tx: Tx, options: {
 
     /**
      * THE SPLIT. An unreturned Session whose Offering came back short is kept,
-     * not deleted — `demand.short` is empty whenever the answer was complete or
+     * not deleted: `demand.short` is empty whenever the answer was complete or
      * could not be checked, so this is a no-op on every well-formed run and
      * `deletes` is exactly what it always was.
      */
@@ -482,8 +482,8 @@ export interface WeekSummaryRow {
 /**
  * The plan's changes bucketed by term week.
  *
- * A review screen renders one week at a time — the payload for a whole term can
- * be a thousand placements — which leaves a reviewer clicking through nineteen
+ * A review screen renders one week at a time, and the payload for a whole term can
+ * be a thousand placements, which leaves a reviewer clicking through nineteen
  * weeks to find the three that changed. This is the index that makes the week
  * picker able to say where the changes are.
  *
@@ -502,8 +502,8 @@ export function summarizePlanByWeek(plan: MaterializationPlan): WeekSummaryRow[]
         return existing;
     };
 
-    // The action names and the count names differ by design — `create` is what
-    // happens, `created` is how many — so the mapping is explicit rather than
+    // The action names and the count names differ by design: `create` is what
+    // happens, `created` is how many, so the mapping is explicit rather than
     // an index that happens to line up.
     const KEY = { create: 'created', move: 'moved', unchanged: 'unchanged' } as const;
 
@@ -511,7 +511,7 @@ export function summarizePlanByWeek(plan: MaterializationPlan): WeekSummaryRow[]
         row(placement.placement.termWeek)[KEY[placement.action]]++;
     }
 
-    // A deletion belongs to the week it currently occupies — that is where a
+    // A deletion belongs to the week it currently occupies: that is where a
     // reviewer will look for the session that is about to vanish.
     for (const del of plan.deletes) {
         row(del.placement.termWeek).deleted++;
@@ -568,7 +568,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
          * the authority on who and what is involved, and a diff would be three
          * code paths where this is one.
          *
-         * EXCEPT WHERE IT IS NOT THE AUTHORITY. Rooms always are — the solver
+         * EXCEPT WHERE IT IS NOT THE AUTHORITY. Rooms always are: the solver
          * chose the room, that is what moving a Session means. Attendees are
          * not, for a Session moved from outside the scope: see
          * `attendeesAreAuthoritative`. Those rows are left exactly as they were,
@@ -577,7 +577,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
         await tx.sessionRoom.deleteMany({ where: { sessionId } });
 
         if (planned.attendeesAreAuthoritative) {
-            // Sequential — `tx` is one shared connection; concurrent queries on
+            // Sequential, because `tx` is one shared connection; concurrent queries on
             // it trip pg's deprecated overlapping-query warning.
             await tx.sessionPerson.deleteMany({ where: { sessionId } });
             await tx.sessionGroup.deleteMany({ where: { sessionId } });
@@ -592,7 +592,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
 
         /*
          * A BLOCK, not an early `continue`. The attendee writes are the last
-         * thing in this loop today, so a `continue` would be equivalent — and
+         * thing in this loop today, so a `continue` would be equivalent, and
          * would silently skip whatever somebody appends here next, for exactly
          * the placements whose handling is already the subtle case.
          */
@@ -617,7 +617,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
         /**
          * A DELETE event PER Session, written BEFORE the rows go.
          *
-         * Materialize used to delete silently — the only record was a `deleted`
+         * Materialize used to delete silently: the only record was a `deleted`
          * count on the APPLY_GENERATION event, so "what was removed, and from
          * where" had no answer. A delete is also the one change the Generation
          * snapshot cannot describe on its own.
@@ -655,7 +655,7 @@ export async function executePlan(tx: Tx, plan: MaterializationPlan, options: {
     };
 }
 
-/** Plan and execute in one step — the apply route's entry point. */
+/** Plan and execute in one step: the apply route's entry point. */
 export async function materializeGeneration(tx: Tx, options: {
     tenantId: string;
     termId: string;
@@ -704,8 +704,8 @@ async function materializeViolations(tx: Tx, options: {
     const counts = { violationsSession: 0, violationsOffering: 0, violationsUnmapped: 0 };
 
     for (const violation of violations) {
-        // `constraint_id` is the app's own Constraint row id — it was sent as
-        // ConstraintConfig.id — so a miss means the constraint was deleted
+        // `constraint_id` is the app's own Constraint row id: it was sent as
+        // ConstraintConfig.id, so a miss means the constraint was deleted
         // between starting the run and applying it.
         const constraint = await tx.constraint.findFirst({
             where: { id: violation.constraintId, tenantId },
@@ -754,7 +754,7 @@ async function materializeViolations(tx: Tx, options: {
 
         /**
          * Offering-scoped: the ExactFrequency case. Recorded ONLY when the
-         * violation named no sessions — otherwise a violation that names both
+         * violation named no sessions; otherwise a violation that names both
          * would be counted twice for the same breach.
          */
         if (violation.sessionIds.length === 0) {
@@ -763,7 +763,7 @@ async function materializeViolations(tx: Tx, options: {
                  * The SECOND place a wire offering id must be reversed. A
                  * violation on a split series names `offering::group`, and
                  * `constraint_violation.offering_id` is a foreign key to the
-                 * real row — so without this every ExactFrequency breach on a
+                 * real row, so without this every ExactFrequency breach on a
                  * multi-group Offering would land in `violationsUnmapped` and
                  * the tenant would see no violations at all for exactly the
                  * Offerings most likely to have them.
@@ -788,7 +788,7 @@ async function materializeViolations(tx: Tx, options: {
                  * and they collapse onto one real Offering id. `writeViolation`
                  * is find-then-write against
                  * (constraint_id, session_id, offering_id), so the second
-                 * updates the first rather than colliding — the breach is
+                 * updates the first rather than colliding: the breach is
                  * reported once against the Offering, which is the row a human
                  * acts on.
                  */
@@ -809,7 +809,7 @@ async function materializeViolations(tx: Tx, options: {
  * that one resolves against Sessions as they exist AFTER the plan is applied,
  * this one has to answer before any of it exists. What it can say honestly is
  * how many name a Session the solver invented and therefore cannot be attached
- * to any row — the tracked cross-repo gap. Reporting that number is the point;
+ * to any row: the tracked cross-repo gap. Reporting that number is the point;
  * netting it out would make an unsatisfiable timetable look cleaner than it is.
  */
 export function summarizeProposedViolations(violations: ConstraintViolation[]): {
@@ -844,8 +844,8 @@ export function summarizeProposedViolations(violations: ConstraintViolation[]): 
 /**
  * Insert-or-refresh one violation.
  *
- * Split out because the uniqueness it respects — (constraint, session, offering)
- * with NULLS NOT DISTINCT — is enforced by an index Prisma's type system cannot
+ * Split out because the uniqueness it respects (constraint, session, offering,
+ * with NULLS NOT DISTINCT) is enforced by an index Prisma's type system cannot
  * describe, so `upsert` is unavailable and both call sites would otherwise
  * repeat the same eight lines.
  */

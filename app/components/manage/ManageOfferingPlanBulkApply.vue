@@ -8,7 +8,7 @@
         </header>
 
         <p class="bulk_help">
-            Applies this plan to every group below, for one Term, in a single action —
+            Applies this plan to every group below, for one Term, in a single action:
             the moment a whole term's cohorts move forward together rather than one at a
             time. Filter by name and add every match at once, rather than picking groups
             one by one. Reuse still applies: a group that already has an offering from
@@ -16,7 +16,7 @@
             <template v-if="preSelectedCount">
                 {{ preSelectedCount }} group{{ preSelectedCount === 1 ? '' : 's' }} already
                 {{ preSelectedCount === 1 ? 'names' : 'name' }} this as its curriculum plan and
-                {{ preSelectedCount === 1 ? 'is' : 'are' }} pre-selected below — remove any that
+                {{ preSelectedCount === 1 ? 'is' : 'are' }} pre-selected below; remove any that
                 don’t belong in this rollout.
             </template>
         </p>
@@ -121,22 +121,22 @@
  * The Plan-side complement to `ManageGroupApplyPlan`: that one applies ONE
  * plan to ONE group from the group's own page (including the "advance"
  * shortcut); this applies ONE plan to SEVERAL groups at once, from the
- * plan's own page — the shape a whole term's rollout actually takes, rather
+ * plan's own page: the shape a whole term's rollout actually takes, rather
  * than one apply-click per cohort.
  *
  * SAME IDEMPOTENCY GUARANTEE, so there is nothing to confirm here either: a
  * group already reached by this plan in this Term is a no-op entry in the
  * result, not a duplicate.
  *
- * THREE WAYS INTO THE LIST, cheapest first. `Group.curriculumPlanId` —
- * an intent set on the Group itself, before it has a single Offering —
+ * THREE WAYS INTO THE LIST, cheapest first. `Group.curriculumPlanId`
+ * (an intent set on the Group itself, before it has a single Offering)
  * pre-selects every Group already naming THIS plan, with nothing to click.
  * The filter + "add all" covers a Group that never set the field but shares
  * a name pattern with its cohort ("dIT25 S1", "dWI25 S1", …). The plain
  * dropdown is the fallback for the odd one out neither of those catches.
  * `groupIds` is still capped at 100 server-side
  * (`offering-plan-apply/[id].post.ts`'s zod schema); nothing here pre-empts
- * that — a plan whose pre-selection plus filter matches more than 100 groups
+ * that: a plan whose pre-selection plus filter matches more than 100 groups
  * is refused the same way a 101st manual add would have been.
  */
 const props = defineProps<{
@@ -169,7 +169,7 @@ const terms = computed(() => termsData.value ?? []);
 // PRE-SELECTED, not just offered: `Group.curriculumPlanId` is exactly the
 // "we already know who this plan is for" intent this panel exists to act on,
 // so a Group naming this plan starts in the list rather than waiting to be
-// found through the filter. Still just a starting point — every row below
+// found through the filter. Still just a starting point: every row below
 // has its own remove button, and the manual add/filter still reaches a Group
 // that never set the field.
 const preSelectedCount = allGroups.value.filter((g) => g.curriculumPlanId === props.planId).length;
@@ -189,7 +189,7 @@ const availableGroups = computed(() => {
 const filter = ref('');
 
 // Case-insensitive substring, matching the manage list's own search
-// convention — a group is a name to a human doing this, not an id.
+// convention: a group is a name to a human doing this, not an id.
 const filteredAvailableGroups = computed(() => {
     const needle = filter.value.trim().toLowerCase();
 
@@ -219,7 +219,7 @@ function addGroup(event: Event) {
 }
 
 // The whole point: going from "one dropdown pick per group" to "every group
-// this filter already identifies, in one click" — the manual add above still
+// this filter already identifies, in one click"; the manual add above still
 // covers the odd one out the filter didn't catch.
 function addAllFiltered() {
     if (!filteredAvailableGroups.value.length) {
@@ -253,7 +253,7 @@ function describe(results: AppliedResult[]): string {
 
     const alreadyClause = already ? ` (${already} were already in place)` : '';
 
-    return `Done across ${results.length} group${results.length === 1 ? '' : 's'} — ${parts.join(' and ')}${alreadyClause}.`;
+    return `Done across ${results.length} group${results.length === 1 ? '' : 's'}: ${parts.join(' and ')}${alreadyClause}.`;
 }
 
 async function apply() {
@@ -273,7 +273,7 @@ async function apply() {
 
         summary.value = describe(result.results);
     } catch (cause) {
-        // h3 nests a custom `data` one level inside the response body — see
+        // h3 nests a custom `data` one level inside the response body; see
         // `useEntityForm`'s own comment on this, verified against a live error.
         const body = (cause as { data?: { statusMessage?: string } }).data;
 

@@ -29,7 +29,7 @@ export default defineEventHandler(event => {
         // ws:/wss: for Vite's dev-server HMR socket. challenges.cloudflare.com
         // is Turnstile's own client-side verification traffic.
         `connect-src 'self' ws: wss: https://challenges.cloudflare.com${__impeccableLiveDev}`,
-        // Turnstile renders its challenge in an iframe — no frame-src existed
+        // Turnstile renders its challenge in an iframe, and no frame-src existed
         // before issue #79 because nothing on this site framed anything.
         "frame-src https://challenges.cloudflare.com",
         "frame-ancestors 'self'",

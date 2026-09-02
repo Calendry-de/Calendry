@@ -12,7 +12,7 @@
 #
 # The rasters differ from the SVG in one deliberate way: they are drawn on an
 # OPAQUE light tile, inset, rather than transparent. Two reasons, and both are
-# format limits rather than taste —
+# format limits rather than taste:
 #
 #   * `prefers-color-scheme` does not exist in ICO or PNG, so a transparent
 #     dark-ink mark would vanish against a dark tab strip with no way to adapt.
@@ -26,7 +26,7 @@
 # while a 180px app tile with the same fill would look cramped against every
 # other icon on a home screen.
 #
-# A separate, simplified 16px drawing was tried and rejected — one with the
+# A separate, simplified 16px drawing was tried and rejected, one with the
 # middle agenda row dropped and the strokes fattened. Rendered side by side it
 # was not measurably clearer than the real mark at this fill, and it would have
 # made the logo two drawings that must be changed together, which is the

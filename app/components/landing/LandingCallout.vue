@@ -12,8 +12,8 @@
 /**
  * One call to action in the middle of the page.
  *
- * There were two conversion affordances in 1,500 words — the hero pair and the
- * form itself — so a reader persuaded by the list of what already works had
+ * There were two conversion affordances in 1,500 words (the hero pair and the
+ * form itself), so a reader persuaded by the list of what already works had
  * roughly 800 words and two more sections to scroll before they could act on
  * it. This sits directly after that list, where conviction is highest.
  *

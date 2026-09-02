@@ -5,13 +5,13 @@ import { assembleSolverInput } from '../server/utils/solverInput';
 import { RESOURCES } from '../server/utils/resources';
 
 /**
- * `Offering.scheduling_pattern` — whether a course spreads across the Term or
+ * `Offering.scheduling_pattern`: whether a course spreads across the Term or
  * concentrates into a window.
  *
  * CLASSIFICATION ONLY at this point: the value reaches the wire, and the solver
  * acts on it only through the pattern-adherence constraint types, which no
  * tenant can enable yet. So the property worth pinning is not that a timetable
- * changes — it must not — but that the three states stay THREE.
+ * changes (it must not) but that the three states stay THREE.
  *
  * NULL IS NOT DISTRIBUTED. "A weekly slot" is what most timetables assume, so
  * mapping an unclassified Offering onto it is the tempting default and the
@@ -78,7 +78,7 @@ describe('the inert-rule report', () => {
      * A PATTERN RULE PRICES ONLY THE OFFERINGS CARRYING ITS PATTERN, and an
      * unclassified Offering is untouched by both. So a tenant can enable
      * `distributed_pattern_adherence`, weight it, see it in the catalogue, and
-     * have it do nothing — the `lecturer_veto` shape this codebase already paid
+     * have it do nothing, the `lecturer_veto` shape this codebase already paid
      * for once, which went unnoticed precisely because nothing counted it.
      *
      * Asserted in BOTH directions so a hardcoded value cannot satisfy it.
@@ -108,7 +108,7 @@ describe('the inert-rule report', () => {
 
 describe('the write schema', () => {
     /*
-     * A `<select>` cannot send "absent" — it sends the empty string. Without the
+     * A `<select>` cannot send "absent": it sends the empty string. Without the
      * preprocess the one option that means "I have not decided" would be the
      * only one the API rejects, and an Offering could be classified but never
      * un-classified.

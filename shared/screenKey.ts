@@ -3,7 +3,7 @@
  *
  * GENERATED IN THE BROWSER, for exactly the reason `randomPassword()` is: the
  * create page navigates to the saved row on success, so a key the SERVER
- * generated would be gone before anybody could read it — and only its SHA-256 is
+ * generated would be gone before anybody could read it, and only its SHA-256 is
  * stored, so "read it later" does not exist. Generating it client-side lets the
  * create form show the whole display URL, with a copy button, before the save
  * that makes it real.
@@ -25,7 +25,7 @@ export function randomScreenKey(): string {
     crypto.getRandomValues(bytes);
 
     // base64url, so it survives being copied out of a terminal or pasted into a
-    // device's browser without a quoting question — and needs no escaping in the
+    // device's browser without a quoting question, and needs no escaping in the
     // query string it lives in.
     return btoa(String.fromCharCode(...bytes))
         .replace(/\+/g, '-')

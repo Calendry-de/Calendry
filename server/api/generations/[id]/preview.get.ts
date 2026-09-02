@@ -11,7 +11,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 import type { Tx } from '../../../utils/tenantDb';
 
 /**
- * What applying this Generation would do — computed, never written.
+ * What applying this Generation would do: computed, never written.
  *
  * THE POINT OF THIS ROUTE is that it does not compute its own answer. It calls
  * `planMaterialization()`, the same function the apply then executes, so the
@@ -21,7 +21,7 @@ import type { Tx } from '../../../utils/tenantDb';
  * IT IS A SNAPSHOT, NOT A PROMISE. A manual edit between preview and apply
  * legitimately changes the outcome, which is what `computedAt` is for.
  *
- * Gated by `generation.read` — see index.get.ts. `session.read` is deliberately
+ * Gated by `generation.read`; see index.get.ts. `session.read` is deliberately
  * NOT required on top: this returns the placements a proposal WOULD create, not
  * the ones in force, and demanding authority over the applied timetable to read
  * a proposal would make "may review proposals" unexpressible on its own.
@@ -105,7 +105,7 @@ export default defineEventHandler(async (event) => {
                 output,
                 scopeOfferingIds: scope.offeringIds ?? [],
                 // The same evidence the apply reconciles against, read the same
-                // way — this route's whole contract is that its numbers ARE the
+                // way: this route's whole contract is that its numbers ARE the
                 // apply's decision, so a preview computed without the ledger
                 // would show deletes the apply then refuses to make.
                 demandLedger: demandLedgerFrom(stored.meta),
@@ -141,7 +141,7 @@ export default defineEventHandler(async (event) => {
                  *
                  * The review page leads with what changes grouped by OFFERING
                  * rather than by slot, because a proposal that moves 187 of 260
-                 * Sessions cannot be reviewed one week at a time — thirteen
+                 * Sessions cannot be reviewed one week at a time: thirteen
                  * `<select>` interactions is not a review, it is a search.
                  *
                  * It cannot be built on the client: `placements` is fetched per
@@ -168,7 +168,7 @@ export default defineEventHandler(async (event) => {
                  * fetched separately from /api/offerings.
                  *
                  * That endpoint requires `offering.read`, which this route's
-                 * own gate (`session.read`) does not imply — a viewer with
+                 * own gate (`session.read`) does not imply: a viewer with
                  * session.read got a 403 that rejected the page's whole
                  * reference fetch and rendered a blank screen. A page must
                  * only depend on what its own permission gate guarantees.
@@ -200,7 +200,7 @@ function emptyCounts() {
  * Violations on the schedule as it stands, so the review screen has a baseline
  * to state alongside the proposal's own count.
  *
- * NOT A DELTA, and this comment used to say it was — the Stage 6c decision the
+ * NOT A DELTA, and this comment used to say it was: the Stage 6c decision the
  * review component enforces is the opposite. These rows come from this app's
  * evaluator, which fills `constraint_violation` from the four STRUCTURAL
  * double-booking rules only, while the proposal's count is the solver reporting
@@ -260,8 +260,8 @@ async function summarizeCurrentViolations(tx: Tx, tenantId: string, termId: stri
  * `outOfScope` is the granularity that finally makes `movedCollateral`
  * actionable. The plan reports it as a term-level integer ("12 of them outside
  * what you asked for"), which is the sharpest warning on the screen and, until
- * now, the one with nothing to click. Scope is an OFFERING-level property —
- * `scopeOfferingIds` is what the run was allowed to place — so the Offerings
+ * now, the one with nothing to click. Scope is an OFFERING-level property:
+ * `scopeOfferingIds` is what the run was allowed to place, so the Offerings
  * whose Sessions the solver moved on its own initiative can be named, which is
  * exactly the resolution a reviewer needs. A repair run (`LOCK_POLICY_MINIMIZE_
  * MOVEMENT`, empty scope) makes every moved Offering out-of-scope; that is the
@@ -397,8 +397,8 @@ async function deletesByOffering(tx: Tx, tenantId: string, rows: PlannedDelete[]
     const counts = new Map<string, number>();
 
     for (const del of rows) {
-        // Unreachable by construction — the delete partition excludes Events
-        // explicitly — but skipped rather than coerced, so that if it ever DID
+        // Unreachable by construction (the delete partition excludes Events
+        // explicitly), but skipped rather than coerced, so that if it ever DID
         // happen this would under-report by one rather than invent an Offering
         // named "null" in the reviewer's summary.
         if (del.offeringId === null) {
@@ -446,12 +446,12 @@ function filterPlacements(plan: MaterializationPlan, query: {
         && matches(p.groupIds, query.groupId)
         // Against the FULL Room set, not the primary. A reviewer filtering by
         // the second hall of a two-hall lecture was shown nothing, which reads
-        // as "this room is free" — the same room the placement occupies.
+        // as "this room is free", the same room the placement occupies.
         && matches(p.roomIds, query.roomId)
         && matches([...p.lecturerIds, ...p.personIds], query.personId)
     ));
 
-    // Deletions belong in the same view — a Session vanishing from Monday is a
+    // Deletions belong in the same view: a Session vanishing from Monday is a
     // change the reviewer needs to see, and it has a placement to show it at.
     const deletes = plan.deletes.filter((d) => (
         query.termWeek === undefined || d.placement.termWeek === query.termWeek

@@ -10,9 +10,9 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * A preference is soft and tenant-weighted: it cannot make a term infeasible
  * the way a veto can, so there is nothing for a reviewer to protect.
  *
- * ALL THREE AXES REACH THE SOLVER — days, blocks and preferred room types all
+ * ALL THREE AXES REACH THE SOLVER: days, blocks and preferred room types all
  * travel as `Person.preferred`. This comment previously said the opposite
- * ("no effect on the solver at all — the wire has no field for it yet"), which
+ * ("no effect on the solver at all: the wire has no field for it yet"), which
  * was true when written and had been wrong since the field shipped.
  */
 export default defineEventHandler(async (event) => {
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
      *
      * Refused by name, and refused BEFORE parsing, because zod strips unknown
      * keys: left to the schema this would be accepted with a 200 and silently
-     * dropped, which is the worst of the three possible behaviours — the caller
+     * dropped, which is the worst of the three possible behaviours: the caller
      * is told it worked. The administrator path
      * (`PUT /api/availability/preferences/[personId]`) is where the override
      * lives.
@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
         if (outOfRange.length) {
             throw createError({
                 statusCode: 400,
-                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1} — the largest time grid `
+                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1}; the largest time grid `
                     + `in this tenant has ${limits.blocksPerDay} blocks per day.`,
                 data: { field: 'preferredBlocks' },
             });

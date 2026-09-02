@@ -6,7 +6,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Curriculum plans'],
         summary: 'One Group\'s current curriculum-plan phase(s), with its advance target',
-        description: 'The per-Group form of GET /api/group-plan-applications — issue #100\'s "how do we know which phase a group is in" answer, fully derived (never stored) from Offering.createdFromTemplateId. A Group with no Offering seeded from any plan template yet gets an empty array, not a 404.',
+        description: 'The per-Group form of GET /api/group-plan-applications: issue #100\'s "how do we know which phase a group is in" answer, fully derived (never stored) from Offering.createdFromTemplateId. A Group with no Offering seeded from any plan template yet gets an empty array, not a 404.',
         parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Group id.' },
         ],
@@ -20,12 +20,12 @@ defineRouteMeta({
 
 /**
  * Every curriculum plan this Group already has offerings from, with the
- * "advance" target for each — the ONE query that answers both "what does
+ * "advance" target for each: the ONE query that answers both "what does
  * this Group already have" (so applying again isn't a mystery) and "what's
  * next" (so moving it forward needs no picker). A separate top-level
  * resource rather than `groups/[id]/...`, the same reason
- * `offering-plan-items` sits beside `offering-plans` instead of under it —
- * see that file's own comment on the routing shadow this avoids.
+ * `offering-plan-items` sits beside `offering-plans` instead of under it.
+ * See that file's own comment on the routing shadow this avoids.
  *
  * The actual derivation lives in `deriveGroupPlanApplications()`
  * (`server/utils/offeringPlans.ts`), shared with the tenant-wide list

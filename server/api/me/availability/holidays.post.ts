@@ -4,7 +4,7 @@ import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
- * Declare a date-range absence for YOURSELF — "I am away from the 14th".
+ * Declare a date-range absence for YOURSELF: "I am away from the 14th".
  *
  * The second entry mode, alongside the recurring weekly pattern next door, and
  * deliberately its own route rather than a flag on that one. They take different
@@ -13,7 +13,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  * things. One route with a mode switch would be two implementations sharing a
  * door.
  *
- * DATES IN, WEEKS OUT. The client never computes week indices — that arithmetic
+ * DATES IN, WEEKS OUT. The client never computes week indices: that arithmetic
  * is `weekIndexOf`, and this project has already had to unify two copies of it
  * that agreed until they did not. The term is derived from the dates too, so
  * nobody has to know which academic term contains their holiday.

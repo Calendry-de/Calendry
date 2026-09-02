@@ -5,8 +5,8 @@
  * ---------------
  * Until migration `20260901040000_generation_per_term`, three things about a
  * Generation were scoped to the TENANT that should have been scoped to the term:
- * its version series, the "exactly one current" unique index, and — the one that
- * corrupted data — `POST /generations/:id/apply`, which looked up
+ * its version series, the "exactly one current" unique index, and (the one that
+ * corrupted data) `POST /generations/:id/apply`, which looked up
  * `{tenant_id, is_current}` with no term condition and marked whatever it found
  * SUPERSEDED.
  *
@@ -21,7 +21,7 @@
  * genuinely superseded proposal and a wrongly superseded one are the same row:
  * `status = SUPERSEDED`, `applied_at` set, `is_current = false`. The only thing
  * that distinguishes them is whether a LATER Generation in the SAME TERM took
- * over — which is a rule this script states explicitly, prints per row, and
+ * over, which is a rule this script states explicitly, prints per row, and
  * lets an operator refuse.
  *
  * The migration's backfill of `term_id` is different in kind: there is exactly
@@ -31,15 +31,15 @@
  * ------------------------------------
  * A row is repaired only when ALL of these hold:
  *
- *   - `status = 'SUPERSEDED'` and `applied_at IS NOT NULL` — it was really
+ *   - `status = 'SUPERSEDED'` and `applied_at IS NOT NULL`: it was really
  *     applied once, so it is a former live schedule rather than a proposal
  *     somebody discarded before applying. A discard sets SUPERSEDED too
  *     (`discard.post.ts`) but never sets `applied_at`, which is what keeps this
  *     from resurrecting deliberately discarded proposals.
  *   - it has a `term_id`. A tenant-wide baseline (`term_id IS NULL`) WAS also
- *     superseded by this bug — the demo tenant's MANUAL_BASELINE v1 sits at
+ *     superseded by this bug: the demo tenant's MANUAL_BASELINE v1 sits at
  *     SUPERSEDED because the first solver apply found it as "the tenant's
- *     current" and took the flag — but it is deliberately left alone anyway.
+ *     current" and took the flag, but it is deliberately left alone anyway.
  *     Under the new invariant a tenant-wide baseline MAY be current alongside
  *     per-term schedules, so reviving it is possible; whether it SHOULD be is a
  *     product question (is a starting snapshot still "live" once every term has
@@ -119,7 +119,7 @@ async function main() {
 
         /*
          * The latest applied row per term. `applied` is already sorted newest
-         * first, so the first row seen for a term is that term's winner — and
+         * first, so the first row seen for a term is that term's winner, and
          * every later row in the same term is a correct supersede.
          */
         const winnerByTerm = new Map<string, typeof applied[number]>();
@@ -185,7 +185,7 @@ async function main() {
 
         /*
          * One transaction, so a partial repair cannot leave two terms disagreeing
-         * about which of them holds the tenant's single current flag — the state
+         * about which of them holds the tenant's single current flag: the state
          * the old index permitted and the new one forbids.
          */
         await prisma.$transaction(candidates.map((row) => prisma.generation.update({

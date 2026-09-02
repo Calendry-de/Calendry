@@ -14,19 +14,19 @@ const STATE_CHANGING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
  * can legitimately reach as its very first request of a browsing session (a
  * bookmarked/shared deep link straight to a login form that POSTs without a
  * prior same-origin GET isn't something this app controls), and unlike every
- * other route here, a false rejection has no retry path worth the name — the
+ * other route here, a false rejection has no retry path worth the name: the
  * caller isn't authenticated yet, so there is no session to fall back to.
  *
  * `/api/auth/change-password` and `/api/staff-auth/change-password` are the
  * SAME shape, for the SAME reason: both are "public by necessity" (their own
- * route comments) — a forced or expired password issues NO session, so the
+ * route comments): a forced or expired password issues NO session, so the
  * only way out is re-authenticating from credentials in the body, exactly
  * like login. A caller here may have no prior same-origin request at all
  * (`login.vue`'s own `navigateTo('/change-password?forced=1...')` is a
  * same-session SPA navigation and would carry the cookie, but nothing stops a
  * bookmarked/shared link to this page either, same as login's own argument).
  * This gap shipped un-exempted and broke every test exercising a forced/
- * expired password change with a 403 that had nothing to do with credentials —
+ * expired password change with a 403 that had nothing to do with credentials,
  * found via the integration suite, not by inspection.
  *
  * The exemption lives here, at the path level, rather than inside each
@@ -41,11 +41,11 @@ const EXEMPT_PATHS = [
 
 /**
  * Double-submit cookie CSRF protection, defense-in-depth alongside the
- * session cookie's `sameSite: 'lax'` (`login.post.ts`) — lax blocks the main
+ * session cookie's `sameSite: 'lax'` (`login.post.ts`): lax blocks the main
  * cross-site POST vector in current browsers but isn't a complete answer on
  * its own (older browsers, subdomain-scoped attacks).
  *
- * 1. Every response gets a CSRF cookie if it doesn't already have one —
+ * 1. Every response gets a CSRF cookie if it doesn't already have one,
  *    readable by JS (NOT httpOnly: the client has to read it back), so this
  *    runs unconditionally, before the method/path checks below, and applies
  *    to every request including a plain page GET. That is what makes it
@@ -59,8 +59,8 @@ const EXEMPT_PATHS = [
  *
  * This only defends session-cookie auth. `Authorization: Bearer <token>`
  * requests (`apiTokenResolver` in `tenantResolver.ts`) aren't vulnerable the
- * same way — there's no way for a cross-site page to make a victim's browser
- * attach an Authorization header — so they're exempt from the token check
+ * same way: there's no way for a cross-site page to make a victim's browser
+ * attach an Authorization header, so they're exempt from the token check
  * (they still get the cookie set, harmlessly, like anything else).
  */
 export default defineEventHandler((event) => {

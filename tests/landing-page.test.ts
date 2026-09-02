@@ -10,16 +10,16 @@ import { BUILT, CONTACT_EMAIL, FEATURES, NEXT, PRINCIPLES, TECHNICAL_NOTES, TECH
  *
  * 1. RENDER. Every other page in this app is behind auth, so this one exercises a
  *    path nothing else does: a page fetched with no cookie at all. Fetching it
- *    is not enough — a 200 with an empty body is exactly what a blanked page
+ *    is not enough: a 200 with an empty body is exactly what a blanked page
  *    returns (see tests/page-renders-per-role.test.ts), so every assertion here
  *    names content that only exists once the page actually composed.
  *
- * 2. DRIFT. A marketing page is prose, and prose is checked by nobody — the
+ * 2. DRIFT. A marketing page is prose, and prose is checked by nobody. That is the
  *    failure this repository has hit repeatedly. So the roadmap's claims are not
  *    prose: they are `app/utils/landingContent.ts`, and the page is asserted to
  *    render exactly it. See the long note above the roadmap block for what that
  *    guarantees now and what it stopped guaranteeing when `BACKLOG.md` was
- *    retired — the honest answer is "less", and it is written down there rather
+ *    retired. The honest answer is "less", and it is written down there rather
  *    than left for somebody to assume.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
@@ -39,7 +39,7 @@ describe('reachability without a session', () => {
     });
 
     it('is linked from the login page, so someone bounced there can read it', async () => {
-        // Reachability of `/` itself is inherent — it is the domain root. This
+        // Reachability of `/` itself is inherent: it is the domain root. This
         // link is the reverse path: an anonymous visitor sent to /login by a deep
         // link needs a way back to what the product actually is.
         const res = await page('/login');
@@ -49,7 +49,7 @@ describe('reachability without a session', () => {
         expect(res.html).toContain('href="/"');
     });
 
-    it('renders WITHOUT the app chrome — no menu, no command palette trigger', async () => {
+    it('renders WITHOUT the app chrome: no menu, no command palette trigger', async () => {
         const res = await page('/');
 
         // Paired with a positive assertion on purpose: "the header is absent"
@@ -75,9 +75,9 @@ describe('the page states what it is', () => {
 
         // The whole tag, not a fragment: the layout's titleTemplate appends the
         // product name, and asserting only the page's half is how a page ends up
-        // titled "Calendry — … | Calendry" with a green test.
+        // titled "Calendry: … | Calendry" with a green test.
         expect(html).toContain('<title>Timetabling for schools and universities | Calendry</title>');
-        // The CONTENT, not just the attribute — useLayout() registers a
+        // The CONTENT, not just the attribute: useLayout() registers a
         // description of its own with an empty string, so "a description tag
         // exists" would pass over an empty one.
         expect(html).toContain('content="Calendry is a multi-tenant timetabling platform');
@@ -109,7 +109,7 @@ describe('the page states what it is', () => {
         expect(html).toContain('class="version"');
     });
 
-    it('renders the hero figure — the one place the product is visible', async () => {
+    it('renders the hero figure, the one place the product is visible', async () => {
         const { html } = await page('/');
 
         // A timetabling page with no timetable on it was the critique's first
@@ -131,7 +131,7 @@ describe('the page states what it is', () => {
 
         // Reading order is the argument. "Under the hood" opens by telling a
         // timetabling officer to skip it, and it used to sit between her and
-        // the form — so the last thing she read before the CTA was addressed to
+        // the form, so the last thing she read before the CTA was addressed to
         // somebody else, followed by "Calendry cannot send mail yet".
         expect(html.indexOf('id="contact"')).toBeLessThan(html.indexOf('id="under-the-hood"'));
         expect(html.indexOf('id="contact"')).toBeGreaterThan(-1);
@@ -219,7 +219,7 @@ describe('no fabricated social proof', () => {
  * IT USED TO CROSS-CHECK TWO INDEPENDENT SOURCES: `BACKLOG.md`'s phase checklist
  * against what this page presents as unbuilt. Tick a box without touching the
  * page and the test failed, naming the mismatch. That is a genuinely strong
- * property — the page could not advertise a gap that had closed.
+ * property: the page could not advertise a gap that had closed.
  *
  * `BACKLOG.md` was retired in favour of a GitHub project board, which nothing
  * offline can read: querying it would put a network call and a secret into the
@@ -233,12 +233,12 @@ describe('no fabricated social proof', () => {
  *
  * WHAT NO LONGER HOLDS: nothing catches the content module drifting from
  * reality. If import ships and `NEXT` still lists it, this suite stays green and
- * the landing page lies. That is now a human step — moving a card to Done on the
- * board means editing `NEXT`/`BUILT` in the same change — and it is stated in
+ * the landing page lies. That is now a human step (moving a card to Done on the
+ * board means editing `NEXT`/`BUILT` in the same change), and it is stated in
  * CLAUDE.md as a rule because a test can no longer state it.
  */
 describe('the roadmap is internally consistent', () => {
-    it('has roadmap content at all — the guard must not pass by finding nothing', () => {
+    it('has roadmap content at all: the guard must not pass by finding nothing', () => {
         // Without this, an emptied or renamed export would make every assertion
         // below pass over nothing: the "correctly found nothing / broken and
         // found nothing" failure CLAUDE.md warns about.

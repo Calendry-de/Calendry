@@ -8,7 +8,7 @@ import { resolveTermId, scheduleLinkForTerm } from '../app/composables/scheduleF
  * from disagreeing, plus the #75 fix that depends on the same URL shape.
  *
  * The URL read/write side itself is `useScheduleFilters()`'s own (pre-existing)
- * `?term=` param — not re-tested here, since these two helpers no longer
+ * `?term=` param, not re-tested here, since these two helpers no longer
  * duplicate that reading/writing.
  */
 describe('resolveTermId (the #73/#74 precedence rule)', () => {

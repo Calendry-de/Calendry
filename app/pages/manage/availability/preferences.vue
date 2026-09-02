@@ -31,7 +31,7 @@
                 name="material-symbols:lock-outline"
                 aria-hidden="true"
             />
-            You can view preferences but not change them — that needs
+            You can view preferences but not change them; that needs
             <code>availability.manage_any</code>.
         </p>
 
@@ -145,7 +145,7 @@ import { describePreferences } from '~/utils/availabilityLabels';
 import { useHasPermission, useSession } from '~/composables/session';
 
 definePageMeta({
-    // Inline, not the `manage` middleware — see the reviews page for why.
+    // Inline, not the `manage` middleware; see the reviews page for why.
     // `read_any` is enough to LOOK; the editor renders read-only without
     // `manage_any`, which is the whole reason the two keys are separate.
     middleware: [
@@ -210,7 +210,7 @@ const error = ref('');
 
 /*
  * Seeded when a row is opened rather than by a watcher with `immediate`, for the
- * SSR reason recorded in CLAUDE.md — and because only one row is edited at a
+ * SSR reason recorded in CLAUDE.md, and because only one row is edited at a
  * time, so there is nothing to seed until somebody picks one.
  */
 watch(open, (personId) => {
@@ -220,7 +220,7 @@ watch(open, (personId) => {
     draftBlocks.value = [...(person?.preference?.preferredBlocks ?? [])];
     draftRoomFeatures.value = [...(person?.preference?.preferredRoomFeatureIds ?? [])];
     // `null` is the real default state, and a person with no preference row at
-    // all is also on the default — both seed the same way.
+    // all is also on the default; both seed the same way.
     draftMultiplier.value = person?.preference?.weightMultiplier ?? null;
     error.value = '';
 });
@@ -231,8 +231,8 @@ async function save(personId: string) {
 
     try {
         /*
-         * The whole state, every time. This endpoint is a true replace — an
-         * absent `weightMultiplier` means `null`, not "leave it alone" — so
+         * The whole state, every time. This endpoint is a true replace: an
+         * absent `weightMultiplier` means `null`, not "leave it alone", so
          * sending it only when it changed would make it a partial-update side
          * channel while the two arrays stay full-replace, and clearing an
          * override would depend on which fields the page happened to include.

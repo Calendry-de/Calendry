@@ -6,7 +6,7 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
  *
  * TAXONOMY.md §2's amendment makes Session a third federation-shareable entity.
  * Its literal wording also said the relation tables should let a shared Session
- * reference Groups and Persons from either member tenant — which, implemented
+ * reference Groups and Persons from either member tenant, which, implemented
  * literally, means widening RLS on `group` and `person`, so Federation
  * membership would imply roster visibility.
  *
@@ -92,7 +92,7 @@ describe('the shared Session row', () => {
          * WITH CHECK is narrower than USING: readable, not writable.
          *
          * Note HOW that manifests. An UPDATE whose rows are filtered out by the
-         * write policy's USING clause affects ZERO ROWS — it does not raise.
+         * write policy's USING clause affects ZERO ROWS: it does not raise.
          * Asserting a throw would be testing the wrong mechanism entirely, so
          * this asserts the thing that actually protects the data: nothing
          * changed.
@@ -127,7 +127,7 @@ describe('participant links stay tenant-private', () => {
         expect(rows).toHaveLength(0);
     });
 
-    it('still shows tenant A its OWN links — the isolation is not just blanket denial', async () => {
+    it('still shows tenant A its OWN links: the isolation is not just blanket denial', async () => {
         // Without this, the two assertions above would pass for a policy that
         // hid the rows from everybody, which would be a different bug.
         const groups = await asTenant(f.tenantA, f.federationId, (tx) =>
@@ -144,7 +144,7 @@ describe('participant links stay tenant-private', () => {
 
 describe('session_room IS widened', () => {
     it('lets tenant B see where the shared Session happens', async () => {
-        // Where a shared event takes place is genuinely shared information —
+        // Where a shared event takes place is genuinely shared information:
         // the one relation table that follows room_equipment's precedent.
         const rows = await asTenant(f.tenantB, f.federationId, (tx) =>
             tx.$queryRawUnsafe<{ room_id: string }[]>(
@@ -156,7 +156,7 @@ describe('session_room IS widened', () => {
 
     it('still refuses tenant B a WRITE to that link', async () => {
         // Readable through the widened SELECT policy, untouchable through the
-        // tenant-only write policy — and again, silently, by affecting nothing.
+        // tenant-only write policy, and again, silently, by affecting nothing.
         const affected = await asTenant(f.tenantB, f.federationId, (tx) =>
             tx.$executeRawUnsafe(`DELETE FROM session_room WHERE session_id = '${SHARED}'`));
 

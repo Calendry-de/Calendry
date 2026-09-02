@@ -17,7 +17,7 @@ const bodySchema = z.object({
     tenantSlug: z.string().optional(),
     /**
      * Cloudflare Turnstile response token (issue #79). Optional below
-     * `CAPTCHA_ATTEMPT_THRESHOLD` failed attempts; required above it — see
+     * `CAPTCHA_ATTEMPT_THRESHOLD` failed attempts; required above it, see
      * the check right after `checkRateLimit` below.
      */
     turnstileToken: z.string().optional(),
@@ -80,21 +80,21 @@ defineRouteMeta({
  *
  * If the Account maps to exactly one Person the tenant is selected implicitly.
  * Otherwise the session opens with no active Person and the caller must call
- * /api/auth/select-tenant — authenticated, but not yet situated.
+ * /api/auth/select-tenant: authenticated, but not yet situated.
  */
 export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, bodySchema.parse);
 
-    // BEFORE any password work — issue #13 item 3. Failing fast on a rate
+    // BEFORE any password work: issue #13 item 3. Failing fast on a rate
     // limit also means an attacker's blocked guesses cost no scrypt work.
     const attemptCount = await checkRateLimit('login', body.email, { maxAttempts: 10, windowMinutes: 15 });
 
     /*
-     * CAPTCHA gate on top of the rate limit — issue #79. Below the threshold
+     * CAPTCHA gate on top of the rate limit: issue #79. Below the threshold
      * this is a no-op; at and above it, a valid Turnstile token is required
      * for the login to proceed at all. Checked here, before any password
      * work, for the same reason the rate limit itself is: a blocked guess
-     * should cost no scrypt work. Additive — the rate limit above is
+     * should cost no scrypt work. Additive: the rate limit above is
      * unchanged and still the backstop if this is ever misconfigured.
      */
     if (attemptCount > CAPTCHA_ATTEMPT_THRESHOLD) {
@@ -115,7 +115,7 @@ export default defineEventHandler(async (event) => {
         : await verifyPassword(body.password, 'scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA');
 
     if (!account || !account.isActive || !passwordOk) {
-        // Past the dummy-verify branch, whether or not an Account exists —
+        // Past the dummy-verify branch, whether or not an Account exists:
         // issue #78. `actorAccountId` is populated when one does, even
         // though the guess was wrong or the account is deactivated: knowing
         // WHICH account was targeted is exactly what an audit trail of failed
@@ -134,12 +134,12 @@ export default defineEventHandler(async (event) => {
     }
 
     // A correct guess, whatever happens next (tenant selection, a forced
-    // reset). The attacker's job — and a legitimate user's — is done here;
+    // reset). The attacker's job, and a legitimate user's, is done here;
     // penalising an earlier typo past this point would only hurt the latter.
     await resetRateLimit('login', body.email);
 
     /*
-     * EXPIRY READS THE SAME BRANCH AS A FORCED RESET, deliberately — issue
+     * EXPIRY READS THE SAME BRANCH AS A FORCED RESET, deliberately: issue
      * #13 item 1. Both mean "authenticate, but issue no session until the
      * password changes", and a route two steps downstream should not have to
      * know there are two different reasons that state can be true. Checked
@@ -156,7 +156,7 @@ export default defineEventHandler(async (event) => {
     // session": every route would then have to know about a half-privileged
     // state, and one that forgot would be a hole.
     if (account.mustChangePassword || passwordExpired) {
-        // Credentials WERE correct — this is a successful authentication, not
+        // Credentials WERE correct: this is a successful authentication, not
         // a failure, even though no session is issued yet.
         await writeAuditLog({
             action: 'login.success',
@@ -199,7 +199,7 @@ export default defineEventHandler(async (event) => {
 
     if (body.tenantSlug && !selected) {
         // The Account is real and authenticated, but has no identity in the
-        // TENANT it named — a denied cross-tenant access attempt, not an
+        // TENANT it named: a denied cross-tenant access attempt, not an
         // ordinary login failure. `tenantId` is left null: the requested
         // slug does not resolve to a tenant this Account may act in, so there
         // is no id to name safely; the slug itself is recorded in `target`.

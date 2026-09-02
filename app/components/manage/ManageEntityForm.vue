@@ -44,7 +44,7 @@
 
             <!--
                 PROGRESSIVE DISCLOSURE, NEVER REMOVAL (issue #8): a tenant's
-                mode only decides which fields lead — every one of them is
+                mode only decides which fields lead: every one of them is
                 still reachable, saved and validated exactly as before.
             -->
             <details
@@ -97,7 +97,7 @@
             v-if="mode === 'edit' && form.isSystemRow.value"
             class="entity-form_hint"
         >
-            Created by tenant provisioning and required by the system — it can be
+            Created by tenant provisioning and required by the system; it can be
             renamed but not deleted.
         </p>
     </form>
@@ -128,14 +128,14 @@ defineEmits<{ save: []; reset: []; 'request-delete': [] }>();
 defineSlots<{ fields?: (props: { readonly: boolean }) => unknown }>();
 
 /**
- * Fields this component renders. `custom` ones are part of the record — draft,
- * dirty tracking, payload, error mapping — but their control is supplied by the
+ * Fields this component renders. `custom` ones are part of the record (draft,
+ * dirty tracking, payload, error mapping), but their control is supplied by the
  * bespoke detail component through the `fields` slot.
  */
 const genericFields = computed(() => props.form.fields.filter((field) => !field.custom));
 
 /**
- * Split by the entity's own `advancedFieldsForMode` hook (issue #8) — a UI
+ * Split by the entity's own `advancedFieldsForMode` hook (issue #8), a UI
  * bias, so it is computed here rather than in the registry, which stays pure
  * data. Most entities declare no hook and get an empty advanced set, i.e. no
  * behaviour change from before this existed.
@@ -191,7 +191,7 @@ async function loadDerived() {
 /*
  * Re-run whenever the row changes, so editing another Offering does not show
  * the previous one's number. `immediate` is safe here because this is not
- * first-render state — the note is additive, and SSR simply omits it.
+ * first-render state: the note is additive, and SSR simply omits it.
  */
 watch(() => (props.form.row.value as { id?: string } | null)?.id, loadDerived, { immediate: true });
 
@@ -225,8 +225,8 @@ const readonlyReason = computed(() => {
  * The field's note, plus the one the FORM has to add.
  *
  * A locked reference must say why it is locked, or it reads as a field somebody
- * decided to freeze. It also has to say what happens on save — the value is left
- * alone, not cleared — because "read-only" alone does not distinguish the two,
+ * decided to freeze. It also has to say what happens on save (the value is left
+ * alone, not cleared), because "read-only" alone does not distinguish the two,
  * and the difference is a record's data.
  *
  * Composed rather than replacing `derivedNotes`: both can apply to the same
@@ -240,7 +240,7 @@ function noteFor(field: FieldDef): string {
         return derived;
     }
 
-    const locked = 'The list of choices for this field could not be loaded — it needs a '
+    const locked = 'The list of choices for this field could not be loaded: it needs a '
         + 'permission this account does not hold. The current value is kept as it is and '
         + 'will not be changed by saving.';
 

@@ -2,7 +2,7 @@ import type { Session as WireSession } from '@calendry-de/calendry-proto';
 import { MAX_WIRE_ROOMS_PER_SESSION } from '../../shared/solverBudget';
 
 /**
- * Stage 3c — already-placed Sessions.
+ * Stage 3c: already-placed Sessions.
  *
  * EVERY Session in the term goes over the wire, not just the ones being
  * re-placed: locked Sessions, past Sessions and out-of-scope Sessions are all
@@ -10,7 +10,7 @@ import { MAX_WIRE_ROOMS_PER_SESSION } from '../../shared/solverBudget';
  * it place a lecture on top of a locked one and report no violation, because
  * from its side the slot was empty.
  *
- * Scope membership is NOT expressed here — it travels in `SolveScope`. The only
+ * Scope membership is NOT expressed here; it travels in `SolveScope`. The only
  * per-Session flag is `is_locked`, which the proto describes as absolute: never
  * relaxed, distinct from merely being out of scope.
  */
@@ -26,7 +26,7 @@ export interface AppSessionRow {
     tenantId: string | null;
     federationId?: string | null;
     /**
-     * NULL for an EVENT — a Session with no recurring demand behind it
+     * NULL for an EVENT, a Session with no recurring demand behind it
      * (TAXONOMY.md §2). See `toWireSession` for what that means on the wire.
      */
     offeringId: string | null;
@@ -36,7 +36,7 @@ export interface AppSessionRow {
     blockIndex: number;
     durationBlocks: number;
     isLocked: boolean;
-    /** Resolved kind KEY, not the id — the wire carries tenant vocabulary. */
+    /** Resolved kind KEY, not the id: the wire carries tenant vocabulary. */
     kindKey: string;
     roomIds: string[];
     /** People holding the tenant's `lecturer` role on this Session. */
@@ -65,7 +65,7 @@ export function fromWireWeek(week: number): number {
 }
 
 /*
- * NO `as WireSession` ON THE RETURN, deliberately — see the same note on
+ * NO `as WireSession` ON THE RETURN, deliberately: see the same note on
  * `rooms` in solverInput.ts. The cast this replaces asserted the shape instead
  * of checking it, so v0.10.0's new `room_ids` compiled clean and threw
  * "roomIds is not iterable" from `Session.encode` at runtime.
@@ -78,12 +78,12 @@ export function toWireSession(row: AppSessionRow): WireSession {
         federationId: row.federationId ?? '',
         /**
          * An EVENT has no Offering. The wire field is a plain string, so the
-         * empty string is what "no offering" looks like to the solver — the
+         * empty string is what "no offering" looks like to the solver, the
          * same convention `tenantId`/`federationId`/`roomId` already use above.
          *
          * The solver never places an Event: it has no Offering, so no demand
          * references it and nothing asks for it to be scheduled. It arrives
-         * purely as OCCUPANCY — a room and a slot that are already taken — which
+         * purely as OCCUPANCY (a room and a slot that are already taken), which
          * is exactly the role `existingSessions` documents for federation-owned
          * Sessions.
          */
@@ -120,7 +120,7 @@ export function toWireSession(row: AppSessionRow): WireSession {
          *
          * The RLS write policy already refuses to let this tenant change it, so
          * a solver that "moved" one would produce a placement the app could
-         * never apply — and `materializeGeneration` would then either fail or,
+         * never apply, and `materializeGeneration` would then either fail or,
          * worse, silently skip it. Sending it locked makes the constraint the
          * solver reasons with match the constraint the database enforces.
          *
@@ -131,9 +131,9 @@ export function toWireSession(row: AppSessionRow): WireSession {
          * Immovable in two cases, for the same underlying reason: the app could
          * not apply a move the solver proposed.
          *
-         *  - a federation-shared Session (`tenantId === null`) — RLS refuses
+         *  - a federation-shared Session (`tenantId === null`): RLS refuses
          *    the write;
-         *  - an EVENT (`offeringId === null`) — it is in no solve's scope, so
+         *  - an EVENT (`offeringId === null`): it is in no solve's scope, so
          *    `planMaterialization()` would never write the placement back, and
          *    a solver that moved it would be reasoning about a timetable the
          *    apply then silently declines to produce.
@@ -150,13 +150,13 @@ export function toWireSession(row: AppSessionRow): WireSession {
  *
  * THE REPORT MOVED RATHER THAN RETIRED. This replaced `multiRoomSessionIds`,
  * which named every Session with more than one Room, because that gap is now
- * closed — `Session.room_ids` carries the full set and the solver honours it.
+ * closed: `Session.room_ids` carries the full set and the solver honours it.
  *
  * The reason to report has narrowed to the cap: `convert.rs` keeps `room_id`
  * plus `MAX_ADDITIONAL_ROOMS` extras and TRUNCATES the rest, warn-and-allow,
  * with nothing on the wire saying it did. Truncation puts the solver back to
- * reasoning about a Session that occupies less Room than it really does — the
- * exact failure the plural field exists to fix — so the app names it here or
+ * reasoning about a Session that occupies less Room than it really does, the
+ * exact failure the plural field exists to fix, so the app names it here or
  * nobody ever learns of it.
  */
 export function sessionsOverRoomCap(rows: AppSessionRow[]): string[] {

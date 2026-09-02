@@ -7,9 +7,9 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
  *
  * The two cases that matter most here:
  *
- *  - PERMISSION DENIAL — a legitimately authenticated member of a tenant is
+ *  - PERMISSION DENIAL: a legitimately authenticated member of a tenant is
  *    still refused the actions their access roles do not grant.
- *  - CROSS-TENANT SESSION REUSE — a valid session for tenant A cannot be turned
+ *  - CROSS-TENANT SESSION REUSE: a valid session for tenant A cannot be turned
  *    into access to tenant B, by any route, including tenant switching.
  */
 let f: Fixtures;
@@ -139,7 +139,7 @@ describe('permission enforcement', () => {
             }),
             api('/api/violations', { cookie }),
             // Stage 2 replaced the /api/solver/generations 501 stub with the
-            // real run surface. Still `solver.trigger`, still denied — the
+            // real run surface. Still `solver.trigger`, still denied; the
             // assertion is unchanged, only the path moved.
             api('/api/solver/runs', { method: 'POST', cookie, body: JSON.stringify({ termId: f.termA }) }),
             /*
@@ -154,7 +154,7 @@ describe('permission enforcement', () => {
             /*
              * WRITING display settings is `tenant.update`, moved off
              * `session_kind.update` when the page acquired a gate of its own.
-             * Reading it is asserted the other way below — it must NOT be
+             * Reading it is asserted the other way below: it must NOT be
              * denied, because the schedule needs the colours to draw.
              */
             api('/api/display-settings', {
@@ -180,7 +180,7 @@ describe('permission enforcement', () => {
      *
      * `/api/display-settings` accepts `tenant.read` OR `session.read`, because
      * the schedule's colour fetch is tolerant: narrowing it to the new key would
-     * not deny anybody a page — it would draw every lecturer's timetable in
+     * not deny anybody a page; it would draw every lecturer's timetable in
      * default colours with nothing on screen to say why. The endpoint being
      * wider than the link that leads to its page is deliberate, and this is the
      * assertion that stops somebody "tidying" it.
@@ -210,7 +210,7 @@ describe('permission enforcement', () => {
         const { cookie } = await login(ACCOUNTS.adminB, TEST_PASSWORD);
         const res = await api<{ permissions: string[] }>('/api/auth/session', { cookie });
 
-        // Tenant B's admin gets B's role, not A's — even though both are keyed
+        // Tenant B's admin gets B's role, not A's, even though both are keyed
         // 'tenant-admin'. person_access_role is behind RLS.
         //
         // Scoped to the fixture tenants on purpose: an unscoped count would also
@@ -285,7 +285,7 @@ describe('cross-tenant session reuse', () => {
 
         const inB = await api<{ id: string }[]>('/api/persons', { cookie: first.cookie });
 
-        // Same cookie, different tenant — and crucially no leakage of A's rows.
+        // Same cookie, different tenant, and crucially no leakage of A's rows.
         expect(inB.body.map((p) => p.id)).toContain(f.personMultiB);
         expect(inB.body.map((p) => p.id)).not.toContain(f.personMultiA);
         expect(inB.body.map((p) => p.id)).not.toContain(f.personA);

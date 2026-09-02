@@ -14,9 +14,9 @@ defineRouteMeta({
 });
 
 /**
- * End the current staff session — issue #76. Mirrors /api/auth/logout.post.ts.
+ * End the current staff session (issue #76). Mirrors /api/auth/logout.post.ts.
  *
- * Audited (issue #106) only when there was an actual session to revoke — an
+ * Audited (issue #106) only when there was an actual session to revoke: an
  * idempotent logout with no cookie/session names no actor and would be a
  * meaningless row.
  */

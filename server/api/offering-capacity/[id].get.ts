@@ -10,7 +10,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * 96-attendee Offering placed in a 24-seat room months later. The number is now
  * visible at the moment someone decides whether to leave the field blank.
  *
- * Read-only, and it does NOT tell the caller which value is in force — that is
+ * Read-only, and it does NOT tell the caller which value is in force: that is
  * `requiredCapacity` itself, which always wins when set. This answers only
  * "what would blank mean here".
  *
@@ -22,7 +22,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * Because the RESTful path breaks every offerings route. `server/api/[resource]/`
  * is the generic CRUD catch-all, and creating a literal `server/api/offerings/`
  * directory makes Nitro match `offerings` as a static segment and stop
- * considering the dynamic branch — so `GET /api/offerings` began returning
+ * considering the dynamic branch, so `GET /api/offerings` began returning
  * "Page not found" while `/api/rooms` and `/api/groups` stayed 200. Measured,
  * not theorised: the whole Offerings management section 404s.
  *
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const groups = await tx.group.findMany({
             where: { tenantId: identity.tenantId },

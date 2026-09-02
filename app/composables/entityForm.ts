@@ -9,7 +9,7 @@ export type FormMode = 'create' | 'edit';
  * OWNERSHIP BOUNDARY: one row being edited. Not the list it came from, not
  * permissions (the page decides which affordances to render), not navigation.
  *
- * SYNCHRONOUS, for the same reason as every other data composable here — the
+ * SYNCHRONOUS, for the same reason as every other data composable here: the
  * page holds the await. See CLAUDE.md.
  */
 export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string) {
@@ -18,13 +18,13 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     /**
      * Two different lists, and conflating them was a bug.
      *
-     * `fields`   — what this mode may EDIT and SEND. Drops `createOnly` fields
-     *              on edit, because the server's update schema omits them.
-     * `seeded`   — what the draft HOLDS. Everything, including `createOnly`,
-     *              because a bespoke detail component still has to display
-     *              them: the constraint builder shows which rule a constraint
-     *              is, and with `type` missing from the draft it rendered "—"
-     *              for a row that plainly has one.
+     * `fields`: what this mode may EDIT and SEND. Drops `createOnly` fields
+     *            on edit, because the server's update schema omits them.
+     * `seeded`: what the draft HOLDS. Everything, including `createOnly`,
+     *           because a bespoke detail component still has to display
+     *           them: the constraint builder shows which rule a constraint
+     *           is, and with `type` missing from the draft it rendered a
+     *           placeholder dash for a row that plainly has one.
      *
      * Sending is filtered, not seeding. The reverse loses data on screen.
      */
@@ -44,13 +44,13 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
          * data-destruction bug.
          *
          * These list endpoints carry permissions the page's own gate does not
-         * imply — `offerings` fetches `/api/terms`, `/api/session-kinds` and
+         * imply: `offerings` fetches `/api/terms`, `/api/session-kinds` and
          * `/api/roles`. Under `Promise.all` one 403 rejected the entire wave,
          * and because the page awaits the useAsyncData HANDLE (which resolves
          * rather than rejects) it did not blank: `row` stayed null and `seed()`
          * filled every control with an empty value. The form then showed blank
          * inputs over a record that has data, and since Save is gated on
-         * `isDirty` alone, editing ONE field PATCHed every field — most of them
+         * `isDirty` alone, editing ONE field PATCHed every field, most of them
          * blank. Reproduced against a live role holding `offering.read` +
          * `offering.update` and nothing else.
          *
@@ -73,7 +73,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         /*
          * NAMED, not silently empty. An unreadable list and a genuinely empty
          * one are different facts with different fixes, and a select that is
-         * merely empty cannot tell them apart — so the fields that depend on one
+         * merely empty cannot tell them apart, so the fields that depend on one
          * are locked rather than offered against options that never arrived.
          */
         const unavailable: string[] = [];
@@ -95,7 +95,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
     const row = computed(() => asyncData.data.value?.row ?? null);
     const references = computed(() => asyncData.data.value?.references ?? {});
 
-    /** Reference resources whose fetch failed — see the note in the wave above. */
+    /** Reference resources whose fetch failed; see the note in the wave above. */
     const unavailableReferences = computed(() => new Set(asyncData.data.value?.unavailable ?? []));
 
     /**
@@ -105,7 +105,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
      * anything reaches `asyncData.error` it can only have come from the rethrow
      * of `rowResult`. Before that change this would have conflated "the record
      * is missing" with "one option list needs a permission", which are opposite
-     * problems — one is fatal, the other is a locked field.
+     * problems: one is fatal, the other is a locked field.
      *
      * Exposed rather than acted on here because a composable cannot answer with
      * an HTTP status; only the page can. `useAsyncData`'s handle RESOLVES even
@@ -137,7 +137,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
      *
      * A message is for the person; this is for the FORM. `POST /api/accounts`
      * answers an already-registered address with `{ accountExists: true }` and
-     * the create form turns that into an "attach it instead" affordance — a
+     * the create form turns that into an "attach it instead" affordance: a
      * decision that must not be reached by matching on the sentence, because the
      * sentence is wording and the flag is contract.
      *
@@ -168,8 +168,8 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
      * Seeding is driven by the PROMISE, not by a watcher.
      *
      * Vue does not flush watchers during SSR. A `watch(data, seed, { immediate:
-     * true })` therefore ran exactly once on the server — at setup, when the
-     * fetch had not resolved and `row` was still null — and never again. The
+     * true })` therefore ran exactly once on the server, at setup, when the
+     * fetch had not resolved and `row` was still null, and never again. The
      * server rendered every edit form with empty controls, the client re-seeded
      * on hydration, and the result was a hydration mismatch plus a visible flash
      * of a blank form over a record that has data.
@@ -285,7 +285,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
 
         /*
          * h3 nests the `data` passed to `createError` one level inside the
-         * response body, so the server's own payload is `error.data.data` — the
+         * response body, so the server's own payload is `error.data.data`, the
          * same shape `extractIssues` reads issues out of. Verified against a live
          * 409 rather than assumed, for the reason that function documents.
          */
@@ -307,7 +307,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
             fieldErrors.value = mapped;
 
             // An issue on a field this form does not render would otherwise be
-            // invisible — the user would see a failed save with nothing marked.
+            // invisible: the user would see a failed save with nothing marked.
             const orphaned = issues.filter((issue) => !fields.some((f) => f.key === issue.path[0]));
 
             if (orphaned.length) {
@@ -348,7 +348,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         /**
          * Re-read the row from the server and re-seed the draft.
          *
-         * For a change made by something OTHER than this form — an explicit verb
+         * For a change made by something OTHER than this form: an explicit verb
          * on the same record. Issuing a new password moves `mustChangePassword`
          * and the session count, and a panel rendering stale values beside a
          * button that just changed them is a page contradicting itself.
@@ -360,7 +360,7 @@ export function useEntityForm(entity: ManageEntity, mode: FormMode, id?: string)
         refresh: () => asyncData.refresh(),
         pending: computed(() => asyncData.pending.value),
         /**
-         * The page awaits this — the one await, at setup top level. Resolves
+         * The page awaits this, the one await, at setup top level. Resolves
          * only once the draft has been seeded, so the first render already has
          * the record's values.
          */
@@ -375,8 +375,8 @@ interface Issue { path: (string | number)[]; message: string }
  *
  * The shape is not obvious and was verified against a live 400 rather than
  * assumed: `readValidatedBody` puts the ZodError in `data`, and serialising it
- * across the wire flattens it to `{ name: 'ZodError', message: '<JSON array>' }`
- * — the issues survive only as a JSON *string* inside `message`. Reading
+ * across the wire flattens it to `{ name: 'ZodError', message: '<JSON array>' }`,
+ * so the issues survive only as a JSON *string* inside `message`. Reading
  * `data.issues` (the shape it has server-side) finds nothing, and the form
  * silently degrades to "Some fields need attention" with no field marked.
  *
@@ -395,7 +395,7 @@ function extractIssues(data: unknown): Issue[] {
         try {
             candidates.push(JSON.parse(container.message));
         } catch {
-            // Not JSON after all — fall through to the generic message.
+            // Not JSON after all, fall through to the generic message.
         }
     }
 
@@ -430,7 +430,7 @@ function toInputValue(field: FieldDef, value: unknown): unknown {
 
     // A structured value is never coerced to a string. Falling through to
     // `value ?? ''` turned an absent `params` into '', which the API then
-    // rejected as "expected object, received null" — an error about a field the
+    // rejected as "expected object, received null", an error about a field the
     // user never touched.
     if (field.type === 'json') {
         return value ?? {};
@@ -460,7 +460,7 @@ function toPayloadValue(field: FieldDef, value: unknown): unknown {
     if (typeof value === 'string') {
         const trimmed = value.trim();
 
-        // Empty means "unset", not "the empty string" — sending '' to a nullable
+        // Empty means "unset", not "the empty string": sending '' to a nullable
         // email column fails its format check instead of clearing it.
         if (trimmed === '') {
             return field.required ? '' : null;

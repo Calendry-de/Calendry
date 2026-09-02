@@ -5,7 +5,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  * Remove any window in the tenant.
  *
  * Rows are immutable, so an administrator correcting a window deletes it and
- * enters a new one — the same rule the self-service side follows, for the same
+ * enters a new one: the same rule the self-service side follows, for the same
  * reason: an edit path would need its own re-enters-pending state machine.
  *
  * A REJECTED row is deliberately kept until somebody deletes it, so the

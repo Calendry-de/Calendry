@@ -6,14 +6,14 @@ import { api, login } from './helpers/client';
  * Self-service availability: who may write what, about whom.
  *
  * THE MECHANISM UNDER TEST IS ROUTE SHAPE, NOT A PERMISSION FLAG. Every
- * permission in this system is tenant-wide — `person.read` means every Person —
+ * permission in this system is tenant-wide (`person.read` means every Person),
  * and rather than teach the catalogue a "self only" semantic, the self-service
  * routes take NO person id at all: not in the path, not in the query, not in the
  * body. The subject comes from the resolved session identity, the same way
  * `tenant_id` already does on every write.
  *
  * So the important assertions here are the ones that show another Person's data
- * is UNREACHABLE rather than merely refused — there is no parameter to smuggle
+ * is UNREACHABLE rather than merely refused: there is no parameter to smuggle
  * one through, and the only id a self-service route accepts (a row id, for
  * deletion) is filtered by the caller's own person id and 404s otherwise.
  *
@@ -126,8 +126,8 @@ describe('a lecturer, holding only availability.manage_own', () => {
 
         /*
          * The GRID travels with the response. A page that fetched
-         * /api/time-grids for it would 403 for this caller — they hold no
-         * time_grid.read — and one refused fetch in a reference wave renders
+         * /api/time-grids for it would 403 for this caller (they hold no
+         * time_grid.read), and one refused fetch in a reference wave renders
          * every control on the page over empty data.
          */
         expect(mine.body.grid?.blocksPerDay).toBeGreaterThan(0);
@@ -167,7 +167,7 @@ describe('a lecturer, holding only availability.manage_own', () => {
         });
 
         // 404, not 403: the route filters by the caller's own person, so
-        // somebody else's row simply is not there to be found — the same shape a
+        // somebody else's row simply is not there to be found, the same shape a
         // cross-TENANT id already produces everywhere else.
         expect(attempt.status).toBe(404);
         expect(await ownerDb.personUnavailability.count({ where: { id: theirs.id } })).toBe(1);
@@ -271,7 +271,7 @@ describe('review', () => {
             body: JSON.stringify({ decision: 'REJECTED' }),
         });
 
-        // Re-deciding would silently rewrite who approved it and when — a
+        // Re-deciding would silently rewrite who approved it and when: a
         // reviewer clicking twice on a stale list taking ownership of somebody
         // else's decision.
         expect(again.status).toBe(409);
@@ -335,7 +335,7 @@ describe('preferences', () => {
      * The third axis. Two things that only break over HTTP: the id must be one
      * this tenant can see (the FK cannot tell, because Postgres runs referential
      * integrity as the referenced table's owner and never consults RLS), and a
-     * preference holding ONLY room types must survive — the row is deleted when
+     * preference holding ONLY room types must survive: the row is deleted when
      * every axis is empty, and "every" now means three.
      */
     it('store preferred room types, and refuse an id this tenant cannot see', async () => {
@@ -482,7 +482,7 @@ describe('preferences', () => {
         }
     });
 
-    it('CLEAR the override when the multiplier is omitted — true replace, not partial update', async () => {
+    it('CLEAR the override when the multiplier is omitted: true replace, not partial update', async () => {
         const personId = personIds['lecturer-other'];
 
         await api('/api/availability/preferences/' + personId, {
@@ -494,7 +494,7 @@ describe('preferences', () => {
         /*
          * The same endpoint, the same person, no multiplier in the body. This is
          * a PUT and replaces the whole preference state, so an absent key means
-         * `null` — NOT "leave it alone". That is why the staff page sends the
+         * `null`, NOT "leave it alone". That is why the staff page sends the
          * multiplier on every save alongside both arrays: were it sent only when
          * changed, clearing an override would depend on which fields the page
          * happened to include, and the multiplier would be a partial-update side
@@ -549,8 +549,8 @@ describe('preferences', () => {
         });
 
         /*
-         * Server-rendered, so this proves the whole read path — GET select, the
-         * page's row type, and the summary label — not just that the column
+         * Server-rendered, so this proves the whole read path (GET select, the
+         * page's row type, and the summary label), not just that the column
          * stores a number. The expanded editor cannot be reached over SSR (it
          * renders behind a click), which is exactly why the override belongs in
          * the collapsed summary as well as in the control.
@@ -571,7 +571,7 @@ describe('preferences', () => {
         /*
          * `provision-tenant.ts` and any backfill write with `createMany` and
          * never pass through a route, so a clamp living only in zod is one a
-         * script can walk around — the same reason
+         * script can walk around, the same reason
          * `constraint_weight_non_negative` exists as a CHECK as well as a
          * refinement. Raw SQL here, deliberately around the application layer.
          */
@@ -587,7 +587,7 @@ describe('preferences', () => {
         });
 
         // Matched by NAME, not merely "it threw": a bare rejects.toThrow() would
-        // pass on a typo in the SQL, on an RLS refusal, or on a missing column —
+        // pass on a typo in the SQL, on an RLS refusal, or on a missing column,
         // none of which would prove the clamp is enforced.
         await expect(ownerDb.$executeRawUnsafe(
             'UPDATE person_preference SET weight_multiplier = 9 WHERE person_id = $1',
@@ -627,7 +627,7 @@ describe('preferences', () => {
  * has already had to unify two copies of it that agreed until they did not.
  *
  * The term is derived from the dates too, and both ways of failing to derive one
- * are refusals rather than guesses — a stored row that resolves to nothing would
+ * are refusals rather than guesses: a stored row that resolves to nothing would
  * be inert forever, which is the failure mode this whole area keeps closing.
  */
 describe('holiday entry', () => {
@@ -659,7 +659,7 @@ describe('holiday entry', () => {
         expect(row.termId).toBe(f.termA);
 
         // A Wednesday-to-Friday range touches two weeks and covers neither in
-        // full, and the response says so — the form shows this before submitting
+        // full, and the response says so: the form shows this before submitting
         // rather than leaving the over-block to be discovered in a timetable.
         expect(created.body.touched.some((week) => !week.whole)).toBe(true);
     });
@@ -757,12 +757,12 @@ describe('holiday entry', () => {
 });
 
 /**
- * Both tables are ORDINARY tenant-scoped tables — no new RLS exception.
+ * Both tables are ORDINARY tenant-scoped tables: no new RLS exception.
  *
  * The design deliberately did not push self-scoping into the database. Doing so
  * would need a second, CONDITIONAL isolation dimension (a `calendry.person_id`
  * GUC set on some requests and not others) so the policy could tell an
- * administrator editing anyone from a person editing themselves — and CLAUDE.md
+ * administrator editing anyone from a person editing themselves, and CLAUDE.md
  * requires a comparably strong reason for a new RLS-widening path. "The route
  * could also have enforced this" is not one.
  *

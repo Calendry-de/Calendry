@@ -10,7 +10,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['My account'],
         summary: 'Export everything Calendry holds about me (GDPR Right to Access)',
-        description: 'Self-service, no permission beyond being signed in — the caller\'s own Person, Account, roles, memberships, sessions, unavailability, preferences, exam requests, API tokens, calendar links (metadata only, no live secrets) and own audit trail. `?format=xlsx` returns a workbook with one sheet per category; anything else returns the same data as JSON.',
+        description: 'Self-service, no permission beyond being signed in: the caller\'s own Person, Account, roles, memberships, sessions, unavailability, preferences, exam requests, API tokens, calendar links (metadata only, no live secrets) and own audit trail. `?format=xlsx` returns a workbook with one sheet per category; anything else returns the same data as JSON.',
         parameters: [
             { name: 'format', in: 'query', schema: { type: 'string', enum: ['json', 'xlsx'] }, description: 'Defaults to json.' },
         ],
@@ -22,7 +22,7 @@ defineRouteMeta({
 });
 
 /**
- * `GET /api/me/export` (issue #84) — the self-service half of per-Person
+ * `GET /api/me/export` (issue #84): the self-service half of per-Person
  * export. Mirrors every other `/api/me/*` route: no permission key, because
  * the WHERE is the caller's own Person, and the export can never reach
  * anyone else's data no matter what the caller otherwise holds.

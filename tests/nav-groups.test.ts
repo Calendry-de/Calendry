@@ -8,7 +8,7 @@ import { isSidebarPlace, navPlaces } from '../app/utils/navPlaces';
  * WHY THIS FILE EXISTS
  *
  * The sidebar renders `NAV_GROUPS`, matching each group's `paths` against the
- * permission-filtered entry list. A path no group claims is not rendered —
+ * permission-filtered entry list. A path no group claims is not rendered,
  * silently, with no warning, no empty group and no gap. The link simply is not
  * there, and because the header and Ctrl+K read the registry directly rather
  * than the grouping, the route stays reachable by two other means. So the
@@ -18,13 +18,13 @@ import { isSidebarPlace, navPlaces } from '../app/utils/navPlaces';
  * gated on `tenant.export`, reachable from the dashboard cards and the command
  * palette, and absent from the app's one persistent nav because nobody added
  * its path to a group. The shell's own comment had predicted this failure mode
- * in prose, which is checked by nobody — CLAUDE.md's standing warning about
+ * in prose, which is checked by nobody: CLAUDE.md's standing warning about
  * exactly that.
  *
  * TWO FAILURE MODES, BOTH CHECKED, because they are opposites:
  *
- *   unclassified  a destination no group claims — invisible in the sidebar
- *   dead path     a group path matching no entry — a typo or a deleted route,
+ *   unclassified  a destination no group claims: invisible in the sidebar
+ *   dead path     a group path matching no entry: a typo or a deleted route,
  *                 which fails the same way and is just as quiet
  *
  * This is a UNIT test: `navPlaces()` and `isSidebarPlace()` are pure module
@@ -39,7 +39,7 @@ describe('sidebar grouping covers the navigation registry', () => {
 
     it('has entries and groups to check at all', () => {
         // Guards the guard: every assertion below is a loop, and a loop over an
-        // empty list passes. Same reasoning as manage-relation-gates.test.ts —
+        // empty list passes. Same reasoning as manage-relation-gates.test.ts:
         // an import that silently resolved to nothing would make this whole
         // file green and worthless.
         expect(places.length).toBeGreaterThan(20);
@@ -58,7 +58,7 @@ describe('sidebar grouping covers the navigation registry', () => {
     it('names no path that is not a destination', () => {
         const dead = groupedPaths.filter((path) => !sidebarPaths.includes(path));
 
-        expect(dead, 'NAV_GROUPS paths matching no registry entry — a typo drops the link exactly as silently as omitting it').toEqual([]);
+        expect(dead, 'NAV_GROUPS paths matching no registry entry: a typo drops the link exactly as silently as omitting it').toEqual([]);
     });
 
     it('claims each destination exactly once', () => {

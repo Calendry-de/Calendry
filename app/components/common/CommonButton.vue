@@ -47,7 +47,7 @@
 <script setup lang="ts">
 import type { PropType, VNode } from 'vue';
 // The label wrapper was <ui-text type="2b">, but no UiText component exists in
-// this repo — it was never ported from the source template, so Vue could not
+// this repo; it was never ported from the source template, so Vue could not
 // resolve it and logged a warning for every button with a label. Styling is
 // keyed on the .button_content class rather than the tag, so a span is a
 // drop-in replacement. Restore a typography component here if one is added.
@@ -62,7 +62,7 @@ const props = defineProps({
         default: undefined,
     },
     /**
-     * The NATIVE button type — distinct from `type`, which is this component's
+     * The NATIVE button type, distinct from `type`, which is this component's
      * visual variant and was already taken. Defaults to 'button' so a button
      * inside a form does not submit it by accident; the auth forms pass
      * 'submit' deliberately.
@@ -81,7 +81,7 @@ const props = defineProps({
     },
     type: {
         // NOTE: 'secondary-875' is accepted because ViewMenu.vue passes it, but
-        // this component has no styles for it — it renders with an unstyled
+        // this component has no styles for it, so it renders with an unstyled
         // button--type-secondary-875 class. Either add the SCSS or migrate that
         // caller to an implemented variant. ('transparent' was the other half
         // of this gap and now has styles.)
@@ -170,7 +170,7 @@ const getAttrs = computed(() => {
         /**
          * `type` is already this component's VISUAL variant, so the native one
          * needs its own prop. It defaults to "button" because a <button> inside
-         * a <form> is a SUBMIT button unless told otherwise — switching the
+         * a <form> is a SUBMIT button unless told otherwise, so switching the
          * default tag without this would have turned every button in every form
          * into an accidental submit.
          *
@@ -202,7 +202,7 @@ const getAttrs = computed(() => {
     border: none;
     border-radius: var(--radius-sm);
 
-    /* A native <button> inherits the UA's font, not the page's — so switching
+    /* A native <button> inherits the UA's font, not the page's, so switching
        the root element from <div> would silently restyle every button. The
        styling is otherwise keyed on classes, which is what makes the tag change
        a drop-in. */
@@ -218,7 +218,7 @@ const getAttrs = computed(() => {
 
     /*
      * MUST STAY. `outline: none` above compiles scoped to (0,2,0) and therefore
-     * BEATS the global `:focus-visible` rule in layout.scss at (0,1,0) — so
+     * BEATS the global `:focus-visible` rule in layout.scss at (0,1,0), so
      * without this, keyboard focus on any button in the product was invisible
      * except where a variant happened to change its own background. The
      * `--type-primary` focus background lived inside `@include pc`, so on any
@@ -255,7 +255,7 @@ const getAttrs = computed(() => {
     /*
      * THE LABEL IS INK AND THE STATES GO LIGHTER, which is the reverse of what the
      * purple ramp needed. White measured 5.01:1 on `$primary500` when it was purple;
-     * on the teal fill it is only 3.14:1 — the same failure the white label was
+     * on the teal fill it is only 3.14:1, the same failure the white label was
      * introduced to fix, arriving from the other side. Ink passes instead, and with
      * an ink label the states must move UP the ramp, since darkening now costs
      * contrast:
@@ -321,12 +321,12 @@ const getAttrs = computed(() => {
     }
 
     /**
-     * Chrome, not a surface — for controls that sit ON other content, where a filled
+     * Chrome, not a surface: for controls that sit ON other content, where a filled
      * rest state would read as a panel of its own.
      *
      * It cannot reuse `secondary`: that is `var(--primary-color, transparent)`, so
      * it is only transparent until a caller sets the variable, and its
-     * :active/:focus jumps to solid $primary500 — a chevron that flashes solid when
+     * :active/:focus jumps to solid $primary500, so a chevron that flashes solid when
      * clicked reads as a primary action. Unlike `link` it keeps padding, radius and
      * the 40px icon box, so it stays a real hit target.
      */
@@ -335,7 +335,7 @@ const getAttrs = computed(() => {
 
         /* The base declares backgrounds for rest AND hover/focus/active inside
            `@include pc`, so overriding only the unmediated declaration above
-           would leave this variant solid purple on wide viewports — a bug that
+           would leave this variant solid purple on wide viewports, a bug that
            survives review because nobody resizes to 1366px to check a chevron.
            Every state is therefore restated, not just the rest one. */
         @include pc {
@@ -346,7 +346,7 @@ const getAttrs = computed(() => {
 
         /* MUST STAY AFTER THE RESET ABOVE. On a wide pointer device both blocks
            match and both are (0,2,0), so source order alone decides which wins.
-           Moving this above the `@include pc` block does not fail loudly — it
+           Moving this above the `@include pc` block does not fail loudly: it
            silently removes the hover feedback at >=1366px only. */
         @include hover {
             &:hover {
@@ -363,7 +363,7 @@ const getAttrs = computed(() => {
            there is nothing left to see, so keyboard focus would be invisible.
 
            The colour is the GLOBAL ring's (`:focus-visible` in layout.scss), not
-           a local choice — only the inset offset is local, because an outward
+           a local choice; only the inset offset is local, because an outward
            ring on a button sitting flush in a toolbar gets clipped. This used to
            say it matched "the ring used across the schedule components", which
            was true and was the problem: those components had each copied
@@ -391,7 +391,7 @@ const getAttrs = computed(() => {
     }
 
     /*
-     * 44px ON A PHONE ONLY — the rule this codebase already applies to every
+     * 44px ON A PHONE ONLY: the rule this codebase already applies to every
      * other thumb-reached control (`ScheduleAgenda`'s day tabs,
      * `ScheduleWeekNav`'s steppers, `ScheduleToolbar`'s selects and toggles,
      * `ScheduleFilterPanel`'s close), and which the buttons those controls sit
@@ -453,7 +453,7 @@ const getAttrs = computed(() => {
 
         /*
          * The disabled primary keeps an INK label, not the variant's white one.
-         * This background is a 2%-alpha white wash — effectively the page — so
+         * This background is a 2%-alpha white wash, effectively the page, so
          * white-on-white would be invisible, which is the regression the label
          * change above would otherwise have introduced in a state nobody looks
          * at. (The `opacity: 0.24` above is pre-existing and makes every

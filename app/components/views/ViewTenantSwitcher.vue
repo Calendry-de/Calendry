@@ -38,15 +38,15 @@ import { fetchSession, useSession } from '~/composables/session';
 import { resolveHomeRoute } from '~/utils/routes';
 
 /**
- * Which institution the signed-in Account is currently acting in, and — only
- * when the Account has more than one — a way to switch without signing out
+ * Which institution the signed-in Account is currently acting in, and (only
+ * when the Account has more than one) a way to switch without signing out
  * (issue #67's "indication of scope" half; the tenant-selector-at-login half
  * already exists in `login.vue`).
  *
  * PLAIN TEXT, NOT A SELECT, for a single-tenant Account: rendering a
  * one-option dropdown would invite clicking it for nothing, and "is this a
  * control or a label" is exactly the ambiguity a disabled-looking select
- * creates. `activeTenants` filters `isActive` itself — `GET /api/auth/session`
+ * creates. `activeTenants` filters `isActive` itself: `GET /api/auth/session`
  * returns every identity including a deactivated Person, same shape
  * `login.post.ts` already filters before building ITS picker.
  */
@@ -59,8 +59,8 @@ const switching = ref(false);
 const switchError = ref('');
 
 /**
- * `POST /api/auth/select-tenant` mutates the session in place — no
- * re-authentication — but everything already rendered (nav, cached fetches)
+ * `POST /api/auth/select-tenant` mutates the session in place, no
+ * re-authentication, but everything already rendered (nav, cached fetches)
  * was drawn for the OLD tenant. A full reload, not `navigateTo()`, is
  * deliberate: it is the only way to guarantee nothing tenant-scoped survives
  * from before the switch, the same reasoning `logout()` sending the browser to

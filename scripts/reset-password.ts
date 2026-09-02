@@ -1,13 +1,13 @@
 /**
- * Force-resets an Account's password, and — with `--create` — issues one to
+ * Force-resets an Account's password, and, with `--create`, issues one to
  * somebody who is on the roster but has no login yet. Last-resort operator
  * recovery.
  *
  * WHY A CLI AS WELL AS THE MANAGE AREA
  * ------------------------------------
  * `/manage/accounts` can now issue a password, gated on `account.manage` inside
- * one tenant. This stays because it answers to a different authority — whoever
- * holds the database credential — and because that route deliberately refuses a
+ * one tenant. This stays because it answers to a different authority (whoever
+ * holds the database credential) and because that route deliberately refuses a
  * login SHARED with another institution, so that one tenant cannot take over a
  * credential another one also uses. An operator is the right actor for exactly
  * that case, and for the case where nobody can sign in at all.
@@ -24,7 +24,7 @@
  *
  * `--create` IS THE EXCEPTION, and it is why the connection is chosen rather than
  * fixed: finding a Person by email means READING `person`, which is behind RLS
- * with no tenant context to set out here. So that mode — and only that mode —
+ * with no tenant context to set out here. So that mode, and only that mode,
  * connects as the owner. The choice is printed, because "which role am I" is not
  * something an operator should have to infer.
  *
@@ -32,14 +32,14 @@
  * ----------------------
  * Creating a Person in the management area does NOT create a login; they are
  * different things (TAXONOMY.md §2 vs §4). So the ordinary shape of "X cannot
- * sign in" is that X exists on the roster and has no Account at all — and this
+ * sign in" is that X exists on the roster and has no Account at all, and this
  * script used to answer that with "No account with email X." and stop, which was
  * true, unhelpful, and left no command that could fix it. With `--create` the
  * Account is created and linked to that Person, and the password is reported the
  * same way a reset's is.
  *
  * It does NOT grant anything. A Person with no AccessRole can sign in and see
- * nothing, so that case is reported loudly rather than quietly fixed — deciding
+ * nothing, so that case is reported loudly rather than quietly fixed: deciding
  * what somebody may do is tenant configuration, not password recovery.
  *
  * TARGETS AN ACCOUNT, NOT A PERSON
@@ -100,7 +100,7 @@ async function main() {
              * Unlike the login route, this names the failure. The
              * account-existence oracle protection exists to stop anonymous
              * probing; an operator with database credentials needs to know they
-             * mistyped the address — or that the address has no login yet, which
+             * mistyped the address, or that the address has no login yet, which
              * is a different problem with a different flag.
              */
             console.error(`\nNo account with email '${email}'.`);
@@ -125,7 +125,7 @@ async function main() {
             /*
              * Every roster entry with this address, in any tenant, with what it
              * already has. One query rather than a scan per tenant, and it
-             * reports what it found rather than picking for the operator — the
+             * reports what it found rather than picking for the operator: the
              * `person.email` uniqueness is PER TENANT, so more than one is
              * ordinary rather than a corruption.
              */
@@ -229,7 +229,7 @@ async function main() {
             + `${create ? 'the OWNER (--create reads person, which is behind RLS)' : 'the app role'}`);
 
         if (created) {
-            console.log(`Account   ${email} — NEW, none existed`);
+            console.log(`Account   ${email} (NEW, none existed)`);
             console.log(`Acts as   ${created.given_name} ${created.family_name} in `
                 + `${created.tenant_slug} (${created.tenant_name})`);
             console.log('Effect    new login, one-time password, must be changed at first sign-in');
@@ -247,7 +247,7 @@ async function main() {
         } else {
             console.log(`Account   ${email} (${account?.id})`);
             console.log(`Tenants   ${identities.map((i) => i.tenant_slug).join(', ') || '(none)'}`);
-            console.log(`Sessions  ${liveSessions} active — all will be revoked, in every tenant`);
+            console.log(`Sessions  ${liveSessions} active, all will be revoked, in every tenant`);
             console.log('Effect    new one-time password, and the account must change it at next login');
         }
 
@@ -296,7 +296,7 @@ async function main() {
             });
 
             // Sessions hang off account_id, so this reaches every tenant the
-            // account acts in — not just the one it was last used in.
+            // account acts in, not just the one it was last used in.
             const revoked = await tx.authSession.updateMany({
                 where: { accountId: account.id, revokedAt: null },
                 data: { revokedAt: new Date() },

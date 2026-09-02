@@ -41,7 +41,7 @@
 <script setup lang="ts">
 /**
  * Loader 13A ("Queue") from the "Calendry logo concepts" design project, and
- * the only loader in the app — four call sites render this one component.
+ * the only loader in the app: four call sites render this one component.
  *
  * The C never moves. Rows enter at the bottom in the brand accent, turn ink as
  * they step up a slot, and fade out at the top: three rows on one 2.7s
@@ -49,7 +49,7 @@
  * queue is already full at first paint rather than filling in from empty.
  *
  * The ink colour is `$content4`, the body text colour, rather than the
- * design's `#1A2230` — that value is invisible on this app's dark theme, and
+ * design's `#1A2230`, since that value is invisible on this app's dark theme, and
  * a keyframe interpolating to `currentColor` resolves against whatever the
  * call site happens to inherit. A token is both theme-correct and fixed.
  *
@@ -138,10 +138,10 @@ defineProps({
 }
 
 // A reader who asked for less motion still needs to know something is in
-// flight. Rather than freeze the queue mid-step — which stacks all three rows
-// on the bottom slot, since that is where they are drawn — park them at the
+// flight. Rather than freeze the queue mid-step, which stacks all three rows
+// on the bottom slot since that is where they are drawn, it parks them at the
 // three slots they occupy in the static 11C mark (rows at y=41/50/59, the
-// bottom one accented) and let the whole lockup breathe.
+// bottom one accented) and lets the whole lockup breathe.
 @media (prefers-reduced-motion: reduce) {
     .loader_row {
         animation: cal-queue-still 1.8s ease-in-out infinite;

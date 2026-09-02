@@ -9,13 +9,13 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  * Declare unavailability for YOURSELF. Lands PENDING.
  *
  * TWO ENTRY SHAPES, ONE ROUTE: a recurring day/week pattern (unchanged, writes
- * no Term — "every Friday, every term"), or a single `date` — "I cannot teach
- * this day" (issue #2's schedule button) — which resolves to exactly one
+ * no Term: "every Friday, every term"), or a single `date`: "I cannot teach
+ * this day" (issue #2's schedule button), which resolves to exactly one
  * Term's week and writes it, because a specific date is NOT "every term" the
  * way a recurring pattern is.
  *
  * The subject is the session's own Person and cannot be named in the request,
- * so this route has no way to write a window against anybody else — see the GET
+ * so this route has no way to write a window against anybody else; see the GET
  * alongside it.
  *
  * PENDING, not APPROVED, because a veto is a HARD constraint. Someone who could
@@ -37,8 +37,8 @@ export default defineEventHandler(async (event) => {
         }
 
         /*
-         * TWO SHAPES, ONE ROUTE. `date` names a single calendar date — issue
-         * #2's "I cannot teach this day" — and MUST NOT be combined with the
+         * TWO SHAPES, ONE ROUTE. `date` names a single calendar date (issue
+         * #2's "I cannot teach this day") and MUST NOT be combined with the
          * axis fields: naming both is ambiguous about which one the caller
          * meant, and guessing which is how a lecturer ends up blocking a
          * different day than the one they clicked.
@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
         if (body.date && (body.days.length || body.weeks.length)) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'Name a single date, or a recurring day/week pattern — not both.',
+                statusMessage: 'Name a single date, or a recurring day/week pattern, not both.',
                 data: { field: 'date' },
             });
         }

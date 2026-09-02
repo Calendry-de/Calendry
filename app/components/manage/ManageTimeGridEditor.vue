@@ -39,7 +39,7 @@
                         <strong>Default grid</strong>
                         <em>
                             Used by any term that names no grid of its own. At most one
-                            per institution — the database enforces it, so promoting a
+                            per institution: the database enforces it, so promoting a
                             second is refused rather than silently accepted.
                         </em>
                     </span>
@@ -62,7 +62,7 @@
                 />
 
                 <!--
-                    The preview is computed with `blockTime()` — the SAME helper
+                    The preview is computed with `blockTime()`, the SAME helper
                     the schedule renders from. Reimplementing the arithmetic here
                     would let the preview and the timetable disagree, and the
                     preview is precisely the thing meant to make that impossible.
@@ -126,7 +126,7 @@
                         <span
                             v-if="rollsPastMidnight"
                             class="grid-editor_warn"
-                        >The last block runs past midnight — check the start hour and block length.</span>
+                        >The last block runs past midnight. Check the start hour and block length.</span>
                     </p>
                 </section>
             </div>
@@ -150,7 +150,7 @@ import { blockTime, weekdayName } from '~/composables/schedule';
  *
  * Bespoke for two reasons the generic form genuinely cannot cover: `activeDays`
  * is an ISO-weekday array rather than a scalar, and these numbers are
- * unverifiable in isolation — "45 minutes × 8 blocks, 15 minute breaks" only
+ * unverifiable in isolation: "45 minutes × 8 blocks, 15 minute breaks" only
  * becomes checkable when you can see it ends at 16:00.
  *
  * This is the most consequential configuration in the system: every session
@@ -173,8 +173,8 @@ const draft = defineModel<Record<string, unknown>>('draft', { required: true });
 /**
  * Fields this editor delegates to the generic `ManageField`.
  *
- * The registry marks EVERY time-grid field `custom: true` — meaning "the
- * bespoke component decides" — and this component decides to render most of
+ * The registry marks EVERY time-grid field `custom: true`, meaning "the
+ * bespoke component decides", and this component decides to render most of
  * them generically and three of them itself. So the filter cannot be
  * `!field.custom`: that would leave the editor empty.
  *
@@ -243,7 +243,7 @@ const previewBlocks = computed(() => {
          * Resolved by the shared helper rather than locally. The local version
          * was `breaks.find(b => b.afterBlockIndex === index && (b.dayOfWeek === day
          * || b.dayOfWeek === null))`, which returns whichever row comes FIRST in
-         * the array — so with a universal break and a day-specific one at the
+         * the array, so with a universal break and a day-specific one at the
          * same position, this preview could name the universal break while
          * `blockTime()` above had already applied the day-specific DURATION.
          * The label and the times would disagree, in the one component whose
@@ -256,7 +256,7 @@ const previewBlocks = computed(() => {
 /**
  * Break overrides live in the draft under `breaks`, like any other field, so
  * they take part in dirty tracking and the single Save. They are PERSISTED as a
- * PUT-set sub-resource, which the shell handles — see RELATIONS.
+ * PUT-set sub-resource, which the shell handles; see RELATIONS.
  */
 const breaks = computed<TimeGridBreak[]>(() => {
     const value = draft.value.breaks;
@@ -266,7 +266,7 @@ const breaks = computed<TimeGridBreak[]>(() => {
 
 /**
  * The break editor's model. The array itself is the only thing that crosses
- * between the two components — the editor keeps sole write access to the draft,
+ * between the two components: the editor keeps sole write access to the draft,
  * so the break list cannot start writing other fields of it by accident.
  */
 const breaksModel = computed({
@@ -303,7 +303,7 @@ const rollsPastMidnight = computed(() => {
     }
 
     // The shared walk's trailing entry IS when teaching ends, so this no longer
-    // re-derives it from a stride — which was the same arithmetic blockTime()
+    // re-derives it from a stride, which was the same arithmetic blockTime()
     // owns, written a second time, in the one component whose whole purpose is
     // to show the two agreeing.
     const bounds = blockBoundaries(grid);

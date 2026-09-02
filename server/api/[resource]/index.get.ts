@@ -9,7 +9,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * Paging and free-text search, kept separate from each resource's own filters.
  *
  * These cannot live in `config.filters` because a zod object silently STRIPS
- * unknown keys — adding `limit` to the query string of a resource whose filter
+ * unknown keys: adding `limit` to the query string of a resource whose filter
  * schema does not mention it would parse cleanly and then do nothing. Parsing
  * them from the raw query with their own schema makes an unsupported parameter
  * impossible rather than inert.
@@ -19,7 +19,7 @@ const LIST_QUERY = z.object({
     offset: z.coerce.number().int().min(0).optional(),
     q: z.string().trim().min(1).max(200).optional(),
     /**
-     * Resolve exactly these rows, by id — the other half of search.
+     * Resolve exactly these rows, by id: the other half of search.
      *
      * A searchable picker never holds the full list, so it cannot label the
      * rows already assigned to the entity it is editing. It asks for those by
@@ -27,7 +27,7 @@ const LIST_QUERY = z.object({
      * "these specific rows" rather than "rows matching this".
      *
      * REJECTS EMPTY rather than treating it as absent. `?ids=` is a caller that
-     * meant to name rows and named none — most likely from `[].join(',')` — and
+     * meant to name rows and named none (most likely from `[].join(',')`), and
      * the two readings are "return nothing" and "return everything", one of
      * which is a silent tenant-wide dump. A 400 makes the mistake impossible to
      * ship instead of impossible to notice; a caller with nothing to resolve is
@@ -69,8 +69,8 @@ defineRouteMeta({
  *   no `limit`  →  a bare array, exactly as before
  *   `limit`     →  { rows, total }
  *
- * A paginated caller is asking a different question — "give me a page, and tell
- * me how many there are" — and needs the count to say so. Making the shape
+ * A paginated caller is asking a different question: "give me a page, and tell
+ * me how many there are", and needs the count to say so. Making the shape
  * switch on `limit` keeps every existing caller (the schedule view's five
  * reference fetches, the integration tests) byte-identical, instead of
  * rewriting them for a feature they do not use.
@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
     const config = getResource(resource);
     // Both go through getValidatedQuery so a malformed parameter is a 400 with
     // the offending field named. Calling `LIST_QUERY.parse` directly throws a
-    // bare ZodError, which h3 reports as a 500 — an input mistake dressed up as
+    // bare ZodError, which h3 reports as a 500: an input mistake dressed up as
     // a server fault.
     const paging = await getValidatedQuery(event, LIST_QUERY.parse);
     const query = await getValidatedQuery(event, config.filters.parse);
@@ -90,12 +90,12 @@ export default defineEventHandler(async (event) => {
 
 
         /**
-         * Filters that are not plain column equality — a range, or a relation —
+         * Filters that are not plain column equality (a range, or a relation)
          * are declared per resource and become AND clauses instead.
          *
          * Per resource, not per filter name: `minCapacity` used to be
          * special-cased by name here, which happens to be safe only because one
-         * resource declares it. `termId` is not safe that way — `offerings`
+         * resource declares it. `termId` is not safe that way: `offerings`
          * declares a `termId` filter that IS a column, so a name-keyed rule
          * would rewrite it into a relation query against a relation Offering
          * does not have.
@@ -122,7 +122,7 @@ export default defineEventHandler(async (event) => {
         // consortium's shared lecture hall would be invisible to its members.
         //
         // Ownership goes under AND rather than a bare OR so that adding the
-        // search clause below cannot overwrite it — two sibling `OR` keys on one
+        // search clause below cannot overwrite it: two sibling `OR` keys on one
         // object would leave only the last, quietly widening the query past the
         // tenant boundary.
         const ownership = config.federationOwnable
@@ -137,7 +137,7 @@ export default defineEventHandler(async (event) => {
         const conditions: Record<string, unknown>[] = [ownership, ...relational];
 
         // AND-ed with everything else, ownership included, so naming an id
-        // cannot reach a row outside the tenant (or its federation) — the id is
+        // cannot reach a row outside the tenant (or its federation): the id is
         // a narrowing, never an escape hatch.
         if (paging.ids !== undefined) {
             conditions.push({ id: { in: paging.ids } });
@@ -147,7 +147,7 @@ export default defineEventHandler(async (event) => {
             const fields = config.searchFields ?? [];
 
             // A resource with no declared search fields cannot be searched. It
-            // must not silently ignore `q` and return everything — that reads as
+            // must not silently ignore `q` and return everything: that reads as
             // "no results were filtered out" when it means "search is not
             // implemented here".
             if (fields.length === 0) {
@@ -169,7 +169,7 @@ export default defineEventHandler(async (event) => {
                 return delegate(tx, config.model).findMany({ where, orderBy: config.orderBy, include: config.include });
             }
 
-            // Sequential — `tx` is one shared connection; concurrent queries on
+            // Sequential, because `tx` is one shared connection; concurrent queries on
             // it trip pg's deprecated overlapping-query warning.
             const rows = await delegate(tx, config.model).findMany({
                 include: config.include,

@@ -9,7 +9,7 @@
         </header>
 
         <p class="sources_help">
-            For a track taught across cohorts — two semesters’ Management students in
+            For a track taught across cohorts: two semesters’ Management students in
             one room. Name the groups it draws from, then copy their members in.
             <strong>Members are copied, not linked</strong>: the group stays as it is
             until you regenerate, so a solve today and a solve tomorrow see the same
@@ -52,7 +52,7 @@
             v-else
             class="sources_empty"
         >
-            This is an ordinary group — its members are whoever you put in it.
+            This is an ordinary group: its members are whoever you put in it.
         </p>
 
         <label
@@ -88,7 +88,7 @@
         >
             <p class="sources_drift-line">
                 <template v-if="!drift.generatedAt">
-                    Never copied — this group holds {{ drift.memberCount }}
+                    Never copied: this group holds {{ drift.memberCount }}
                     {{ drift.memberCount === 1 ? 'person' : 'people' }}, its sources hold
                     {{ drift.expectedCount }}.
                 </template>
@@ -122,7 +122,7 @@ import { indentedOptions } from '~/utils/groupTree';
  * NOT A SECOND PARENT. Two cohorts' Management tracks taught together would be
  * a DAG if the combining group sat above them, and the hierarchy is a tree on
  * the wire and in every closure walk. A combined group is an ordinary
- * root-level Group with its own membership, which is what already works — a
+ * root-level Group with its own membership, which is what already works: a
  * student in both their cohort and this group is double-booked on the PERSON
  * axis. What this adds is a record of where the membership came from.
  *
@@ -183,7 +183,7 @@ function nameOf(id: string): string {
 const available = computed(() => {
     const taken = new Set(rows.value.map((r) => r.sourceGroupId));
 
-    // A group cannot draw from itself — the database refuses it, and offering
+    // A group cannot draw from itself: the database refuses it, and offering
     // it here would be a control whose only outcome is an error.
     taken.add(props.groupId);
 
@@ -198,7 +198,7 @@ async function save(next: SourceRow[]) {
     error.value = '';
 
     try {
-        // A bare array is the body `[relation].put.ts` parses — NOT `{ rows }`.
+        // A bare array is the body `[relation].put.ts` parses, NOT `{ rows }`.
         await request(`/api/groups/${props.groupId}/sources`, { method: 'PUT', body: next });
         await refresh();
     } catch (cause) {

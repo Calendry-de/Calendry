@@ -3,7 +3,7 @@
         <p class="intro">
             How each module you lead is placed across the term.
             <strong>Spread</strong> gives it a consistent weekly slot; <strong>Kept together</strong>
-            concentrates it into a short window instead. Neither is a guarantee — a pattern is weighed
+            concentrates it into a short window instead. Neither is a guarantee: a pattern is weighed
             against every other rule the next time this institution generates a timetable, and it takes
             effect only once a tenant has switched the matching rule on.
         </p>
@@ -31,7 +31,7 @@
                 class="row"
             >
                 <div class="row_main">
-                    <strong>{{ offering.code ? `${offering.code} — ${offering.title}` : offering.title }}</strong>
+                    <strong>{{ offering.code ? `${offering.code}: ${offering.title}` : offering.title }}</strong>
                     <span class="row_meta">{{ offering.term.name }}</span>
                 </div>
 
@@ -58,8 +58,8 @@
                         <!--
                             THE TICKET'S THIRD MODE, DELIBERATELY DISABLED. "Multiple sessions
                             grouped into a day" needs a solver evaluator that rewards clustering
-                            within a day — the existing per-day caps only discourage excess, they
-                            do not encourage it — and that evaluator lives in calendry-solver, not
+                            within a day (the existing per-day caps only discourage excess, they
+                            do not encourage it), and that evaluator lives in calendry-solver, not
                             here. A native `disabled` option is unclickable rather than merely
                             unexplained, so this is a stated gap, not a silent one.
                         -->
@@ -81,8 +81,8 @@
 
 <script setup lang="ts">
 /**
- * A lecturer's own choice of HOW each module they lead is taught (issue #28)
- * — the same shape `/my/preferences` uses for slot preferences, attached to
+ * A lecturer's own choice of HOW each module they lead is taught (issue #28),
+ * the same shape `/my/preferences` uses for slot preferences, attached to
  * an Offering instead of to the Person.
  *
  * `GET /api/me/offerings` is a CONVENIENCE list, not the boundary: the write

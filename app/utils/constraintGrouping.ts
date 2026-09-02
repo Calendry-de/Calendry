@@ -10,24 +10,24 @@ export interface ConstraintVariantEntry {
 /**
  * One or more variant entries that share a configuration.
  *
- * `entries.length === 1` is the common case — a variant with nothing else
- * like it — and the caller is expected to render that case identically to an
+ * `entries.length === 1` is the common case (a variant with nothing else
+ * like it), and the caller is expected to render that case identically to an
  * ungrouped row. `entries.length > 1` is what issue #103 asks for: several
  * Offerings/Groups narrowed by the exact same rule, worth showing once.
  */
 export interface ConstraintVariantGroup {
-    /** Stable only within one render pass — never persisted or sent to the server. */
+    /** Stable only within one render pass: never persisted or sent to the server. */
     key: string;
     type: ConstraintTypeDef;
-    /** The shared configuration every entry in this group has (first entry, arbitrarily — they agree by construction). */
+    /** The shared configuration every entry in this group has (first entry, arbitrarily; they agree by construction). */
     row: ConstraintRowData;
     entries: ConstraintVariantEntry[];
 }
 
 /**
  * Deterministic stringify: object keys sorted so two params objects built in
- * a different field order still hash the same. Arrays keep their given order
- * — a weekday list's order can matter to a future type even if none reads it
+ * a different field order still hash the same. Arrays keep their given order:
+ * a weekday list's order can matter to a future type even if none reads it
  * today, and sorting it would be a silent behavioural claim this function has
  * no business making.
  */
@@ -47,7 +47,7 @@ function stableKey(value: unknown): string {
 
 /**
  * The identity of what a variant DOES, deliberately excluding `id`, `name`
- * and `scopes` — those are what tells two otherwise-identical rules apart
+ * and `scopes`: those are what tells two otherwise-identical rules apart
  * (which Offering/Group/kind they were narrowed to), not part of the rule
  * itself. Two rows with the same key are interchangeable but for who they
  * apply to.
@@ -72,7 +72,7 @@ function configKey(type: ConstraintTypeDef, row: ConstraintRowData): string {
 /**
  * Groups variant entries sharing a configuration, in first-seen order.
  *
- * PURE AND IDEMPOTENT — a function of `entries` alone, computed fresh every
+ * PURE AND IDEMPOTENT: a function of `entries` alone, computed fresh every
  * render, mutates nothing. This is display grouping only: the solver keeps
  * resolving each underlying `Constraint`/`ConstraintScope` row independently,
  * and nothing here is persisted or sent anywhere.

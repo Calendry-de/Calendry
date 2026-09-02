@@ -18,7 +18,7 @@ services:
       # curl, not wget: the runner image (`.config/Dockerfile`) never installed
       # wget, only curl (via the base image / apt), so this healthcheck has
       # been failing outright ("wget: not found") since #92 gave `/health`
-      # something worth checking — Docker reported the container unhealthy
+      # something worth checking: Docker reported the container unhealthy
       # while `/health` itself answered correctly. `-f` makes curl exit
       # non-zero on a non-2xx response (the 503 `/health` now returns when
       # degraded), matching wget's default failure behaviour.
@@ -44,8 +44,8 @@ services:
     # depend on did not. That asymmetry is the failure mode, not a missing nicety:
     # when the db stopped (host sleep, daemon restart, OOM) nothing brought it
     # back, while the two dependents restarted forever against a database that was
-    # never coming — `Error: P1001: Can't reach database server at db:5432`, on a
-    # loop, indefinitely.
+    # never coming, throwing `Error: P1001: Can't reach database server at db:5432`,
+    # on a loop, indefinitely.
     #
     # The loop also has a second-order effect worth knowing, because `up -d` does
     # NOT fix it: a container that keeps restarting while its network is recreated
@@ -67,7 +67,7 @@ services:
       - .env
 
   redis:
-    # Cache for issue #66 — a read-through cache for calendar reads,
+    # Cache for issue #66: a read-through cache for calendar reads,
     # invalidated on schedule changes (server/utils/cache.ts). Never the
     # database of record: every key it holds is disposable, so a lost
     # `redis_data` volume degrades reads back to hitting Postgres directly

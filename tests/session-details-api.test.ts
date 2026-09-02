@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * `POST /api/sessions/:id/details` — editing what an EVENT is.
+ * `POST /api/sessions/:id/details`: editing what an EVENT is.
  *
  * A NAMED VERB, NOT A PATCH. CLAUDE.md's routing convention: editing operations
  * are explicit verbs on the Session resource "so the event log can record
@@ -12,7 +12,7 @@ import { api, login } from './helpers/client';
  *
  * EVENTS ONLY, for the reason DELETE is: an Offering-linked Session's kind
  * comes from its Offering and its groups and people from solver output, so a
- * manual edit here would be silently overwritten by the next apply — an edit
+ * manual edit here would be silently overwritten by the next apply: an edit
  * that appears to work and then undoes itself.
  */
 const TENANT = 'test-tenant-a';
@@ -150,7 +150,7 @@ describe('the event log', () => {
         const payload = logged.payload as Record<string, unknown>;
 
         expect(payload.changed).toEqual(expect.arrayContaining(['title', 'groupIds']));
-        // kindId did not change, so it must not appear — the log records what
+        // kindId did not change, so it must not appear: the log records what
         // happened, not every field the request could have touched.
         expect(payload.changed).not.toContain('kindId');
         expect((payload.before as Record<string, unknown>).title).toBe('Before');

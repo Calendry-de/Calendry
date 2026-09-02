@@ -2,7 +2,7 @@
     <CommonPage title="Calendar links">
         <p class="intro">
             Subscribe an external calendar app (Google Calendar, Outlook, Apple
-            Calendar…) to your own schedule, or — if you may — to a specific
+            Calendar…) to your own schedule, or, if you may, to a specific
             Group's.
         </p>
 
@@ -17,7 +17,7 @@ import IcsLinksPanel from '~/components/my/IcsLinksPanel.vue';
 /**
  * MOVED from `/manage/external-references` (issue #115): self-service over
  * the caller's own data (or, holding `ics_link.generate`, over Groups they
- * may target) belongs in `/my`, not Management — see `navigation.ts`'s
+ * may target) belongs in `/my`, not Management; see `navigation.ts`'s
  * `my.calendar-links` entry for the fuller reasoning. Gated through the
  * shared `my` middleware, matching every other `/my/*` page:
  * `MY_SECTION_PERMISSIONS['/my/calendar-links']` is the single place that

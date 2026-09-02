@@ -69,7 +69,7 @@ afterAll(teardown);
 
 describe('offering-plans: items are an ordered sequence, not a set', () => {
     it('adds, lists in order, and removes items via the bespoke sub-resource', async () => {
-        const plan = await createPlan('Jahrgang 10 — Standard');
+        const plan = await createPlan('Jahrgang 10: Standard');
         const math = await createTemplate('Math');
         const german = await createTemplate('German');
 
@@ -86,7 +86,7 @@ describe('offering-plans: items are an ordered sequence, not a set', () => {
 
         expect(get.body.map((r) => r.templateId)).toEqual([math.id, german.id]);
 
-        // Replace, not append — dropping german and reordering is one PUT.
+        // Replace, not append: dropping german and reordering is one PUT.
         const replaced = await api<{ templateId: string }[]>(`/api/offering-plan-items/${plan.id}`, {
             method: 'PUT',
             cookie: adminCookie,
@@ -119,7 +119,7 @@ describe('offering-plans: items are an ordered sequence, not a set', () => {
 
 describe('offering-plans: applying creates a group’s whole course load', () => {
     it('creates one offering per item, each attached to the group', async () => {
-        const plan = await createPlan('Jahrgang 11 — Standard');
+        const plan = await createPlan('Jahrgang 11: Standard');
         const math = await createTemplate('Math 11');
         const german = await createTemplate('German 11');
 
@@ -151,7 +151,7 @@ describe('offering-plans: applying creates a group’s whole course load', () =>
 
     it('refuses the whole apply when a template is missing a kind or a title', async () => {
         const plan = await createPlan('Incomplete plan');
-        // No `title`, no `kindId` — a shape nobody finished fixing yet.
+        // No `title`, no `kindId`: a shape nobody finished fixing yet.
         const bare = await createTemplate('Bare shape', { title: null, kindId: null });
 
         await api(`/api/offering-plan-items/${plan.id}`, {
@@ -170,7 +170,7 @@ describe('offering-plans: applying creates a group’s whole course load', () =>
     });
 
     it('re-applying to the same group in the same term changes nothing (idempotent)', async () => {
-        const plan = await createPlan('Jahrgang 12 — Standard');
+        const plan = await createPlan('Jahrgang 12: Standard');
         const math = await createTemplate('Math 12');
 
         await api(`/api/offering-plan-items/${plan.id}`, {
@@ -206,7 +206,7 @@ describe('offering-plans: applying creates a group’s whole course load', () =>
     });
 
     it('a second group taking the same subject joins the first group’s offering instead of duplicating it', async () => {
-        const plan = await createPlan('Shared Math — two cohorts');
+        const plan = await createPlan('Shared Math: two cohorts');
         const math = await createTemplate('Shared Math');
 
         await api(`/api/offering-plan-items/${plan.id}`, {
@@ -262,7 +262,7 @@ describe('offering-plans: applying creates a group’s whole course load', () =>
 
 describe('offering-plan-apply: bulk (groupIds)', () => {
     it('applies to several groups in one call, sharing one offering across them', async () => {
-        const plan = await createPlan('Bulk — shared subject');
+        const plan = await createPlan('Bulk: shared subject');
         const shared = await createTemplate('Bulk Shared Subject');
 
         await addItems(plan.id, [shared.id]);
@@ -282,13 +282,13 @@ describe('offering-plan-apply: bulk (groupIds)', () => {
         expect(res.body.results[1]!.groupId).toBe(ids.groupSeminarA);
         expect(res.body.results[0]!.offerings[0]!.action).toBe('created');
         // Second group in the SAME call joins the first's offering rather
-        // than getting its own — the whole point of a bulk apply.
+        // than getting its own: the whole point of a bulk apply.
         expect(res.body.results[1]!.offerings[0]!.action).toBe('attached');
         expect(res.body.results[1]!.offerings[0]!.id).toBe(res.body.results[0]!.offerings[0]!.id);
     });
 
     it('refuses the whole call, writing nothing, when one group id in the batch is unknown', async () => {
-        const plan = await createPlan('Bulk — bad group');
+        const plan = await createPlan('Bulk: bad group');
         const t = await createTemplate('Bulk Bad Group Subject');
 
         await addItems(plan.id, [t.id]);
@@ -309,7 +309,7 @@ describe('offering-plan-apply: bulk (groupIds)', () => {
     });
 
     it('refuses a body naming both groupId and groupIds, or neither', async () => {
-        const plan = await createPlan('Bulk — malformed body');
+        const plan = await createPlan('Bulk: malformed body');
 
         const both = await api(`/api/offering-plan-apply/${plan.id}`, {
             method: 'POST',
@@ -329,7 +329,7 @@ describe('offering-plan-apply: bulk (groupIds)', () => {
     });
 });
 
-describe('curriculum plan succession — group-plan-applications and "advance"', () => {
+describe('curriculum plan succession: group-plan-applications and "advance"', () => {
     it('lists a group’s existing applications and names the successor plan and term', async () => {
         const nextTerm = await api<{ id: string; name: string }>('/api/terms', {
             method: 'POST',
@@ -421,12 +421,12 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
     /**
      * Same derivation as `GET /api/group-plan-applications/:id`
      * (`deriveGroupPlanApplications`, `server/utils/offeringPlans.ts`), just
-     * for every group in one call — the settings page needs to show every
+     * for every group in one call, because the settings page needs to show every
      * group's current phase without one request per group.
      */
     it('lists every group with a derived application, not just one', async () => {
-        const plan = await createPlan('Tenant-wide list — plan');
-        const template = await createTemplate('Tenant-wide list — subject');
+        const plan = await createPlan('Tenant-wide list: plan');
+        const template = await createTemplate('Tenant-wide list: subject');
 
         await addItems(plan.id, [template.id]);
 
@@ -462,7 +462,7 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
     it('advances every eligible group to its OWN next plan and term in one call', async () => {
         // Both fresh and far in the future, deliberately: "the next Term" is
         // resolved GLOBALLY (the earliest Term after the current one, across
-        // the whole tenant) — reusing `ids.termA` here would let some OTHER
+        // the whole tenant), so reusing `ids.termA` here would let some OTHER
         // test's own "successor term" (created earlier in this same file,
         // dated well before 2040) win that lookup instead of the one THIS
         // test creates, which is exactly the failure this comment is pinning
@@ -484,18 +484,18 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
             }),
         });
 
-        const nextPlan = await createPlan('Advance-all — successor plan');
-        const nextTemplate = await createTemplate('Advance-all — successor subject');
+        const nextPlan = await createPlan('Advance-all: successor plan');
+        const nextTemplate = await createTemplate('Advance-all: successor subject');
 
         await addItems(nextPlan.id, [nextTemplate.id]);
 
-        const plan = await createPlan('Advance-all — current plan', { nextPlanId: nextPlan.id });
-        const template = await createTemplate('Advance-all — current subject');
+        const plan = await createPlan('Advance-all: current plan', { nextPlanId: nextPlan.id });
+        const template = await createTemplate('Advance-all: current subject');
 
         await addItems(plan.id, [template.id]);
 
         // Two groups on the SAME current plan, so their advance targets land
-        // in the SAME batch — the case that proves batching by
+        // in the SAME batch: the case that proves batching by
         // (planId, termId) rather than looping per-group naively.
         await api(`/api/offering-plan-apply/${plan.id}`, {
             method: 'POST',
@@ -526,7 +526,7 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
         expect(rows[0]!.groups.map((g) => g.groupId).sort()).toEqual([ids.groupCohortA, ids.groupSeminarA].sort());
 
         // IDEMPOTENT: both groups are now ON `nextPlan`, which has no
-        // successor of its own — running advance-all again must not re-offer
+        // successor of its own, so running advance-all again must not re-offer
         // (let alone re-apply) the exact move it just made.
         const again = await api<{ advanced: { groupId: string; toPlanId: string }[]; failed: unknown[] }>(
             '/api/group-plan-applications/advance-all',
@@ -540,12 +540,12 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
     });
 
     it('reports a batch failure by name, without blocking other groups in the same call', async () => {
-        // A successor plan with NO items — every group pointing at it fails
+        // A successor plan with NO items: every group pointing at it fails
         // the same way a single apply already does (422 "no offerings to
         // apply yet"), just reported per-batch instead of refusing the call.
-        const emptyNextPlan = await createPlan('Advance-all — empty successor');
-        const plan = await createPlan('Advance-all — points at an empty plan', { nextPlanId: emptyNextPlan.id });
-        const template = await createTemplate('Advance-all — orphaned subject');
+        const emptyNextPlan = await createPlan('Advance-all: empty successor');
+        const plan = await createPlan('Advance-all: points at an empty plan', { nextPlanId: emptyNextPlan.id });
+        const template = await createTemplate('Advance-all: orphaned subject');
 
         await addItems(plan.id, [template.id]);
 
@@ -553,7 +553,7 @@ describe('curriculum progression: the tenant-wide list and bulk "advance all"', 
             method: 'POST',
             cookie: adminCookie,
             body: JSON.stringify({
-                name: 'Advance-all — later term for the empty-plan case', timeGridId: 'test-grid-a',
+                name: 'Advance-all: later term for the empty-plan case', timeGridId: 'test-grid-a',
                 startDate: '2031-10-01', endDate: '2032-02-28',
             }),
         });

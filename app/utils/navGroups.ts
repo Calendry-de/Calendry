@@ -5,14 +5,14 @@
  * A MODULE rather than a const inside the component, so `tests/nav-groups.test.ts`
  * can import it. That is not a cosmetic move: the sidebar SILENTLY DROPS any
  * destination no group claims (see `navGroups()` in the shell), which is the
- * exact "no data and load failed render identically" failure CLAUDE.md names —
+ * exact "no data and load failed render identically" failure CLAUDE.md names:
  * a route stays reachable in the header and in Ctrl+K while vanishing from the
  * app's one persistent nav, and nothing says so. `/manage/data-export` shipped
  * in that state. The test is what makes the next one impossible; living in a
  * `.vue` script block is what made the test impossible.
  *
  * Membership is keyed by route path rather than by a `group` field on
- * `NavEntry` — adding one is a bigger change than this grouping warrants, and
+ * `NavEntry`: adding one is a bigger change than this grouping warrants, and
  * the test covers what the field would have guaranteed.
  */
 export interface NavGroup {

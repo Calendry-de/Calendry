@@ -32,7 +32,7 @@
             from the border box.
 
             `aria-hidden` because `interruptionLabel` is already in the
-            accessible name — this is the same decorative-icon-plus-real-text
+            accessible name; this is the same decorative-icon-plus-real-text
             split the meta row below uses.
         -->
         <span
@@ -49,7 +49,7 @@
         <!--
             TIME AND ROOM. In the grid a chip's POSITION carries its time, but a
             crowded cluster stacks its members one line each and a stack has no
-            position to read — 5 of 7 occupied slots on the live tenant. Rendered
+            position to read (5 of 7 occupied slots on the live tenant). Rendered
             for every chip and hidden by the container in the roomy case, so the
             two forms cannot say different things.
         -->
@@ -108,14 +108,14 @@
         </span>
 
         <!--
-            WHO AND WHICH — only when the filters are not already saying it. With
+            WHO AND WHICH, only when the filters are not already saying it. With
             a Group or Person filter set every chip belongs to it, and repeating
             it spends the chip's scarcest resource on what the toolbar just said.
         -->
         <!--
             ALWAYS RENDERED, even when empty: conditional, this line made the
             chip's HEIGHT depend on whether a session had a resolvable cohort, so
-            a row grew from data rather than crowding — and the three-line
+            a row grew from data rather than crowding, and the three-line
             intrinsic height (~62px) exceeded both Compact and Comfortable,
             collapsing two density settings into one.
         -->
@@ -144,7 +144,7 @@ import { DISPLAY_DEFAULTS, deliveryMode, resolveSessionColor } from '#shared/ses
 import type { DisplaySettings } from '#shared/sessionColor';
 
 const props = defineProps<{
-    /** Always placed (issue #22) — drawn only by the grid and the agenda, which never show a banked Session. */
+    /** Always placed (issue #22); drawn only by the grid and the agenda, which never show a banked Session. */
     session: PlacedScheduleSession;
     violations: Violation[];
     selected: boolean;
@@ -162,7 +162,7 @@ const props = defineProps<{
     virtualRoomIds?: Set<string>;
     /**
      * Pixels per minute, from `useGridGeometry`. Present only where the chip is
-     * MINUTE-TRUE — the week grid — and absent in the agenda, which is a list
+     * MINUTE-TRUE (the week grid) and absent in the agenda, which is a list
      * with no vertical time axis and would have to invent a number.
      *
      * Its absence removes the break OVERLAY, never the FACT: the interruption is
@@ -175,7 +175,7 @@ const props = defineProps<{
     /** Resolvers for the who/which line. Absent means the fact is omitted, not guessed. */
     groupName?: (id: string) => string;
     personName?: (id: string) => string;
-    /** Group/Person filters OFF — the chip only says what the toolbar does not. */
+    /** Group/Person filters OFF: the chip only says what the toolbar does not. */
     showGroup?: boolean;
     showPerson?: boolean;
     /**
@@ -188,7 +188,7 @@ const props = defineProps<{
      * A left-edge kind/offering colour stripe, alongside the dot rather than
      * instead of it. Opt-in and off by default: the grid's own dot-not-stripe
      * choice (see `_dot` below) is about ITS density, not a system-wide rule,
-     * and stays untouched. `ScheduleAgenda` is the one caller that sets this —
+     * and stays untouched. `ScheduleAgenda` is the one caller that sets this:
      * its rows are roomy enough (58px, one session each) for a stripe to read
      * as structure rather than noise.
      */
@@ -213,7 +213,7 @@ const resolvedColor = computed(() => resolveSessionColor(props.session, settings
  */
 /**
  * Emitted ONLY when set, so the stylesheet's `var(--online-color, <neutral>)`
- * fallback decides the unset case — an empty string would suppress it and paint
+ * fallback decides the unset case: an empty string would suppress it and paint
  * nothing. The CSS referenced this property from the start while nothing set it.
  */
 const onlineColor = computed(() => settings.value.onlineColor ?? '');
@@ -224,11 +224,11 @@ const delivery = computed(() => deliveryMode(
 ));
 
 /**
- * Severity drives shape and icon as well as colour — a violation must not be
+ * Severity drives shape and icon as well as colour: a violation must not be
  * signalled by hue alone.
  */
 /**
- * This day's clock time, not the shared timeline's — `blockTime` defaults
+ * This day's clock time, not the shared timeline's: `blockTime` defaults
  * `dayOfWeek` to null, which resolves the universal boundaries and is wrong by
  * that day's break minutes on a grid carrying day-specific overrides.
  */
@@ -249,8 +249,8 @@ const roomLabel = computed(() => {
 const roomCode = computed(() => roomLabel.value.split(' · ')[0] ?? '');
 
 /**
- * Assembled rather than inherited: the name was the title glued to the kind —
- * "ProjectLecture" — with no day, time or room, so 31 chips announced as
+ * Assembled rather than inherited: the name was the title glued to the kind,
+ * "ProjectLecture", with no day, time or room, so 31 chips announced as
  * run-together words. Everything position gives the sighted reader is words here.
  */
 /**
@@ -274,7 +274,7 @@ const whichLabel = computed(() => {
 });
 
 /**
- * Lecturer first — the fixed Role key and the question usually being asked — but
+ * Lecturer first, the fixed Role key and the question usually being asked, but
  * a Session with no lecturer and named attendees still has someone worth naming.
  */
 const whoLabel = computed(() => {
@@ -295,7 +295,7 @@ const whoLabel = computed(() => {
 });
 
 /**
- * The gaps inside this session's span — the time it occupies but does not teach.
+ * The gaps inside this session's span: the time it occupies but does not teach.
  *
  * The WALK lives in `gapsWithinSpan` (shared/timeGrid.ts) so the renderer, the
  * accessible name and anything that later reports this all ask one function. The
@@ -320,7 +320,7 @@ const interruptionLabel = computed(() => {
     const named = interruptions.value.map((gap) => gap.label).filter(Boolean);
 
     return named.length
-        ? `Interrupted by ${named.join(' and ')} — ${total} minutes not taught`
+        ? `Interrupted by ${named.join(' and ')}, ${total} minutes not taught`
         : `Interrupted by ${total} minutes of break`;
 });
 
@@ -418,7 +418,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
 
     /*
      * INSET outlines: at `outline-offset: 1px` the ring is drawn into the grid's
-     * 1px gap and overpainted along the bottom edge — it looked complete only
+     * 1px gap and overpainted along the bottom edge: it looked complete only
      * while hovered, because the hover `translateY` lifts it into its own
      * stacking context.
      */
@@ -507,7 +507,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     // a dot survives a 44px row where a 3px edge just adds noise.
 
     /*
-     * ONLINE: a dashed edge, never colour alone — it has to survive greyscale and
+     * ONLINE: a dashed edge, never colour alone; it has to survive greyscale and
      * the tenant leaving `onlineColor` empty. Same rule as violations.
      */
     &--online {
@@ -516,7 +516,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     }
 
     /*
-     * A NON-TEXT indicator only — border colour needs 3:1, not text's 4.5:1,
+     * A NON-TEXT indicator only: border colour needs 3:1, not text's 4.5:1,
      * so this is safe against an arbitrary tenant-picked kind colour where a
      * full-fill background would not be. Overrides only the left edge of the
      * base `border` shorthand above; top/right/bottom stay the surface5
@@ -556,7 +556,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
      *
      * Opaque over the chip's own fill rather than translucent: the point is that
      * this stretch is NOT the session, and a tint would read as a variation of
-     * it. The hatch carries the meaning where colour cannot — greyscale, an
+     * it. The hatch carries the meaning where colour cannot: greyscale, an
      * unset kind colour, or a violation tint already occupying the background.
      */
     &_gap {
@@ -592,7 +592,7 @@ const severity = computed<'none' | 'soft' | 'hard'>(() => {
     }
 
     // Tint layered OVER an opaque base rather than replacing it: a translucent
-    // background let the grid cell — and any chip behind it — show through.
+    // background let the grid cell, and any chip behind it, show through.
     &--hard {
         background: linear-gradient(rgb(169, 45, 70, 0.22), rgb(169, 45, 70, 0.22)), $surface3;
 

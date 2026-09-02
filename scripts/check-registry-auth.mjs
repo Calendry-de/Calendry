@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fails `bun install` with an explanation when the GitHub Packages credential
- * for the @calendry-de scope is missing — or, worse, present but inert.
+ * for the @calendry-de scope is missing, or, worse, present but inert.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -19,7 +19,7 @@
  *
  * bun attaches a scope token to the URL declared in the SAME `install.scopes`
  * entry. A token-only entry is silently ignored even when the registry mapping
- * exists in .npmrc — bun reports the same 401 as having no token at all. That
+ * exists in .npmrc; bun reports the same 401 as having no token at all. That
  * is precisely the failure this repo keeps designing against, so it is checked
  * for by name and reported as its own case.
  *
@@ -34,7 +34,7 @@ const SCOPE = '@calendry-de';
 const REGISTRY_HOST = 'npm.pkg.github.com';
 
 /**
- * Deliberately narrow TOML reading — node has no built-in TOML parser and
+ * Deliberately narrow TOML reading, because node has no built-in TOML parser and
  * `preinstall` runs before node_modules exists, so a dependency is not an
  * option. This understands exactly the two shapes bun documents for a scope:
  *
@@ -55,7 +55,7 @@ function readBunfigScope(file) {
 
     // Form 2: a dedicated section for the scope.
     const section = new RegExp(
-        // NB: JavaScript regex has no \Z — it would match a literal "Z" and the
+        // NB: JavaScript regex has no \Z; it would match a literal "Z" and the
         // section would never terminate at end-of-input. This lookahead is the
         // equivalent. (Cost me a full round of tests that all reported "no
         // credential" for perfectly good files.)
@@ -98,7 +98,7 @@ function readBunfigScope(file) {
 /**
  * Nearest wins, and it wins WHOLESALE. Verified: with the same scope declared
  * in both ./bunfig.toml and ~/.bunfig.toml, the project entry replaced the home
- * entry entirely — the home entry's token was not merged in. So a project file
+ * entry entirely: the home entry's token was not merged in. So a project file
  * shadows a working home credential exactly the way a project .npmrc would.
  * That is why the committed repo carries no scope entry of its own.
  */
@@ -127,7 +127,7 @@ const NPMRC_AUTH = new RegExp(`^\\s*//${REGISTRY_HOST.replace(/\./g, '\\.')}/:_a
  * An auth line ALONE is not a working setup: with no mapping, bun resolves
  * @calendry-de against registry.npmjs.org and gets a 404 while cheerfully
  * holding a valid credential for a registry it never contacts. Passing on the
- * token alone would be a guard that reports success for a setup that fails —
+ * token alone would be a guard that reports success for a setup that fails,
  * so both halves are required.
  */
 const NPMRC_SCOPE = new RegExp(`^\\s*${SCOPE}:registry\\s*=\\s*(\\S+)$`, 'm');
@@ -210,7 +210,7 @@ function pass(how) {
  * api.github.com/user (200) and was then refused by the registry with
  * `permission_denied: The token provided does not match expected scopes`, and
  * by the packages REST API with `Resource not accessible by personal access
- * token`. Nothing about that reads as "wrong kind of token" — it reads as a
+ * token`. Nothing about that reads as "wrong kind of token"; it reads as a
  * permissions problem you could chase for an hour on a token that can never
  * work here.
  *
@@ -224,7 +224,7 @@ if (bunfig?.token && bunfig.url && FINE_GRAINED.test(bunfig.token)) {
  The token in ${bunfig.file} is a FINE-GRAINED PAT (github_pat_…).
 
  GitHub Packages does not accept fine-grained tokens for the npm registry. It
- will authenticate — api.github.com accepts it — and then the registry refuses
+ will authenticate (api.github.com accepts it) and then the registry refuses
  with "does not match expected scopes", which looks like a permissions problem
  rather than a wrong token type.
 
@@ -240,13 +240,13 @@ if (bunfig?.token && bunfig.url) {
     pass(`bunfig scope entry in ${bunfig.file}`);
 }
 
-// Requires BOTH halves — see NPMRC_SCOPE above for why a token alone is not a
+// Requires BOTH halves; see NPMRC_SCOPE above for why a token alone is not a
 // working setup.
 if (npmrc?.ok && npmrcScope) {
     pass(`.npmrc auth line in ${npmrc.file} + scope mapping in ${npmrcScope.file}`);
 }
 
-// Everything below is a failure. Say WHICH failure — the three cases need
+// Everything below is a failure. Say WHICH failure: the three cases need
 // different fixes and look identical from the 401 alone.
 let diagnosis;
 
@@ -254,7 +254,7 @@ if (bunfig?.unparsed) {
     diagnosis = `${bunfig.file} declares "${SCOPE}" in a form this check cannot read (${bunfig.unparsed}).\n `
         + `   It may still work; verify by hand, or use the inline-table form below.`;
 } else if (bunfig?.token && !bunfig.url) {
-    diagnosis = `${bunfig.file} sets a token for "${SCOPE}" but NO url — so bun never sends it.\n`
+    diagnosis = `${bunfig.file} sets a token for "${SCOPE}" but NO url, so bun never sends it.\n`
         + ` \n`
         + `    A scope token is attached to the url declared in the SAME entry. Without\n`
         + `    'url' the token is silently ignored, even though .npmrc maps the scope to\n`
@@ -264,7 +264,7 @@ if (bunfig?.unparsed) {
     diagnosis = `${bunfig.file} declares "${SCOPE}" but with no token.`;
 } else if (npmrc?.ok && !npmrcScope) {
     diagnosis = `${npmrc.file} has a token for ${REGISTRY_HOST}, but nothing maps "${SCOPE}"\n`
-        + `    to that registry — so bun resolves it against registry.npmjs.org and gets a\n`
+        + `    to that registry, so bun resolves it against registry.npmjs.org and gets a\n`
         + `    404 while holding a credential it never uses. Use the bunfig entry below,\n`
         + `    which declares both in one place.`;
 } else if (npmrc && !npmrc.ok) {
@@ -275,7 +275,7 @@ if (bunfig?.unparsed) {
 
 console.error(`
 ──────────────────────────────────────────────────────────────────────────────
- Cannot install ${SCOPE}/calendry-proto — GitHub Packages needs a token.
+ Cannot install ${SCOPE}/calendry-proto: GitHub Packages needs a token.
 
  ${diagnosis}
 
@@ -283,7 +283,7 @@ console.error(`
  even public packages. Without a working token you get a 401 that looks
  exactly like the package not existing.
 
- FIX — add to ~/.bunfig.toml (NOT this repo; a project-level entry shadows
+ FIX: add to ~/.bunfig.toml (NOT this repo; a project-level entry shadows
  your home one wholesale, and a token in the repo is a token one 'git add -f'
  from being published):
 

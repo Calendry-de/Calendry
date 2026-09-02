@@ -2,12 +2,12 @@ import type { Prisma } from '@prisma/client';
 import { PER_SESSION_CONSTRAINT_TYPES, RELATION_CONSTRAINT_TYPES, STRUCTURAL_CONSTRAINT_TYPES } from '../../shared/constraintTypes';
 import type { StructuralConstraintType } from '../../shared/constraintTypes';
 import { gapsWithinSpan } from '../../shared/timeGrid';
-import { isPlacedSession } from '../../shared/sessionPlacement';
+import { isBankedSession } from '../../shared/sessionPlacement';
 import type { Tx } from './tenantDb';
 import { conflictGroupIds, descendantGroupIds } from './groupClosure';
 
 /**
- * Constraint evaluation for manual edits — the warn-and-allow half of
+ * Constraint evaluation for manual edits: the warn-and-allow half of
  * TAXONOMY.md §3.
  *
  * SCOPE: only the STRUCTURAL hard constraints a manual edit can break, which are
@@ -29,8 +29,8 @@ import { conflictGroupIds, descendantGroupIds } from './groupClosure';
  *
  * Re-exported here so every existing importer keeps working unchanged.
  */
-// Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
-// scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
+// Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too, by
+// scripts/ and by vitest, where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
 export {
     STRUCTURAL_CONSTRAINT_TYPES,
@@ -44,7 +44,7 @@ export type {
 
 interface PlacedSession {
     id: string;
-    /** Null for a Federation-shared Session — it belongs to no member tenant. */
+    /** Null for a Federation-shared Session: it belongs to no member tenant. */
     tenantId: string | null;
     termId: string;
     kindId: string;
@@ -56,7 +56,7 @@ interface PlacedSession {
 }
 
 /**
- * A seed, additionally carrying its own TimeGrid — needed only by the
+ * A seed, additionally carrying its own TimeGrid: needed only by the
  * per-session pass below, which is why `candidates` does not select it: a
  * candidate is never checked for spanning a break, only for colliding with a
  * seed.
@@ -103,7 +103,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
      * Federation-shared ones. A shared event occupies a real room in a real
      * slot, so excluding it would report a clean schedule that is not.
      *
-     * Only ever used for READING. Violations themselves stay tenant-scoped —
+     * Only ever used for READING. Violations themselves stay tenant-scoped:
      * `constraint_violation.tenant_id` is this tenant's row about its own
      * schedule, even when the other party is a shared Session.
      */
@@ -116,14 +116,14 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     }
 
     /**
-     * EVERY structural constraint the tenant has, enabled or not — then the enabled
+     * EVERY structural constraint the tenant has, enabled or not, then the enabled
      * subset. The distinction is what makes DISABLING take effect:
      * `clearViolations` removes rows for the ids it is given, so passing only the
      * enabled ones left a disabled rule's violations in the table with nothing to
      * delete them, and the toggle looked broken.
      *
      * Note the asymmetry it removes: the `length === 0` branch passed an EMPTY id
-     * list, which `clearViolations` treats as "no filter" and deletes everything —
+     * list, which `clearViolations` treats as "no filter" and deletes everything,
      * so "no rules at all" cleared correctly while "one of several disabled" did not.
      */
     const configured = await tx.constraint.findMany({
@@ -142,7 +142,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const enabled = configured.filter((c) => c.isEnabled);
 
     // Nothing ENABLED means nothing to record. Collisions still happen; the
-    // tenant simply has not asked to be warned about them — and anything a
+    // tenant simply has not asked to be warned about them, and anything a
     // previously-enabled rule recorded is cleared rather than stranded.
     if (enabled.length === 0) {
         await clearViolations(tx, tenantId, sessionIds, clearableIds);
@@ -164,7 +164,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     }
 
     // Candidate collision set: every Session sharing a term/week/day with a seed.
-    // Narrowing by week and day first keeps this bounded — the alternative is
+    // Narrowing by week and day first keeps this bounded; the alternative is
     // scanning the term.
     const candidates = (await tx.session.findMany({
         where: {
@@ -185,7 +185,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
 
     const involvedIds = [...new Set([...seeds.map((s) => s.id), ...candidates.map((c) => c.id)])];
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection; concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const rooms = await tx.sessionRoom.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, roomId: true } });
     const people = await tx.sessionPerson.findMany({ where: { sessionId: { in: involvedIds } }, select: { sessionId: true, personId: true } });
@@ -195,7 +195,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const virtualRoomIds = new Set(virtualRooms.map((room) => room.id));
 
     /**
-     * Virtual rooms host unlimited concurrent sessions — TAXONOMY.md models online
+     * Virtual rooms host unlimited concurrent sessions: TAXONOMY.md models online
      * delivery AS a room precisely so room-assignment logic stays uniform.
      *
      * Excluded at the CONSTRUCTION site rather than inside `describeCollision`, so
@@ -214,7 +214,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     const byGroup = groupBy(groups, 'sessionId', 'groupId');
 
     /**
-     * Who actually ATTENDS each Session — direct participants plus the members of
+     * Who actually ATTENDS each Session: direct participants plus the members of
      * every group beneath the ones assigned to it.
      *
      * DESCENDANTS ONLY, not the conflict closure: membership flows downward, so
@@ -321,13 +321,13 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     /**
      * PER-SESSION: one Session, its own fact, no counterpart. Grids are
      * fetched ONCE per distinct `timeGridId` among the seeds, not once per
-     * (constraint, seed) — the pairwise loop above re-uses precomputed closures
+     * (constraint, seed); the pairwise loop above re-uses precomputed closures
      * for the same reason.
      *
      * DISPATCHED BY TYPE, the same shape as `describeCollision` for the
-     * pairwise types below: `no_unplaced_session` needs no TimeGrid at all — it
+     * pairwise types below: `no_unplaced_session` needs no TimeGrid at all; it
      * is a fact about whether the seed has a placement, not about the grid a
-     * placement sits in — so folding it into the grid-gap body would either
+     * placement sits in, so folding it into the grid-gap body would either
      * skip it for every seed with no grid or run break-gap arithmetic against a
      * NULL block/day, which is exactly the crash the old single-purpose loop
      * had no case to avoid once a second per-session type existed.
@@ -352,7 +352,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
             for (const seed of seeds) {
                 /**
                  * Only ever true when a caller hands this function a banked
-                 * seed — today, no caller does: `bank.post.ts` writes this
+                 * seed; today, no caller does: `bank.post.ts` writes this
                  * violation directly instead of calling this function (see its
                  * file comment), and every other route only reaches this
                  * function with a Session it just confirmed is placed. Handled
@@ -361,7 +361,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                  * the break-gap check below.
                  */
                 if (constraint.type === 'no_unplaced_session') {
-                    if (isPlacedSession(seed)) {
+                    if (!isBankedSession(seed)) {
                         continue;
                     }
 
@@ -376,8 +376,8 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
                     continue;
                 }
 
-                // no_session_spanning_break. No grid, nothing to check against
-                // — the same "named rather than filtered" reasoning `fitsGrid`
+                // no_session_spanning_break. No grid, nothing to check against,
+                // the same "named rather than filtered" reasoning `fitsGrid`
                 // callers already follow: a null timeGridId here means there is
                 // no rule to violate, not that the rule passed.
                 const grid = seed.timeGridId ? gridById.get(seed.timeGridId) : undefined;
@@ -414,13 +414,13 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
     /**
      * RELATION-BASED: keyed by explicit `ConstraintRelationMember` membership,
      * not a shared Room/Lecturer/Group/Person `describeCollision` already has
-     * loaded — the same reason `PER_SESSION_CONSTRAINT_TYPES` gets its own pass
+     * loaded; the same reason `PER_SESSION_CONSTRAINT_TYPES` gets its own pass
      * rather than a case in that switch (`shared/constraintTypes.ts`'s comment
      * on `RELATION_CONSTRAINT_TYPES`).
      *
      * REUSES `candidates`, not a new query: a relation violation still needs
      * `blocksOverlap` (same term/week/day), and `candidates` already holds
-     * every Session sharing one with ANY seed — a relation's OTHER member
+     * every Session sharing one with ANY seed: a relation's OTHER member
      * Offering's Session is already in there if it could possibly overlap.
      */
     if (relationEnabled.length > 0) {
@@ -442,8 +442,8 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
             const memberOfferingIds = membersByConstraint.get(constraint.id) ?? new Set<string>();
 
             // A dangling-member relation (see `assembleSolverInput`'s report)
-            // still names real Offerings here — this reads `Offering.id`
-            // directly, never the solver's snapshot — so this only fires for
+            // still names real Offerings here: this reads `Offering.id`
+            // directly, never the solver's snapshot, so this only fires for
             // a relation that never had two members at all.
             if (memberOfferingIds.size < 2) {
                 continue;
@@ -480,7 +480,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         }
     }
 
-    // `clearableIds`, not `enabled` — see the note above. A rule that was
+    // `clearableIds`, not `enabled`: see the note above. A rule that was
     // switched off must have its old rows removed, not merely stop adding new
     // ones.
     await clearViolations(tx, tenantId, involvedIds, clearableIds);
@@ -489,7 +489,7 @@ export async function refreshViolations(tx: Tx, options: RefreshOptions): Promis
         /**
          * find-then-write rather than `upsert`. Prisma cannot express a
          * compound unique key containing NULLABLE columns, and this one is
-         * (constraint_id, session_id, offering_id) with NULLS NOT DISTINCT —
+         * (constraint_id, session_id, offering_id) with NULLS NOT DISTINCT,
          * a shape the schema language has no way to describe. The index still
          * enforces uniqueness in the database; this is only how it is reached.
          */
@@ -537,7 +537,7 @@ export function describeCollision(
     ctx: {
         byRoom: Map<string, string[]>;
         byPerson: Map<string, string[]>;
-        /** Each Session's DIRECTLY assigned Groups — never the closure. */
+        /** Each Session's DIRECTLY assigned Groups: never the closure. */
         byGroup: Map<string, string[]>;
         conflictSets: Map<string, Set<string>>;
         /** Everyone attending each Session: direct participants + group members. */
@@ -563,7 +563,7 @@ export function describeCollision(
              *
              * A Session booked for a Cohort blocks its child Seminars and vice
              * versa (TAXONOMY.md §6), so one side is widened to its ancestors and
-             * descendants — but the other must be matched by IDENTITY.
+             * descendants, but the other must be matched by IDENTITY.
              *
              * Intersecting two EXPANDED sets makes any two Groups sharing a common
              * ancestor collide, however distantly:
@@ -590,8 +590,8 @@ export function describeCollision(
              * groups unrelated in the nesting tree, both scheduled at once.
              *
              * Both sides expand all the way down to PEOPLE and intersect by
-             * identity. Symmetric expansion is safe here — and would not be for
-             * groups — because people are leaves, so the "shares an ancestor" false
+             * identity. Symmetric expansion is safe here (and would not be for
+             * groups) because people are leaves, so the "shares an ancestor" false
              * positive cannot arise.
              */
             const setA = ctx.attendeeSets.get(a.id) ?? new Set<string>();
@@ -613,7 +613,7 @@ async function clearViolations(tx: Tx, tenantId: string, sessionIds: string[], c
             sessionId: { in: sessionIds },
             // Scoped to session-shaped rows on purpose. `sessionId IN (...)`
             // already excludes NULLs, so a solver-produced offering-scoped
-            // violation survives a manual-edit refresh — this evaluator has no
+            // violation survives a manual-edit refresh: this evaluator has no
             // opinion about those and must not silently clear them.
             offeringId: null,
             ...(constraintIds.length ? { constraintId: { in: constraintIds } } : {}),

@@ -33,7 +33,7 @@ export interface EntityCount {
  * The counted entities this caller may actually read.
  *
  * Gated on `<resource>.read`, which is the SAME key the destination's own nav
- * entry requires — so a tile appears exactly when its `/manage` link does, and
+ * entry requires, so a tile appears exactly when its `/manage` link does, and
  * the strip widens the page's permission surface by nothing. Resolved through
  * `entityPermission()` rather than composed here, so an entity carrying a
  * `permissionOverrides` entry cannot be gated on a key that does not exist.

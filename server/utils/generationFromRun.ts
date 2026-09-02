@@ -6,7 +6,7 @@ import type { Tx } from './tenantDb';
  *
  * A Generation here is a PROPOSAL, not an application: it holds no Session rows
  * and `is_current` stays false until a human applies it. That separation is the
- * whole reason placements stay in `solver_run.result` — see
+ * whole reason placements stay in `solver_run.result`; see
  * generationMaterialize.ts.
  *
  * Only a SUCCEEDED run gets one. A FAILED or CANCELLED run has no placements to
@@ -32,7 +32,7 @@ export async function createGenerationForRun(tx: Tx, options: {
     runId: string;
     /**
      * The Term this run solved. It becomes the Generation's own `termId`, which
-     * is what scopes its version series and its "current" flag — see the
+     * is what scopes its version series and its "current" flag; see the
      * allocation below.
      */
     termId: string;
@@ -59,21 +59,21 @@ export async function createGenerationForRun(tx: Tx, options: {
      * Version allocation races: `version = max + 1` under a unique index lets
      * two concurrent applies compute the same number. A transaction-scoped
      * advisory lock serialises just the allocation, is released at COMMIT, and
-     * involves no network call inside — the same shape as the Stage 4 claim.
+     * involves no network call inside: the same shape as the Stage 4 claim.
      *
      * KEYED ON THE TERM as well as the tenant, now that the series is per term:
      * locking the tenant would serialise allocations for terms that cannot
      * collide, and locking the term alone would let two tenants share a lock.
      */
     // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns void, and
-    // Prisma cannot deserialize a void column — it fails with "Failed to
+    // Prisma cannot deserialize a void column: it fails with "Failed to
     // deserialize column of type 'void'", which reads like a schema problem
     // rather than the wrong client method.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${tenantId} || ':' || ${termId}), hashtext('generation_version'))`;
 
     /*
      * PER TERM. This was the tenant-wide maximum, which is what made six terms
-     * with one proposal each read v1..v6 — a version that told you the order
+     * with one proposal each read v1..v6, a version that told you the order
      * runs happened to finish in across the whole institution, and nothing about
      * the term you were looking at.
      */
@@ -101,7 +101,7 @@ export async function createGenerationForRun(tx: Tx, options: {
             // Lineage: what this proposal was computed against.
             parentGenerationId: current?.id ?? null,
             source: 'SOLVER',
-            // READY even with residual hard violations — that is the
+            // READY even with residual hard violations: that is the
             // warn-and-allow decision, and the violations travel with the
             // result rather than blocking it.
             status: 'READY',

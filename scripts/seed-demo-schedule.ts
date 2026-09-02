@@ -1,22 +1,22 @@
 /**
  * Builds a demo institution for one tenant: a grid, a vocabulary, a group tree,
- * six terms, every module of the six-semester curriculum — as reusable
+ * six terms, every module of the six-semester curriculum (as reusable
  * OfferingTemplates bundled into per-term curriculum plans, applied to their
- * cohorts — and a first week of placements in each term.
+ * cohorts), and a first week of placements in each term.
  *
  * SEPARATE FROM SEEDING, AND THE LINE IS NOT ARBITRARY.
  *
- *   `prisma/seed.ts`      — data the system is INCORRECT without. The permission
+ *   `prisma/seed.ts`      : data the system is INCORRECT without. The permission
  *                           catalogue, mirrored from code. Runs everywhere,
  *                           production included.
- *   `provision:tenant`    — one tenant's own bootstrap: its access roles, its
+ *   `provision:tenant`    : one tenant's own bootstrap: its access roles, its
  *                           first administrator, its baseline constraint rows.
- *   this script           — DEMO CONTENT. Nothing here is required by anything;
+ *   this script           : DEMO CONTENT. Nothing here is required by anything;
  *                           a real institution names its own session kinds,
  *                           draws its own grid and enters its own modules.
  *
  * Offerings in particular can only ever live here. There is no default Offering
- * and there cannot be one — an Offering is the institution's own curriculum, so
+ * and there cannot be one: an Offering is the institution's own curriculum, so
  * seeding one would be inventing a course nobody teaches. Templates and plans
  * are the SAME story one level up: this script's own opinion of how the
  * curriculum is shaped, not something any tenant is owed.
@@ -69,7 +69,7 @@ async function main() {
             console.log('  cleared existing sessions, offerings and generations');
 
             /*
-             * GROUPS TOO, deliberately, and not with a single DELETE — the
+             * GROUPS TOO, deliberately, and not with a single DELETE: the
              * self-referential `parentGroupId` FK is `onDelete: Restrict`, so a
              * row survives as long as anything still points at it as a parent.
              * Deleting current leaves repeatedly clears the whole tenant's tree
@@ -207,7 +207,7 @@ async function main() {
             })),
         });
 
-        // Systemtechnik/Management are "Built from other groups" — see GROUPS'
+        // Systemtechnik/Management are "Built from other groups"; see GROUPS'
         // own comment. `group_source`'s PK is `(groupId, sourceGroupId)`, so this
         // is idempotent without a delete-then-create.
         for (const link of GROUP_SOURCES) {
@@ -229,7 +229,7 @@ async function main() {
 
         // --- offering templates ------------------------------------------------
         /*
-         * ONE OfferingTemplate per module — the reusable shape a curriculum
+         * ONE OfferingTemplate per module: the reusable shape a curriculum
          * plan bundles, rather than an Offering created directly. Every
          * series still gets the FULL contact hours, not a share of them: the
          * hours are what one student sits through, and a second Group
@@ -244,17 +244,17 @@ async function main() {
             const template = await prisma.offeringTemplate.upsert({
                 where: { id },
                 create: {
-                    id, tenantId: t, name: `${m.code} — ${m.title}`,
+                    id, tenantId: t, name: `${m.code}: ${m.title}`,
                     title: m.title, kindId: kindByKey.get(m.kind)!, code: m.code,
                     frequency,
-                    // ONE block, which IS 90 minutes here — the slot a module
+                    // ONE block, which IS 90 minutes here: the slot a module
                     // fills in the source timetable. It was 2 while a block
                     // was 45.
                     durationBlocks: 1,
                     requiredRoleId: lecturerRole?.id ?? null,
                 },
                 update: {
-                    name: `${m.code} — ${m.title}`, title: m.title, kindId: kindByKey.get(m.kind)!,
+                    name: `${m.code}: ${m.title}`, title: m.title, kindId: kindByKey.get(m.kind)!,
                     frequency, durationBlocks: 1, requiredRoleId: lecturerRole?.id ?? null,
                 },
             });
@@ -265,8 +265,8 @@ async function main() {
         // --- curriculum plans ----------------------------------------------
         /*
          * One plan per (term, audience). Most terms have a single plan for
-         * the whole cohort — `m.groups` defaulting to `['s1', 's2']`, per
-         * `demoData.ts`'s own comment — and Semester 4-6 additionally split
+         * the whole cohort (`m.groups` defaulting to `['s1', 's2']`, per
+         * `demoData.ts`'s own comment), and Semester 4-6 additionally split
          * into a Systemtechnik and a Management plan for the modules scoped
          * to just one of those tracks. Grouping by `m.groups` rather than
          * hand-declaring the plans keeps this in sync with `MODULES` by
@@ -294,11 +294,11 @@ async function main() {
         for (const [key, plan] of planGroups) {
             /*
              * The full-cohort plan is just the term's own name; a track plan
-             * says so — "Semester 4 — Systemtechnik" — since the term alone
+             * says so ("Semester 4: Systemtechnik") since the term alone
              * would collide with the cohort plan sharing that term.
              */
             const planName = plan.groupKeys.length === 1
-                ? `${termNameByKey.get(plan.termKey)} — ${groupNameByKey.get(plan.groupKeys[0]!)}`
+                ? `${termNameByKey.get(plan.termKey)}: ${groupNameByKey.get(plan.groupKeys[0]!)}`
                 : termNameByKey.get(plan.termKey)!;
 
             const planId = `${t}-plan-${key.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`;
@@ -329,7 +329,7 @@ async function main() {
 
             /*
              * APPLIED ONCE PER GROUP IN THE PLAN'S AUDIENCE, through the SAME
-             * function `/api/offering-plan-apply` uses — the demo curriculum
+             * function `/api/offering-plan-apply` uses: the demo curriculum
              * is built the way a tenant would build it, not a second
              * definition of what applying a plan means. A two-group plan's
              * second apply finds the first apply's Offerings already exist
@@ -360,8 +360,8 @@ async function main() {
 
         /*
          * SUCCESSION: "Semester 3" points at "Semester 4" for the SAME
-         * audience — the core cohort plan chains to the next core cohort
-         * plan, Systemtechnik's to Systemtechnik's — so advancing a Group
+         * audience: the core cohort plan chains to the next core cohort
+         * plan, Systemtechnik's to Systemtechnik's, so advancing a Group
          * from the Group page needs no picker. A second pass, not folded
          * into the loop above, because linking a Term's plan to the NEXT
          * Term's needs that next plan to already exist.
@@ -403,7 +403,7 @@ async function main() {
         /*
          * A handful of placements, not a full timetable. Producing the full one
          * is the SOLVER's job, and pre-placing it here would hide whether the
-         * solver can — the demo exists to be run against, not to look finished.
+         * solver can: the demo exists to be run against, not to look finished.
          *
          * Placed at block 1, 3, 5 … deliberately: those are the positions a
          * 90-minute session occupies without spanning a break, so the starting
@@ -441,7 +441,7 @@ async function main() {
         let placed = 0;
         /*
          * RESET PER TERM, not a running count across all six. Every term's
-         * baseline is its own "handful of placements" — without the reset,
+         * baseline is its own "handful of placements": without the reset,
          * Semester 2 onward would start wherever the previous term's count
          * happened to land in the day/block cycle instead of Monday, block 0.
          */
@@ -463,7 +463,7 @@ async function main() {
             /*
              * ONE SESSION PER ATTACHED GROUP, mirroring what the solver does
              * with a multi-group Offering (TAXONOMY.md § "What attaching
-             * several Groups to one Offering MEANS") — never one shared
+             * several Groups to one Offering MEANS"), never one shared
              * Session for the union, which would put both halves in the same
              * room at the same time.
              */
@@ -488,12 +488,12 @@ async function main() {
                 /*
                  * THE LAP, not the raw index. Day and block both cycle on
                  * `indexInTerm % 6` above, so every 6th series repeats the same
-                 * (day, block) pair — harmless with only a handful of series per
+                 * (day, block) pair, harmless with only a handful of series per
                  * term, but Semester 4-6 now carry up to 20. Cycling the room on
                  * that same period-6 index would make every repeat land in the
                  * same ROOM too, i.e. a real double-booking rather than a
-                 * cosmetic one. Indexing by lap instead — how many full sweeps
-                 * of the 6 slots this series is into — guarantees the 6 series
+                 * cosmetic one. Indexing by lap instead (how many full sweeps
+                 * of the 6 slots this series is into) guarantees the 6 series
                  * sharing one lap get 6 distinct (day, block) pairs, and only
                  * the NEXT lap's repeat of a pair gets a different room.
                  */
@@ -537,7 +537,7 @@ async function main() {
         console.log(`  ${LECTURERS.length} lecturers, ${rooms.length} rooms`);
         console.log(`  ${templateByCode.size} offering templates, ${planGroups.size} curriculum plans`);
         console.log(`  ${offeringCount} offerings applied from those plans across all ${TERMS.length} terms, each with a lecturer and one or two groups`);
-        console.log(`  ${placed} baseline sessions in week 1 — the rest is the solver's job`);
+        console.log(`  ${placed} baseline sessions in week 1; the rest is the solver's job`);
         console.log('Done.');
     } catch (error) {
         console.error(`\nFailed: ${error instanceof Error ? error.message : String(error)}\n`);

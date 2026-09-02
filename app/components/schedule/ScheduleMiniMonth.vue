@@ -69,7 +69,7 @@ import { weekdayShort } from '~/composables/schedule';
 import { addDays, isoDate, mondayOf, weekIndexOf } from '#shared/academicCalendar';
 
 /**
- * A "jump to a date" tool, secondary to `ScheduleWeekNav`'s prev/next stepper —
+ * A "jump to a date" tool, secondary to `ScheduleWeekNav`'s prev/next stepper:
  * it does not replace it. Every date-to-week conversion goes through
  * `shared/academicCalendar.ts`, the one definition also used by the solver's
  * calendar and the calendar-period editor; no date arithmetic is reinvented
@@ -87,7 +87,7 @@ defineEmits<{ 'select-week': [week: number] }>();
 const termStart = computed(() => (props.term ? new Date(props.term.startDate) : null));
 
 /**
- * The month on screen, independent of the term's own start — a reader jumping
+ * The month on screen, independent of the term's own start: a reader jumping
  * a few months ahead should not have their place reset by an unrelated prop
  * change. Re-seeded only when the TERM itself changes (a different Term's
  * dates make the old viewed month meaningless), never on every `week` step.
@@ -130,7 +130,7 @@ interface Cell {
 }
 
 /**
- * A fixed 42-cell (6-week) grid, Monday-anchored, covering the viewed month —
+ * A fixed 42-cell (6-week) grid, Monday-anchored, covering the viewed month:
  * the conventional month-picker shape, never resized by how many weeks a
  * given month happens to span.
  */
@@ -262,14 +262,14 @@ const cells = computed<Cell[]>(() => {
         // The whole week reads as a band. `varToRgba('primary500', 0.14)`,
         // not the flat `primary200` this used to be: `primary200` is a LIGHT-
         // ONLY tint with no dark-theme override, while `primary700` (the text
-        // sitting on top of it) DOES flip to a light value in dark mode —
-        // light text on a background that stayed light regardless of theme,
-        // which is exactly the low-contrast selected-week band reported live.
-        // `primary500` at low opacity is the pattern every OTHER "selected/
-        // highlighted" surface in this app already uses (`ManageList`,
+        // sitting on top of it) DOES flip to a light value in dark mode,
+        // meaning light text on a background that stayed light regardless of
+        // theme, which is exactly the low-contrast selected-week band reported
+        // live. `primary500` at low opacity is the pattern every OTHER
+        // "selected/highlighted" surface in this app already uses (`ManageList`,
         // `ScheduleGrid`, `ManageConstraintVariantGroup`, …) because it is
-        // translucent over whatever ground sits under it — light in light
-        // mode, dark in dark mode — so it composes correctly with
+        // translucent over whatever ground sits under it, light in light
+        // mode, dark in dark mode, so it composes correctly with
         // `primary700`'s own per-theme flip instead of fighting it.
         &--selected {
             font-weight: 650;

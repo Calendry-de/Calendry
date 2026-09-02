@@ -17,7 +17,7 @@
 
             <!--
                 NAMED, not drawn as emptiness. Between terms the rooms below are
-                genuinely all free, which is true and worth showing — but a
+                genuinely all free, which is true and worth showing, but a
                 display that showed only free rooms with no explanation would be
                 indistinguishable from one whose timetable had been wiped.
             -->
@@ -77,13 +77,13 @@
 /**
  * The lobby display.
  *
- * NO CHROME AT ALL — no nav, no header, no account menu. This page is not
+ * NO CHROME AT ALL: no nav, no header, no account menu. This page is not
  * browsed, it is mounted on a wall and left running for a term, and every
  * affordance on it is a thing nobody can click. It reads at a distance and does
  * one job: which rooms are busy right now.
  *
  * AUTHENTICATES WITH A DEVICE KEY in its own URL, never a session cookie, which
- * is why it sits in `ANONYMOUS_ROUTES` — a session check would bounce a display
+ * is why it sits in `ANONYMOUS_ROUTES`: a session check would bounce a display
  * to a login form nobody is standing at. The key holds no permissions and is
  * scoped to rooms; `GET /api/screens/board` is what enforces it.
  */
@@ -122,7 +122,7 @@ const board = ref<Board | null>(null);
 const error = ref('');
 
 /*
- * A LOCAL CLOCK, ticking every second, purely so the display looks alive — but
+ * A LOCAL CLOCK, ticking every second, purely so the display looks alive, but
  * "is this room busy" is decided SERVER-side (`isNow`), from the same clock that
  * chose the term week. A display left running for months would otherwise drift
  * against the schedule it draws and there would be nothing on screen to say so.
@@ -151,7 +151,7 @@ async function load(): Promise<void> {
         /*
          * The message is SHOWN, not swallowed. A revoked screen and a mistyped
          * URL are different problems with different fixes, and the person who
-         * can act on either is the one walking past — so the wall has to say
+         * can act on either is the one walking past, so the wall has to say
          * which it is rather than going blank.
          */
         error.value = message ?? 'Could not reach the timetable.';
@@ -163,7 +163,7 @@ await load();
 onMounted(() => {
     const tick = setInterval(() => { now.value = new Date(); }, 1000);
     /*
-     * A minute is the resolution that matters — a block boundary — and it keeps
+     * A minute is the resolution that matters (a block boundary), and it keeps
      * a year of unattended running to ~525k requests, which is nothing. Faster
      * would buy no accuracy, since the underlying data changes when somebody
      * edits a timetable, not continuously.
@@ -184,7 +184,7 @@ useHead({ title: () => board.value?.screenName ?? 'Room board' });
  * SIZED FOR DISTANCE, not for a desk. Everything here is deliberately larger
  * than the app's scale: the reader is several metres away and walking. That is
  * why this page uses `clamp()` against the viewport rather than the shared
- * font-size tokens — the tokens are calibrated for someone at a keyboard, and
+ * font-size tokens: the tokens are calibrated for someone at a keyboard, and
  * borrowing them here would produce a technically consistent board nobody can
  * read from the far side of a corridor.
  */
@@ -264,7 +264,7 @@ useHead({ title: () => board.value?.screenName ?? 'Room board' });
     padding: clamp(var(--space-5), 2vh, var(--space-7));
 
     // The content ramp, because no step of the surface ramp reaches 3:1 against
-    // this ground in either theme — and on a wall, at distance, an edge that is
+    // this ground in either theme, and on a wall, at distance, an edge that is
     // merely almost visible is not visible.
     border: 2px solid varToRgba('content7', 0.4);
     border-radius: var(--radius-lg);

@@ -27,8 +27,8 @@
                     `display: none`, which takes a control out of the focus
                     order AND out of the accessibility tree: all eight blocks
                     were unreachable by keyboard and invisible to assistive
-                    technology, on both /my pages — WCAG 2.1.1 and 4.1.2, both
-                    Level A. Since the block axis is the only way to say "not
+                    technology, on both /my pages (WCAG 2.1.1 and 4.1.2, both
+                    Level A). Since the block axis is the only way to say "not
                     this time of day", the sole window a keyboard user could
                     express was the whole day, the most destructive one.
 
@@ -53,7 +53,7 @@
 
         <!--
             Read-only renders the selection as TEXT, never as disabled
-            checkboxes — a disabled control reads as "unavailable right now"
+            checkboxes: a disabled control reads as "unavailable right now"
             rather than "not yours to change".
         -->
         <p
@@ -83,7 +83,7 @@ import { blockTime } from '~/composables/schedule';
  * IT SHOWS TIMES, and that is the whole reason it is not a row of numbers.
  * "Block 3" is unverifiable; "Block 3 (11:15–12:00)" is the thing the person
  * actually means when they say they prefer mornings. Times come from
- * `blockTime()` — the same helper the schedule grid and the TimeGrid editor
+ * `blockTime()`, the same helper the schedule grid and the TimeGrid editor
  * use, so a break override cannot make this control disagree with the timetable.
  */
 const props = defineProps<{

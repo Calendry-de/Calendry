@@ -5,7 +5,7 @@ import type { Tx } from './tenantDb';
  * Shared read shaping for the Generation routes (Stage 6a).
  *
  * The list, the detail and the preview all describe the same thing, so they
- * describe it the same way — a review screen that shows one set of fields in a
+ * describe it the same way: a review screen that shows one set of fields in a
  * list and a differently-named set on the detail page is a screen nobody trusts.
  */
 
@@ -36,7 +36,7 @@ export const GENERATION_SELECT = {
  *
  * AN ALLOW-LIST, NOT A DENY-LIST, and the difference is the whole point. This
  * was `reason !== 'time_budget'`, which answers "reproducible" for every string
- * it has never seen — so when the solver gained `stagnated` (a run that could
+ * it has never seen, so when the solver gained `stagnated` (a run that could
  * not place everything and stopped searching), the app reported it as a clean,
  * repeatable result without a line of code being wrong about `stagnated`
  * specifically. A new termination reason must now arrive as UNKNOWN and stay
@@ -51,7 +51,7 @@ const REPRODUCIBLE_TERMINATIONS = new Set(['converged', 'move_budget']);
  * property of the input. `converged` and `move_budget` both are.
  *
  * NULL means the run predates Stage 6a's `termination_reason` capture, OR ends
- * for a reason this version does not recognise. Both are honestly "unknown" —
+ * for a reason this version does not recognise. Both are honestly "unknown",
  * never "reproducible". Rows are not backfilled, so the first case is real and
  * permanent, not transitional.
  */

@@ -7,7 +7,7 @@ import { defaultConstraintRow, defaultConstraintTypes } from '#shared/constraint
  * Every page a role can reach must actually RENDER for that role.
  *
  * A page's data arrives as one `Promise.all` of reference fetches carrying their
- * OWN permissions, which need not be the one the page is gated on — and a single
+ * OWN permissions, which need not be the one the page is gated on, and a single
  * 403 inside `Promise.all` rejects the whole handler, so the page renders as
  * NOTHING. Not an error, not a partial view: blank, and indistinguishable from a
  * page that legitimately has no data.
@@ -18,7 +18,7 @@ import { defaultConstraintRow, defaultConstraintTypes } from '#shared/constraint
  * checked by nobody. A lint rule cannot know which permission an endpoint needs.
  *
  * ADDING A PAGE: add a row. The marker must be a structural element that exists
- * only once the data resolved — NOT "200 OK", because a blanked page returns 200
+ * only once the data resolved, not "200 OK": a blanked page returns 200
  * with an empty body, which is how both incidents escaped review.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
@@ -38,25 +38,25 @@ const CONSTRAINT_VIEWER = 'constraint-viewer@test.local';
  * Everything a person editor plausibly holds, and NOTHING about access roles.
  *
  * `role.read` and `group.read` are in there because the Person page's relation
- * wave already fetched `/api/roles` and `/api/groups` long before this feature
- * — a role holding only `person.*` gets every picker on that page reporting
+ * wave already fetched `/api/roles` and `/api/groups` long before this feature.
+ * A role holding only `person.*` gets every picker on that page reporting
  * "nothing defined yet", which is a separate and pre-existing gap. Including
  * them keeps this fixture aimed at the one thing it is testing.
  */
 const PERSON_EDITOR = 'person-editor-page@test.local';
 
 /**
- * Only `person.*` and `room.*` — the systemic case. SIX relation pickers across
+ * Only `person.*` and `room.*`: the systemic case. SIX relation pickers across
  * four entities fetched options from a resource their page's gate did not cover,
  * and none was new. The result was not a blank page but every picker rendering an
  * EMPTY option list: a tenant with groups being told it has none.
  *
- * One account across two entities on purpose — this was never about access roles.
+ * One account across two entities on purpose: this was never about access roles.
  */
 const ENTITY_EDITOR = 'entity-editor@test.local';
 
 /**
- * Only `availability.manage_own` — the self-service case.
+ * Only `availability.manage_own`: the self-service case.
  *
  * The sharpest instrument for the /my section, because it is the whole point of
  * that section existing: a lecturer must reach their own settings WITHOUT
@@ -67,7 +67,7 @@ const ENTITY_EDITOR = 'entity-editor@test.local';
 const SELF_SERVICE = 'self-service@test.local';
 
 /**
- * Only `generation.read` — the reviewer case, and the reason that key exists.
+ * Only `generation.read`: the reviewer case, and the reason that key exists.
  *
  * PRODUCT.md's reviewer is a department head who decides on solver output and
  * administers nothing. Under the old gate that role was unexpressible: reading
@@ -78,14 +78,14 @@ const SELF_SERVICE = 'self-service@test.local';
 const PROPOSAL_REVIEWER = 'proposal-reviewer@test.local';
 
 /**
- * `session.read` PLUS `dashboard.view` — issue #112.
+ * `session.read` PLUS `dashboard.view`: issue #112.
  *
  * File-local rather than a widening of `viewer`: `viewer` is pinned to hold
  * EXACTLY `['session.read']` by `auth-permissions.test.ts`
  * (`expect(viewerSession.body.permissions).toEqual(['session.read'])`), and
  * is shared by 24 test files (`grep -rl "ACCOUNTS.viewerA\|personViewerA\|
  * viewerRole" tests/*.test.ts`). Adding `dashboard.view` to it would break
- * that exact-match pin and risk every other consumer — exactly the blast
+ * that exact-match pin and risk every other consumer, exactly the blast
  * radius issue #112 warns about.
  *
  * This shape is not synthetic: it is what a role that existed BEFORE issue
@@ -115,8 +115,8 @@ const ROLES = [
 /**
  * The fixture tenant's id, from tests/helpers/seed.ts.
  *
- * Hardcoded because the helper does not export its ids, and the alternative —
- * exporting them — widens a fixture 40 suites share for the benefit of one.
+ * Hardcoded because the helper does not export its ids, and the alternative
+ * (exporting them) widens a fixture 40 suites share for the benefit of one.
  */
 const TENANT_A = 'test-tenant-a';
 
@@ -129,10 +129,10 @@ const PAGES = [
          * Was `grid_col`, the per-day column wrapper. The grid no longer has
          * one: blocks are shared grid ROWS and every cell names its own row and
          * column, so the day columns are grid tracks rather than elements. A
-         * cell is the equivalent structural marker — it exists only once the
+         * cell is the equivalent structural marker: it exists only once the
          * reference wave resolved and the TimeGrid could be read.
          */
-        why: 'a grid cell — present only once the reference wave resolved',
+        why: 'a grid cell, present only once the reference wave resolved',
     },
     {
         /*
@@ -140,8 +140,8 @@ const PAGES = [
          * of the change that put it here.
          *
          * It holds ONLY `session.read`. It used to render blank (one 403 inside
-         * the reference wave rejecting the lot), then — once the six-permission
-         * gate was added — a stated denial naming five permissions it did not
+         * the reference wave rejecting the lot), then, once the six-permission
+         * gate was added, a stated denial naming five permissions it did not
          * need. Both were symptoms of the page assembling the institution's
          * directory in order to draw itself. It draws from
          * `/api/schedule/context` now, behind its own key, so the smallest role
@@ -150,12 +150,12 @@ const PAGES = [
         path: '/schedule',
         roles: ['viewer'],
         marker: 'grid_cell',
-        why: 'a grid cell — the viewer needs no directory permission to draw one',
+        why: 'a grid cell; the viewer needs no directory permission to draw one',
     },
     {
         /*
          * A role holding NEITHER read key is still refused, and the denial names
-         * BOTH — a tenant admin told only `session.read` would grant the whole
+         * BOTH: a tenant admin told only `session.read` would grant the whole
          * institution's timetable to somebody who needed their own.
          */
         path: '/schedule',
@@ -169,7 +169,7 @@ const PAGES = [
          * A proposal that does not exist must say SO. The review page's preview
          * fetch is the one thing on it that is not tolerant, and a rejection nulled
          * `preview`, fell through to the "not produced by a solver run" branch and
-         * interpolated `undefined` into the message — so a 403, a 404, a dropped
+         * interpolated `undefined` into the message, so a 403, a 404, a dropped
          * connection and a genuine manual baseline were indistinguishable.
          */
         path: '/schedule/review/01a04015-0000-0000-0000-000000000000',
@@ -192,8 +192,8 @@ const PAGES = [
     },
     {
         /*
-         * The display-settings page is NOT a registry entity — no list, no row
-         * form, no `/api/display` resource — so it is gated inline rather than
+         * The display-settings page is NOT a registry entity (no list, no row
+         * form, no `/api/display` resource), so it is gated inline rather than
          * by the `manage` middleware, which resolves `to.params.entity` against
          * the registry and 404s a static path that has no entity param at all.
          * It shipped that way first; this row is what would catch it again.
@@ -222,7 +222,7 @@ const PAGES = [
     {
         /*
          * Proposals: `generation.read`, and the admin row is the control. The
-         * marker is the resolved empty state — it renders only on the branch
+         * marker is the resolved empty state: it renders only on the branch
          * where the fetch came back, so a 403 or a dropped request cannot pass
          * as "nothing awaiting a decision".
          */
@@ -234,7 +234,7 @@ const PAGES = [
     {
         /*
          * The same page for the viewer, which holds `session.read` and therefore
-         * used to reach it — every solver proposal this tenant had ever produced,
+         * used to reach it: every solver proposal this tenant had ever produced,
          * offered to anybody who could see the grid.
          */
         path: '/schedule/proposals',
@@ -260,13 +260,13 @@ const PAGES = [
         /*
          * ISSUE #112. This used to be `roles: ['viewer']`: `/manage` redirects
          * to `/dashboard`, and before issue #107 that reached everyone
-         * signed in. Now `/dashboard` itself needs `dashboard.view` — a
-         * direct-navigation guard in `auth.global.ts`, not just a default
-         * destination — so `viewer` (`session.read` only, no `dashboard.view`)
+         * signed in. Now `/dashboard` itself needs `dashboard.view`, a
+         * direct-navigation guard in `auth.global.ts` and not just a default
+         * destination, so `viewer` (`session.read` only, no `dashboard.view`)
          * is redirected straight to `/schedule` before ever reaching this
          * empty state. `noManageAccess` is the shape this now needs: it holds
          * `dashboard.view` (so it reaches `/dashboard` at all) and no
-         * `manage.*` read permission (so the grid is empty once it does) —
+         * `manage.*` read permission (so the grid is empty once it does):
          * exactly what a role that existed BEFORE #107 and got the one-time
          * `dashboard.view` backfill looks like today. `viewer` itself was left
          * untouched rather than widened: it is pinned to hold EXACTLY
@@ -284,14 +284,14 @@ const PAGES = [
     {
         /*
          * The constraint grid renders from the CATALOGUE, so its rows exist
-         * whether or not the tenant has rows — which is why the marker is a
+         * whether or not the tenant has rows, which is why the marker is a
          * rule's own description rather than a heading. A heading survives a
          * failed fetch; this does not.
          */
         path: '/manage/constraints',
         roles: ['admin', 'constraintViewer'],
         marker: 'A room cannot host two sessions that overlap',
-        why: 'a catalogue rule\'s description — present only once the rows rendered',
+        why: 'a catalogue rule\'s description, present only once the rows rendered',
     },
     {
         /*
@@ -303,26 +303,26 @@ const PAGES = [
         path: '/manage/access-roles/new',
         roles: ['admin'],
         marker: 'Grant or revoke access roles',
-        why: 'a catalogue permission\'s description — present only once the matrix rendered',
+        why: 'a catalogue permission\'s description, present only once the matrix rendered',
     },
     {
         /*
          * THE OPTION-WAVE TRAP. The Person page fetches every relation's options in
          * ONE `Promise.all`, including `/api/access-roles`, which no person
          * permission reaches. `useEntityRelations` awaits a useAsyncData HANDLE,
-         * which resolves rather than rejects — so the page renders with every
+         * which resolves rather than rejects, so the page renders with every
          * picker EMPTY. Verified live: the role picker says "No roles defined yet"
          * to a tenant that has them. A page-wide lie instead of an obvious absence.
          */
         path: '/manage/persons/:personEditorId',
         roles: ['personEditor'],
         marker: 'Fix',
-        why: 'the person\'s own name — present only once the whole relation wave resolved',
+        why: 'the person\'s own name, present only once the whole relation wave resolved',
     },
     {
         /*
          * The same page for a role holding ONLY `person.*`. Every picker on it
-         * is now omitted, and the page still has to render the record — an
+         * is now omitted, and the page still has to render the record: an
          * absence check that a blank page would pass is no check at all.
          */
         path: '/manage/persons/:personEditorId',
@@ -339,20 +339,20 @@ const PAGES = [
         path: '/manage/rooms/test-room-private-a',
         roles: ['admin', 'entityEditor'],
         marker: 'A101',
-        why: 'the room\'s own code — present only once the form seeded',
+        why: 'the room\'s own code, present only once the form seeded',
     },
     {
         /*
          * The self-service pages, as somebody holding ONE permission. The marker
          * is the block picker's own rendered clock time, which exists only if
-         * the TimeGrid arrived — and the grid arrives only because it travels
+         * the TimeGrid arrived, and the grid arrives only because it travels
          * with `/api/me/availability` rather than being fetched from
          * `/api/time-grids`, which this role cannot read.
          */
         path: '/my/availability',
         roles: ['selfService'],
         marker: 'Submit for approval',
-        why: 'the veto form itself — present only once the grid and rows resolved',
+        why: 'the veto form itself, present only once the grid and rows resolved',
     },
     {
         /*
@@ -365,19 +365,19 @@ const PAGES = [
          * `person_preference_fit` is OFF by default and this fixture tenant
          * never enables it. Neither half is true any more. The catalogue
          * entry (`shared/constraintTypes.ts`) now declares
-         * `defaultEnabled: true` for this type — `constraint-defaults.test.ts`
+         * `defaultEnabled: true` for this type; `constraint-defaults.test.ts`
          * pins exactly this as "auto-enables person_preference_fit now that
-         * its solver evaluator has shipped" — and `seedConstraintViewer`
+         * its solver evaluator has shipped", and `seedConstraintViewer`
          * above seeds TENANT_A with one `defaultConstraintRow()` per LIVE
          * catalogue type specifically so its own fixture matches
          * `provision:tenant`'s behaviour. That means TENANT_A gets a
          * `person_preference_fit` row that is ENABLED from `beforeAll`
-         * onward, in this file alone — confirmed live, not assumed: fetching
+         * onward, in this file alone. Confirmed live, not assumed: fetching
          * this page as `selfService` renders "Your institution weighs these."
          * `/my/preferences` is not behind the `/dashboard` redirect at all
          * (`middleware/my.ts` checks `MY_SECTION_PERMISSIONS`, which
          * `selfService`'s `availability.manage_own` already satisfies), so
-         * this had nothing to do with issue #107's gate — the comment above
+         * this had nothing to do with issue #107's gate; the comment above
          * had simply gone stale against an unrelated, already-shipped
          * catalogue change, exactly the drift CLAUDE.md warns a tracked
          * assumption can suffer.
@@ -391,7 +391,7 @@ const PAGES = [
         path: '/manage/availability/reviews',
         roles: ['admin'],
         marker: 'A declared window is a',
-        why: 'the review page body — proves the static route beats /manage/[entity]/[id]',
+        why: 'the review page body, proves the static route beats /manage/[entity]/[id]',
     },
     {
         path: '/manage/availability/preferences',
@@ -408,7 +408,7 @@ const cookies: Record<string, string> = {};
  * and NOT `constraint.update`, plus the constraint rows the page needs.
  *
  * Everything tenant-scoped here dies with the tenant in `teardown()`. The
- * ACCOUNT does not — accounts are tenant-independent by design — so it is
+ * ACCOUNT does not, since accounts are tenant-independent by design, so it is
  * removed explicitly, and removed again up front in case a crashed run left one
  * behind and the unique email would otherwise fail the next seed.
  */
@@ -589,7 +589,7 @@ async function seedProposalReviewer() {
 
 /**
  * A person + account + role holding `session.read` and `dashboard.view` and
- * NOTHING else — issue #112. Same lifecycle reasoning as `seedConstraintViewer`
+ * NOTHING else (issue #112). Same lifecycle reasoning as `seedConstraintViewer`
  * above, and file-local for the same reason: `viewer` cannot grow this
  * permission without breaking `auth-permissions.test.ts`'s exact-match pin.
  */
@@ -671,7 +671,7 @@ describe('every page renders for every role that can reach it', () => {
 
                 /*
                  * The CONTENT check is the whole point. A page whose data fetch
-                 * rejected still returns 200 with a shell — status alone passes
+                 * rejected still returns 200 with a shell: status alone passes
                  * for exactly the failure this file exists to catch.
                  */
                 expect(html, `${page.path} for ${role} lost its content (${page.why})`)
@@ -688,7 +688,7 @@ describe('every page renders for every role that can reach it', () => {
      * the reviewer.
      *
      * IT USED TO BE THE `viewer` ON BOTH SIDES OF THIS, because the gate was
-     * `session.read` — which is the state that turned out to be wrong in the
+     * `session.read`, which is the state that turned out to be wrong in the
      * other direction: every lecturer who could see a timetable was also offered
      * every proposal. The single-permission property is what this test is about
      * and it survives the key changing; the role holding that key does not.
@@ -717,9 +717,9 @@ describe('every page renders for every role that can reach it', () => {
                 .not.toContain('Could not load proposals');
 
             /*
-             * Either outcome of a SUCCESSFUL fetch is acceptable — the fixture
+             * Either outcome of a SUCCESSFUL fetch is acceptable (the fixture
              * tenant may or may not hold proposals depending on what ran before
-             * it — but one of them must be present. A shell with neither is the
+             * it), but one of them must be present. A shell with neither is the
              * blank-page failure this file exists to catch.
              */
             const resolved = html.includes('props_row')
@@ -764,14 +764,14 @@ describe('every page renders for every role that can reach it', () => {
      * A proposal must be REACHABLE by clicking, from both entry points. Before
      * this, the only link to `/schedule/review/:id` was inside
      * `ScheduleSolverControl`'s transient `finished` state, which a reload
-     * destroys — so a proposal was reachable for minutes, by one person, while
+     * destroys, so a proposal was reachable for minutes, by one person, while
      * dozens sat READY. Every page test passed throughout.
      *
      * Asserted in both directions: a link offered to everybody proves nothing.
      */
     it('offers a route to proposals from the schedule and the palette', async () => {
         // Entry point 1: the schedule toolbar, gated on `generation.read` rather
-        // than `solver.trigger` — the person who reviews a schedule is usually
+        // than `solver.trigger`: the person who reviews a schedule is usually
         // not the person allowed to generate one.
         const schedule = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.admin! } })
             .then((res) => res.text());
@@ -792,7 +792,7 @@ describe('every page renders for every role that can reach it', () => {
          *
          * The bare string first passed the positive cases and then FAILED the
          * negative one, because the dev server inlines a route manifest naming
-         * every page — so `/schedule/proposals` appears in the document of a
+         * every page, so `/schedule/proposals` appears in the document of a
          * role that cannot reach it. A guard that matches build metadata instead
          * of a link is the "matches for the wrong reason" failure in miniature:
          * it would also have gone green had the actual link disappeared.
@@ -803,12 +803,12 @@ describe('every page renders for every role that can reach it', () => {
 
         /*
          * The negative direction, and it needs the page proven to have rendered
-         * first — otherwise "no proposals entry" passes for a blank dashboard,
+         * first: otherwise "no proposals entry" passes for a blank dashboard,
          * which is the trap this file exists to catch.
          *
          * THE VIEWER IS NOW THE NEGATIVE CASE. It used to be the second positive
          * one, on the reasoning that `session.read` was the gate and the viewer
-         * holds it — which is exactly the state that turned out to be wrong:
+         * holds it, which is exactly the state that turned out to be wrong:
          * "may look at the timetable" was offering every solver proposal the
          * tenant had ever produced. The gate is `generation.read` now, so a role
          * holding only `session.read` belongs on this side of the assertion.
@@ -824,18 +824,18 @@ describe('every page renders for every role that can reach it', () => {
      * a schedule.
      *
      * This is the report that produced `tenant.read` and `generation.read`. Both
-     * entries were gated on `session.read` — which sounds exactly like "may view
-     * the timetable" — so every lecturer was shown a link to the institution's
+     * entries were gated on `session.read`, which sounds exactly like "may view
+     * the timetable", so every lecturer was shown a link to the institution's
      * own settings and a link to every solver proposal it had ever produced.
      *
      * ISSUE #112: read off `/manage` as `noManageAccess`, not `viewer`. Since
      * issue #107, `/manage` (a redirect stub to `/dashboard`) needs
-     * `dashboard.view` to reach the empty state at all — `viewer` lacks it and
+     * `dashboard.view` to reach the empty state at all; `viewer` lacks it and
      * is redirected to `/schedule` before this page ever renders, which is a
      * different page with neither label to begin with and would pass this
      * check for the wrong reason. `noManageAccess` holds `session.read` (the
      * same "can only look at a schedule" shape the docstring above describes)
-     * PLUS `dashboard.view` and no `manage.*` read permission — a role that
+     * PLUS `dashboard.view` and no `manage.*` read permission: a role that
      * predates #107 and got the one-time `dashboard.view` backfill. Asserted
      * BOTH WAYS in one test: the admin's copy of the same page must contain
      * both labels. An absence check alone would pass against a build where the
@@ -868,7 +868,7 @@ describe('every page renders for every role that can reach it', () => {
      * does not round-trip through the list.
      *
      * Creating lands you on the row you just made, so without this the loop was:
-     * back to the list, New, fill, create — two navigations per record whose only
+     * back to the list, New, fill, create: two navigations per record whose only
      * purpose was to reach a button that had been on screen a moment earlier.
      *
      * Both directions in one test, because "the link is not there" is true of a
@@ -879,7 +879,7 @@ describe('every page renders for every role that can reach it', () => {
         const detail = async (path: string) => fetch(`${BASE}${path}`, {
             headers: { cookie: cookies.admin! },
         }).then((res) => res.text())
-            // Rendered body only — the hydration payload carries every registry
+            // Rendered body only: the hydration payload carries every registry
             // key, so a raw match would find the path for any entity at all.
             .then((html) => html.split('<script type="application/json"')[0] ?? '');
 
@@ -890,9 +890,9 @@ describe('every page renders for every role that can reach it', () => {
 
         /*
          * `hideCreateAction` still wins. The constraint catalogue is a fixed set
-         * of switches rather than a collection you populate — framing it as one
+         * of switches rather than a collection you populate. Framing it as one
          * is how a tenant ended up with types that had no row and were therefore
-         * never evaluated — so the detail screen must not grow the affordance the
+         * never evaluated, so the detail screen must not grow the affordance the
          * list deliberately does without.
          */
         const stored = await ownerDb.constraint.findFirstOrThrow({ where: { tenantId: TENANT_A } });
@@ -904,7 +904,7 @@ describe('every page renders for every role that can reach it', () => {
     });
 
     /**
-     * The manage sections a role may not read are not there AT ALL — no nav
+     * The manage sections a role may not read are not there AT ALL: no nav
      * entry, and a direct URL redirects away. Asserted as a REDIRECT rather
      * than as an absent marker: "the page did not contain X" passes just as
      * well for a page that failed to render, which is the trap this whole
@@ -913,13 +913,13 @@ describe('every page renders for every role that can reach it', () => {
      * ISSUE #112: the outcome is NOT uniform across the three roles, and is no
      * longer always a redirect to `/dashboard`, as of issue #107.
      * `manage.ts`'s own middleware still calls `navigateTo('/dashboard')`
-     * literally — but with `redirect: 'manual'` the fetch below sees only the
+     * literally, but with `redirect: 'manual'` the fetch below sees only the
      * FIRST hop, and Nuxt resolves that hop's target route (including ITS OWN
      * middleware) within the same server-side navigation before replying, so
      * what's observed here is `/dashboard`'s own resolution, not the literal
      * string passed to `navigateTo`. `auth.global.ts`'s direct-navigation
      * guard on `/dashboard` fires next and sends every one of these three
-     * roles on to `/schedule`, since none holds `dashboard.view` — and THAT
+     * roles on to `/schedule`, since none holds `dashboard.view`, and THAT
      * route has its own gate (`schedule.ts`, `SCHEDULE_PERMISSIONS`):
      *
      *   - `viewer` holds `session.read`, so `/schedule` succeeds as a
@@ -927,10 +927,10 @@ describe('every page renders for every role that can reach it', () => {
      *   - `constraintViewer` and `personEditor` hold NEITHER `session.read`
      *     nor `session.read_own`, so `schedule.ts` throws a FATAL error
      *     (`abortNavigation(createError(...))`) instead of completing the
-     *     redirect — which becomes the response to the ORIGINAL request: 403,
+     *     redirect, which becomes the response to the ORIGINAL request: 403,
      *     no `Location` header at all, not a redirect to anywhere.
      *
-     * Confirmed against the running app, not assumed — the two redirect
+     * Confirmed against the running app, not assumed: the two redirect
      * literals in the codebase disagreeing with the observed responses is
      * exactly the kind of drift CLAUDE.md warns a comment can have with the
      * code.
@@ -948,7 +948,7 @@ describe('every page renders for every role that can reach it', () => {
         // `constraintViewer` and `personEditor` hold neither `session.read`
         // nor `session.read_own`, so the chase through `/dashboard` to
         // `/schedule` ends in `/schedule`'s OWN fatal denial rather than a
-        // redirect anywhere — refused outright, not sent somewhere else.
+        // redirect anywhere: refused outright, not sent somewhere else.
         for (const role of ['constraintViewer', 'personEditor'] as const) {
             const res = await fetch(`${BASE}/manage/access-roles`, {
                 headers: { cookie: cookies[role]! },
@@ -973,7 +973,7 @@ describe('every page renders for every role that can reach it', () => {
 
     /**
      * The person editor sees the person page and its scheduling-role picker, and
-     * does NOT see the access-role picker — one page, two relations, two
+     * does NOT see the access-role picker: one page, two relations, two
      * different answers.
      *
      * Paired deliberately: "the access-role picker is absent" means nothing
@@ -984,7 +984,7 @@ describe('every page renders for every role that can reach it', () => {
         const html = await fetch(`${BASE}/manage/persons/${personEditorId}`, {
             headers: { cookie: cookies.personEditor! },
         }).then((res) => res.text())
-            // Rendered body only — the hydration payload carries the registry
+            // Rendered body only: the hydration payload carries the registry
             // as JSON, and matching there would pass for a page that rendered
             // nothing at all.
             .then((body) => body.split('<script type="application/json"')[0] ?? '');
@@ -994,7 +994,7 @@ describe('every page renders for every role that can reach it', () => {
         expect(html).not.toContain('Access roles');
 
         /*
-         * The option wave RESOLVED — this is the assertion that makes the
+         * The option wave RESOLVED: this is the assertion that makes the
          * absence above mean something. If the access-roles fetch had been left
          * in and 403'd, every picker on this page would render with an empty
          * option list, and "no Access roles heading" would pass while the page
@@ -1016,7 +1016,7 @@ describe('every page renders for every role that can reach it', () => {
      * OMITTED, never rendered empty. Six relations across four entities were in
      * that state and only one involved access roles, so both pages are checked.
      *
-     * Every absence is paired with an admin rendering the SAME page — "does not
+     * Every absence is paired with an admin rendering the SAME page: "does not
      * contain X" passes just as well for a page that rendered nothing.
      */
     describe('relation pickers whose options are out of reach', () => {
@@ -1031,7 +1031,7 @@ describe('every page renders for every role that can reach it', () => {
         it('omits all three pickers on the Person page for a person.*-only role', async () => {
             const html = await body(`/manage/persons/${personEditorId}`, 'entityEditor');
 
-            // The record itself still renders — this is an edit form, not a
+            // The record itself still renders: this is an edit form, not a
             // denial. Only the controls it cannot populate are gone.
             expect(html).toContain('Fix');
             expect(html).not.toContain('Scheduling roles');
@@ -1040,7 +1040,7 @@ describe('every page renders for every role that can reach it', () => {
 
             /*
              * The control. Without it, all three assertions above would pass
-             * against a build where the page simply failed to render — which is
+             * against a build where the page simply failed to render, which is
              * precisely the shape of the bug being fixed.
              */
             const asAdmin = await body(`/manage/persons/${personEditorId}`, 'admin');
@@ -1066,7 +1066,7 @@ describe('every page renders for every role that can reach it', () => {
              * The failure this replaced, stated directly: the old behaviour kept
              * the picker and showed its `emptyHint`, so a tenant that HAS roles
              * and groups was told it has none. If a relation is ever offered
-             * without its options being reachable, that hint comes back — on a
+             * without its options being reachable, that hint comes back, on a
              * page whose fixture demonstrably has both.
              */
             const html = await body(`/manage/persons/${personEditorId}`, 'entityEditor');
@@ -1114,7 +1114,7 @@ describe('every page renders for every role that can reach it', () => {
      *
      * ISSUE #112: no longer reads the header off `/dashboard` for every role.
      * Since issue #107 that page itself needs `dashboard.view`, which neither
-     * `selfService` nor `entityEditor` holds — `auth.global.ts` sends both on
+     * `selfService` nor `entityEditor` holds; `auth.global.ts` sends both on
      * to `/schedule`, where `schedule.ts`'s OWN gate then refuses them outright
      * (`abortNavigation(createError(...))`, a fatal 403 that renders Nuxt's
      * bare error page, no `default` layout, no header at all). Confirmed live:
@@ -1127,20 +1127,20 @@ describe('every page renders for every role that can reach it', () => {
     it('offers the /my section in the header to exactly the roles that can use it', async () => {
         const header = async (role: string, path: string) => {
             // Not `/`: the root is the PUBLIC landing page and uses the
-            // `empty` layout, which renders no header at all — so fetching it
+            // `empty` layout, which renders no header at all, so fetching it
             // here would find no nav and report every role as "correctly not
             // offered the section".
             const html = await fetch(`${BASE}${path}`, { headers: { cookie: cookies[role]! } })
                 .then((res) => res.text());
 
-            // The header nav only — the command palette renders every permitted
+            // The header nav only: the command palette renders every permitted
             // entry into the same document, so matching the whole page would
             // pass for a build with no header link at all.
             return html.match(/<nav class="header__menu"[\s\S]*?<\/nav>/)?.[0] ?? '';
         };
 
         // `selfService` holds `availability.manage_own` and no `dashboard.view`,
-        // so it is read off `/my/availability` — its own reachable page,
+        // so it is read off `/my/availability`, its own reachable page,
         // proven in the PAGES table above.
         expect(await header('selfService', '/my/availability'), 'the one role that needs it')
             .toContain('My settings');
@@ -1149,7 +1149,7 @@ describe('every page renders for every role that can reach it', () => {
 
         // The viewer holds only `session.read`; the entity editor only
         // `person.*`/`room.*`. Neither can use the section, so neither is
-        // offered it. Read off `/schedule` and a Room page respectively —
+        // offered it. Read off `/schedule` and a Room page respectively:
         // both roles' own proven-reachable pages, not `/dashboard`.
         expect(await header('viewer', '/schedule')).not.toContain('My settings');
         expect(await header('entityEditor', '/manage/rooms/test-room-private-a')).not.toContain('My settings');
@@ -1171,7 +1171,7 @@ describe('every page renders for every role that can reach it', () => {
         expect(asAdmin).toContain('Teaching preferences');
 
         // The self-service role holds `manage_own` and neither administrator
-        // key, so it sees the hub's other sections — none of them, in its case —
+        // key, so it sees the hub's other sections (none of them, in its case)
         // but never these two.
         const asSelfService = await manage('selfService');
 
@@ -1184,8 +1184,8 @@ describe('every page renders for every role that can reach it', () => {
          * "You do not have access" sends someone to ask for the wrong thing, so
          * the denial states what would fix it.
          *
-         * IT USED TO NAME FIVE — `term.read`, `time_grid.read`, `group.read`,
-         * `room.read`, `person.read` — because the page assembled the
+         * IT USED TO NAME FIVE: `term.read`, `time_grid.read`, `group.read`,
+         * `room.read`, `person.read`, because the page assembled the
          * institution's directory in order to draw itself, and the `viewer`
          * (holding `session.read`) was the role it refused. That was an honest
          * message about a wrong requirement: none of those five is anything to do
@@ -1196,7 +1196,7 @@ describe('every page renders for every role that can reach it', () => {
          *
          * BOTH keys are named on purpose. Told only `session.read`, an admin
          * grants the whole institution's timetable to somebody who needed their
-         * own — an over-grant chosen by an error message.
+         * own: an over-grant chosen by an error message.
          */
         const res = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies.constraintViewer! } });
         const html = await res.text();
@@ -1229,7 +1229,7 @@ describe('every page renders for every role that can reach it', () => {
                 .then((res) => res.text())
                 // Assertions read the RENDERED body only. The hydration payload
                 // carries the same rows as JSON, and matching there would pass
-                // for a page that rendered nothing at all — which is precisely
+                // for a page that rendered nothing at all, which is precisely
                 // how the deprecated-constraint bug hid.
                 .then((html) => html.split('<script type="application/json"')[0] ?? '');
 
@@ -1238,7 +1238,7 @@ describe('every page renders for every role that can reach it', () => {
         /** One row per live catalogue type, because the fixture seeds one row per type. */
         const expectedRows = defaultConstraintTypes().length;
 
-        /** Only SOFT rules carry a weight — the presence of the control IS the severity signal. */
+        /** Only SOFT rules carry a weight: the presence of the control IS the severity signal. */
         const softRules = defaultConstraintTypes().filter((type) => type.severity === 'SOFT').length;
 
         it('renders every rule, with no control the role cannot use', async () => {
@@ -1290,7 +1290,7 @@ describe('every page renders for every role that can reach it', () => {
             /*
              * The rule stated directly. A `disabled` attribute surviving here
              * would mean some control had been made inert rather than replaced
-             * by the value it holds — which is what this path is about.
+             * by the value it holds, which is what this path is about.
              */
             expect(viewer).not.toMatch(/<(?:input|select|textarea|button)[^>]*\sdisabled/);
         });
@@ -1310,7 +1310,7 @@ describe('every page renders for every role that can reach it', () => {
     it('fails when a page depends on a permission its role lacks', async () => {
         /*
          * Proof this suite can fail, not just pass. `/manage/session-kinds`
-         * needs `session_kind.read`, which the viewer does not hold — so it
+         * needs `session_kind.read`, which the viewer does not hold, so it
          * redirects rather than rendering that section, and asserting the
          * section's own marker finds nothing.
          *

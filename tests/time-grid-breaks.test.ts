@@ -8,7 +8,7 @@ import { blockOfMinute } from '../server/utils/solverCalendar';
  *
  * WHY THIS IS CORRECTNESS WORK AND NOT RENDERING. `blockOfMinute()` feeds
  * `computeReferenceSlot()`, and that decides which Sessions the solver may
- * move — "Sessions starting strictly before this slot are excluded from
+ * move: "Sessions starting strictly before this slot are excluded from
  * recalculation, a correctness rule, not a preference". A block-from-clock that
  * is one out does not produce an ugly label; it lets the solver reschedule a
  * class that already happened, or refuse to touch one that has not.
@@ -38,11 +38,11 @@ const UNIFORM_ACTIVE_DAYS = [1, 2, 3, 4, 5];
 
 const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
-describe('the uniform case is unchanged — the property the rewrite rests on', () => {
+describe('the uniform case is unchanged: the property the rewrite rests on', () => {
     it('reproduces the old stride arithmetic at every index, across many grids', () => {
         // THE central assertion. If the walk and `dayStart + i * (len + gap)`
         // ever disagree for a grid with no overrides, the rewrite changed
-        // behaviour it was supposed to preserve — and the Stage 3a suite would
+        // behaviour it was supposed to preserve, and the Stage 3a suite would
         // only catch the handful of points it happens to sample.
         for (const blockLengthMinutes of [30, 45, 50, 90, 120]) {
             for (const breakMinutes of [0, 5, 10, 15, 30]) {
@@ -71,7 +71,7 @@ describe('the uniform case is unchanged — the property the rewrite rests on', 
 
     it('agrees with the old blockOfMinute at every minute of a teaching day', () => {
         // Minute-by-minute rather than at a few sample points, and deliberately
-        // only up to the end of the last block — the one place the two DO differ
+        // only up to the end of the last block: the one place the two DO differ
         // is asserted separately below, as a fix rather than as parity.
         const stride = UNIFORM.blockLengthMinutes + UNIFORM.breakMinutes;
         const dayStart = UNIFORM.startHour * 60 + UNIFORM.startMinute;
@@ -88,7 +88,7 @@ describe('the uniform case is unchanged — the property the rewrite rests on', 
 describe('a latent off-by-one at the end of the day, now fixed', () => {
     it('counts the day finished when the LAST BLOCK ends, not a stride later', () => {
         // The stride version divided by (length + gap), so it kept reporting
-        // block 7 until 16:00 — a phantom gap after the final block, during
+        // block 7 until 16:00, a phantom gap after the final block, during
         // which a Session at block 7 was still "not strictly before" the
         // reference slot and so still movable, though it had ended at 15:45.
         //
@@ -172,7 +172,7 @@ describe('non-uniform breaks', () => {
         //
         // It matters because the editor bounds its day picker to the grid's
         // active days, so such a row can only arrive by a grid narrowing its
-        // days afterwards — and the shrink cascade that deletes those rows is
+        // days afterwards, and the shrink cascade that deletes those rows is
         // API-level. Between the narrowing and the next save, the walk has to be
         // right on its own.
         const grid: BlockGrid = {
@@ -181,7 +181,7 @@ describe('non-uniform breaks', () => {
         };
         const noBreaks: BlockGrid = { ...UNIFORM, breaks: [] };
 
-        // Every TAUGHT day is untouched — including at the override's own
+        // Every TAUGHT day is untouched, including at the override's own
         // position, which is the assertion that would fail if the day were
         // ignored and the row treated as universal.
         for (const day of UNIFORM_ACTIVE_DAYS) {
@@ -233,7 +233,7 @@ describe('blockSpan and the public helpers', () => {
 
 
 /**
- * `breakAfter` and `gapsOfDay` — what a RENDERER asks the timeline.
+ * `breakAfter` and `gapsOfDay`: what a RENDERER asks the timeline.
  *
  * These exist because two components needed to name the break in a gap, and
  * the first one to need it grew its own lookup:
@@ -241,7 +241,7 @@ describe('blockSpan and the public helpers', () => {
  *     breaks.find((b) => b.afterBlockIndex === i && (b.dayOfWeek === day || b.dayOfWeek === null))
  *
  * which returns whichever row is FIRST in the array. `gapAfter` prefers the
- * day-specific one. So a label and a duration could describe different breaks —
+ * day-specific one. So a label and a duration could describe different breaks:
  * the divergence this module exists to prevent, and the reason resolution now
  * lives here once.
  */
@@ -253,7 +253,7 @@ describe('breakAfter resolves the same break gapAfter measures', () => {
         startMinute: 0,
         breakMinutes: 5,
         breaks: [
-            // Universal FIRST in the array, day-specific second — the order
+            // Universal FIRST in the array, day-specific second: the order
             // that made the naive `.find()` return the wrong one on Friday.
             { afterBlockIndex: 2, durationMinutes: 45, label: 'Lunch', dayOfWeek: null },
             { afterBlockIndex: 2, durationMinutes: 90, label: 'Friday lunch', dayOfWeek: 5 },

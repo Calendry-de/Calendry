@@ -5,8 +5,8 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 /**
  * Tenant isolation, over real HTTP with real session cookies.
  *
- * These go through the whole stack — middleware, session resolver, withTenant,
- * PostgreSQL RLS — because the guarantee lives in the interaction between those
+ * These go through the whole stack (middleware, session resolver, withTenant,
+ * PostgreSQL RLS) because the guarantee lives in the interaction between those
  * layers, not in any one of them.
  *
  * The central case is ID GUESSING: tenant B holds a valid session and asks for
@@ -170,7 +170,7 @@ describe('domain behaviour within a tenant', () => {
         expect(res.status).toBe(200);
         expect(res.body.persons.map((p) => p.id)).toContain(f.personA);
         expect(res.body.resolvedGroupIds).toContain(f.groupSeminarA);
-        // Descendants only — a seminar's session must not notify the whole cohort.
+        // Descendants only: a seminar's session must not notify the whole cohort.
         expect(res.body.resolvedGroupIds).not.toContain(f.groupCohortA);
     });
 

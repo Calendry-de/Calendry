@@ -10,18 +10,18 @@ import type { GroupNode } from '../server/utils/solverGroups';
  * The reference-derived Group filter for `assembleSolverInput`.
  *
  * Before this, every tenant Group was sent on every run while Offerings and
- * Sessions were already narrowed to the Term — measured at 10 sent, 2
- * referenced. Filtering is easy; filtering WITHOUT changing the answer is the
+ * Sessions were already narrowed to the Term (measured at 10 sent, 2
+ * referenced). Filtering is easy; filtering WITHOUT changing the answer is the
  * part that needs proving, and this file is that proof.
  *
  * TWO PROPERTIES, AND THEY ARE NOT THE SAME CLAIM
  *
- *   1. COMPLETENESS — every Group an Offering or Session names is sent. If this
+ *   1. COMPLETENESS: every Group an Offering or Session names is sent. If this
  *      fails, the input is internally inconsistent: an Offering references a
  *      `group_id` the solver was never given, and the solver has no way to know
  *      the app meant something else.
  *
- *   2. CLOSED UNDER PARENT — no sent Group points at an absent parent. The
+ *   2. CLOSED UNDER PARENT: no sent Group points at an absent parent. The
  *      solver rebuilds `conflict = {g} ∪ ancestors(g) ∪ descendants(g)` from the
  *      `parent_id` values it receives (groups.rs), so a severed chain silently
  *      WEAKENS the propagation TAXONOMY.md §6 requires. Nothing errors; a cohort
@@ -31,7 +31,7 @@ import type { GroupNode } from '../server/utils/solverGroups';
  * because a single example proves a filter works on that example.
  */
 
-/** Deterministic PRNG — a failing seed must be reproducible. */
+/** Deterministic PRNG: a failing seed must be reproducible. */
 function rng(seed: number) {
     let state = seed >>> 0;
 
@@ -72,7 +72,7 @@ function oracle(groups: GroupNode[], seeds: string[]): Set<string> {
         }
     };
 
-    // Descendants by repeated relaxation — deliberately not the same algorithm
+    // Descendants by repeated relaxation, deliberately not the same algorithm
     // as the implementation, so a shared bug cannot cancel out.
     const isDescendantOf = (candidate: string, root: string) => {
         let cursor = parentOf.get(candidate) ?? null;
@@ -126,7 +126,7 @@ describe('the two properties, over many random hierarchies', () => {
     });
 
     it('equals an independently computed closure', () => {
-        // Neither property above pins the set's SIZE — "send everything" would
+        // Neither property above pins the set's SIZE: "send everything" would
         // satisfy both. This is what stops the filter degenerating into a no-op
         // or over-narrowing.
         for (let seed = 1; seed <= 200; seed += 1) {
@@ -155,14 +155,14 @@ describe('the specific shapes the closure exists for', () => {
     });
 
     it('pulls in descendants, so child-blocks-parent still propagates', () => {
-        // `programme` is here too, as cohortA's ancestor — the closure is
+        // `programme` is here too, as cohortA's ancestor: the closure is
         // {g} u ancestors u descendants in one step, not two separate walks.
         expect([...conflictClosure(tree, ['cohortA'])].sort())
             .toEqual(['cohortA', 'programme', 'seminarA1']);
     });
 
     it('does NOT pull in a sibling branch', () => {
-        // cohortB is a descendant of programme, which IS in the set — but it can
+        // cohortB is a descendant of programme, which IS in the set, but it can
         // only matter if something places on it, and anything placing on it is
         // itself a referenced seed. Including it would undo the whole saving:
         // one referenced cohort would drag in every other cohort of the degree.
@@ -192,7 +192,7 @@ describe('the specific shapes the closure exists for', () => {
 
 describe('referencedGroupIds reads BOTH sources', () => {
     it('collects from Offerings and Sessions alike', () => {
-        // A Session can carry a Group its Offering does not — one added to a
+        // A Session can carry a Group its Offering does not: one added to a
         // single occurrence. Seeding from Offerings alone would drop it from the
         // input while the Session still referenced it: precisely the
         // inconsistency this module exists to prevent.

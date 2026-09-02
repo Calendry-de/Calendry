@@ -5,7 +5,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['API tokens'],
         summary: 'Revoke an API token',
-        description: 'Deletes one of the signed-in Person tokens. The bearer secret stops resolving immediately — revocation is a row lookup, not a cache. Session only; a token cannot revoke itself or its siblings.',
+        description: 'Deletes one of the signed-in Person tokens. The bearer secret stops resolving immediately: revocation is a row lookup, not a cache. Session only; a token cannot revoke itself or its siblings.',
         parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],

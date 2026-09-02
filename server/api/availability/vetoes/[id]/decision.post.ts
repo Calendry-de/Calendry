@@ -20,8 +20,8 @@ const BODY = z.object({
  * DECIDING IS IDEMPOTENT-BY-REFUSAL, not by overwrite: only a PENDING row can
  * be decided. Re-deciding an approved window would silently rewrite who
  * approved it and when, and a reviewer clicking twice on a stale list would
- * quietly take ownership of somebody else's decision. The second click gets 409
- * naming the current status instead.
+ * quietly take ownership of somebody else's decision, so the second click gets
+ * 409 naming the current status instead.
  */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
                 status: body.decision,
                 decidedByPersonId: identity.actorPersonId,
                 decidedAt: new Date(),
-                // Kept for approvals too — a reviewer may want to record why
+                // Kept for approvals too, since a reviewer may want to record why
                 // they let an unusual window through, and dropping the note on
                 // one branch would make its absence ambiguous.
                 decisionNote: body.note ?? null,

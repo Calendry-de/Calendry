@@ -5,8 +5,8 @@ import { parseWireOfferingId, splitsIntoSeries, wireOfferingId } from '../server
  * The wire identity for a per-group Offering series.
  *
  * This is the same class of risk as the tracked "violations naming Sessions the
- * solver invented" gap — a wire-level identity that must lead back to real rows
- * — with one difference that makes it sharper: the reversal happens at APPLY,
+ * solver invented" gap (a wire-level identity that must lead back to real rows),
+ * with one difference that makes it sharper: the reversal happens at APPLY,
  * from `solver_run.result`, possibly days later and across a restart. Nothing
  * held in memory during assembly is available then, which is why the mapping is
  * encoded in the id rather than kept beside it, and why the round trip has to
@@ -23,7 +23,7 @@ describe('split ids reverse exactly', () => {
         });
     });
 
-    it('round-trips an UNSPLIT id — the identity case', () => {
+    it('round-trips an UNSPLIT id (the identity case)', () => {
         // The property single-group and group-less Offerings depend on: their
         // ids pass through untouched, so nothing downstream needs to know
         // whether a split happened.
@@ -35,7 +35,7 @@ describe('split ids reverse exactly', () => {
     });
 
     it('round-trips this codebase\'s hyphenated seeded ids', () => {
-        // Real ids here are not all uuid7 — the seeder mints
+        // Real ids here are not all uuid7: the seeder mints
         // `…-class-A`, `…-room-A101`. Hyphens must not be mistaken for the
         // separator.
         const wire = wireOfferingId('tenant-x-offering-1', 'tenant-x-class-A');

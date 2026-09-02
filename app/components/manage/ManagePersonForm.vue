@@ -12,7 +12,7 @@
         />
 
         <!--
-            Issue #84 — GDPR data export. Edit mode only: on create there is
+            Issue #84: GDPR data export. Edit mode only: on create there is
             no id yet for the export route to name. A separate permission
             from `person.read`/`person.update` (see shared/permissions.ts's
             `person.export` comment), so gated on its own rather than on
@@ -25,7 +25,7 @@
             <h2 class="person_export_title">Data export</h2>
 
             <p class="person_export_hint">
-                Everything Calendry holds about {{ personLabel }} — profile, roles, group
+                Everything Calendry holds about {{ personLabel }}: profile, roles, group
                 memberships, sessions, unavailability, preferences, exam requests, API tokens,
                 calendar links and their own audit trail. A GDPR Right to Access request.
             </p>
@@ -53,7 +53,7 @@ import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 import CommonButton from '~/components/common/CommonButton.vue';
 
 /**
- * Person's detail: the shared generic form (every field here is plain —
+ * Person's detail: the shared generic form (every field here is plain,
  * nothing custom to inject into its `fields` slot) plus the GDPR export
  * action issue #84 adds. Bespoke for the same reason `ManageAccountForm`
  * keeps its credential ops OUTSIDE the form: a download is an explicit,

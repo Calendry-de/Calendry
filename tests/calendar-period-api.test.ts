@@ -5,7 +5,7 @@ import { api, login } from './helpers/client';
 /**
  * Calendar periods over HTTP.
  *
- * The unit suite pins the classification rules; this pins the write boundary —
+ * The unit suite pins the classification rules; this pins the write boundary:
  * that a period which would classify NOTHING is refused, that one which
  * classifies something is accepted, and that overlaps are not treated as errors.
  *

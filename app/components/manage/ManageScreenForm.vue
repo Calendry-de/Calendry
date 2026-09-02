@@ -16,7 +16,7 @@
                 Not a nicety: only the SHA-256 is stored, so this panel is the
                 only moment the URL exists anywhere. If it is dismissed
                 unread, the screen is unreachable and the only remedy is
-                deleting it and making another — which is why the copy says so
+                deleting it and making another, which is why the copy says so
                 rather than leaving somebody to discover it at the wall.
             -->
             <section
@@ -34,7 +34,7 @@
                         aria-hidden="true"
                     />
                     <span>
-                        Copy this before saving — only a hash of the key is stored, so it can
+                        Copy this before saving: only a hash of the key is stored, so it can
                         never be shown again. If it is lost, delete this screen and create another.
                     </span>
                 </p>
@@ -57,7 +57,7 @@
                 <!--
                     "EMPTY MEANS EVERY ROOM" is stated, not implied. A blank
                     multi-select reads as "nothing selected, so nothing shown",
-                    which is the opposite of what the table does — the same
+                    which is the opposite of what the table does, the same
                     fail-open reading `group_term` has, and the same reason its
                     picker spells it out.
                 -->
@@ -109,7 +109,7 @@ import ManageEntityForm from '~/components/manage/ManageEntityForm.vue';
 /**
  * A lobby display's detail: the shared form plus two things it cannot express.
  *
- * 1. The KEY, which exists exactly once — at the moment of creation — because
+ * 1. The KEY, which exists exactly once (at the moment of creation) because
  *    only its hash is stored. The generic scaffold shows the row it saved; it
  *    has nowhere to put a secret that is not part of the row.
  * 2. The ROOM SCOPE, whose empty state means "every room" and therefore has to
@@ -169,7 +169,7 @@ const issued = computed(() => {
 
 /*
  * Seeded once, on the create form only. `onMounted` rather than at setup so it
- * never runs during SSR — a key generated server-side would be replaced by a
+ * never runs during SSR: a key generated server-side would be replaced by a
  * different one on hydration, and the address a person copied would stop being
  * the address that got saved.
  */

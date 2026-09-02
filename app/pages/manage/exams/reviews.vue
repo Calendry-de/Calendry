@@ -5,7 +5,7 @@
     >
         <p class="intro">
             An approved exam becomes a <strong>locked event</strong> at the slot that was
-            asked for — it occupies its room and its people, and no solve will move it.
+            asked for: it occupies its room and its people, and no solve will move it.
             Approving is the moment the schedule changes, not a formality afterwards.
         </p>
 
@@ -19,7 +19,7 @@
             WARN, DON'T BLOCK: the approval above already went through. The
             teaching-plan fact itself is now a per-row column (issue #101),
             visible before deciding; this is what is left needing a one-time
-            message — a preferred room too small for the exam sitting, known
+            message: a preferred room too small for the exam sitting, known
             only once the approval has actually run the capacity check.
         -->
         <p
@@ -135,7 +135,7 @@ definePageMeta({
     /*
      * Gated INLINE, not through the `manage` middleware: that one resolves the
      * route segment against the entity registry and 404s anything it does not
-     * recognise, and this is not a registry entity — it has no list, no row
+     * recognise, and this is not a registry entity: it has no list, no row
      * form and no `/api/exams` resource behind it. Same reasoning the
      * unavailability review page already carries.
      */
@@ -170,7 +170,7 @@ interface ReviewRow {
     room: { id: string; name: string; code: string } | null;
     /** Resolved per Term by the server, so both exam pages agree. */
     weekKind: string;
-    /** Issue #101 — the module's own teaching plan, not this request's placement. */
+    /** Issue #101: the module's own teaching plan, not this request's placement. */
     teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
     requestedBy: Named | null;
     decidedBy: Named | null;

@@ -6,7 +6,7 @@
         <p class="intro">
             A declared window is a <strong>hard</strong> rule for the scheduler, so a
             self-declared one stays inert until it is approved here. Windows an
-            administrator entered directly are already approved — approving your own
+            administrator entered directly are already approved: approving your own
             authorized action would be ceremony, not control.
         </p>
 
@@ -18,7 +18,7 @@
 
         <!--
             ENTRY, not just review. `POST /api/availability/vetoes` existed from
-            the previous slice with nothing calling it — an administrator could
+            the previous slice with nothing calling it: an administrator could
             approve somebody else's window but not record one, which is the more
             common case when leave is reported by email.
         -->
@@ -41,7 +41,7 @@
                     <option
                         :selected="!subject"
                         value=""
-                    >— Pick a person —</option>
+                    >Pick a person</option>
                     <option
                         v-for="person in people"
                         :key="person.id"
@@ -233,7 +233,7 @@ definePageMeta({
     /*
      * Gated INLINE rather than through the `manage` middleware: that one resolves
      * the route segment against the entity registry and 404s anything it does
-     * not recognise, and this page is not a registry entity — it has no list,
+     * not recognise, and this page is not a registry entity: it has no list,
      * no row form and no `/api/reviews` resource behind it.
      */
     middleware: [
@@ -310,7 +310,7 @@ const draftBlocks = ref<number[]>([]);
 const entryError = ref('');
 const holidayForm = ref<{ reset: () => void } | null>(null);
 
-// UI only — every route re-checks. Kept because the page is reachable with
+// UI only: every route re-checks. Kept because the page is reachable with
 // `read_any` through a direct URL even though the nav offers it only to
 // `manage_any`.
 const canDecide = useHasPermission('availability.manage_any');
@@ -318,8 +318,8 @@ const canDecide = useHasPermission('availability.manage_any');
 /**
  * A holiday row reads as its term and weeks, a recurring one as its pattern.
  *
- * `describeWindow` renders the wire's emptiness convention faithfully — empty
- * `days` IS every day — which is right for a recurring window and misleading for
+ * `describeWindow` renders the wire's emptiness convention faithfully: empty
+ * `days` IS every day, which is right for a recurring window and misleading for
  * a holiday, where the empty axes are how "the whole of these weeks" is spelled.
  */
 function describeRow(row: ReviewRow): string {
@@ -330,7 +330,7 @@ function describeRow(row: ReviewRow): string {
     const label = row.term?.name ?? 'term';
     const weeks = row.weeks.map((week) => week + 1).join(', ');
 
-    return `${label}: week${row.weeks.length === 1 ? '' : 's'} ${weeks} — away all day`;
+    return `${label}: week${row.weeks.length === 1 ? '' : 's'} ${weeks}, away all day`;
 }
 
 async function submitRecurring() {

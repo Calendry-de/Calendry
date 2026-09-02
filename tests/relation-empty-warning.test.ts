@@ -8,15 +8,15 @@ import { login } from './helpers/client';
  *
  * The bug this closes is the codebase's most familiar shape, one layer up from
  * the usual instance: a Person with no AccessRole and a Person deliberately left
- * unprivileged render IDENTICALLY — "None assigned." — so the second is
+ * unprivileged render IDENTICALLY, "None assigned.", so the second is
  * invisible. The consequence is not cosmetic. `provision:tenant` ships a
  * `member` role and `/manage/accounts` issues logins, but nothing assigns the
  * role, so the default onboarding path ends with somebody signing in to an
  * empty application.
  *
  * Granting deliberately stays a human decision behind
- * `person_access_role.assign` — a CRUD route that granted a role on every insert
- * would be privilege escalation wearing a default's clothes — so the fix is to
+ * `person_access_role.assign`: a CRUD route that granted a role on every insert
+ * would be privilege escalation wearing a default's clothes, so the fix is to
  * make the empty state VISIBLE, not automatic.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
@@ -25,7 +25,7 @@ const ROLELESS = 'test-person-roleless';
 
 let cookie: string | null;
 
-/** The rendered body only — see the note in `page-renders-per-role.test.ts`. */
+/** The rendered body only; see the note in `page-renders-per-role.test.ts`. */
 async function renderedBody(path: string): Promise<string> {
     const html = await fetch(`${BASE}${path}`, { headers: { cookie: cookie! } })
         .then((res) => res.text());
@@ -69,7 +69,7 @@ describe('the registry declares it, and declares it correctly', () => {
     it('names no specific role, because role keys are tenant vocabulary', () => {
         /*
          * CLAUDE.md: never hardcode an open value into logic. There is no
-         * `DEFAULT_ROLE_KEY` constant — `member` exists only because
+         * `DEFAULT_ROLE_KEY` constant: `member` exists only because
          * `provision:tenant` happens to create it, and a tenant may rename or
          * delete it. A warning naming it would be advice about a row that need
          * not exist.
@@ -110,7 +110,7 @@ describe('the Person page renders it', () => {
         expect(html).toContain('Access roles');
     });
 
-    it('says NOTHING once a role is assigned — the counter-example', async () => {
+    it('says NOTHING once a role is assigned, the counter-example', async () => {
         /*
          * Without this, a warning rendered unconditionally would pass the test
          * above. It also pins the specific bug of warning at the wrong time,
@@ -139,7 +139,7 @@ describe('the Person page renders it', () => {
     it('leaves other empty relations reading "None assigned."', async () => {
         /*
          * The scope check. `emptyWarning` is opt-in per relation, so an
-         * unrelated empty relation on the SAME page must be unaffected — a
+         * unrelated empty relation on the SAME page must be unaffected: a
          * warning on every empty set would be noise, and noise is ignored.
          */
         await createRoleless();

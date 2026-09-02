@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { refreshViolations } from '../server/utils/violations';
 
 /**
- * PersonDoubleBooking — the blind spot the Group rule structurally cannot see.
+ * PersonDoubleBooking: the blind spot the Group rule structurally cannot see.
  *
  * Mirrors the solver's slice-2 test: a person enrolled in two groups that are
  * UNRELATED in the nesting tree, both scheduled at the same slot. Nothing
@@ -27,7 +27,7 @@ const T = 'person-clash';
 const ids = {
     tenant: `${T}-tenant`, grid: `${T}-grid`, term: `${T}-term`, kind: `${T}-kind`,
     offering: `${T}-offering`, generation: `${T}-generation`, room: `${T}-room`,
-    // Two roots — deliberately NOT parent/child of each other.
+    // Two roots, deliberately NOT parent/child of each other.
     groupChoir: `${T}-group-choir`, groupLab: `${T}-group-lab`,
     dual: `${T}-person-dual`, other: `${T}-person-other`,
     cGroup: `${T}-constraint-group`, cPerson: `${T}-constraint-person`,
@@ -157,7 +157,7 @@ describe('person double-booking across unrelated groups', () => {
 
         const counts = await countsByConstraint();
 
-        // Same placement, same unrelated groups — only the shared person is
+        // Same placement, same unrelated groups; only the shared person is
         // gone. Without this, the test above would pass for a check that
         // flagged every concurrent pair.
         expect(counts.person).toBe(0);
@@ -200,7 +200,7 @@ describe('disabling a rule clears its existing violations', () => {
 
         expect(counts.person).toBe(0);
         // The group rule is still enabled and still correctly silent for
-        // unrelated groups — disabling its neighbour changed nothing about it.
+        // unrelated groups; disabling its neighbour changed nothing about it.
         expect(counts.group).toBe(0);
 
         await db.constraint.update({ where: { id: ids.cPerson }, data: { isEnabled: true } });

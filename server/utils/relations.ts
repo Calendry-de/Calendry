@@ -11,7 +11,7 @@ import { assertTenantRetainsAdministrator } from './accessRoleGuards';
  *
  * SO THE VERB IS PUT-SET: `PUT /api/offerings/:id/groups` replaces the whole
  * collection in one transaction. Idempotent, and it removes a class of
- * half-applied state — per-row calls make "add two, remove one" three requests
+ * half-applied state: per-row calls make "add two, remove one" three requests
  * that can partially fail, leaving a set nobody chose.
  *
  * PERMISSION IS THE PARENT'S `.update`: changing which rooms an Offering needs IS
@@ -29,7 +29,7 @@ export interface RelationConfig {
     parentKey: string;
     /**
      * Zod schema for ONE item of the replacement set, without tenant_id or the
-     * parent key — both are supplied by the server.
+     * parent key; both are supplied by the server.
      */
     item: z.ZodTypeAny;
     /** Columns returned on GET, in addition to the parent key. */
@@ -59,13 +59,13 @@ export interface RelationConfig {
      * replacement, so the notes describe the new set.
      *
      * THE SHAPE OF THE PUT RESPONSE DEPENDS ON THIS FIELD: a relation declaring it
-     * returns `{ rows, warnings }`, every other returns the bare array — which is
+     * returns `{ rows, warnings }`, every other returns the bare array, which is
      * what keeps it from being a breaking change for the five that do not want them.
      */
     warnAfterWrite?: (ctx: {
         tx: Tx;
         tenantId: string;
-        /** The parent row's id — for `groups/terms`, the Group. */
+        /** The parent row's id; for `groups/terms`, the Group. */
         id: string;
         /** The set as just written. */
         rows: Record<string, unknown>[];
@@ -74,7 +74,7 @@ export interface RelationConfig {
      * An invariant about the state the write LEAVES BEHIND. Runs inside the
      * transaction after the replacement; throwing rolls it back.
      *
-     * Not folded into `warnAfterWrite`, which is advisory and never a refusal —
+     * Not folded into `warnAfterWrite`, which is advisory and never a refusal:
      * conflating them would make one hook's return value sometimes advice and
      * sometimes a veto.
      */
@@ -93,7 +93,7 @@ interface OrphanedScope {
  * reference it.
  *
  * WARNS RATHER THAN REFUSES because nothing breaks: `group_term` is a VISIBILITY
- * scope and the solver never reads it — `assembleSolverInput` derives the Groups it
+ * scope and the solver never reads it: `assembleSolverInput` derives the Groups it
  * needs from what is actually referenced, precisely so tenant configuration cannot
  * make an input inconsistent. What does change is that the Group stops appearing in
  * that Term's pickers, so an accidental removal cannot be undone without first
@@ -155,7 +155,7 @@ async function groupTermScopeWarnings(ctx: {
         // true by construction, and without it the warning reads as though a
         // timetable is about to break.
         return `Scoped out of ${row.name}, but ${parts.join(' and ')} in that term still use this group. `
-            + 'They keep working and the solver is unaffected — this group just will not appear in '
+            + 'They keep working and the solver is unaffected; this group just will not appear in '
             + `group pickers for ${row.name}.`;
     });
 }
@@ -180,7 +180,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
         model: 'timeGridBreak',
         parentKey: 'timeGridId',
         // `dayOfWeek: null` is universal; 1..7 is a specific ISO weekday. The
-        // database CHECK rejects 0 and 8 as well — a grid cannot have a break
+        // database CHECK rejects 0 and 8 as well: a grid cannot have a break
         // on a day no Session can occupy.
         item: z.object({
             afterBlockIndex: z.number().int().min(0),
@@ -193,7 +193,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
 
     /**
      * Which Terms a Group is available in. NO ROWS MEANS EVERY TERM, so saving an
-     * empty list WIDENS the Group back to universal rather than hiding it — the one
+     * empty list WIDENS the Group back to universal rather than hiding it. It is the one
      * thing here that reads backwards, and why the editor labels the empty state.
      */
     'groups/terms': {
@@ -211,7 +211,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
      *
      * NOT in the manage registry's `relations` array, like `groups/availability`
      * below and for a related reason: editing the set is only half the feature.
-     * The other half is an ACTION — copy those members in — and a panel that
+     * The other half is an ACTION (copy those members in), and a panel that
      * saved the sources while the membership silently stayed as it was would be
      * the most misleading version of this possible. `ManageGroupForm` renders
      * both together.
@@ -229,7 +229,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
     },
 
     /**
-     * When a Group is available inside each Term — the cohort that runs only the
+     * When a Group is available inside each Term: the cohort that runs only the
      * first six weeks.
      *
      * NOT in the manage registry's `relations` array, deliberately, so the
@@ -237,7 +237,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
      * of links with at most one number or one reference per row, and this needs
      * two dates; declared here it still gets the PUT-set machinery, the tenant
      * column, and the `group.update` gate for free while the UI stays bespoke
-     * inside `ManageGroupForm` — the "bespoke means one slot" rule.
+     * inside `ManageGroupForm`, per the "bespoke means one slot" rule.
      *
      * ABSENT ROW MEANS THE WHOLE TERM, so removing a row is how a tenant clears
      * a window. A PUT-set gives that for nothing: a term dropped from the
@@ -249,7 +249,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
         model: 'groupTermAvailability',
         parentKey: 'groupId',
         /*
-         * Both bounds optional, at least one required — the DB CHECK says the
+         * Both bounds optional, at least one required. The DB CHECK says the
          * same thing, and a row with neither is exactly what an absent row
          * already means. Refused here so the caller gets a 400 naming the field
          * rather than a constraint-violation 500.
@@ -319,10 +319,10 @@ export const RELATIONS: Record<string, RelationConfig> = {
     },
 
     /**
-     * Which AccessRoles a Person holds — what they may DO, as opposed to what they
+     * Which AccessRoles a Person holds: what they may DO, as opposed to what they
      * ARE (`persons/roles` above is scheduling vocabulary and grants nothing).
      *
-     * Behind `person_access_role.assign` rather than `person.update` — see
+     * Behind `person_access_role.assign` rather than `person.update`; see
      * `writePermission`.
      */
     'persons/access-roles': {

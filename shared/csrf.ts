@@ -8,18 +8,18 @@
  * (does the same for the integration suite, which talks to the API directly
  * rather than through a browser).
  *
- * The inline script — not a Nuxt plugin — is what patches `fetch`: a plugin's
+ * The inline script (not a Nuxt plugin) is what patches `fetch`: a plugin's
  * `setup()` runs too late to intercept it. Nuxt's own `$fetch` singleton is
  * created by `#build/fetch.mjs`'s top-level code (`globalThis.$fetch =
  * ofetch.create(...)`), which captures `globalThis.fetch` once, at MODULE
- * EVALUATION time. Module evaluation always finishes before any runtime code
- * — including the first plugin's callback — ever runs, so by the time a
+ * EVALUATION time. Module evaluation always finishes before any runtime code,
+ * including the first plugin's callback, ever runs, so by the time a
  * plugin's `defineNuxtPlugin(() => { ... })` body executes, that capture has
  * already happened and reassigning `globalThis.fetch`/`globalThis.$fetch`
  * from inside it is provably too late. A classic (non-module) inline
- * `<script>`, by contrast, runs during HTML parsing — strictly before any
+ * `<script>`, by contrast, runs during HTML parsing, strictly before any
  * `type="module"` script, which is deferred by spec regardless of its
- * position in the document — so it is the only place that is guaranteed to
+ * position in the document, so it is the only place that is guaranteed to
  * win the race.
  */
 

@@ -33,7 +33,7 @@
                     <option
                         :selected="!draft.parentGroupId"
                         value=""
-                    >— Top level —</option>
+                    >Top level</option>
                     <option
                         v-for="option in parentOptions"
                         :key="option.value"
@@ -56,7 +56,7 @@
                     this group blocks its parents and its children.
                     <template v-if="mode === 'edit' && excludedCount">
                         {{ excludedCount }} group{{ excludedCount === 1 ? '' : 's' }} nested beneath this
-                        one {{ excludedCount === 1 ? 'is' : 'are' }} not listed — moving a group under its own
+                        one {{ excludedCount === 1 ? 'is' : 'are' }} not listed, since moving a group under its own
                         descendant would create a cycle.
                     </template>
                 </p>
@@ -104,8 +104,8 @@ import { descendantIds, indentedOptions } from '~/utils/groupTree';
 /**
  * Group's detail: the shared form plus one control it cannot express.
  *
- * The parent selector's options depend on the row being edited — self and every
- * descendant have to be excluded — which no static registry entry can describe.
+ * The parent selector's options depend on the row being edited: self and every
+ * descendant have to be excluded, which no static registry entry can describe.
  * Everything else (save, delete, dirty state, server errors, the read-only
  * rendering) is the generic scaffold, unchanged.
  *
@@ -145,7 +145,7 @@ const currentParentLabel = computed(() => {
         return 'Top level';
     }
 
-    return allGroups.value.find((row) => String(row.id) === String(id))?.name as string ?? '—';
+    return allGroups.value.find((row) => String(row.id) === String(id))?.name as string ?? '-';
 });
 </script>
 

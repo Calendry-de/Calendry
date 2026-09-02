@@ -27,8 +27,8 @@
         </div>
 
         <!--
-            THE MOBILE PRESENTATION HAS TO BE ABLE TO EDIT. Below 1365px — which
-            includes an ordinary 1280px laptop — this is the only surface, and
+            THE MOBILE PRESENTATION HAS TO BE ABLE TO EDIT. Below 1365px (which
+            includes an ordinary 1280px laptop), this is the only surface, and
             without cell targets "Move…" entered placement mode and offered
             nothing to pick. Same targets the grid emits, in the shape this
             presentation can carry.
@@ -112,13 +112,13 @@ import ScheduleSessionChip from './ScheduleSessionChip.vue';
 
 const props = defineProps<{
     grid: TimeGrid;
-    /** Placed only (issue #22) — a banked Session has no day to fall under. */
+    /** Placed only (issue #22): a banked Session has no day to fall under. */
     sessions: PlacedScheduleSession[];
     violations: Map<string, Violation[]>;
     selectedId: string | null;
     /** Blocks become targets, exactly as the grid's cells do. */
     placing?: boolean;
-    /** "Move to" or "Add event at" — the same promise the grid makes. */
+    /** "Move to" or "Add event at": the same promise the grid makes. */
     targetVerb?: string;
     roomName?: (id: string) => string;
     virtualRoomIds?: Set<string>;
@@ -137,7 +137,7 @@ defineEmits<{
 /**
  * Opens on the SELECTED session's day, not on Monday. Both presentations are
  * always in the DOM and the 1365px swap is a `display` toggle, so crossing the
- * breakpoint always landed on `activeDays[0]` — the inspector said Friday while
+ * breakpoint always landed on `activeDays[0]`: the inspector said Friday while
  * the agenda said Monday.
  */
 const activeDay = ref(props.grid.activeDays[0] ?? 1);
@@ -162,7 +162,7 @@ function countFor(day: number): number {
  * Issue #109's Today button: the desktop grid already shows every day as a
  * column, but this presentation shows ONE day at a time, so jumping the week
  * alone would leave the agenda open on whichever day it last was rather than
- * today's. Exposed rather than modelled — `activeDay` otherwise stays this
+ * today's. Exposed rather than modelled: `activeDay` otherwise stays this
  * component's own business (it also follows selection, above), and the page
  * only ever needs to set it at the moment of one click.
  */
@@ -198,7 +198,7 @@ defineExpose({ showDay });
 
         display: flex;
         flex: 1;
-        gap: 5px; // Between space-2 (4px) and space-3 (6px) — hand-tuned, not on the scale.
+        gap: 5px; // Between space-2 (4px) and space-3 (6px), hand-tuned, not on the scale.
         align-items: center;
         justify-content: center;
 
@@ -233,7 +233,7 @@ defineExpose({ showDay });
     &_count {
         min-width: 17px;
         padding: 1px 4px; // 1px is a hairline on a small badge; kept together rather than half-tokenized.
-        border-radius: 9px; // Half the 17px min-width — a circular badge, not a scale step.
+        border-radius: 9px; // Half the 17px min-width, a circular badge, not a scale step.
 
         font-size: var(--font-size-xs);
         font-variant-numeric: tabular-nums;
@@ -304,7 +304,7 @@ defineExpose({ showDay });
 
     &_empty {
         margin: 0;
-        padding: 28px 0; // Between space-7 (24px) and space-8 (32px) — hand-tuned, not on the scale.
+        padding: 28px 0; // Between space-7 (24px) and space-8 (32px), hand-tuned, not on the scale.
 
         font-size: var(--font-size-md);
         color: $content7;

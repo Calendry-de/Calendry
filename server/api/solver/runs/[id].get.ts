@@ -8,7 +8,7 @@ import { pollSolverRun } from '../../../utils/solverPolling';
  *
  * ON-DEMAND polling, for latency: someone watching a run gets a fresh answer
  * immediately rather than waiting for the background poller's next tick. It is
- * NOT the mechanism that guarantees a run reaches a terminal state — that is
+ * NOT the mechanism that guarantees a run reaches a terminal state; that is
  * `server/plugins/solverPoller.ts`, because nothing about correctness may
  * depend on a human keeping a tab open.
  *

@@ -3,7 +3,7 @@
  *
  * WHY THIS EXISTS
  * ---------------
- * There was no path — CLI or otherwise — to create an AccessRole.
+ * There was no path, CLI or otherwise, to create an AccessRole.
  * `provision:tenant` mints exactly one (`tenant-admin`, at creation time) and
  * `grant:permissions` only widens a role that already exists, so a rebuilt
  * database had ONE role and `create:account --role viewer` failed outright:
@@ -11,8 +11,8 @@
  *     No access role 'viewer' in tenant 'test'.
  *     Available: tenant-admin
  *
- * The practical cost was that permission-gated regression checks — the Stage 6b
- * solver-control gate, the 6c viewer check — could not run at all, and the two
+ * The practical cost was that permission-gated regression checks (the Stage 6b
+ * solver-control gate, the 6c viewer check) could not run at all, and the two
  * under-privileged accounts they depend on existed only as raw-SQL artifacts.
  *
  * This is the operator tool, not the tenant-facing role editor. Letting a tenant
@@ -26,7 +26,7 @@
  * CLI means the running application cannot invent authority, however it is
  * tricked.
  *
- * WHY THE OWNER CONNECTION — AND WHY THE WRITES STILL GO THROUGH RLS
+ * WHY THE OWNER CONNECTION, AND WHY THE WRITES STILL GO THROUGH RLS
  * ------------------------------------------------------------------
  * Unlike every other operator script here, this one does NOT need ownership to
  * write. Verified against the live database rather than assumed: `access_role`,
@@ -38,13 +38,13 @@
  * What it cannot do is resolve `--tenant <slug>` to an id. `tenant`'s policy is
  * `id = current_tenant_id() OR federation_id = current_federation_id()`, so
  * finding a tenant by slug requires already knowing which tenant you are. A
- * SECURITY DEFINER slug lookup would fix that and is deliberately NOT added —
+ * SECURITY DEFINER slug lookup would fix that and is deliberately NOT added:
  * CLAUDE.md permits exactly four RLS-bypassing paths and "an operator CLI would
  * like a nicer argument" is not the comparably strong reason a fifth needs.
  *
  * So: the OWNER connection resolves the slug, and the transaction then drops to
  * `SET LOCAL ROLE calendry_app` with tenant context set before writing anything.
- * That narrows the write PATH, not the credential — an operator still needs the
+ * That narrows the write PATH, not the credential; an operator still needs the
  * owner URL to run this. What it actually buys is that a mismatched pair cannot
  * be written: `access_role.tenant_id` and `access_role_permission.tenant_id`
  * must both equal the context, so a bug that resolved the wrong tenant is
@@ -76,7 +76,7 @@ async function main() {
             + 'There is deliberately no --all: provision:tenant already mints a\n'
             + 'full-catalogue tenant-admin, and a role granted "everything" once\n'
             + 'silently stops being everything the next time a permission is added.\n'
-            + 'Compose it from two audited steps instead — create:role, then\n'
+            + 'Compose it from two audited steps instead: create:role, then\n'
             + '`grant:permissions --role <key> --all-missing`.\n',
         );
         process.exit(1);
@@ -95,7 +95,7 @@ async function main() {
     }
 
     // Validation pass 1: the CODE catalogue. A typo'd key would otherwise fail
-    // on the foreign key with an opaque message — or, if it happened to be a
+    // on the foreign key with an opaque message, or, if it happened to be a
     // prefix of a real one, grant something subtly different and report success.
     const unknown = requested.filter((key) => !isPermissionKey(key));
 
@@ -116,7 +116,7 @@ async function main() {
             process.exit(1);
         }
 
-        // Validation pass 2: the SEEDED catalogue. Distinct from pass 1 — the
+        // Validation pass 2: the SEEDED catalogue. Distinct from pass 1: the
         // code can be ahead of the database, and `db seed` is the step that
         // closes the gap. Naming it beats an FK violation on permission_key.
         const seeded = new Set((await prisma.permission.findMany({ select: { key: true } })).map((p) => p.key));
@@ -125,7 +125,7 @@ async function main() {
         if (notSeeded.length) {
             console.error(`\n${notSeeded.length} permission(s) are in the code but not in the database:`);
             console.error(`  ${notSeeded.slice(0, 8).join(', ')}${notSeeded.length > 8 ? ' …' : ''}`);
-            console.error('\nRun `bun run db-seed` first — the catalogue is seeded, not migrated.\n');
+            console.error('\nRun `bun run db-seed` first: the catalogue is seeded, not migrated.\n');
             process.exit(1);
         }
 
@@ -136,19 +136,19 @@ async function main() {
 
         // Fails loudly rather than upserting. A second row that looks like the
         // first is worse than an error: `type` on a Constraint is createOnly, and
-        // the mislabelled duplicate that produced taught this the hard way — it
+        // the mislabelled duplicate that produced taught this the hard way: it
         // could never be corrected by editing, only deleted and recreated.
         const clash = siblings.find((role) => role.key === roleKey);
 
         if (clash) {
             console.error(`\nAccessRole '${roleKey}' already exists in tenant '${tenantSlug}'`
-                + ` — ${clash._count.permissions} permission(s).`);
+                + ` (${clash._count.permissions} permission(s)).`);
             console.error('This script creates; it does not update.');
             console.error(`To widen it: bun run grant:permissions -- --tenant ${tenantSlug} --role ${roleKey} --permissions …\n`);
             process.exit(1);
         }
 
-        // `name` is not unique in the schema, so this cannot be an error — but
+        // `name` is not unique in the schema, so this cannot be an error, but
         // silence is exactly how a rule labelled "Cap online share per group"
         // ended up being a minimize_exam_week_sessions row.
         const nameClash = siblings.find((role) => role.name === roleName);
@@ -162,7 +162,7 @@ async function main() {
         }
 
         console.log(`Permissions ${requested.length}: ${requested.join(', ')}`);
-        console.log('System      no — provision:tenant owns is_system, and this role stays deletable');
+        console.log('System      no (provision:tenant owns is_system, and this role stays deletable)');
 
         if (nameClash) {
             console.log(`\n  WARNING: '${nameClash.key}' in this tenant already displays as "${roleName}".`);
@@ -189,7 +189,7 @@ async function main() {
         }
 
         // One transaction, and the writes run as the APP role under the tenant's
-        // own RLS context — see the header. A role with no permissions, or
+        // own RLS context; see the header. A role with no permissions, or
         // permission rows pointing at a tenant the role does not belong to, are
         // both refused by the database rather than left to be discovered later.
         const created = await prisma.$transaction(async (tx) => {
@@ -232,7 +232,7 @@ async function main() {
 
         console.log(`\nCreated. access_role=${created.id}`);
         console.log(`Assign it with: bun run create:account -- --tenant ${tenantSlug} --role ${roleKey} …`);
-        console.log('Existing people are unaffected — this creates a role, it does not assign one.\n');
+        console.log('Existing people are unaffected: this creates a role, it does not assign one.\n');
 
         // Structured line for an external log sink, deliberately not a database
         // table: the operator running this can rewrite any table here, so a local

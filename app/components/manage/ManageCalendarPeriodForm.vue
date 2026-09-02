@@ -51,7 +51,7 @@
                                 An exam period claims any week it touches, so this one falls outside the term.
                             </template>
                             <template v-else>
-                                A {{ kind.toLowerCase() }} claims a week only if it covers the whole of it —
+                                A {{ kind.toLowerCase() }} claims a week only if it covers the whole of it,
                                 Monday to Sunday.
                             </template>
                         </template>
@@ -88,7 +88,7 @@ import type { CalendarPeriodLike, PeriodKind } from '~~/shared/academicCalendar'
  * ----------------------------------
  * The mapping from two dates to a set of week kinds is genuinely unpredictable.
  * An exam period of 2027-09-27 to 2027-10-18 marks FOUR weeks EXAM, not three,
- * because the precedence rule is "touches" — the week beginning 2027-10-18
+ * because the precedence rule is "touches": the week beginning 2027-10-18
  * counts even though only its Monday falls inside. BREAK and HOLIDAY use
  * "covers the entire week" instead, so the same dates produce a different
  * answer depending on the kind chosen. Nobody derives that from two date
@@ -99,7 +99,7 @@ import type { CalendarPeriodLike, PeriodKind } from '~~/shared/academicCalendar'
  * `classifyWeeks` is imported from `shared/`, and is the SAME function
  * `buildAcademicCalendar` calls to build what the solver is told. A preview
  * computed locally would eventually disagree with the wire, and would then
- * state the opposite of the truth while looking authoritative — the failure the
+ * state the opposite of the truth while looking authoritative, the failure the
  * `<select>`/`:selected` bug produced on the schedule page. Same discipline as
  * `shared/timeGrid.ts`.
  */
@@ -141,7 +141,7 @@ const validRange = computed(() => startDate.value !== null && endDate.value !== 
 /**
  * Both classifications: the term as it is WITHOUT this period, and with it.
  *
- * The comparison is what makes the preview readable — "week 3 is EXAM" is far
+ * The comparison is what makes the preview readable: "week 3 is EXAM" is far
  * less useful than "week 3 becomes EXAM, and was TEACHING". Other existing
  * periods are deliberately NOT loaded: this answers "what does THIS period do",
  * and folding in the rest would make an unchanged row look like this period's

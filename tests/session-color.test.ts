@@ -11,14 +11,14 @@ import {
  * The colour a Session is drawn in, and the two rules that make it mean
  * something.
  *
- * A pure unit test — no server, no database. It exists because four surfaces
+ * A pure unit test: no server, no database. It exists because four surfaces
  * draw a Session (week grid, day agenda, inspector, review diff) and a chip
  * that is teal in one and violet in another is not a styling inconsistency, it
  * is two different claims about the same thing.
  *
  * The regression it pins specifically: the chip used to read
  * `session.kind?.color ?? primary500`, so every Session without a kind colour
- * claimed the brand accent — the one colour DESIGN.md reserves for "where a
+ * claimed the brand accent: the one colour DESIGN.md reserves for "where a
  * session may land". Measured on real tenant data, every chip on the screen
  * carried it. `resolveSessionColor` returning NULL rather than a hex fallback
  * is what stops that, so that is asserted first.
@@ -74,8 +74,8 @@ describe('resolveSessionColor', () => {
     });
 
     it('declares exactly the sources the write boundary accepts', () => {
-        // If these drift, a tenant can save a source the resolver silently skips
-        // — a setting that saves, displays, and does nothing.
+        // If these drift, a tenant can save a source the resolver silently
+        // skips: a setting that saves, displays, and does nothing.
         expect([...COLOR_SOURCES].sort()).toEqual(['kind', 'offering']);
     });
 });
@@ -93,12 +93,12 @@ describe('isOnlineSession', () => {
 
     it('does not mark a session that is only partly online', () => {
         // A session split across a lecture hall and a virtual room is streamed,
-        // not online — `deliveryMode` calls that `hybrid`.
+        // not online: `deliveryMode` calls that `hybrid`.
         expect(isOnlineSession([{ isVirtual: true }, { isVirtual: false }])).toBe(false);
     });
 
     it('does not mark an unplaced session', () => {
-        // No rooms is "nowhere", not "online" — a different fact, and the one
+        // No rooms is "nowhere", not "online": a different fact, and the one
         // `every()` on an empty array would get wrong.
         expect(isOnlineSession([])).toBe(false);
         expect(isOnlineSession(undefined)).toBe(false);
@@ -116,7 +116,7 @@ describe('isOnlineSession', () => {
  * Three delivery states, and the third is not decoration.
  *
  * Measured on real tenant data, EVERY session touching the virtual room also had
- * a physical one — so a two-state rule marked nothing at all and the feature was
+ * a physical one, so a two-state rule marked nothing at all and the feature was
  * invisible on the only data that exists. `hybrid` is what makes the room
  * assignment legible instead of silently unrepresentable.
  */
@@ -130,7 +130,7 @@ describe('deliveryMode', () => {
 
     it('reports on-site for a session with no rooms rather than inventing a mode', () => {
         // Unplaced is a different fact, and the off-grid tray is where it is
-        // reported — not here, and never as "online".
+        // reported, not here, and never as "online".
         expect(deliveryMode([])).toBe('onsite');
         expect(deliveryMode(undefined)).toBe('onsite');
     });

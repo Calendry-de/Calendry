@@ -30,7 +30,7 @@ import { logout, useIsSignedIn, useSession } from '~/composables/session';
 import CommonLoader from '../common/CommonLoader.vue';
 
 /**
- * Header widget, not the login form itself — that lives at /login.
+ * Header widget, not the login form itself: that lives at /login.
  *
  * Reads the real session rather than the WebUser template stub, which is now
  * referenced only by the navigation composable and is still slated for removal

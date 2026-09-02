@@ -35,14 +35,14 @@ export interface UnavailabilityRow {
 
 /**
  * APPROVED windows for the given people, in the term being solved. The ONLY read
- * path for solver input — the two filters are the whole safety property, and both
+ * path for solver input: the two filters are the whole safety property, and both
  * were added because their absence was demonstrated:
  *
  *   status  a PENDING window applies a HARD rule nobody approved
  *   term    `weeks` counts ONE term's calendar; a stored `weeks:[2]` reached both
  *           demo terms, where week 2 begins thirteen months apart
  *
- * `termId IS NULL` means every term — what a recurring weekly pattern means.
+ * `termId IS NULL` means every term, which is what a recurring weekly pattern means.
  */
 export async function approvedBlackoutsFor(
     tx: Tx,
@@ -78,7 +78,7 @@ export async function approvedBlackoutsFor(
 /**
  * The grid limits a window is validated against.
  *
- * `blocksPerDay` is the MAXIMUM across the tenant's grids — a veto is not
+ * `blocksPerDay` is the MAXIMUM across the tenant's grids, because a veto is not
  * term-scoped, so it must stay expressible under every grid the tenant has.
  * `defaultGrid` is what the "you have blocked N of M" summary counts against,
  * because a summary needs ONE grid to be a number at all, and the default is the
@@ -91,7 +91,7 @@ export interface GridLimits {
      *
      * `blockTime()` needs the lengths, the start clock and the break overrides
      * to name a block, and the pages in this area must not fetch
-     * `/api/time-grids` for them — that needs `time_grid.read`, which nobody
+     * `/api/time-grids` for them, because that needs `time_grid.read`, which nobody
      * holding only `availability.manage_own` has, and one refused fetch in a
      * reference wave renders every control on the page over empty data.
      */
@@ -109,7 +109,7 @@ export interface GridLimits {
 }
 
 /**
- * Stated preferences for the given people — the ONLY read path into
+ * Stated preferences for the given people: the ONLY read path into
  * `person_preference` for solver input, mirroring `approvedBlackoutsFor`.
  *
  * No status filter, because preferences have no state machine: a preference is
@@ -125,7 +125,7 @@ export interface GridLimits {
  * exists to prevent.
  *
  * `roomFeatures` are resolved to Equipment KEYS here, not ids. The wire matches
- * them against `Room.feature_tags`, which is the same vocabulary by key — the
+ * them against `Room.feature_tags`, which is the same vocabulary by key; the
  * id is this app's internal handle and means nothing to the solver.
  */
 export interface StatedPreference {
@@ -288,7 +288,7 @@ export function resolveHolidayRange(
             statusCode: 422,
             statusMessage: 'That range spans more than one term '
                 + `(${overlapping.map((term) => term.name).join(', ')}). `
-                + 'Enter one absence per term — a single entry counts the weeks of one term only.',
+                + 'Enter one absence per term. A single entry counts the weeks of one term only.',
             data: { field: 'endDate' },
         });
     }
@@ -309,7 +309,7 @@ export function resolveHolidayRange(
 
 /**
  * A single date, resolved to the ONE term it falls in, its week index, and its
- * ISO weekday — the day-level counterpart to `resolveHolidayRange` above,
+ * ISO weekday: the day-level counterpart to `resolveHolidayRange` above,
  * which resolves a RANGE and deliberately blocks every day of every week it
  * touches. Reused rather than duplicated: `resolveHolidayRange(terms, d, d)`
  * already refuses a date outside every term and a date spanning more than one
@@ -318,7 +318,7 @@ export function resolveHolidayRange(
  *
  * WHY THIS NEEDS A TERM AT ALL, when the recurring pattern next door writes
  * none. `termId IS NULL` means "every term", which is what a recurring pattern
- * means and is NOT what a specific date means — `weeks:[2]` reached both demo
+ * means and is NOT what a specific date means: `weeks:[2]` reached both demo
  * terms once, thirteen months apart, before `approvedBlackoutsFor` scoped
  * reads by term. A date-derived window is unambiguously one term's week, so it
  * writes that term rather than leaving the field to mean "every term" by
@@ -337,7 +337,7 @@ export function resolveVetoDate(
  * Payload for one submitted window.
  *
  * Ranges are NOT checked here. `validateWindow` needs the tenant's grid, which a
- * synchronous zod refinement cannot read — the same split `constraintShapeRefinement`
+ * synchronous zod refinement cannot read; it is the same split `constraintShapeRefinement`
  * and `constraintBeforeUpdate` already make for the same reason.
  */
 export const windowSchema = z.object({
@@ -346,7 +346,7 @@ export const windowSchema = z.object({
     weeks: z.array(z.number().int()).max(64).default([]),
     reason: z.string().trim().max(500).nullish(),
     /**
-     * "I cannot teach THIS day" — a single calendar date, as `/schedule`'s
+     * "I cannot teach THIS day": a single calendar date, as `/schedule`'s
      * blocked-day button sends it (issue #2), rather than the recurring
      * pattern this route otherwise writes.
      *
@@ -356,7 +356,7 @@ export const windowSchema = z.object({
      * they clicked.
      *
      * NOT a third route. The card is explicit that this must not grow its own
-     * endpoint — it converges on the same `personUnavailability.create()`
+     * endpoint: it converges on the same `personUnavailability.create()`
      * this route already makes; only how `days`/`weeks`/`termId` are derived
      * differs.
      */
@@ -366,7 +366,7 @@ export const windowSchema = z.object({
 /**
  * A date-range absence, as the form submits it.
  *
- * Dates in, weeks out — the caller never sends week indices. Letting a client
+ * Dates in, weeks out; the caller never sends week indices. Letting a client
  * compute them would be a second implementation of `weekIndexOf`, which is the
  * arithmetic this project already had to unify once after two copies agreed
  * right up until they did not.
@@ -384,8 +384,8 @@ export const preferencesSchema = z.object({
      * Equipment IDS. Capped like the other axes; a person preferring more than
      * 64 room types is expressing no preference at all.
      *
-     * `.default([])` so a caller written before this axis existed keeps working
-     * — but note that a PUT replaces the whole preference state, so an existing
+     * `.default([])` so a caller written before this axis existed keeps working.
+     * But note that a PUT replaces the whole preference state, so an existing
      * UI that does not send this field CLEARS it. Both pages send all three.
      */
     preferredRoomFeatureIds: z.array(z.string().min(1)).max(64).default([]),
@@ -414,7 +414,7 @@ export const staffPreferencesSchema = preferencesSchema.extend({
  *
  * THE CHECK IS NOT REDUNDANT WITH THE FOREIGN KEY. Postgres runs referential
  * integrity as the referenced table's owner, so an FK check does NOT consult
- * row-level security — `equipment_id` pointing at another tenant's row would
+ * row-level security: `equipment_id` pointing at another tenant's row would
  * satisfy the constraint and insert cleanly. RLS on `equipment` is what decides
  * what this tenant can see, and that has to be asked explicitly.
  *
@@ -440,8 +440,8 @@ export async function replaceRoomFeaturePreferences(tx: Tx, options: {
         return;
     }
 
-    // Federation-owned equipment is legitimately referenceable — the read policy
-    // on `equipment` widens to the federation — so this must not filter on
+    // Federation-owned equipment is legitimately referenceable: the read policy
+    // on `equipment` widens to the federation, so this must not filter on
     // `tenantId` itself. RLS already answers the question correctly.
     const visible = await tx.equipment.findMany({
         where: { id: { in: equipmentIds } },
@@ -495,7 +495,7 @@ export function normaliseWindow(
     /*
      * "Never available, on any day, in any week" is legal on the wire and the
      * solver honours it literally. It is also almost always a mis-click, and it
-     * is the most destructive thing a veto can say — so it is refused at the
+     * is the most destructive thing a veto can say, so it is refused at the
      * boundary rather than routed through approval where somebody might wave it
      * past in a list of twenty.
      */

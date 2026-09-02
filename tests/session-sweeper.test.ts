@@ -7,14 +7,14 @@ import { resolveOwnerDatabaseUrl } from '../scripts/lib/ownerDatabaseUrl';
  * Expired-session cleanup.
  *
  * `auth_session` rows were never deleted: sessions are only ever looked up by
- * primary key or unique token hash, so a dead row was never in anyone's way —
+ * primary key or unique token hash, so a dead row was never in anyone's way:
  * it just accumulated, one per login, forever. Harmless and unbounded.
  *
  * WHAT THESE PIN, AND WHY EACH MATTERS
  *
  * The predicate is `expires_at < now() - 30 days` and nothing else. It has to
  * delete only rows that can never authenticate again, and it has to KEEP a row
- * that is merely expired — the 30 days are not about the session (an expired
+ * that is merely expired: the 30 days are not about the session (an expired
  * one is already dead) but about `user_agent` and `ip_address`, which answer
  * "where was this account used from" and are worth nothing if they vanish the
  * moment they become interesting.
@@ -47,7 +47,7 @@ async function session(id: string, expiresAgoDays: number, revoked = false) {
     );
 }
 
-/** The production predicate, verbatim — see `deleteExpiredSessions`. */
+/** The production predicate, verbatim: see `deleteExpiredSessions`. */
 async function sweep(retentionDays = 30): Promise<number> {
     const { count } = await db.authSession.deleteMany({
         where: { expiresAt: { lt: new Date(Date.now() - retentionDays * DAY) } },
@@ -111,7 +111,7 @@ describe('the retention window', () => {
 describe('revoked sessions need no separate clause', () => {
     it('deletes a long-revoked row once its expiry is past the window', async () => {
         // Sessions live 12 hours, so a revoked row expires within half a day and
-        // is then caught by the expiry test — which is why the predicate is one
+        // is then caught by the expiry test, which is why the predicate is one
         // condition rather than a LEAST(...) over two.
         await account();
         await session('sweep-revoked-old', 40, true);
@@ -128,7 +128,7 @@ describe('revoked sessions need no separate clause', () => {
     });
 });
 
-describe('idempotence — why no claim or lease is needed', () => {
+describe('idempotence: why no claim or lease is needed', () => {
     it('is a no-op the second time, so concurrent instances cannot conflict', async () => {
         // The solver poller leases its work because two instances advancing the
         // same run would double-poll a stateful service. Here the loser of a

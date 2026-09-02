@@ -7,8 +7,8 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 const BODY = holidaySchema.extend({ personId: z.string().min(1) });
 
 /**
- * An administrator records a date-range absence for somebody — APPROVED on
- * arrival, like every other window they enter directly.
+ * An administrator records a date-range absence for somebody, marked
+ * APPROVED on arrival, like every other window they enter directly.
  *
  * The same resolution as the self-service route, through the same function: an
  * administrator's holiday must land on the same weeks a lecturer's would, and

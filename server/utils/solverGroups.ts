@@ -10,7 +10,7 @@
  * There is now a `group_term` table saying which Terms a Group is available in,
  * and filtering on it would be the obvious move. It is the wrong one.
  *
- * That table is TENANT CONFIGURATION — a human sets it, no-rows means "every
+ * That table is TENANT CONFIGURATION: a human sets it, no-rows means "every
  * Term", and nothing forces it to agree with what the Offerings actually
  * reference. Filter the solver's Groups by it and a mis-scoped Group produces
  * an input where an Offering names a `group_id` the solver was never given:
@@ -30,16 +30,16 @@
  * is also closed under `parent`, which is the property that makes the result a
  * well-formed forest rather than one with dangling parent pointers:
  *
- *   - a descendant D of a referenced X has its parent on the path X→D, so that
- *     parent is D's ancestor and X's descendant — in the set;
- *   - an ancestor A of X has as parent another ancestor of X — in the set, or A
- *     is a root and has none.
+ *   - a descendant D of a referenced X has its parent on the path X→D: that
+ *     parent is D's ancestor and X's descendant, and is therefore in the set;
+ *   - an ancestor A of X has as parent another ancestor of X, itself in the
+ *     set, or A is a root and has none.
  *
  * So no sent Group can point at an absent parent. Proven by construction rather
  * than asserted, and pinned by `assertClosedUnderParent` below plus a test that
  * cross-checks against every Offering's own group references.
  *
- * A sibling branch — some other child of an ancestor A — is deliberately NOT
+ * A sibling branch (some other child of an ancestor A) is deliberately NOT
  * pulled in. It can only matter if something places on it, and anything that
  * places on it in this Term is itself a referenced id and therefore already a
  * seed.
@@ -56,7 +56,7 @@ export interface GroupNode {
  *
  * Computed in memory from the `parent_id` values already fetched, rather than
  * queried from `group_closure`. Two reasons: it costs no extra round trip, and
- * more importantly it derives the closure from the SAME data the solver will —
+ * more importantly it derives the closure from the SAME data the solver will:
  * reading the closure table instead would introduce a second source of truth
  * that could disagree with `parent_id` if a trigger ever lagged.
  */
@@ -89,7 +89,7 @@ export function conflictClosure(groups: GroupNode[], seeds: Iterable<string>): S
         out.add(seed);
 
         // Upward: the parent chain. Guarded by `seen` because a cycle in the
-        // data would otherwise hang the request — the database has a
+        // data would otherwise hang the request; the database has a
         // reparent guard, but this must not depend on it holding.
         const seen = new Set<string>([seed]);
         let cursor = parentOf.get(seed) ?? null;
@@ -123,7 +123,7 @@ export function conflictClosure(groups: GroupNode[], seeds: Iterable<string>): S
  *
  * BOTH sources, not just Offerings: a Session can carry a Group its Offering
  * does not (one added to a single occurrence), and seeding from Offerings alone
- * would drop it from the input while the Session still referenced it — exactly
+ * would drop it from the input while the Session still referenced it, exactly
  * the inconsistency this module exists to prevent.
  */
 export function referencedGroupIds(

@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * `DELETE /api/sessions/:id` — removing an Event.
+ * `DELETE /api/sessions/:id`: removing an Event.
  *
  * WHY THE ROUTE REFUSES A REAL SESSION. An Offering-linked Session is demand
  * made concrete: its Offering declares how many times it must happen, so
@@ -77,7 +77,7 @@ describe('deleting an Event', () => {
 
         expect(events).toHaveLength(1);
 
-        // NULL because the FK is ON DELETE SET NULL and the row is gone — the
+        // NULL because the FK is ON DELETE SET NULL and the row is gone: the
         // designed behaviour, and exactly why the placement has to live in the
         // payload rather than be looked up through the pointer.
         expect(events[0].sessionId).toBeNull();

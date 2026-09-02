@@ -40,7 +40,7 @@ defineRouteMeta({
 });
 
 /**
- * Change a StaffAccount's password — issue #106, mirroring
+ * Change a StaffAccount's password (issue #106), mirroring
  * `/api/auth/change-password.post.ts` exactly for the staff plane.
  *
  * PUBLIC BY NECESSITY (`tenant-context.ts`'s `PUBLIC_API_PATHS`): a forced

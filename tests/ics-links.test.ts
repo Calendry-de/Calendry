@@ -3,16 +3,16 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * Calendar-subscription links — issue #15's stream half, replacing the
+ * Calendar-subscription links: issue #15's stream half, replacing the
  * one-off `GET /api/me/schedule.ics` download (`tests/ical-export.test.ts`,
  * removed with it).
  *
- * THE SECRET IS RETRIEVABLE, unlike an API token or screen key — the whole
+ * THE SECRET IS RETRIEVABLE, unlike an API token or screen key: the whole
  * point is a link a Person re-copies into a calendar app, so `GET
  * /api/me/ics-links` returns the full `url` every time, not once.
  *
  * THE STREAM ITSELF REUSES `ownSessionClause`, the same "mine" `session.read_own`
- * already uses — proven the same way the old download test proved it: a second
+ * already uses, proven the same way the old download test proved it: a second
  * Session in the same Term attached to a different Person must never appear.
  *
  * `test-tenant-a`'s timezone is set to Europe/Berlin here for the same reason
@@ -21,15 +21,15 @@ import { api, login } from './helpers/client';
  *
  * PERMISSION FIXTURES (issue #115). `adminA` holds the whole catalogue
  * (`allPermissions` in `tests/helpers/seed.ts`), so it covers both
- * `ics_link.generate` and `ics_link.generate_own` — the "may target Groups"
- * cases below use it. `viewerA` holds exactly `session.read` — pinned exactly
+ * `ics_link.generate` and `ics_link.generate_own`: the "may target Groups"
+ * cases below use it. `viewerA` holds exactly `session.read`, pinned exactly
  * by `auth-permissions.test.ts` and shared by 24 other suites, so it is
- * deliberately NOT widened here — it stands in for "holds neither ics_link
+ * deliberately NOT widened here. It stands in for "holds neither ics_link
  * key". `multiA` (personMultiA, `ACCOUNTS.multi` logged into `test-a`) is a
  * SECOND admin-shaped person in the same tenant, used wherever the "own
  * links only" tests need somebody who is not `adminA` but can still mint one.
  * `ownOnly` is a file-local fixture (own AccessRole, own Person, own Account)
- * holding EXACTLY `ics_link.generate_own` — the one shape that can mint a
+ * holding EXACTLY `ics_link.generate_own`, the one shape that can mint a
  * link at all but must be refused `groupIds`.
  */
 let f: Fixtures;
@@ -64,7 +64,7 @@ async function createLink(cookie: string, body: Record<string, unknown>) {
     return { status: res.status, body: res.body };
 }
 
-/** A Person/AccessRole/Account holding exactly `ics_link.generate_own` — no `session.read_own`, no `ics_link.generate`. */
+/** A Person/AccessRole/Account holding exactly `ics_link.generate_own`: no `session.read_own`, no `ics_link.generate`. */
 async function seedOwnOnly(tenantId: string) {
     await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${OWN_ONLY_EMAIL}'`);
 
@@ -153,7 +153,7 @@ describe('creating a link', () => {
         expect(status).toBe(404);
     });
 
-    it('a bearer token cannot mint a link — session only', async () => {
+    it('a bearer token cannot mint a link, session only', async () => {
         const minted = await api<{ token: string; id: string }>('/api/me/api-tokens', {
             method: 'POST',
             cookie: adminCookie,
@@ -260,7 +260,7 @@ describe('the stream', () => {
 
         try {
             // A second Session in the same Term, attached to nobody `adminA`
-            // is — the stream must never show it.
+            // is: the stream must never show it.
             const stranger = await ownerDb.person.create({
                 data: { tenantId: f.tenantA, givenName: 'Not', familyName: 'Mine', email: 'notmine-ics@a.test' },
             });
@@ -276,7 +276,7 @@ describe('the stream', () => {
                 data: { tenantId: f.tenantA, sessionId: other.id, personId: stranger.id },
             });
 
-            // No `cookie` — this is the whole point: an external calendar app
+            // No `cookie`: this is the whole point, an external calendar app
             // never has one.
             const res = await api(`/api/ics/stream.ics?token=${tokenOf(body.url)}`);
 
@@ -289,7 +289,7 @@ describe('the stream', () => {
             expect(text).toContain('LOCATION:Private A');
             expect(text).not.toContain('Somebody else');
 
-            // test-session-a: week 1, Tuesday, block 0 (08:00 local) —
+            // test-session-a: week 1, Tuesday, block 0 (08:00 local),
             // 2026-09-29 in Europe/Berlin, still CEST (UTC+2) before the late
             // October transition. A UTC-literal bug would emit 08:00Z.
             expect(text).toContain('DTSTART:20260929T060000Z');
@@ -307,9 +307,9 @@ describe('the stream', () => {
         }
     });
 
-    it('ALL scope bounds by weeksAhead — a short window excludes a Session further out, a longer one includes it', async () => {
+    it('ALL scope bounds by weeksAhead: a short window excludes a Session further out, a longer one includes it', async () => {
         // test-session-a is ~4 weeks from "now" at the time this suite was
-        // written (2026-09-29, term starts 2026-10-01) — see the fixture.
+        // written (2026-09-29, term starts 2026-10-01); see the fixture.
         const short = await createLink(adminCookie, { name: 'Next week', scope: 'ALL', weeksAhead: 1 });
         const long = await createLink(adminCookie, { name: 'Next couple months', scope: 'ALL', weeksAhead: 8 });
 
@@ -342,8 +342,8 @@ describe('group-scoped links (issue #115)', () => {
     });
 
     it('streams a Group\'s own Sessions, not the creator\'s', async () => {
-        // test-session-a is attached DIRECTLY to groupSeminarA (session_group)
-        // — the fixture's own creator, personA, is also directly attached to
+        // test-session-a is attached DIRECTLY to groupSeminarA (session_group);
+        // the fixture's own creator, personA, is also directly attached to
         // it via session_person. A group-scoped link must reach it through
         // the GROUP row alone: `multiA` (personMultiA) creates this link and
         // is attached to no Session at all, so the only way it can show up
@@ -365,10 +365,10 @@ describe('group-scoped links (issue #115)', () => {
         }
     });
 
-    it('does NOT walk down to a child Group\'s Sessions — only ancestors, same as a member\'s own timetable', async () => {
+    it('does NOT walk down to a child Group\'s Sessions, only ancestors, same as a member\'s own timetable', async () => {
         // groupCohortA is groupSeminarA's PARENT. test-session-a is assigned
         // to the SEMINAR, not the cohort, so a link scoped to the cohort must
-        // miss it — the same "attendance flows down, not up" rule
+        // miss it: the same "attendance flows down, not up" rule
         // `ownSessionClause`'s own comment states. Getting this backwards
         // would also accidentally leak `multiA`'s creator identity never
         // mattering here, since a DESCENDANT walk would show the seminar's

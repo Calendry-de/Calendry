@@ -6,7 +6,7 @@ import type { Tx } from './tenantDb';
  * Every other permission is recoverable from inside the application: if nobody
  * can read rooms, an administrator grants `room.read` and the problem is over.
  * These two are different, because they are the permissions that grant
- * permissions. Lose them both and the tenant cannot repair ITSELF — there is no
+ * permissions. Lose them both and the tenant cannot repair ITSELF: there is no
  * screen left that can compose a role or assign one.
  *
  * Recovery would then mean an operator with the owner database URL running
@@ -17,7 +17,7 @@ import type { Tx } from './tenantDb';
  * WHY TENANT-WIDE AND NOT "DO NOT DEMOTE YOURSELF"
  *
  * Demoting yourself while colleagues still hold the capability is an ordinary
- * thing to do — handing over administration and stepping back is a real
+ * thing to do: handing over administration and stepping back is a real
  * workflow, and refusing it would be this guard inventing a rule nobody asked
  * for. What must not happen is the LAST holder going away, whichever route
  * takes it: editing a role's grants, deleting the role, or revoking the last
@@ -27,7 +27,7 @@ import type { Tx } from './tenantDb';
  *
  * Predicting whether a write will breach this means reimplementing the write.
  * Instead the change lands inside the transaction, the invariant is measured
- * against the real post-write state, and a breach throws — which rolls the
+ * against the real post-write state, and a breach throws, which rolls the
  * whole transaction back. A guard that models the write can drift from it; one
  * that measures the result cannot.
  *
@@ -38,7 +38,7 @@ import type { Tx } from './tenantDb';
  * `authDb.ts` may query (CLAUDE.md's second deliberate RLS exception). Widening
  * that boundary for a convenience check is not the comparably strong reason a
  * new exception needs. So a tenant whose only administrator is a Person with no
- * account is still reachable — by a route this guard cannot see, and one an
+ * account is still reachable by a route this guard cannot see, and one an
  * operator has to fix either way.
  */
 const SELF_ADMINISTRATION: { key: string; describes: string }[] = [
@@ -59,7 +59,7 @@ export async function assertTenantRetainsAdministrator(tx: Tx, tenantId: string)
             throw createError({
                 statusCode: 422,
                 statusMessage: `This would leave nobody in this tenant able to ${capability.describes} `
-                    + `('${capability.key}'). Grant it to somebody else first — recovering from `
+                    + `('${capability.key}'). Grant it to somebody else first; recovering from `
                     + 'this state needs an operator with database access.',
                 data: { field: 'permissions', permission: capability.key },
             });

@@ -11,7 +11,7 @@
  *
  * `crypto.getRandomValues` rather than `node:crypto`, for the same reason: it is
  * the one CSPRNG both runtimes have. Node has exposed it on `globalThis.crypto`
- * since 18, and in a browser it exists only in a secure context — which every
+ * since 18, and in a browser it exists only in a secure context, which every
  * page serving this application already is.
  */
 
@@ -22,7 +22,7 @@ export const PASSWORD_MIN_LENGTH = 12;
  * A one-time password: 16 random bytes, base64url, 128 bits of entropy.
  *
  * base64url so it survives being copied out of a terminal, pasted into a form,
- * or read aloud over a phone without a quoting question — the three ways an
+ * or read aloud over a phone without a quoting question: the three ways an
  * initial password actually travels. Never stored in the clear anywhere; the
  * caller shows it once and hashes it.
  */

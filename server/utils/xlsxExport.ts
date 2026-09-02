@@ -9,7 +9,7 @@ export interface XlsxSheet {
 
 /**
  * A cell value ExcelJS accepts as-is. Everything else (an array, a plain
- * object) is stringified — ExcelJS has no representation for either and
+ * object) is stringified: ExcelJS has no representation for either and
  * silently writes `[object Object]` if handed one directly, which is worse
  * than a readable JSON string in the one cell a person will actually open.
  */
@@ -26,13 +26,13 @@ function cellValue(value: unknown): string | number | boolean | Date | null {
 }
 
 /**
- * One `.xlsx` workbook, one sheet per data category — the shape every export
+ * One `.xlsx` workbook, one sheet per data category: the shape every export
  * route in issue #84 shares (`GET /api/me/export`, `GET
  * /api/person-export/:id`, `GET /api/tenant/export`). A thin wrapper over
  * ExcelJS rather than a bespoke writer: hand-rolling the OOXML format is not
  * this app's job, and ExcelJS is the one place that complexity should live.
  *
- * Sheet names are truncated to Excel's 31-character cap — callers pick names
+ * Sheet names are truncated to Excel's 31-character cap. Callers pick names
  * short enough that this never bites in practice, but a silently-thrown
  * workbook write is a worse failure than a slightly clipped tab name.
  */

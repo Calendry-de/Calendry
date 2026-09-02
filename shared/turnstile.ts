@@ -4,7 +4,7 @@
  * A CONSTANT, NOT A CONFIG VALUE: both `server/utils/turnstile.ts` (which
  * enforces it) and `app/pages/login.vue` (which decides when to render the
  * widget) must agree on the exact same number, or the client could fail to
- * show the widget for a request the server is about to reject — the worst
+ * show the widget for a request the server is about to reject: the worst
  * version of this feature, a login that cannot succeed with no visible reason.
  */
 

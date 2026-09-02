@@ -14,7 +14,7 @@ import { CONSTRAINT_TYPES, validateConstraintShape } from '../shared/constraintT
  * declared. Worse, it is not local: the solver derives
  * `hard_penalty = sum(all soft weights) * placements + 1`, so a negative weight
  * subtracts from the margin that keeps HARD constraints outranking every soft
- * configuration — for every rule in the tenant, not just the mis-typed one.
+ * configuration: for every rule in the tenant, not just the mis-typed one.
  *
  * These are unit tests over the shared validator. The HTTP behaviour it backs
  * is exercised in `constraint-write-guard-api.test.ts`; this pins the rules
@@ -35,7 +35,7 @@ describe('weight floor', () => {
         // builder's input carried `min: 1`, but calendry-solver's own check is
         // `weight < 0.0` with the comment "Zero is fine and means report the
         // count, do not steer". A floor of 1 here would reject a configuration
-        // the solver accepts — the same builder-stricter-than-API divergence,
+        // the solver accepts: the same builder-stricter-than-API divergence,
         // just pointing the other way.
         expect(validateConstraintShape({
             type: 'minimize_online_sessions', severity: 'SOFT', weight: 0,
@@ -87,15 +87,15 @@ describe('severity must match the catalogue', () => {
     });
 });
 
-describe('partial validation — the trap this design exists to avoid', () => {
+describe('partial validation: the trap this design exists to avoid', () => {
     /**
      * A row that predates the guard: `no_double_booking_room` is pinned HARD,
      * stored as SOFT. Validating the MERGED row on every update would make it
-     * permanently uneditable — someone trying to DISABLE the very row the guard
+     * permanently uneditable: someone trying to DISABLE the very row the guard
      * protects them from would be refused by the guard.
      *
      * That is not hypothetical. CLAUDE.md records a mislabelled constraint that
-     * "could never be corrected by editing — only deleted and recreated",
+     * "could never be corrected by editing, only deleted and recreated",
      * because `type` is create-only. This is the same shape, and these cases are
      * what stop it recurring.
      */
@@ -125,7 +125,7 @@ describe('partial validation — the trap this design exists to avoid', () => {
             type: 'no_double_booking_room', severity: 'SOFT', weight: -2,
         });
 
-        // Both, not the first — a form that highlights one field per save is a
+        // Both, not the first: a form that highlights one field per save is a
         // form the user fights twice.
         expect(problems.map((p) => p.field).sort()).toEqual(['severity', 'weight']);
     });
@@ -134,7 +134,7 @@ describe('partial validation — the trap this design exists to avoid', () => {
 /**
  * PARAMETERS, the third rule the generic schema cannot express.
  *
- * `params` was `z.record(z.string(), z.unknown())` — arbitrary JSON — while
+ * `params` was `z.record(z.string(), z.unknown())` (arbitrary JSON) while
  * `buildVariant` reads four of those values with no guard at all. The tests
  * below are grouped by what a bad value actually DOES, because the four failure
  * modes are not the same severity and only one of them is loud:
@@ -143,13 +143,13 @@ describe('partial validation — the trap this design exists to avoid', () => {
  *   `assembleSolverInput` and fails the entire run, every other constraint with
  *   it. That is the only one anybody would notice.
  * - a non-numeric `maxRatio`/`rankThreshold` becomes `NaN`, and every comparison
- *   against `NaN` is false — the rule is inert and looks satisfied.
+ *   against `NaN` is false: the rule is inert and looks satisfied.
  * - `Boolean('false')` is `true`, so a stringified boolean means its opposite.
  * - `window` is compared against one literal, so a typo silently selects the
  *   other branch.
  */
 describe('parameter values', () => {
-    it('rejects a weekdays value that is not a list — the one that crashes assembly', () => {
+    it('rejects a weekdays value that is not a list: the one that crashes assembly', () => {
         // `buildVariant` does `(params.days as number[]).map(Number)`. This
         // string does not disable `minimize_specifc_day`; it throws before the
         // request is built, so a whole solver run fails on one bad character.
@@ -245,7 +245,7 @@ describe('parameter values', () => {
     it('ignores keys the catalogue does not declare, so a legacy row stays editable', () => {
         // The builder spreads the stored object on every edit, so a key left by
         // a parameter that no longer exists travels with the row. Refusing it
-        // would make exactly the rows that need repairing unrepairable — the
+        // would make exactly the rows that need repairing unrepairable: the
         // same reasoning as validating only the fields being changed.
         expect(validateConstraintShape({
             type: 'minimize_specifc_day',

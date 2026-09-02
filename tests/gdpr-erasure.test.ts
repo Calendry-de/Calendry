@@ -3,12 +3,12 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * Tenant-wide erasure (issue #84) — `DELETE /api/staff/tenants/:id`, staff
+ * Tenant-wide erasure (issue #84): `DELETE /api/staff/tenants/:id`, staff
  * only, via `calendry_internal.staff_erase_tenant()`.
  *
  * A THROWAWAY TENANT, never `tenantA`/`tenantB`: every other file in this
  * suite reseeds from the shared fixture in its own `beforeAll`, and this one
- * is about to delete a tenant outright — reusing either shared one would
+ * is about to delete a tenant outright; reusing either shared one would
  * break every test file that runs after it in the same `vitest` process
  * (`fileParallelism: false`, so ordering matters).
  */
@@ -55,9 +55,9 @@ async function seedThrowawayTenant(f: Fixtures) {
     });
     await ownerDb.accountPerson.create({ data: { accountId: soleAccount.id, personId: PERSON_SOLE_ID } });
 
-    // Shared across this throwaway tenant AND the shared fixture's tenantA —
+    // Shared across this throwaway tenant AND the shared fixture's tenantA:
     // the account this test expects to SURVIVE erasure. A FRESH Person in
-    // tenantA, not one of the fixture's own — every fixture Person already
+    // tenantA, not one of the fixture's own: every fixture Person already
     // has its own Account, and `account_person` is `@@unique([personId])`.
     await ownerDb.person.create({
         data: { id: PERSON_EXTRA_TENANT_A_ID, tenantId: f.tenantA, givenName: 'Extra', familyName: 'InA', email: 'extra@a.test' },
@@ -117,7 +117,7 @@ afterAll(async () => {
 });
 
 describe('DELETE /api/staff/tenants/:id', () => {
-    it('refuses a tenant Account session — staff only', async () => {
+    it('refuses a tenant Account session, staff only', async () => {
         const res = await api(`/api/staff/tenants/${TENANT_ID}`, {
             method: 'DELETE',
             cookie: adminACookie,
@@ -165,7 +165,7 @@ describe('DELETE /api/staff/tenants/:id', () => {
         expect(await ownerDb.person.findUnique({ where: { id: PERSON_SOLE_ID } })).toBeNull();
         expect(await ownerDb.group.findUnique({ where: { id: GROUP_ID } })).toBeNull();
 
-        // The sole-tenant account is gone — nothing else referenced it.
+        // The sole-tenant account is gone: nothing else referenced it.
         expect(await ownerDb.account.findFirst({ where: { email: SOLE_ACCOUNT_EMAIL } })).toBeNull();
 
         // The shared account survives: tenantA's admin Person still holds it.

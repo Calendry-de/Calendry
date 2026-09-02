@@ -13,7 +13,7 @@ interface DirectoryPerson { id: string; givenName: string; familyName: string }
 interface DirectoryGroup { id: string; name: string; parentGroupId: string | null }
 
 /**
- * `GET /api/schedule/context` — everything needed to DRAW, behind the page's own
+ * `GET /api/schedule/context`: everything needed to DRAW, behind the page's own
  * permission. See that route for why it exists and what it deliberately omits.
  */
 interface ScheduleContext {
@@ -27,7 +27,7 @@ interface ScheduleContext {
     people: DirectoryPerson[];
     groups: DirectoryGroup[];
     /**
-     * IANA zone name. The ONE source for "what timezone is the tenant in" —
+     * IANA zone name, the ONE source for "what timezone is the tenant in":
      * the Today button and the grid's live now-indicator both resolve
      * "today"/"now" against this, never `Intl`'s guess at the viewer's own
      * zone (CLAUDE.md: timezone is per-Person and display-only; grid
@@ -41,7 +41,7 @@ interface ScheduleContext {
  *
  * The `.catch` is not laziness: these lists feed CONTROLS, not the grid, and the
  * honest response to "we could not read the room list" is a schedule with no
- * room filter — not an empty screen. What must never happen is the version of
+ * room filter, not an empty screen. What must never happen is the version of
  * this that had no catch, where one 403 inside a `Promise.all` rejected the
  * whole handler and rendered nothing at all.
  */
@@ -64,7 +64,7 @@ function mergeById<T extends { id: string }>(primary: T[], extra: T[]): T[] {
 
 /**
  * Everything the schedule view reads from the server, plus what is derived from
- * it. Server state only — no selection, placement mode or view preferences.
+ * it. Server state only: no selection, placement mode or view preferences.
  */
 export function useScheduleData(filters: {
     termId: Ref<string>;
@@ -74,7 +74,7 @@ export function useScheduleData(filters: {
      * Resolved at setup time, not inside the fetch handler: `useRequestFetch()`
      * needs the Nuxt request context to forward the cookie during SSR, and
      * without it every authenticated call 401s and the page renders its empty
-     * state — indistinguishable from a tenant with no data.
+     * state, indistinguishable from a tenant with no data.
      *
      * For the same reason this composable stays SYNCHRONOUS; the single await
      * belongs to the page.
@@ -88,7 +88,7 @@ export function useScheduleData(filters: {
      * than drawing a timetable.
      *
      * Every one of these used to be a REQUIREMENT of this page, because its
-     * reference wave fetched the whole roster to put names on chips — so the
+     * reference wave fetched the whole roster to put names on chips, so the
      * smallest role that could see a schedule could also enumerate every person,
      * room and cohort. The names now travel with the schedule
      * (`/api/schedule/context`); these keys buy the WIDER lists that the filters
@@ -98,7 +98,7 @@ export function useScheduleData(filters: {
      * (see `ScheduleToolbar`): somebody reading their own timetable holds none of
      * these and can still have sessions across three cohorts, and narrowing to
      * one of them is exactly what a filter is for. What these keys change is how
-     * far the list reaches — their own schedule, or the whole institution.
+     * far the list reaches: their own schedule, or the whole institution.
      *
      * What they still decide is whether the REQUEST is made at all: skipping it
      * keeps a guaranteed 403 off the wire.
@@ -116,7 +116,7 @@ export function useScheduleData(filters: {
         /**
          * ONE ENDPOINT, THE PAGE'S OWN GATE. Everything needed to DRAW: the
          * terms, the grid geometry, and names for the rooms, people and groups
-         * appearing in the sessions this caller may read — narrowed server-side
+         * appearing in the sessions this caller may read, narrowed server-side
          * by the same rule that narrows the sessions themselves.
          *
          * Not tolerant, deliberately: without this there is no schedule, so a
@@ -142,8 +142,8 @@ export function useScheduleData(filters: {
                 })
                 : Promise.resolve([] as ScheduleSession[]),
             /**
-             * The spare bank (issue #22): NOT scoped by week — a banked
-             * Session has none — so this is a second, independent fetch
+             * The spare bank (issue #22): NOT scoped by week, because a banked
+             * Session has none, so this is a second, independent fetch
              * rather than a filter composed with the one above. Gated the
              * same way `sessions` itself is (permission enforced server-side
              * by `sessionReadScope`, this just skips the request without a
@@ -160,7 +160,7 @@ export function useScheduleData(filters: {
             /*
              * THE DIRECTORY, AND EVERY ONE OF THESE IS OPTIONAL TWICE OVER:
              * skipped when the permission is absent, and caught when it fails
-             * anyway. Both matter — the permission check keeps the request off
+             * anyway. Both matter: the permission check keeps the request off
              * the wire, and the catch survives a permission revoked mid-session
              * or a role the client's cached session predates.
              *
@@ -233,7 +233,7 @@ export function useScheduleData(filters: {
     const kinds = computed(() => reference.value?.kinds ?? []);
     const virtualRoomIds = computed(() => new Set(reference.value?.virtualRoomIds ?? []));
     /**
-     * `'UTC'` before the fetch lands, never the browser's zone — an absent
+     * `'UTC'` before the fetch lands, never the browser's zone: an absent
      * answer must not silently fall back to guessing at the viewer's own
      * timezone, which is exactly the source CLAUDE.md says this may never be.
      */
@@ -241,7 +241,7 @@ export function useScheduleData(filters: {
 
     /**
      * A separate, tolerant fetch: its absence is harmless, so a tenant that has
-     * never opened the Display page — or a failed request — still draws with
+     * never opened the Display page, or a failed request, still draws with
      * `DISPLAY_DEFAULTS` rather than not drawing.
      */
     const display = useAsyncData(
@@ -260,7 +260,7 @@ export function useScheduleData(filters: {
      */
     const term = computed(() => terms.value.find((t) => t.id === resolvedTermId.value) ?? null);
     /**
-     * `weekCountOf` — the same definition the week classifier, the solver
+     * `weekCountOf`, the same definition the week classifier, the solver
      * calendar and `POST /api/sessions` use. A local `ceil((end - start) / 7)`
      * disagrees by one on about half of all terms, which capped the schedule a
      * week short of what the server accepts.
@@ -294,11 +294,11 @@ export function useScheduleData(filters: {
         : null));
 
     const allSessions = computed(() => reference.value?.sessions ?? []);
-    /** The spare bank (issue #22) — fetched separately, see the wave above. */
+    /** The spare bank (issue #22), fetched separately; see the wave above. */
     const bankedSessions = computed(() => reference.value?.bankedSessions ?? []);
     /**
      * Both fetches, for whatever needs to resolve a selection by id regardless
-     * of which bucket it is in — `useScheduleEditing`'s whole `sessions`
+     * of which bucket it is in: `useScheduleEditing`'s whole `sessions`
      * option, so selecting a banked Session (from the spare bank list) and
      * later a placed one (from the grid) both find their subject.
      */
@@ -306,7 +306,7 @@ export function useScheduleData(filters: {
     const violations = computed(() => reference.value?.violations ?? []);
 
     /**
-     * `isPlacedSession` FIRST, always — `isOnGrid` already excludes a banked
+     * `isPlacedSession` FIRST, always: `isOnGrid` already excludes a banked
      * Session, but filtering here too is what lets `PlacedScheduleSession[]`
      * type-check as the narrower type `ScheduleGrid`/`ScheduleAgenda`/
      * `ScheduleOffGridTray` declare, rather than requiring every one of them
@@ -318,7 +318,7 @@ export function useScheduleData(filters: {
         ? placedSessions.value.filter((s) => isOnGrid(grid.value as TimeGrid, s))
         : []));
 
-    /** Sessions the grid cannot position — surfaced, never silently dropped. */
+    /** Sessions the grid cannot position: surfaced, never silently dropped. */
     const offGridSessions = computed(() => (grid.value
         ? placedSessions.value.filter((s) => !isOnGrid(grid.value as TimeGrid, s))
         : []));
@@ -349,8 +349,8 @@ export function useScheduleData(filters: {
         /**
          * The group's PARENT name, or null for a root.
          *
-         * Group names repeat across a hierarchy — "Seminar A1" means little
-         * without "under Class A" — and the nesting is load-bearing rather than
+         * Group names repeat across a hierarchy ("Seminar A1" means little
+         * without "under Class A"), and the nesting is load-bearing rather than
          * decorative: a Session on a cohort blocks every class beneath it, so
          * knowing where a group sits explains why a clash appears somewhere the
          * name alone would not suggest.
@@ -358,8 +358,8 @@ export function useScheduleData(filters: {
          * ONE level only. The full ancestry is available but reads as noise in a
          * side panel, and the immediate parent is what disambiguates.
          *
-         * `parentGroupId` already arrives in the /api/groups payload — the type
-         * annotation was simply narrowing it away — so this costs no extra
+         * `parentGroupId` already arrives in the /api/groups payload; the type
+         * annotation was simply narrowing it away, so this costs no extra
          * request and no permission the page does not already hold.
          */
         groupParent: (id: string): string | null => {
@@ -407,7 +407,7 @@ export function useScheduleData(filters: {
         violations, violationsBySessionId,
         lookup, sessionTitle, slotDateOf,
         pending, loadError, canReadViolations, refreshAll,
-        /** The page awaits this — the one await, at setup top level. */
+        /** The page awaits this: the one await, at setup top level. */
         ready: asyncData,
     };
 }

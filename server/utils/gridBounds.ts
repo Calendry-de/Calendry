@@ -6,7 +6,7 @@ import type { Tx } from './tenantDb';
  * WHY THIS IS A HARD GUARD AND NOT A WARNING
  * ------------------------------------------
  * "Warn and allow" (TAXONOMY.md §3) covers hard-CONSTRAINT violations from
- * manual edits, and its mechanism is `constraint_violation` — a queryable row
+ * manual edits, and its mechanism is `constraint_violation`: a queryable row
  * keyed to a `constraint_id`. "Sits outside the grid" is not one of the 14
  * catalogue types and cannot become one: it is not a rule a tenant configures,
  * it is the precondition for the Session being expressible at all. There is
@@ -22,7 +22,7 @@ import type { Tx } from './tenantDb';
  *     which is not a slot in this tenant's grid
  *
  * That is not hypothetical. Shrinking the demo tenant's grid from 8 blocks to 4
- * orphaned 7 of 16 Sessions, and the next solver run failed 86 seconds later —
+ * orphaned 7 of 16 Sessions, and the next solver run failed 86 seconds later,
  * then went unnoticed for two days, because nothing between the edit and the
  * solver looks at the grid.
  *
@@ -49,7 +49,7 @@ export interface GridPlacement {
  *
  * Both directions of the same defect: narrowing a grid under a Session, and
  * moving a Session outside its grid. One predicate so they cannot disagree
- * about what "outside" means — a guard that two call sites spell differently is
+ * about what "outside" means: a guard that two call sites spell differently is
  * a guard that eventually only holds on one of them.
  *
  * Block indices are 0-based (`blockOfMinute()` floors from zero, and the demo
@@ -83,7 +83,7 @@ const NAMED_LIMIT = 5;
  * Sessions on `gridId` that would not fit `bounds`.
  *
  * Raw SQL because the test compares two COLUMNS (`block_index + duration_blocks`
- * against a bound), which Prisma's filter language cannot express — the
+ * against a bound), which Prisma's filter language cannot express; the
  * alternative is fetching every Session for the grid and filtering in memory,
  * which is a full table read on the one path that must stay cheap enough to run
  * on every grid edit.
@@ -127,7 +127,7 @@ export async function sessionsOutsideGrid(
  */
 export function describeOrphans(total: number, named: OrphanedSession[]): string {
     const lines = named.map((s) => (
-        `${s.title ?? 'Session'} — day ${s.dayOfWeek}, block ${s.blockIndex}`
+        `${s.title ?? 'Session'}: day ${s.dayOfWeek}, block ${s.blockIndex}`
         + (s.durationBlocks > 1 ? ` (${s.durationBlocks} blocks)` : '')
     ));
 

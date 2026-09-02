@@ -9,7 +9,7 @@ import { resourcePermissions, satisfiesPermissionRequirement } from '#shared/per
  *
  * A relation's options are fetched in ONE `Promise.all`. A single 403 inside it
  * takes down the whole wave, and because `useEntityRelations` awaits the
- * useAsyncData HANDLE — which resolves rather than rejects — the page does not
+ * useAsyncData HANDLE, which resolves rather than rejects, the page does not
  * blank. Every picker on it renders an EMPTY option list instead. A person
  * editor's Person page said "No roles defined yet" over a tenant that has them:
  * a page-wide lie, indistinguishable from an unconfigured tenant.
@@ -21,7 +21,7 @@ import { resourcePermissions, satisfiesPermissionRequirement } from '#shared/per
  *
  * TWO FAILURE MODES, BOTH CHECKED, because they are opposites:
  *
- *   too weak    a gate that admits somebody the wave will refuse — the bug
+ *   too weak    a gate that admits somebody the wave will refuse: the bug
  *   too silent  a gate nothing can satisfy, so the picker vanishes for
  *               everyone and looks exactly like a relation nobody configured
  */
@@ -54,7 +54,7 @@ describe('relation option waves are covered by their own gate', () => {
 
             // An empty clause is unsatisfiable by design (it means "one of
             // nothing"), so a relation carrying one is hidden from every user
-            // forever — which reads as "this tenant has none" rather than as a
+            // forever, which reads as "this tenant has none" rather than as a
             // bug. Fail-closed is right; failing closed INVISIBLY is not.
             for (const clause of requirement) {
                 const alternatives = typeof clause === 'string' ? [clause] : clause;
@@ -103,7 +103,7 @@ describe('relation option waves are covered by their own gate', () => {
 
         // Named rather than assumed: if a registry change drops this to zero the
         // assertion above stops testing anything, silently.
-        expect(checked, 'no relation fetches outside its own resource — has the registry changed?')
+        expect(checked, 'no relation fetches outside its own resource: has the registry changed?')
             .toBeGreaterThan(0);
     });
 });

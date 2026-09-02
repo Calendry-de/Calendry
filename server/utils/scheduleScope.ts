@@ -70,17 +70,17 @@ export async function sessionReadScope(
  *
  * THREE WAYS TO BE IN ONE, and all three are needed:
  *
- *   1. ATTACHED DIRECTLY (`session_person`) — the lecturer leading it, and
+ *   1. ATTACHED DIRECTLY (`session_person`): the lecturer leading it, and
  *      anybody named on it individually. This is the case a naive
  *      implementation gets right.
  *   2. THROUGH A GROUP, walking UP the hierarchy. A Session assigned to a Cohort
- *      is attended by everyone in that Cohort's Seminars (attendance flows DOWN
- *      — TAXONOMY.md §6), so the question "is this session mine" starts from the
+ *      is attended by everyone in that Cohort's Seminars (attendance flows DOWN;
+ *      TAXONOMY.md §6), so the question "is this session mine" starts from the
  *      Groups I am a MEMBER of and asks whether the Session names one of them or
  *      any of their ANCESTORS.
  *   3. COVERING IT (`session_substitution`, issue #30). The substitute is never
- *      written into `session_person` — the original lecturer's row survives
- *      untouched, see the model's own comment — so without this branch a
+ *      written into `session_person` (the original lecturer's row survives
+ *      untouched, see the model's own comment), so without this branch a
  *      substitute's OWN timetable would not show the Session they are standing
  *      in for, which is the entire point of `session.read_own` existing.
  *
@@ -90,10 +90,10 @@ export async function sessionReadScope(
  * fixture with a flat group list.
  *
  * A person with no memberships and no attachments matches NOTHING, which is the
- * honest answer — an empty timetable, not everybody's.
+ * honest answer: an empty timetable, not everybody's.
  *
  * EXPORTED for the iCal export (issue #15), which must not invent a second
- * answer to "which Sessions are mine" — the card's own words. That export is
+ * answer to "which Sessions are mine" (the card's own words). That export is
  * ALWAYS the caller's own slice, never `sessionReadScope`'s `any` branch, so it
  * calls this directly rather than going through the read-permission switch
  * above.
@@ -105,7 +105,7 @@ export async function ownSessionClause(tx: Tx, identity: TenantScopedIdentity): 
         /*
          * No acting Person means no "own" to scope to. `requireAnyPermission`
          * has already refused this case (it needs an actor to load permissions
-         * at all), so this is unreachable — and it fails CLOSED rather than
+         * at all), so this is unreachable, and it fails CLOSED rather than
          * returning an unscoped clause, because the one thing this must never do
          * is widen.
          */
@@ -131,18 +131,18 @@ export async function ownSessionClause(tx: Tx, identity: TenantScopedIdentity): 
 }
 
 /**
- * "Sessions belonging to these Groups" — the calendar-link equivalent of
+ * "Sessions belonging to these Groups": the calendar-link equivalent of
  * `ownSessionClause`'s Group branch (issue #115), for a link that names
  * explicit Groups instead of streaming its creator's own Sessions.
  *
  * SAME ANCESTOR WALK, deliberately: a Group's own calendar must show a
  * Session assigned to one of its ANCESTORS too (a cohort-wide lecture reaches
- * its seminars — TAXONOMY.md §6, attendance flows DOWN), which is exactly
+ * its seminars; TAXONOMY.md §6, attendance flows DOWN), which is exactly
  * what a MEMBER of that Group would see via `ownSessionClause`. This omits
  * `ownSessionClause`'s other two branches on purpose: there is no specific
  * Person here to attach a direct `session_person` row or a substitution to.
  *
- * `groupIds` must already be validated as belonging to the caller's tenant —
+ * `groupIds` must already be validated as belonging to the caller's tenant:
  * this function does not re-check that.
  */
 export async function groupSessionClause(tx: Tx, groupIds: string[]): Promise<Record<string, unknown>> {

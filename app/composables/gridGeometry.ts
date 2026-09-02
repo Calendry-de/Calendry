@@ -7,7 +7,7 @@ import { blockBoundaries, blockSpan, gapsOfDay } from '#shared/timeGrid';
 /**
  * The row structure a week grid is drawn on: one row per block, one per break.
  *
- * Knows nothing about Sessions, diffs or selection — only that items occupy a
+ * Knows nothing about Sessions, diffs or selection, only that items occupy a
  * range of blocks on a day. Every day shares ONE set of rows, so a block's time
  * label and its cells are structurally aligned and cannot drift. The cost: a day
  * whose own breaks move its blocks cannot be DRAWN differently, so consumers
@@ -40,7 +40,7 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     /**
      * `line` is the 1-based CSS grid line; the header occupies row 1. Held on
      * the row so the time column, cells and chips cannot disagree. The gaps are
-     * the UNIVERSAL ones — a day-specific break gets no row of its own.
+     * the UNIVERSAL ones: a day-specific break gets no row of its own.
      */
     const rows = computed<GridRow[]>(() => {
         const gapAfter = new Map(gapsOfDay(grid.value, null).map((gap) => [gap.afterBlockIndex, gap]));
@@ -128,7 +128,7 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
     /**
      * `minmax(<true minutes>, auto)`: the minimum keeps the picture
      * proportional, `auto` lets a row that cannot fit its contents grow instead
-     * of overflowing into the row below. Not `var(--row-height)` — that states
+     * of overflowing into the row below. Not `var(--row-height)`: that states
      * the density setting rather than a duration, so breaks came out as tall as
      * their label.
      */
@@ -161,7 +161,7 @@ export function useGridGeometry(grid: Ref<TimeGrid>, rowHeight: Ref<number>) {
 
     /**
      * Where something sits inside the rows it spans, in PIXELS at a constant
-     * minute scale — never a percentage of the row, which resolves against the
+     * minute scale, never a percentage of the row, which resolves against the
      * row's real height and so makes a minute worth more pixels in a busy row.
      *
      * A band covering its rows WHOLE across more than one row gets `stretch`,
@@ -243,7 +243,7 @@ export const FAN_LIMIT = 3;
 /**
  * Overlapping items, packed into positioned slots for one day.
  *
- * PAST THE FAN LIMIT THE DENSITY CHANGES, NEVER THE COUNT — an overlap is either
+ * PAST THE FAN LIMIT THE DENSITY CHANGES, NEVER THE COUNT: an overlap is either
  * a defect being hunted or a placement being accepted, and neither survives
  * being behind a disclosure. A collapse-past-three rule was measured turning 17
  * of 20 slots in a real week into "+N more" buttons.

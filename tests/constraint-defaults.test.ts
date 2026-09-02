@@ -13,7 +13,7 @@ import {
  * The property that matters is not "the rows exist" but WHY they must:
  * `refreshViolations()` evaluates only the types a tenant has a row for, so a
  * missing row is a silently disabled rule. `no_double_booking_person` was
- * exactly that for the whole of Stage 7 — added to the catalogue, never added
+ * exactly that for the whole of Stage 7: added to the catalogue, never added
  * to provisioning, and invisible because its own unit test seeds its row.
  */
 const url = process.env.TEST_MIGRATION_DATABASE_URL ?? process.env.MIGRATION_DATABASE_URL ?? '';
@@ -73,7 +73,7 @@ describe('the catalogue half', () => {
         // both are purely informational reports with no way to make a term
         // infeasible, so both start on for a freshly-provisioned tenant.
         // Everything past that is a per-type, explicit `defaultEnabled: true`
-        // in the catalogue — tuned on 2026-08-31 to match what the `test`
+        // in the catalogue, tuned on 2026-08-31 to match what the `test`
         // tenant actually runs, not a blanket flip. A type with no opinion
         // stays off, so `backfill:constraints --all-missing` can never
         // silently switch a new solver-steering rule on for every tenant.
@@ -95,7 +95,7 @@ describe('the catalogue half', () => {
          * Used to ship off: enabling a previously-off, solver-steering rule
          * for every tenant on upgrade changes the timetable they get from
          * their next run, and its proto field had not shipped yet either.
-         * Neither holds any more — the evaluator landed in calendry-solver
+         * Neither holds any more: the evaluator landed in calendry-solver
          * 41f6227, and this is now a per-type `defaultEnabled: true` opt-in
          * (2026-08-31), not a blanket change: `backfill:constraints
          * --all-missing` still leaves any type with no such opt-in off for
@@ -110,7 +110,7 @@ describe('the catalogue half', () => {
         expect(row.weight).toBeGreaterThan(0);
     });
 
-    it('includes no_double_booking_person — the rule that was unreachable', () => {
+    it('includes no_double_booking_person, the rule that was unreachable', () => {
         expect(defaultConstraintTypes().map((t) => t.key)).toContain('no_double_booking_person');
     });
 

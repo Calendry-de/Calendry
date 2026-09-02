@@ -15,19 +15,19 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
  *
  * ONE batch event, not one per Session. The Generation is already the immutable
  * record of these placements (TAXONOMY.md §3), so per-Session events would store
- * the same data twice and make replay ambiguous — a replayer could not tell
+ * the same data twice and make replay ambiguous: a replayer could not tell
  * whether to apply the snapshot, the events, or both. The event log's role is
  * manual deltas layered on a baseline; applying a Generation replaces the
  * baseline rather than being a delta on it. Volume confirms it: a large
  * university would otherwise write five figures of rows per click.
  *
- * Locked Sessions are left exactly as they are — the solver never overwrites a
+ * Locked Sessions are left exactly as they are: the solver never overwrites a
  * lock, so neither does applying its output.
  *
  * STAGE 5 CHANGED WHAT THIS DOES. It used to only RE-BASELINE: stamp the new
  * generation id onto existing Sessions and flip `is_current`. That was correct
  * when every Session was placed by hand, but a SOLVER Generation carries
- * placements that exist nowhere yet — they live in `solver_run.result` until
+ * placements that exist nowhere yet: they live in `solver_run.result` until
  * this moment, precisely so review-before-apply reviews an unchanged schedule.
  *
  * So a solver Generation now MATERIALIZES first (create / move / delete), then
@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
              * THE TERM'S OWN CURRENT SCHEDULE, not the tenant's.
              *
              * This looked up `{tenantId, isCurrent: true}` with no term
-             * condition and then marked what it found SUPERSEDED — so applying
+             * condition and then marked what it found SUPERSEDED, so applying
              * Semester 3's proposal marked Semester 1's live schedule as
              * superseded, and the demo tenant ended up with five terms' records
              * reading "discarded or superseded" that nobody had discarded. The
@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
 
             /*
              * Locked Sessions keep their manual placement and their old
-             * baseline — counted WITHIN THE TERM being applied, since that is
+             * baseline, counted WITHIN THE TERM being applied, since that is
              * the only set this apply can touch. Tenant-wide, the number
              * reported to the user included locks in terms nothing was
              * happening to.
@@ -120,7 +120,7 @@ export default defineEventHandler(async (event) => {
 
             /**
              * A solver Generation reaches its placements through the run that
-             * produced it. Nothing was copied onto the Generation itself — the
+             * produced it. Nothing was copied onto the Generation itself: the
              * payload can be megabytes and duplicating it would make the two
              * copies able to disagree.
              */
@@ -145,7 +145,7 @@ export default defineEventHandler(async (event) => {
                      * What this run ASKED the solver for. Without it an apply
                      * cannot tell "the solver refused to place this Session"
                      * from "the solver's answer was short and never mentioned
-                     * it", and deletes the Session either way — which is how
+                     * it", and deletes the Session either way, which is how
                      * eleven live placements per run went missing. Null for a
                      * run started before the ledger existed; see `PlanDemand`.
                      */
@@ -157,7 +157,7 @@ export default defineEventHandler(async (event) => {
             /**
              * Rebase the applied TERM only, and never an Event.
              *
-             * This used to be `{ tenantId, isLocked: false }` — every unlocked
+             * This used to be `{ tenantId, isLocked: false }`: every unlocked
              * Session in the tenant, regardless of term. Applying a Generation
              * for one term therefore rewrote `generation_id` on every other
              * term's Sessions too, attributing them to a Generation that never
@@ -173,8 +173,8 @@ export default defineEventHandler(async (event) => {
              *
              * THE GENERATION'S OWN TERM FIRST, its run's only as a fallback. The
              * term used to come from the run alone, which left the same hole one
-             * case over: a Generation carrying a term but NO run — an import, or
-             * a solver row whose run was cleaned up — matched no term condition
+             * case over: a Generation carrying a term but NO run (an import, or
+             * a solver row whose run was cleaned up) matched no term condition
              * at all and rebased every term in the tenant, which is the very
              * thing the paragraph above describes fixing. A term-less
              * tenant-wide Generation still rebases tenant-wide, which is what it

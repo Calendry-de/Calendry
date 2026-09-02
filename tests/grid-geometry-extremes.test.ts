@@ -3,7 +3,7 @@ import { FAN_LIMIT, clusterSlots } from '../app/composables/gridGeometry';
 
 /**
  * `clusterSlots` decides what a reader sees when a slot is crowded, and its
- * promise is that NOTHING IS EVER HIDDEN — density changes, count does not. Easy
+ * promise is that NOTHING IS EVER HIDDEN: density changes, count does not. Easy
  * to break with an off-by-one or a slice, so it is asserted rather than trusted.
  */
 const rowSpan = (start: number, span: number) => `${start + 2} / ${start + 2 + Math.max(1, span)}`;
@@ -113,7 +113,7 @@ describe('a crowded cluster stays a time grid', () => {
     /*
      * The reported bug, from a real week: 16 sessions at 09:45, 3 at 10:30 and 1
      * at 11:45 formed one cluster, drawn as ONE slot spanning 09:45–12:30 with
-     * everything in list order — so chips sat in rows contradicting their own
+     * everything in list order, so chips sat in rows contradicting their own
      * printed time, and the spanned break rows inflated to absorb the content.
      */
     const crowded = [
@@ -166,7 +166,7 @@ describe('a crowded cluster stays a time grid', () => {
 
     it('does not go compact until the fan limit is passed', () => {
         // Fanned slots keep their real duration; this must NOT be flattened.
-        // keeps its real duration — this is the case that must NOT be flattened.
+        // keeps its real duration; this is the case that must NOT be flattened.
         const slots = slotsFrom([
             { start: 0, span: 3 }, { start: 1, span: 3 }, { start: 2, span: 3 },
         ]);

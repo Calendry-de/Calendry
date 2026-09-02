@@ -4,8 +4,8 @@ import { withRequestTenant } from '../../utils/tenantDb';
 /**
  * Delete a screen, permanently invalidating its key.
  *
- * `screen_room` cascades. Deleting is the irreversible half of revocation —
- * `isActive: false` is the recoverable one — and the difference matters because
+ * `screen_room` cascades. Deleting is the irreversible half of revocation;
+ * `isActive: false` is the recoverable one, and the difference matters because
  * only one of them lets a display be brought back without somebody walking to
  * it with a new URL.
  */

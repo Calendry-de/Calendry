@@ -3,7 +3,7 @@
         <h2>API tokens</h2>
         <p class="tokens_hint">
             A bearer credential for scripts and integrations, restricted to whichever
-            permissions you pick below and never more than you hold — losing an access role
+            permissions you pick below and never more than you hold. Losing an access role
             narrows every token minted from it immediately. The secret is shown once, right
             after creation, and cannot be recovered afterwards; revoking a token takes effect
             straight away.
@@ -68,7 +68,7 @@
         >{{ revokeError }}</p>
 
         <!--
-            The issued secret, shown once and only here — the server hashes it
+            The issued secret, shown once and only here: the server hashes it
             before answering, so there is nothing to come back for.
         -->
         <div
@@ -90,7 +90,7 @@
             </div>
 
             <p class="tokens_issued_note">
-                Shown once. Use it as <code>Authorization: Bearer &lt;token&gt;</code> — if it's
+                Shown once. Use it as <code>Authorization: Bearer &lt;token&gt;</code>. If it's
                 lost, revoke this token and mint a new one.
             </p>
         </div>
@@ -127,7 +127,7 @@
                 <legend>Permissions</legend>
 
                 <p class="grants_summary">
-                    A token cannot hold more than you do — only permissions you currently hold
+                    A token cannot hold more than you do: only permissions you currently hold
                     are offered.
                 </p>
 
@@ -208,7 +208,7 @@ interface IssuedToken {
 }
 
 /**
- * Self-service token minting (issue #… — the backend has existed since
+ * Self-service token minting (issue #…: the backend has existed since
  * `/api/me/api-tokens` shipped, with no frontend until now).
  *
  * CLIENT-ONLY LIST FETCH (`server: false`), the same departure
@@ -233,7 +233,7 @@ function formatWhen(iso: string): string {
 }
 
 /**
- * Only the permissions the caller currently holds — minting a token cannot
+ * Only the permissions the caller currently holds: minting a token cannot
  * exceed them (the server enforces this as a subset check), so offering the
  * rest of the catalogue would just 403 on submit. Same "options come from what
  * the caller can already see" rule the schedule filters follow.
@@ -325,7 +325,7 @@ async function create() {
             permissions: [...selected.value],
         };
 
-        // Absent, not null, when left blank — the server treats both as
+        // Absent, not null, when left blank: the server treats both as
         // "does not expire", and this is the codebase's convention for a
         // form-fed optional field.
         if (form.expiresAt) {

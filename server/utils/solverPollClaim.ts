@@ -12,7 +12,7 @@ import type { Tx } from './tenantDb';
  *
  *   1. Session-scoped locks belong to a CONNECTION, and Prisma pools
  *      connections. The lock would be held by whichever backend served that
- *      one query, while later queries ran on different connections — so the
+ *      one query, while later queries ran on different connections, so the
  *      "leader" would not reliably hold anything.
  *   2. Holding it across the gRPC calls would mean keeping a database
  *      transaction open across a network call to another service, which is
@@ -25,7 +25,7 @@ import type { Tx } from './tenantDb';
  * a lease so nothing re-claims a run while its gRPC call is in flight.
  *
  * `pg_try_advisory_xact_lock` is still used, but only around the claim itself
- * and released at COMMIT — before any network call. It is cheap protection
+ * and released at COMMIT, before any network call. It is cheap protection
  * against every instance stampeding the same tenant on the same tick; the claim
  * is what makes double-polling impossible.
  */
@@ -76,7 +76,7 @@ export interface ClaimedRun {
  * Tenants with at least one run due right now.
  *
  * The ONE query the poller makes without tenant context, through the narrow
- * SECURITY DEFINER function. It returns ids only — everything afterwards runs
+ * SECURITY DEFINER function. It returns ids only; everything afterwards runs
  * inside `withTenant()` under normal RLS.
  */
 export async function tenantsWithDueRuns(): Promise<string[]> {
@@ -123,7 +123,7 @@ export async function claimDueRuns(tenantId: string, limit = 20): Promise<Claime
          *
          * A run still IN FLIGHT, as before; and a SUCCEEDED run whose result was
          * never captured, which nothing previously ever looked at again. Only
-         * SUCCEEDED promises a result — a CANCELLED run was stopped before
+         * SUCCEEDED promises a result: a CANCELLED run was stopped before
          * producing one and a FAILED run never produced one, so both correctly
          * have `result IS NULL` and must not be chased. Writing this as "terminal
          * and missing a result" would pull in five rows that are working exactly

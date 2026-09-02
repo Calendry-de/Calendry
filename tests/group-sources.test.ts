@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, type Fixtures, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * A Group assembled from other Groups — two cohorts' Management tracks taught
+ * A Group assembled from other Groups: two cohorts' Management tracks taught
  * together.
  *
  * THE MODEL ALREADY EXPRESSED THIS, which is why the work is tooling rather
@@ -11,7 +11,7 @@ import { api, login } from './helpers/client';
  * membership, and a student in both their cohort and it is double-booked on the
  * PERSON axis because `attendees_of` expands a Session's groups through
  * `expand_subtree` and collects their members. What was missing is any record
- * of WHERE that membership came from — somebody hand-added forty students and
+ * of WHERE that membership came from: somebody hand-added forty students and
  * nothing said why those forty.
  *
  * NOT A SECOND PARENT. Both track groups already have one, so a combining group
@@ -20,7 +20,7 @@ import { api, login } from './helpers/client';
  *
  * MATERIALISED, and the tests below are mostly about what that costs. A live
  * union would always be right and would move a timetable's attendee set between
- * two solves with nothing recording it. Materialised goes stale instead — so
+ * two solves with nothing recording it. Materialised goes stale instead, so
  * the drift readout is not a nicety, it is the thing that makes the choice
  * defensible.
  */
@@ -44,7 +44,7 @@ const regenerate = () => api<{ memberCount: number; added: number; removed: numb
 const setSources = (ids: string[]) => api(`/api/groups/${combined}/sources`, {
     method: 'PUT',
     cookie,
-    // A BARE ARRAY, not `{ rows }` — `[relation].put.ts` parses `z.array(item)`.
+    // A BARE ARRAY, not `{ rows }`: `[relation].put.ts` parses `z.array(item)`.
     body: JSON.stringify(ids.map((sourceGroupId) => ({ sourceGroupId }))),
 });
 
@@ -54,7 +54,7 @@ beforeAll(async () => {
 
     const t = f.tenantA;
 
-    // Two cohort-nested track groups, and a root-level group to combine them —
+    // Two cohort-nested track groups, and a root-level group to combine them:
     // the shape the feature exists for.
     trackA = (await ownerDb.group.create({
         data: { tenantId: t, parentGroupId: f.groupCohortA, name: 'S1 Management' },
@@ -127,7 +127,7 @@ describe('regenerating', () => {
         expect(res.body.removed).toBe(0);
     });
 
-    it('does not move until asked — the whole reason it is materialised', async () => {
+    it('does not move until asked, the whole reason it is materialised', async () => {
         const extra = await ownerDb.person.create({
             data: { tenantId: f.tenantA, givenName: 'Late', familyName: 'Joiner', email: 'late@a.test' },
         });
@@ -165,7 +165,7 @@ describe('regenerating', () => {
         const res = await regenerate();
 
         // Destructive answer to a request that reads as harmless, and
-        // indistinguishable from "every source is empty" — which IS legitimate.
+        // indistinguishable from "every source is empty", which IS legitimate.
         expect(res.status).toBe(422);
         expect(await ownerDb.membership.count({ where: { groupId: combined } })).toBe(2);
     });
@@ -217,7 +217,7 @@ describe('the generic relation route still serves Group', () => {
      * Nitro matches a concrete directory ahead of a parameterised one, so a
      * single file at `server/api/groups/[id]/anything.ts` shadows
      * `server/api/[resource]/[id]/[relation].ts` for the WHOLE `/api/groups/*`
-     * prefix. Every Group relation then answers 404 from the PAGE router — which
+     * prefix. Every Group relation then answers 404 from the PAGE router, which
      * reads as a missing page, not a broken API, and names nothing.
      *
      * That is exactly what happened while building this: two routes for the

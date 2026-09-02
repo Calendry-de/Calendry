@@ -3,14 +3,14 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * `POST /api/sessions` — creating a Session directly, without a solver run.
+ * `POST /api/sessions`: creating a Session directly, without a solver run.
  *
  * Two properties matter more than the CRUD surface, and both are asserted here
  * rather than reasoned about:
  *
  *  1. an EVENT (no Offering) is accepted and comes back with `offeringId` null,
  *     which is what makes it structurally invisible to a solve's delete
- *     partition — the partition itself is pinned in generation-materialize;
+ *     partition (the partition itself is pinned in generation-materialize);
  *  2. a placement outside the grid's index space is REFUSED, not warned about.
  *     `fitsGrid()` is the same guard `move` uses, and this is the first route
  *     that could create such a row from nothing.
@@ -93,7 +93,7 @@ describe('creating an Event (no Offering)', () => {
         expect(res.body.session.isLocked).toBe(false);
     });
 
-    it('leaves generationId NULL — a human placed it, no Generation did', async () => {
+    it('leaves generationId NULL: a human placed it, no Generation did', async () => {
         const res = await create({});
 
         expect(res.body.session.generationId).toBeNull();
@@ -195,7 +195,7 @@ describe('permission and tenant scoping', () => {
 
 
 describe('an Event needs a name', () => {
-    it('refuses one with no title — there is no Offering to borrow from', async () => {
+    it('refuses one with no title: there is no Offering to borrow from', async () => {
         const res = await api('/api/sessions', {
             method: 'POST',
             cookie,

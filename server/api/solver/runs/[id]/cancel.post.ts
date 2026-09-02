@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
     }
 
     /**
-     * A PENDING run has no external id — StartRun never acknowledged it. There
+     * A PENDING run has no external id: StartRun never acknowledged it. There
      * is nothing to cancel remotely, but the row is still occupying the term, so
      * it is resolved locally. Without this, the one escape hatch would not work
      * on the one state most likely to need it.

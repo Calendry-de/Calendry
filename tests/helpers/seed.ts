@@ -7,7 +7,7 @@ import { PrismaClient } from '@prisma/client';
  * Seeds fixtures using the OWNER connection.
  *
  * The owner is a superuser and bypasses RLS, which is what a fixture builder
- * needs — it writes into two tenants at once, something no legitimate request
+ * needs, because it writes into two tenants at once, something no legitimate request
  * can do. The tests themselves then go over HTTP as the app role with real
  * session cookies, where RLS and permissions are fully in force.
  */
@@ -35,9 +35,9 @@ export const ACCOUNTS = {
     adminA: 'admin-a@test.local',
     /** Full permissions in tenant B. */
     adminB: 'admin-b@test.local',
-    /** Only `session.read` in tenant A — used for permission-denial tests. */
+    /** Only `session.read` in tenant A: used for permission-denial tests. */
     viewerA: 'viewer-a@test.local',
-    /** A Person in BOTH tenants — used for tenant selection and switching. */
+    /** A Person in BOTH tenants: used for tenant selection and switching. */
     multi: 'multi@test.local',
 };
 
@@ -80,19 +80,19 @@ export type Fixtures = typeof ids;
  *
  * Migration 20260828140000 permits exactly those two FK actions and nothing
  * adjacent. If this function ever needs a `DISABLE TRIGGER` again, that is a
- * finding about the schema — write the migration, do not restore the workaround.
+ * finding about the schema; write the migration, do not restore the workaround.
  */
 export async function teardown() {
     const emails = Object.values(ACCOUNTS).map((e) => `'${e}'`).join(',');
 
     /*
      * WHOLE TABLE, unconditionally. `auth_rate_limit` has no foreign key to
-     * `account` — it is keyed by a computed `route:email` string, precisely
+     * `account`: it is keyed by a computed `route:email` string, precisely
      * because it has to survive the account it is about not existing yet
      * (the row an attacker's guess creates before any account matches it).
      * Nothing here ties it to the fixture's own accounts, so deleting by
      * email would miss rows keyed against ad-hoc emails a test created
-     * itself — and `fileParallelism: false` means no other file's rate-limit
+     * itself, and `fileParallelism: false` means no other file's rate-limit
      * test is ever mid-flight to disturb.
      */
     await ownerDb.$executeRawUnsafe('DELETE FROM auth_rate_limit');
@@ -112,7 +112,7 @@ export async function seed(): Promise<Fixtures> {
     const allPermissions = await ownerDb.permission.findMany({ select: { key: true } });
 
     if (allPermissions.length === 0) {
-        throw new Error('Permission catalogue is empty — the migration did not seed it.');
+        throw new Error('Permission catalogue is empty: the migration did not seed it.');
     }
 
     await ownerDb.federation.create({
@@ -184,7 +184,7 @@ export async function seed(): Promise<Fixtures> {
         [ACCOUNTS.adminA, [ids.personA]],
         [ACCOUNTS.adminB, [ids.personB]],
         [ACCOUNTS.viewerA, [ids.personViewerA]],
-        // One credential, two tenant identities — the federation lecturer case.
+        // One credential, two tenant identities: the federation lecturer case.
         [ACCOUNTS.multi, [ids.personMultiA, ids.personMultiB]],
     ];
 

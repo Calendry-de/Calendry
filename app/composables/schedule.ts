@@ -2,7 +2,7 @@
  * Schedule data and grid geometry.
  *
  * Every dimension of the grid is resolved from the tenant's TimeGrid at
- * runtime — active days, block count, block length, start time, breaks. There
+ * runtime: active days, block count, block length, start time, breaks. There
  * is no fallback shape and no assumed Mon–Fri, because TAXONOMY.md §2 forbids
  * exactly that. A tenant with no TimeGrid renders an empty state, not a guess.
  */
@@ -22,7 +22,7 @@ export interface TimeGrid {
     startMinute: number;
     /** Default gap between consecutive blocks, unless a break override replaces it. */
     breakMinutes: number;
-    /** Named, sparse overrides. Absent on a grid that has none — the common case. */
+    /** Named, sparse overrides. Absent on a grid that has none (the common case). */
     breaks?: TimeGridBreak[];
     isDefault: boolean;
 }
@@ -40,7 +40,7 @@ export interface ScheduleSession {
     /** An EVENT's own name. Null for an Offering-linked Session. */
     title: string | null;
     /**
-     * NULL for an EVENT — a Session placed by a human with no recurring demand
+     * NULL for an EVENT: a Session placed by a human with no recurring demand
      * behind it (TAXONOMY.md §2).
      *
      * Typed `string` until now, which had not been updated when the column
@@ -53,12 +53,12 @@ export interface ScheduleSession {
     kindId: string;
     /**
      * NULL together with `dayOfWeek`/`blockIndex` means this Session is
-     * BANKED (issue #22, cancel-to-spare-bank) — cancelled but still owed by
+     * BANKED (issue #22, cancel-to-spare-bank): cancelled but still owed by
      * its Offering, with nowhere to sit until a human places it again.
      * `isPlacedSession()` (`#shared/sessionPlacement`) is the one predicate
      * that reads these three; nothing else should compare them to `null`
      * directly. `PlacedScheduleSession` is what the grid, the agenda and their
-     * peers still assume — every one of them only ever receives a Session this
+     * peers still assume: every one of them only ever receives a Session this
      * predicate has already confirmed.
      */
     termWeek: number | null;
@@ -69,31 +69,31 @@ export interface ScheduleSession {
     groups: { groupId: string }[];
     people: { personId: string; roleId: string | null; role: { key: string } | null }[];
     rooms: { roomId: string }[];
-    /** `color` is nullable and null means INHERIT — see `shared/sessionColor.ts`. */
+    /** `color` is nullable and null means INHERIT; see `shared/sessionColor.ts`. */
     offering: { id: string; title: string; code: string | null; color?: string | null } | null;
     kind: { id: string; key: string; name: string; color: string | null } | null;
     /**
      * Who is COVERING this occurrence right now (issue #30), if anyone. Never
-     * derived from `people` — a substitute is deliberately NOT written into
+     * derived from `people`: a substitute is deliberately NOT written into
      * `session_person`, so the original lecturer's row is unaffected.
      */
     substitution: { coveringPersonId: string } | null;
 }
 
 /**
- * A `ScheduleSession` known to have a real placement — what `ScheduleGrid`,
+ * A `ScheduleSession` known to have a real placement: what `ScheduleGrid`,
  * `ScheduleAgenda`, `ScheduleSessionChip` and `ScheduleOffGridTray` declare as
  * their prop type. Every one of them is fed a list already filtered through
  * `isPlacedSession` (`useScheduleData`'s `onGridSessions`/`offGridSessions`),
  * so their own arithmetic on `dayOfWeek`/`blockIndex` stays exactly as it was
- * before banked Sessions existed — only the TYPE moved, not the logic.
+ * before banked Sessions existed; only the TYPE moved, not the logic.
  */
 export type PlacedScheduleSession = Placed<ScheduleSession>;
 
 export interface Violation {
     id: string;
     /**
-     * Null for an OFFERING-scoped violation — ExactFrequency ("needs 6, placed
+     * Null for an OFFERING-scoped violation: ExactFrequency ("needs 6, placed
      * 4") is about demand that was never placed, so there is no session to
      * point at. Anything grouping by session must skip these rather than
      * bucketing them under a falsy key.
@@ -151,7 +151,7 @@ function intlWeekday(iso: number, locale: string, weekday: 'long' | 'short'): st
 /**
  * A slot's calendar date, written the way the viewer writes dates.
  *
- * `timeZone: 'UTC'` is not a detail — `slotDate()` returns a UTC-anchored
+ * `timeZone: 'UTC'` is not a detail: `slotDate()` returns a UTC-anchored
  * midnight, and formatting it in the viewer's zone would move it to the
  * previous day for anyone west of UTC. The tenant's timetable says which date a
  * Session falls on; the viewer's locale says only how that date is spelled.
@@ -175,7 +175,7 @@ export function formatSlotDate(
 /**
  * Clock label for a block index, derived from the grid. Walks cumulative
  * boundaries rather than multiplying by a stride, because a named break override
- * can replace the default gap at any position — the walk is shared with
+ * can replace the default gap at any position; the walk is shared with
  * `blockOfMinute()`, which asks the inverse question.
  *
  * `dayOfWeek` defaults to "no particular day", which sees only universal overrides.
@@ -195,7 +195,7 @@ export function blockTime(
 /**
  * The one fixed Role key now lives in `shared/roles.ts`, where the server's
  * uses (lecturer assignment, materialisation, `lecturerIds` on the wire) read
- * the same definition. Imported and re-bound here — not `export ... from` —
+ * the same definition. Imported and re-bound here, not `export ... from`,
  * because this file also uses it below.
  */
 export { LECTURER_ROLE_KEY };
@@ -210,13 +210,13 @@ export function lecturersOf<T extends AssignedPerson>(people: readonly T[]): T[]
     return people.filter((person) => person.role?.key === LECTURER_ROLE_KEY);
 }
 
-/** Everyone else directly assigned — students, auditors, whatever the tenant calls them. */
+/** Everyone else directly assigned: students, auditors, whatever the tenant calls them. */
 export function attendeesOf<T extends AssignedPerson>(people: readonly T[]): T[] {
     return people.filter((person) => person.role?.key !== LECTURER_ROLE_KEY);
 }
 
 /**
- * What to call a Session on screen. ONE definition, five consumers — previously
+ * What to call a Session on screen. ONE definition, five consumers; previously
  * inlined at each with THREE different fallbacks, and the placement banner had
  * none, so it rendered "Pick a slot for ." for every Event.
  *
@@ -229,7 +229,7 @@ export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'
         return 'Session';
     }
 
-    // The Offering wins whenever there is one, unconditionally — `title` is
+    // The Offering wins whenever there is one, unconditionally: `title` is
     // NULL for those rows by construction, and reading it first would quietly
     // introduce the competition the write guard exists to prevent.
     if (session.offering) {
@@ -245,7 +245,7 @@ export function sessionLabel(session: Pick<ScheduleSession, 'title' | 'offering'
  * A session belongs on the grid only if it HAS a placement, its day is one the
  * grid schedules, AND it fits within the day's blocks. A banked Session
  * (issue #22) fails the first test and belongs to neither this nor the
- * off-grid tray — `useScheduleData` partitions it out separately before
+ * off-grid tray; `useScheduleData` partitions it out separately before
  * either bucket is computed, so in practice this only ever sees a real
  * placement or a banked Session explicitly excluded upstream; the check
  * stays here anyway so the function is correct on its own, not just as used.
@@ -264,7 +264,7 @@ export function offGridReason(grid: TimeGrid, session: PlacedScheduleSession): s
         return `${weekdayName(session.dayOfWeek)} is not a scheduled day on this grid`;
     }
 
-    return `Runs past block ${grid.blocksPerDay} — the last block of the day`;
+    return `Runs past block ${grid.blocksPerDay}, the last block of the day`;
 }
 
 /** Sessions keyed by `${dayOfWeek}:${blockIndex}`, so a slot can hold several. */
@@ -335,7 +335,7 @@ export function describeViolation(violation: Violation, lookup: {
  * identical start block is not enough: an item starting at block 1 overlaps one
  * that started at 0 and runs for two, and they land in intersecting grid areas.
  *
- * The ordinary calendar algorithm — transitively overlapping items form a cluster,
+ * The ordinary calendar algorithm: transitively overlapping items form a cluster,
  * and each takes the first column free at its start block. Nothing is ever dropped:
  * an overlap is usually a defect the user is trying to SEE. How a cluster too
  * crowded to fan is PRESENTED is `clusterSlots`' decision, not this one.
@@ -355,7 +355,7 @@ export interface Packed<T> {
     column: number;
     columns: number;
     /**
-     * Identifies the overlap cluster this item belongs to — every member of a
+     * Identifies the overlap cluster this item belongs to; every member of a
      * cluster shares it. A presentation that wants to treat a crowded cluster
      * differently (the review grid collapses one past a legibility floor) needs
      * to address the cluster as a unit, and `columns` alone cannot name WHICH.
@@ -368,7 +368,7 @@ export interface Packed<T> {
  * `ScheduleReviewGrid` packs ReviewPlacements, which have no Session id at all for
  * a new placement. That component used to fan everything sharing an exact
  * `day:blockIndex` key, so a multi-block placement overlapping a single-block one
- * was drawn on top of it — the same bug, reintroduced by a second implementation.
+ * was drawn on top of it, the same bug, reintroduced by a second implementation.
  */
 export function packSpans<T>(items: T[], read: (item: T) => PackedSpan): Packed<T>[] {
     const spans = items.map((item) => ({ item, ...read(item) }));

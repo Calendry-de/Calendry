@@ -17,7 +17,7 @@ const querySchema = z.object({
     /**
      * The spare bank (issue #22): a banked Session has no `termWeek`, so a
      * week-scoped fetch never matches it. Explicit rather than inferred from
-     * an absent `termWeek` — see the `where` assembly below for why this is
+     * an absent `termWeek`; see the `where` assembly below for why this is
      * ALSO the only way in, not merely the way to widen past a week filter.
      */
     banked: z.coerce.boolean().optional(),
@@ -49,15 +49,15 @@ defineRouteMeta({
  * Current schedule state.
  *
  * Reads the materialized `session` table directly rather than replaying the
- * event log. Sessions ARE current state — editing routes write them in the same
- * transaction that appends the event — so replaying on every read would be
+ * event log. Sessions ARE current state: editing routes write them in the same
+ * transaction that appends the event, so replaying on every read would be
  * O(events) per request for an answer already stored. The log exists for audit
  * and rollback, which is a separate (future) endpoint.
  *
  * TWO PERMISSIONS REACH THIS. `session.read` returns the institution's whole
  * timetable; `session.read_own` returns the caller's own sessions. The narrowing
  * is `sessionReadScope()`'s, not this handler's, because `GET
- * /api/schedule/context` has to agree with it exactly — it publishes names for
+ * /api/schedule/context` has to agree with it exactly: it publishes names for
  * whatever this returns, so a second definition of "own" would either strand a
  * chip without a name or name a room in a session the caller may not read.
  *
@@ -72,9 +72,9 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         /*
          * Refuses a caller holding neither key, and otherwise hands back the
-         * ownership predicate — tenant-owned plus Federation-shared, because a
+         * ownership predicate: tenant-owned plus Federation-shared, because a
          * shared event must appear on every member tenant's timetable (Stage 7c)
-         * and RLS permits that read without ever asking for it — already
+         * and RLS permits that read without ever asking for it, already
          * narrowed to the caller's own sessions when that is all they may see.
          */
         const { scope, where } = await sessionReadScope(event, tx, identity);
@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
         if (query.termId) where.termId = query.termId;
 
         /**
-         * DEFAULT EXCLUDES THE SPARE BANK (issue #22) — not merely "absent
+         * DEFAULT EXCLUDES THE SPARE BANK (issue #22): not merely "absent
          * unless a week filter happens to match". A caller that fetches with
          * no `termWeek` at all (the whole Term) would otherwise see a banked
          * Session's null placement flow straight into rendering code that has
@@ -118,8 +118,8 @@ export default defineEventHandler(async (event) => {
 
         /**
          * Cache freshness (issue #66): "immediately visible after a manual
-         * edit" now depends on `invalidateScheduleCache()` actually firing —
-         * it does, from `appendEvent()` (server/utils/sessionEvents.ts), the
+         * edit" now depends on `invalidateScheduleCache()` actually firing.
+         * It does, from `appendEvent()` (server/utils/sessionEvents.ts), the
          * single choke point every write below this GET passes through. The
          * TTL here is a backstop only, in case an invalidation path is ever
          * missed.
@@ -150,7 +150,7 @@ export default defineEventHandler(async (event) => {
                 // which assignment is which.
                 //
                 // Sent from HERE rather than fetched by the client from
-                // /api/roles, which needs `role.read` — a permission the
+                // /api/roles, which needs `role.read`, a permission the
                 // `viewer` role does not hold. A reference fetch the page's own
                 // gate does not cover is what blanked the 6c review screen: one
                 // 403 inside a Promise.all rejects the whole handler.
@@ -165,7 +165,7 @@ export default defineEventHandler(async (event) => {
                 offering: { select: { id: true, title: true, code: true, color: true } },
                 kind: { select: { id: true, key: true, name: true, color: true } },
                 // Issue #30: who is COVERING this occurrence, if anyone. Read
-                // alongside `people` rather than replacing it — the original
+                // alongside `people` rather than replacing it: the original
                 // lecturer's `session_person` row is untouched by a substitution.
                 substitution: { select: { coveringPersonId: true } },
             },

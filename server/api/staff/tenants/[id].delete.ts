@@ -8,7 +8,7 @@ import { writeAuditLog } from '../../../utils/auditLog';
 
 const bodySchema = z.object({
     /**
-     * The tenant's own slug, typed back by the operator — the confirmation
+     * The tenant's own slug, typed back by the operator: the confirmation
      * gate for an operation with no undo. Checked against the REAL slug
      * (read via the owner connection, the same plain cross-tenant read
      * `GET /api/staff/tenants` already performs) before anything is deleted,
@@ -21,7 +21,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Staff'],
         summary: 'Calendry staff: erase a tenant and everything it owns',
-        description: 'Issue #84\'s GDPR erasure tool — IMMEDIATE, IRREVERSIBLE hard delete of a departing institution\'s entire dataset via calendry_internal.staff_erase_tenant() (SECURITY DEFINER, same technique as tenant creation). Staff-only: tenant lifecycle has never had a tenant-side permission (see shared/permissions.ts\'s tenant.read/tenant.update comment — "nobody creates or deletes one from inside it"), so this stays alongside tenant creation rather than becoming tenant self-service. Requires the caller to name the tenant\'s own slug in the body as confirmation; a mismatch deletes nothing.',
+        description: 'Issue #84\'s GDPR erasure tool: IMMEDIATE, IRREVERSIBLE hard delete of a departing institution\'s entire dataset via calendry_internal.staff_erase_tenant() (SECURITY DEFINER, same technique as tenant creation). Staff-only: tenant lifecycle has never had a tenant-side permission (see shared/permissions.ts\'s tenant.read/tenant.update comment, "nobody creates or deletes one from inside it"), so this stays alongside tenant creation rather than becoming tenant self-service. Requires the caller to name the tenant\'s own slug in the body as confirmation; a mismatch deletes nothing.',
         parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'The Tenant id (not slug).' },
         ],
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
     if (body.confirmSlug !== tenant.slug) {
         throw createError({
             statusCode: 409,
-            statusMessage: `Confirmation did not match — type '${tenant.slug}' exactly to erase this institution.`,
+            statusMessage: `Confirmation did not match. Type '${tenant.slug}' exactly to erase this institution.`,
             data: { field: 'confirmSlug' },
         });
     }
@@ -73,7 +73,7 @@ export default defineEventHandler(async (event) => {
         // Written AFTER the erase, on the ordinary connection: the function
         // itself already purged this tenant's OWN audit_log rows (see the
         // migration header), so this is a fresh row recording that the
-        // erasure happened — the one durable proof of it, since nothing
+        // erasure happened, the one durable proof of it, since nothing
         // else about this tenant survives to ask.
         await writeAuditLog({
             action: 'tenant.erased',

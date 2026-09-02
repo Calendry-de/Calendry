@@ -18,7 +18,7 @@ import { api, login } from './helpers/client';
  *      READING the role list additionally accepts `person_access_role.assign`
  *      so the Person page's picker is not blank for a registrar;
  *   2. granting a role is behind `person_access_role.assign` and NOT behind
- *      `person.update` — otherwise anyone who may edit a person may make
+ *      `person.update`; otherwise anyone who may edit a person may make
  *      themselves an administrator.
  *
  * The negative cases carry that second point. A suite that only asserted "an
@@ -29,7 +29,7 @@ const TENANT_A = 'test-tenant-a';
 
 /** Everything a person editor holds, and deliberately not the assign capability. */
 const PERSON_EDITOR = 'person-editor@test.local';
-/** Holds `person_access_role.assign` and nothing else — the registrar case. */
+/** Holds `person_access_role.assign` and nothing else: the registrar case. */
 const REGISTRAR = 'registrar@test.local';
 
 const cookies: Record<string, string> = {};
@@ -65,7 +65,7 @@ async function seedAccount(email: string, key: string, name: string, permissions
  *
  * Deliberately not one of the acting accounts: revoking a set includes revoking
  * it from yourself, and an earlier draft of this file granted-then-revoked
- * against the person editor's own Person — which stripped the very permissions
+ * against the person editor's own Person, which stripped the very permissions
  * the next assertion depended on, and reported it as an unrelated 403.
  */
 let grantTargetId = '';
@@ -130,7 +130,7 @@ describe('access roles: composing a role', () => {
 
         // The grants must exist the moment the role does. A role created empty
         // and populated by a second request is a role that grants nothing for as
-        // long as that request takes — and nothing at all if it fails.
+        // long as that request takes, and nothing at all if it fails.
         const read = await api<RoleRow>(`/api/access-roles/${created.body.id}`, { cookie: cookies.admin });
 
         expect(read.status).toBe(200);
@@ -166,7 +166,7 @@ describe('access roles: composing a role', () => {
 
         // Renaming a role must not silently strip it. `permissions` is optional
         // on the update schema precisely so an omitted key means "unchanged"
-        // rather than "empty" — the same rule constraint scopes follow.
+        // rather than "empty", the same rule constraint scopes follow.
         const patched = await api(`/api/access-roles/${role.id}`, {
             method: 'PATCH',
             cookie: cookies.admin,
@@ -221,7 +221,7 @@ describe('access roles: composing a role', () => {
         });
 
         // Never an upsert. A second row that looks like the first is worse than
-        // an error — the mislabelled constraint duplicate taught this project
+        // an error: the mislabelled constraint duplicate taught this project
         // that once already.
         expect(clash.status).toBe(409);
         expect(JSON.stringify(clash.body)).toContain('Timetabler');
@@ -303,7 +303,7 @@ describe('granting a role to a person', () => {
         /*
          * The person editor holds all four `person.*` permissions. If this
          * relation defaulted to the parent's `.update`, as every other relation
-         * does, this would be a 200 — and anyone who may edit a person could
+         * does, this would be a 200, and anyone who may edit a person could
          * make themselves an administrator.
          */
         const denied = await api(`/api/persons/${grantTargetId}/access-roles`, {
@@ -360,7 +360,7 @@ describe('a tenant cannot write away its own administration', () => {
      */
     /**
      * The fixture gives tenant A TWO administrators (Ada and Mel), which is
-     * realistic and makes "the last one" untestable — the first draft of this
+     * realistic and makes "the last one" untestable: the first draft of this
      * block revoked Ada's grant, got a correct 200 because Mel still held it,
      * and then failed three later assertions with 403s that looked like a broken
      * guard rather than a broken premise.
@@ -464,7 +464,7 @@ describe('a tenant cannot write away its own administration', () => {
 
         expect(stepped.status).toBe(200);
 
-        // Put it back — later assertions in this file act as that administrator.
+        // Put it back: later assertions in this file act as that administrator.
         await ownerDb.personAccessRole.create({
             data: { personId: original.personId, accessRoleId: adminRole.id, tenantId: TENANT_A },
         });
@@ -484,7 +484,7 @@ describe('a tenant cannot write away its own administration', () => {
         });
 
         /*
-         * 409, not 403 — the caller holds `access_role.manage`; what refuses this
+         * 409, not 403: the caller holds `access_role.manage`; what refuses this
          * is the row. Until Step 14 the button was merely hidden and this request
          * succeeded, which for the system role is the shortest path to a tenant
          * that cannot administer itself.

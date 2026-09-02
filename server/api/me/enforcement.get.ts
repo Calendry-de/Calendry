@@ -7,10 +7,10 @@ const TRACKED = {
 
 /**
  * Whether the institution currently WEIGHS what a lecturer states about
- * themselves — issue #3.
+ * themselves (issue #3).
  *
  * NO NEW PERMISSION, deliberately. `constraint.read` is an administrator's
- * key and exposes the whole configured rule set — every weight, every
+ * key and exposes the whole configured rule set: every weight, every
  * parameter, every scope. This answers a narrower question with a plain
  * boolean and nothing else, so the one thing gating it is CLAUDE.md's own
  * architecture rule: only the `account` principal has an acting Person at
@@ -20,15 +20,15 @@ const TRACKED = {
  *
  * BOOLEANS ONLY. `/my/preferences` used to say "the scheduler can weigh
  * these" unconditionally, which was true only once solver support landed and
- * false again the moment a tenant switches the rule off — a policy fact the
+ * false again the moment a tenant switches the rule off, a policy fact the
  * page could not resolve without `constraint.read`. Reading the row directly
  * here, server-side, answers it without the caller ever seeing a weight, a
  * name, or which OTHER rules exist.
  *
- * "NO ROW" READS AS false, same as an explicitly disabled one — both mean
+ * "NO ROW" READS AS false, same as an explicitly disabled one: both mean
  * "not currently weighed" from a reader who cannot act on the distinction
  * either way. This differs from the Group-availability editor's own fix,
- * which DOES distinguish "absent" from "off" — but that fix is for an
+ * which DOES distinguish "absent" from "off", but that fix is for an
  * ADMINISTRATOR deciding whether to configure the rule; this is for a
  * LECTURER who can do nothing with either answer but note it.
  */

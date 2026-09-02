@@ -1,7 +1,7 @@
 // Sizing design tokens.
 
 // This file holds ALIASES ONLY and is prepended to every SCSS file via
-// nuxt.config's additionalData — so it must emit no CSS. The :root declaration
+// nuxt.config's additionalData, so it must emit no CSS. The :root declaration
 // that defines these properties lives once in layout.scss; putting it here
 // would duplicate the whole block into every component stylesheet.
 
@@ -9,12 +9,12 @@
 // `useLayout()` because they genuinely change with the active theme; these do
 // not, so re-emitting them on every render would be waste. Both land as custom
 // properties on :root, so nothing consuming them can tell which mechanism
-// produced it — and if a future compact/density mode needs to override sizing
+// produced it, and if a future compact/density mode needs to override sizing
 // per theme, the same useHead path layers over these defaults with no change
 // to any consumer.
 
 // SCALE: derived from what the codebase actually used, not invented. Font sizes
-// spanned 14 distinct values, radii 5, spacing 14 — the signature of no scale
+// spanned 14 distinct values, radii 5, spacing 14: the signature of no scale
 // at all. Each token below states the values it replaces.
 
 

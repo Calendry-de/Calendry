@@ -3,11 +3,11 @@ import { api, login } from './helpers/client';
 import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed';
 
 /**
- * Password expiry and rate limiting — issue #13 items 1 and 3.
+ * Password expiry and rate limiting: issue #13 items 1 and 3.
  *
  * WHY RATE LIMITING IS TESTED ON TWO ROUTES SEPARATELY. `login` and
  * `change-password` both accept a password as proof and answer a generic
- * 401 either way, so both are a guessing oracle — the card is explicit that
+ * 401 either way, so both are a guessing oracle; the card is explicit that
  * the second is "equally" one, not a lesser case. `checkRateLimit`'s key is
  * route-qualified specifically so exhausting one door's budget cannot be
  * done by hammering the other, which is the property most worth pinning.
@@ -39,7 +39,7 @@ describe('rate limiting on login', () => {
 
         expect(blocked.status).toBe(429);
 
-        // A CORRECT password must ALSO be refused while blocked — the limit
+        // A CORRECT password must ALSO be refused while blocked: the limit
         // guards the account, not just wrong guesses, or an attacker who
         // exhausts the budget learns nothing but a legitimate user is locked
         // out identically either way, which is the intended failure mode.
@@ -63,7 +63,7 @@ describe('rate limiting on login', () => {
 
         expect(success.cookie).toBeTruthy();
 
-        // The counter is gone, not merely under the limit — a later burst of
+        // The counter is gone, not merely under the limit: a later burst of
         // failures starts counting from zero again.
         for (let i = 0; i < 10; i += 1) {
             const res = await api('/api/auth/login', {
@@ -77,7 +77,7 @@ describe('rate limiting on login', () => {
 });
 
 describe('rate limiting on change-password', () => {
-    it('is counted separately from login — exhausting one does not touch the other', async () => {
+    it('is counted separately from login: exhausting one does not touch the other', async () => {
         // Spend change-password's own budget on a fresh account.
         for (let i = 0; i < 10; i += 1) {
             await api('/api/auth/change-password', {

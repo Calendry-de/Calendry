@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { zonedTimeToUtc } from '../shared/timezone';
 
 /**
- * `zonedTimeToUtc` — the one conversion the iCal export (#15) needs and grid
+ * `zonedTimeToUtc`: the one conversion the iCal export (#15) needs and grid
  * resolution must never touch. Pure, so tested without a database: what
  * matters is that the offset-lookup algorithm gets a REAL zone's real
  * transition right, not just its own round-trip.
@@ -22,12 +22,12 @@ describe('zonedTimeToUtc', () => {
     });
 
     it('crosses the DST boundary between two conversions, correctly', () => {
-        // 25 Oct 2026 is the last Sunday of October — CEST ends that day.
+        // 25 Oct 2026 is the last Sunday of October: CEST ends that day.
         const beforeChange = zonedTimeToUtc({ year: 2026, month: 10, day: 24, hour: 9, minute: 0 }, 'Europe/Berlin');
         const afterChange = zonedTimeToUtc({ year: 2026, month: 10, day: 26, hour: 9, minute: 0 }, 'Europe/Berlin');
 
         // Same LOCAL wall-clock hour, different UTC offset either side of the
-        // transition — this is the property a fixed offset would get wrong.
+        // transition: this is the property a fixed offset would get wrong.
         expect(beforeChange.getUTCHours()).toBe(7);
         expect(afterChange.getUTCHours()).toBe(8);
     });

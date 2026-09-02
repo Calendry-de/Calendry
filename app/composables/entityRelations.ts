@@ -9,8 +9,8 @@ export type RelationRow = Record<string, unknown>;
  * The join-table sets on one entity's detail page.
  *
  * OWNERSHIP BOUNDARY: relation membership and the option lists it is chosen
- * from. Not the entity's own scalar fields — that is `useEntityForm`, and the
- * two write to different endpoints.
+ * from. Not the entity's own scalar fields, which is `useEntityForm`'s job, and
+ * the two write to different endpoints.
  *
  * SAVES IMMEDIATELY, one PUT per change
  * -------------------------------------
@@ -21,7 +21,7 @@ export type RelationRow = Record<string, unknown>;
  * landed. Each PUT replaces one whole set atomically, so the worst case is
  * "that one change did not apply", said plainly next to the control.
  *
- * SYNCHRONOUS, and `ready` resolves only after the drafts are seeded — the same
+ * SYNCHRONOUS, and `ready` resolves only after the drafts are seeded: the same
  * shape as useEntityForm, for the same SSR reason (watchers do not flush during
  * SSR, so seeding cannot hang off one).
  */
@@ -36,7 +36,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
      *
      * FILTERED HERE, BEFORE THE FETCH, and that is the whole point. The option
      * lists below are ONE `Promise.all`, so a single 403 inside it takes down
-     * the entire wave — and because the page awaits the useAsyncData HANDLE,
+     * the entire wave, and because the page awaits the useAsyncData HANDLE,
      * which resolves rather than rejects, the result is not the blank page
      * CLAUDE.md's 6c rule describes but every picker on the page rendering an
      * EMPTY option list. Measured: a person editor's Person page then says "No
@@ -60,7 +60,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
     /**
      * Whether this caller may WRITE one relation, as opposed to see it.
      *
-     * UX only — the PUT re-checks. What it buys is not offering a control whose
+     * UX only: the PUT re-checks. What it buys is not offering a control whose
      * every change answers 403, which is the same lie a disabled input tells
      * one step further along.
      */
@@ -84,7 +84,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
          *
          * Duplicating that one small request is deliberate. The page awaits both
          * composables in parallel, and reaching into the form's data would make
-         * this one depend on the other's resolution order — reintroducing
+         * this one depend on the other's resolution order, reintroducing
          * exactly the SSR sequencing that `ready` was restructured to avoid.
          * Only fetched when some relation actually declares `scopeBy`.
          */
@@ -97,7 +97,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
 
         /**
          * Keyed by the full URL, not by resource name. Two relations can draw on
-         * the same resource with different scoping — and deduplicating by
+         * the same resource with different scoping, and deduplicating by
          * resource alone would serve one of them the other's narrowed list,
          * silently.
          */
@@ -119,7 +119,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
              * A SEARCHABLE relation fetches the rows it has, not the rows it
              * could have. Its picker asks the server per keystroke, so the only
              * thing this wave still owes it is a label for each row already
-             * assigned — which is `?ids=`, and which is bounded by the
+             * assigned, which is `?ids=`, and which is bounded by the
              * assignment rather than by the size of the tenant.
              *
              * This is the half of the feature that actually removes the cost.
@@ -158,7 +158,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
     const errors = ref<Record<string, string>>({});
     const saved = ref<Record<string, boolean>>({});
     /**
-     * Advisory notes about what a SAVED set implies — distinct from `errors`,
+     * Advisory notes about what a SAVED set implies, distinct from `errors`,
      * which mean the write did not land. Keyed per relation, cleared on the next
      * write to that relation so a stale note cannot outlive the state it
      * described.
@@ -197,7 +197,7 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
      *
      * Resolved here because `scopeBy.from` names a field on the PARENT row,
      * which only this composable fetches. Returned as parameters rather than a
-     * URL so the picker keeps owning `q` and `limit` — the two it varies.
+     * URL so the picker keeps owning `q` and `limit`, the two it varies.
      *
      * Empty today, since `persons` is the only searchable relation and it is
      * unscoped. It exists so that making a scoped relation searchable is one

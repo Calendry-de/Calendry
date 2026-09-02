@@ -1,6 +1,6 @@
 <template>
     <CommonAppShell
-        description="How this institution's schedule is drawn — the standards every session falls back to."
+        description="How this institution's schedule is drawn: the standards every session falls back to."
         title="Display"
     >
         <p class="intro">
@@ -31,7 +31,7 @@
                 <h2>Institution type</h2>
                 <p class="panel_hint">
                     A default-behaviour bias, not a fork: this never changes what an offering
-                    is or which constraint rules exist — only which offering-form fields are
+                    is or which constraint rules exist; it only changes which offering-form fields are
                     shown first and which constraint types the catalogue suggests. Every field
                     and every rule stays fully reachable in both modes.
                 </p>
@@ -67,7 +67,7 @@
                 <h2>Online sessions</h2>
                 <p class="panel_hint">
                     Online delivery is a <strong>virtual room</strong>, not a flag on the
-                    session — so this decides how that fact is drawn, never whether it is
+                    session, so this decides how that fact is drawn, never whether it is
                     true. A session is treated as online when every room it uses is virtual.
                 </p>
 
@@ -117,7 +117,7 @@
                             <span>{{ SOURCE_LABEL[source.key] }}</span>
                         </label>
 
-                        <span class="panel_source-rank">{{ source.enabled ? `${index + 1}` : '—' }}</span>
+                        <span class="panel_source-rank">{{ source.enabled ? `${index + 1}` : '-' }}</span>
 
                         <button
                             v-if="canEdit && source.enabled && index > 0"
@@ -149,7 +149,7 @@
                     dates and numbers default to. A person's own setting under
                     <NuxtLink to="/my/account">My account</NuxtLink> overrides this; leaving it empty
                     defers straight to whatever language the visitor's browser requests. This never
-                    changes what any label or button SAYS — that stays English until
+                    changes what any label or button SAYS: that stays English until
                     <a href="https://github.com/Calendry-de/Calendry/issues/19" target="_blank" rel="noopener">i18n</a>
                     ships.
                 </p>
@@ -159,7 +159,7 @@
                     <input
                         v-model="localeInput"
                         :disabled="!canEdit"
-                        placeholder="e.g. de-DE — leave empty for none"
+                        placeholder="e.g. de-DE (leave empty for none)"
                         type="text"
                     >
                 </label>
@@ -174,7 +174,7 @@
             <section class="panel_group">
                 <h2>Timezone</h2>
                 <p class="panel_hint">
-                    An IANA zone name (e.g. <code>Europe/Berlin</code>) — the wall clock every
+                    An IANA zone name (e.g. <code>Europe/Berlin</code>): the wall clock every
                     Session, TimeGrid and "today" is resolved against, never a person's own
                     device. A person's own timezone under
                     <NuxtLink to="/my/account">My account</NuxtLink> is display/export only and
@@ -268,13 +268,13 @@ import type { TenantMode } from '#shared/tenantMode';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
- * The tenant's display standards — a SINGLETON, not a list.
+ * The tenant's display standards: a SINGLETON, not a list.
  *
  * Bespoke rather than another row on the generic manage scaffold, and the
  * reason is the shape: the scaffold renders a list of records with a detail
  * pane, and there is exactly one of these per tenant, forever. A list of one is
  * a worse version of a form. The ordering control and the live preview are the
- * other half — neither is a field type the registry has, and inventing them
+ * other half; neither is a field type the registry has, and inventing them
  * there would put two one-off components into a system that serves fourteen
  * entities (CLAUDE.md's "bespoke means one slot" rule, applied one level up).
  */
@@ -282,7 +282,7 @@ definePageMeta({
     /*
      * Gated INLINE rather than through the `manage` middleware: that one resolves
      * `to.params.entity` against the entity registry and 404s anything it does
-     * not recognise, and this page is not a registry entity — it has no list, no
+     * not recognise, and this page is not a registry entity: it has no list, no
      * row form and no `/api/display` resource behind it. Routed through it, the
      * page 404s on a static path with no `entity` param at all.
      *
@@ -293,7 +293,7 @@ definePageMeta({
      *
      * BOTH KEYS MOVED TOGETHER, from `session.read`/`session_kind.update`. Under
      * the old pair this page sat in the navigation of everybody who could look at
-     * a timetable — an institution's settings offered to every lecturer — and a
+     * a timetable. That offered an institution's settings to every lecturer, and a
      * role holding `session_kind.update` could save changes to a page it was
      * never shown. `GET /api/display-settings` still answers `session.read`,
      * because the schedule needs the colours to draw; the endpoint being wider
@@ -321,8 +321,8 @@ const SOURCE_LABEL: Record<ColorSource, string> = {
 };
 
 const MODE_LABEL: Record<TenantMode, string> = {
-    UNIVERSITY: 'University — offerings, required session counts, a lecturer pool',
-    SCHOOL: 'School — a subject, a weekly count, a named teacher',
+    UNIVERSITY: 'University: offerings, required session counts, a lecturer pool',
+    SCHOOL: 'School: a subject, a weekly count, a named teacher',
 };
 
 const canEdit = useHasPermission('tenant.update');
@@ -339,7 +339,7 @@ const loadError = computed(() => (settings.error.value
     ? 'Could not load the display settings. Nothing has been changed.'
     : ''));
 
-/** The form is seeded from the awaited response, never from a watcher — a
+/** The form is seeded from the awaited response, never from a watcher: a
     watcher-seeded ref is `undefined` at first render server-side. */
 const form = reactive({
     highlightOnline: settings.data.value?.highlightOnline ?? DISPLAY_DEFAULTS.highlightOnline,
@@ -353,7 +353,7 @@ const form = reactive({
 
 // A separate text ref rather than binding `form.defaultLocale`/`form.timezone`
 // directly: an in-progress keystroke ("d", "de", "de-") is invalid `Intl`
-// input and must not flip `dirty`/fail validation on every character — only
+// input and must not flip `dirty`/fail validation on every character; only
 // the commit into `form` (on save) is validated.
 const localeInput = ref(form.defaultLocale ?? '');
 const localeError = ref('');
@@ -415,7 +415,7 @@ const samples = computed(() => {
         },
         {
             title: 'MAT100 · Analysis',
-            label: 'no colour set — fallback',
+            label: 'no colour set (fallback)',
             color: form.defaultColor,
             online: false,
         },
@@ -442,7 +442,7 @@ async function save() {
     const trimmedLocale = localeInput.value.trim();
 
     if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
-        localeError.value = 'Not a recognised locale — try a tag like "de-DE" or "en-GB".';
+        localeError.value = 'Not a recognised locale. Try a tag like "de-DE" or "en-GB".';
         saving.value = false;
 
         return;
@@ -451,7 +451,7 @@ async function save() {
     const trimmedTimezone = timezoneInput.value.trim();
 
     if (!isUsableTimeZone(trimmedTimezone)) {
-        timezoneError.value = 'Not a recognised timezone — try a zone name like "Europe/Berlin".';
+        timezoneError.value = 'Not a recognised timezone. Try a zone name like "Europe/Berlin".';
         saving.value = false;
 
         return;

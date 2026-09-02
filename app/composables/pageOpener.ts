@@ -6,7 +6,7 @@ import { useCookie } from '#imports';
  * The distinction matters more than it looks. `localStorage` is the obvious
  * place to record a first visit and it cannot be read while the page is being
  * rendered on the server, so a returning visitor would be served the opener in
- * the HTML and have it removed on hydration — a dark full-screen flash on every
+ * the HTML and have it removed on hydration: a dark full-screen flash on every
  * single visit, which is worse than no opener at all. A cookie is legible to
  * the server, so a returning visitor's HTML simply never contains it.
  *
@@ -17,7 +17,7 @@ import { useCookie } from '#imports';
 /**
  * The stored value is the word `seen`, not `1`, and that is not cosmetic.
  * `useCookie` runs what it reads through `destr`, which parses JSON-ish
- * strings — so a cookie written as `'1'` comes back as the NUMBER 1, and
+ * strings, so a cookie written as `'1'` comes back as the NUMBER 1, and
  * `value !== '1'` is then true forever. Every returning visitor reads as new
  * and gets the opener again. A value that cannot be parsed as anything but
  * itself removes the question.

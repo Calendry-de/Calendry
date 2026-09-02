@@ -7,7 +7,7 @@ import { refreshViolations } from '../server/utils/violations';
  * A virtual Room hosts unlimited concurrent Sessions.
  *
  * TAXONOMY.md models online delivery AS a Room rather than a flag on the
- * Session, so room-assignment logic stays uniform — but "uniform" has to stop at
+ * Session, so room-assignment logic stays uniform, but "uniform" has to stop at
  * the occupancy rule, or the one room every online session shares becomes a
  * capacity-1 resource. Two lectures streaming at the same hour are not a clash.
  *

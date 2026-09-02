@@ -13,10 +13,10 @@ const QUERY = z.object({
  *
  * Readable with EITHER administration permission: `manage_any` obviously, and
  * `read_any` because a scheduler who may see who is unavailable without being
- * able to change it is a real role — that split is why `read_any` exists as its
+ * able to change it is a real role, and that split is why `read_any` exists as its
  * own key rather than being implied.
  *
- * EVERYTHING THE PAGE NEEDS TRAVELS WITH IT — the rows, the people to pick from
+ * EVERYTHING THE PAGE NEEDS TRAVELS WITH IT: the rows, the people to pick from
  * when entering one, the grid to name blocks and the terms to resolve dates
  * against. The alternatives are `/api/persons`, `/api/time-grids` and
  * `/api/terms`, which need three permissions this page is not gated on, and one
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requireAnyPermission(event, tx, ['availability.manage_any', 'availability.read_any']);
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const rows = await tx.personUnavailability.findMany({
             where: {

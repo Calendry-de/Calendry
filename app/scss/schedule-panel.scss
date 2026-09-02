@@ -1,11 +1,11 @@
 // Colours and tokens are resolved at mixin-DEFINITION scope, so this file
-// must load them itself — the globally prepended additionalData applies to
+// must load them itself: the globally prepended additionalData applies to
 // the entry stylesheet, not to partials pulled in with @use.
 @use './colors' as *;
 @use './variables' as *;
 @use './tokens' as *;
 
-// Shared chrome for the two secondary schedule panels — the off-grid tray and
+// Shared chrome for the two secondary schedule panels: the off-grid tray and
 // the violations list. They are different concerns with the same shape, so the
 // styling is a mixin rather than a base class: neither panel inherits the
 // other's meaning, only its frame.
@@ -63,7 +63,7 @@
 
         /*
          * A REAL TARGET, not a text run. At `padding: 0` these rows were ~18px
-         * tall — every row in both panels feeds the inspector, so this is the
+         * tall; every row in both panels feeds the inspector, so this is the
          * primary interaction of the side column, and it was the smallest thing
          * on the screen. Full width and 32px minimum, with the padding inset so
          * the text still aligns with the heading above it.

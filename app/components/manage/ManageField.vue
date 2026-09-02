@@ -18,7 +18,7 @@
         <!--
             Read-only renders as TEXT, not a disabled input. A disabled control
             reads as "unavailable right now"; static text reads as "this is the
-            value, and it is not yours to change" — which is what a missing
+            value, and it is not yours to change", which is what a missing
             update permission actually means.
         -->
         <p
@@ -55,8 +55,8 @@
 
             `value` is a PROPERTY of a select element, not an attribute, so
             server rendering drops it entirely and the browser falls back to the
-            first option. A term that has a time grid rendered as "— None —"
-            until hydration corrected it — the page stating the opposite of the
+            first option. A term that has a time grid rendered as "(None)"
+            until hydration corrected it: the page stating the opposite of the
             truth, briefly, with a hydration mismatch behind it. `selected` IS a
             real attribute and survives SSR.
         -->
@@ -71,7 +71,7 @@
                 v-if="field.type === 'reference' && field.reference?.nullable"
                 :selected="model === null || model === undefined || model === ''"
                 value=""
-            >— None —</option>
+            >(None)</option>
             <option
                 v-for="option in options"
                 :key="String(option.value)"
@@ -181,12 +181,12 @@ const options = computed(() => {
     }));
 });
 
-/** What the read-only view prints — resolved labels, not raw foreign keys. */
+/** What the read-only view prints: resolved labels, not raw foreign keys. */
 /**
  * A value this control can meaningfully render as text.
  *
  * ARRAYS AND OBJECTS ARE NOT, and saying so here is what closes a whole
- * category. `String([{…}])` is `"[object Object]"` — a string that renders
+ * category. `String([{…}])` is `"[object Object]"`, a string that renders
  * happily, passes every type check, and tells the reader nothing. It shipped
  * for real: `time_grid.breaks` is an array declared `type: 'text'`, and a
  * viewer's read-only page displayed exactly that under the label "Named
@@ -219,27 +219,27 @@ const staticText = computed(() => {
         }
 
         /*
-         * THE RAW VALUE, not an em dash, when a value exists but cannot be
-         * resolved to a label. Same rule as `ManageRelationPicker.labelFor` —
+         * THE RAW VALUE, not a dash placeholder, when a value exists but cannot
+         * be resolved to a label. Same rule as `ManageRelationPicker.labelFor`:
          * an unresolvable reference is something to see, not to hide.
          *
-         * It matters most where the option list failed to load: `'—'` there
+         * It matters most where the option list failed to load: `'-'` there
          * claims the field is EMPTY over a record that has a reference, which
          * is the "no data and fetch failed look identical" trap. An id is ugly
          * and true.
          */
         const value = model.value;
 
-        return value === null || value === undefined || value === '' ? '—' : String(value);
+        return value === null || value === undefined || value === '' ? '-' : String(value);
     }
 
     const value = model.value;
 
     if (!isRenderablePrimitive(value)) {
-        return '—';
+        return '-';
     }
 
-    return value === null || value === undefined || value === '' ? '—' : String(value);
+    return value === null || value === undefined || value === '' ? '-' : String(value);
 });
 
 /**
@@ -248,7 +248,7 @@ const staticText = computed(() => {
  * An array bound to `<input type="text">` is worse than the read-only case: it
  * renders as an EMPTY box that looks editable, and one keystroke replaces the
  * whole structure with a string on the next save. Binding empty makes the
- * control inert-looking rather than destructive — and the field should not be
+ * control inert-looking rather than destructive, and the field should not be
  * reaching this component at all, which is the other half of the fix.
  */
 const inputValue = computed(() => (isRenderablePrimitive(model.value) ? (model.value ?? '') : ''));

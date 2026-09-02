@@ -11,7 +11,7 @@ type ExistingOffering = { id: string; title: string; createdFromTemplateId: stri
 
 /**
  * Which of these templates already seeded an Offering in this Term, keyed by
- * template id — the one place both the pre-write completeness check and
+ * template id: the one place both the pre-write completeness check and
  * `applyOfferingPlanItems` below ask "does this need creating," so the two
  * can never disagree about it.
  */
@@ -32,19 +32,19 @@ export async function existingOfferingsByTemplate(
 }
 
 /**
- * Core of "apply a curriculum plan to a Group in a Term" — see
+ * Core of "apply a curriculum plan to a Group in a Term": see
  * `offering-plan-apply/[id].post.ts` for the full reasoning (reuse over
  * duplicate, keyed on `(term, createdFromTemplateId)`, so two Groups taking
  * the same subject in one Term join one Offering rather than each getting
  * their own).
  *
  * Split out of the route so `scripts/seed-demo-schedule.ts` can build its
- * demo curriculum through the SAME path a tenant would use — one definition
+ * demo curriculum through the SAME path a tenant would use: one definition
  * of what applying a plan means, not a second one that quietly drifts from
  * it. Takes already-loaded items (each with its template row) and already-
  * validated ids: confirming the plan/term/Group exist and belong to the
  * tenant, and refusing an incomplete template before calling this, are the
- * caller's job — an HTTP 404/422 and a script's thrown Error are different
+ * caller's job, since an HTTP 404/422 and a script's thrown Error are different
  * enough shapes that inventing a third, generic one here would serve neither.
  */
 export async function applyOfferingPlanItems(
@@ -114,7 +114,7 @@ export async function applyOfferingPlanItems(
     return results;
 }
 
-/** Plan items whose template cannot yet seed an Offering — see the route's own comment. */
+/** Plan items whose template cannot yet seed an Offering: see the route's own comment. */
 export function incompleteTemplateNames(items: { template: OfferingTemplate }[]): string[] {
     return items.filter((item) => !item.template.kindId || !item.template.title).map((item) => item.template.name);
 }
@@ -131,13 +131,13 @@ export interface GroupPlanApplication {
 
 /**
  * "Which curriculum plan(s) is each Group already on, and what would
- * 'advance' apply next" — the ONE derivation, shared by the per-Group detail
+ * 'advance' apply next": the ONE derivation, shared by the per-Group detail
  * (`group-plan-applications/[id].get.ts`), the tenant-wide list
  * (`group-plan-applications/index.get.ts`), and the bulk advance action
  * (`group-plan-applications/advance-all.post.ts`), so the three can never
  * disagree about what "this Group's current phase" means.
  *
- * DERIVED, NOT STORED — same reasoning the single-Group route already
+ * DERIVED, NOT STORED: same reasoning the single-Group route already
  * documented: nothing records "this apply came from this plan",
  * `Offering.createdFromTemplateId` is the only trail, so this reconstructs it
  * by joining back through `OfferingPlanItem`. A template belonging to more
@@ -145,7 +145,7 @@ export interface GroupPlanApplication {
  * which is the honest answer.
  *
  * `groupIds` omitted means EVERY Group in the tenant that has at least one
- * such Offering — the shape the tenant-wide list and the bulk action need;
+ * such Offering: the shape the tenant-wide list and the bulk action need;
  * passing one id is exactly what the per-Group route already did before this
  * was extracted.
  */
@@ -197,7 +197,7 @@ export async function deriveGroupPlanApplications(
         plansByTemplate.set(item.templateId, bucket);
     }
 
-    // All Terms once, ordered — the "next Term after this one" lookup below
+    // All Terms once, ordered: the "next Term after this one" lookup below
     // is a scan of this list rather than a query per application.
     const terms = await tx.term.findMany({
         where: { tenantId },
@@ -255,13 +255,13 @@ export async function deriveGroupPlanApplications(
 
         for (const application of applications) {
             /*
-             * ALREADY THERE, so nothing left to "advance" — `plan.nextPlan`
+             * ALREADY THERE, so nothing left to "advance": `plan.nextPlan`
              * and a later Term existing says nothing about whether this Group
              * has ALREADY made that exact move. Without this check, an old
              * application whose successor was applied years ago would offer
              * the identical "advance" forever: harmless for the single-Group
              * button (re-applying is idempotent, see `applyOfferingPlanItems`)
-             * but wrong for a BULK caller — `advance-all` would re-confirm
+             * but wrong for a BULK caller: `advance-all` would re-confirm
              * every transition a tenant has ever made, on every run, forever,
              * and "N groups eligible" would never shrink to zero even once
              * every Group is fully caught up.
@@ -272,8 +272,8 @@ export async function deriveGroupPlanApplications(
         }
 
         // Chronological, so "what's next" always reads as the row after the
-        // group's most recent Term rather than requiring the reader to sort
-        // it out from term names.
+        // group's most recent Term rather than requiring the reader to sort it
+        // out from term names.
         applications.sort((a, b) => a.termStart.getTime() - b.termStart.getTime());
         result.set(groupId, applications.map(({ termStart: _termStart, ...application }) => application));
     }

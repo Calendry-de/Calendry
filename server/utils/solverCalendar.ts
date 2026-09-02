@@ -9,7 +9,7 @@ import {
  * The grid and the academic calendar, and the one genuinely hard computation in the
  * integration: `reference_slot`. Everything the solver places is addressed as
  * (week, day, block) against the calendar built here, so an error makes every
- * placement wrong in a way that still looks like a valid timetable — hence pure
+ * placement wrong in a way that still looks like a valid timetable, hence pure
  * functions over primitives, testable without a database.
  *
  * ALL DATE ARITHMETIC IS UTC-ANCHORED: `@db.Date` columns come back as UTC-midnight
@@ -45,12 +45,12 @@ export function toWireTimeGrid(grid: AppTimeGrid, institutionTimezone: string): 
         activeDays: [...grid.activeDays].sort((a, b) => a - b),
         institutionTimezone,
         /*
-         * The real gaps are DELIBERATELY NOT SENT — CLAUDE.md, "TimeGrid
+         * The real gaps are DELIBERATELY NOT SENT: CLAUDE.md, "TimeGrid
          * breaks never reach the solver". The solver reasons in block INDICES,
          * so a gap changes no adjacency and no conflict; breaks matter locally
          * (blockTime(), blockOfMinute()). proto v0.15 added these two fields
          * solely for `MinimizeBreakSpanning`, a constraint type this repo's
-         * catalogue does not yet carry, so nothing can read them — and these
+         * catalogue does not yet carry, so nothing can read them, and these
          * are the proto's documented "no gap" defaults, which serialize to the
          * exact bytes the pre-0.15 message had (`inputHash` unchanged).
          * Sending the tenant's real `breakMinutes`/`breaks` is part of landing
@@ -69,7 +69,7 @@ export function toWireTimeGrid(grid: AppTimeGrid, institutionTimezone: string): 
  * MUST include breaks: it converts a wall-clock instant into a grid index, and a
  * 15-minute gap really does shift when block 3 starts.
  *
- * Delegates to the shared walk that `blockTime()` uses — the two answer inverse
+ * Delegates to the shared walk that `blockTime()` uses; the two answer inverse
  * questions about one timeline and must never disagree.
  */
 export function blockOfMinute(
@@ -96,7 +96,7 @@ export interface AppCalendarPeriod {
 /**
  * Weeks are MONDAY-ANCHORED, per the proto's `start_date`. A term rarely starts on
  * a Monday, so week 0 begins at the Monday on or before `term.startDate` and the
- * first week may contain days before the term — correct, because the week index has
+ * first week may contain days before the term. That is correct, because the week index has
  * to be derivable from any date by the same rule or `reference_slot` and Session
  * weeks would disagree.
  *
@@ -127,7 +127,7 @@ export function buildAcademicCalendar(
      * Holidays that do NOT swallow a whole week are emitted as individual dates,
      * matching the proto's "single days that are holidays inside
      * otherwise-teaching weeks". A week already classified HOLIDAY does not also
-     * list its days — that would be the same fact twice.
+     * list its days; that would be the same fact twice.
      */
     const holidays = periods.filter((p) => p.kind === 'HOLIDAY');
     const holidayDates: { date: string; label: string }[] = [];
@@ -179,15 +179,15 @@ export class TermEndedError extends Error {
 
 /*
  * `TenantLocalNow`/`localNow` now live in `shared/academicCalendar.ts` (see
- * the re-export above) — the schedule page's Today button and its live
+ * the re-export above): the schedule page's Today button and its live
  * now-indicator need the exact same tenant-local clock, client-side.
  */
 
 /**
  * Maps "now" onto the tenant's academic calendar.
  *
- * Sessions starting strictly before this slot are excluded from recalculation —
- * a correctness rule, not a preference — so this decides what the solver is
+ * Sessions starting strictly before this slot are excluded from recalculation.
+ * This is a correctness rule, not a preference, so it decides what the solver is
  * allowed to move. It is computed ONCE per run and stored on `solver_run`,
  * because a value derived from the clock would otherwise make the "same input,
  * same seed" guarantee quietly false on a replay.
@@ -208,7 +208,7 @@ export function computeReferenceSlot(options: {
     }
 
     // Before the term: nothing is past. The earliest addressable slot is the
-    // grid's first active day, NOT day 1 — a grid that does not teach Monday
+    // grid's first active day, NOT day 1, because a grid that does not teach Monday
     // would otherwise get a reference day it never schedules.
     if (local.date.getTime() < termStart.getTime()) {
         const firstActiveDay = [...grid.activeDays].sort((a, b) => a - b)[0] ?? 1;
@@ -225,7 +225,7 @@ export function computeReferenceSlot(options: {
         day,
         // The DAY is passed, not defaulted. A grid with a Friday-specific break
         // resolves a different block for the same wall-clock minute, and this
-        // slot decides which Sessions the solver may move — computing it
+        // slot decides which Sessions the solver may move, so computing it
         // against the universal schedule would let a Friday afternoon class be
         // rescheduled after it had already run.
         block: blockOfMinute(grid, local.minutes, day),

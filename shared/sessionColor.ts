@@ -3,8 +3,8 @@
  *
  * WHY THIS IS SHARED AND NOT A COMPONENT DETAIL
  * ---------------------------------------------
- * Four surfaces draw a Session — the week grid, the day agenda, the inspector
- * and the review diff — and a chip that is teal in one and violet in another is
+ * Four surfaces draw a Session (the week grid, the day agenda, the inspector
+ * and the review diff), and a chip that is teal in one and violet in another is
  * not a styling inconsistency, it is two different claims about the same thing.
  * The order lives here so all four read it rather than each deciding.
  *
@@ -14,7 +14,7 @@
  * that colours strictly by activity type can say `['kind']` and mean it.
  *
  * NULL IS A REAL ANSWER at every level. An Offering with no colour is asking to
- * inherit, not asking for grey — which is why every source is nullable and the
+ * inherit, not asking for grey, which is why every source is nullable and the
  * fallback happens here rather than in a `??` at each call site.
  */
 
@@ -73,13 +73,13 @@ export function resolveSessionColor(
  *
  * THREE STATES, NOT TWO, and the third is why. Online delivery is a virtual Room
  * (TAXONOMY.md), so a Session booked into a lecture hall AND a virtual room is
- * neither on-site nor online — it is streamed, and calling it either is a false
+ * neither on-site nor online: it is streamed, and calling it either is a false
  * claim about where people are expected to be. Measured on real tenant data,
  * EVERY session touching the virtual room was of exactly this kind, so a
  * two-state rule marked nothing at all and the feature was invisible.
  *
  * The tenant setting governs whether any of this is DRAWN, never whether it is
- * true — the truth lives in the room assignment and nowhere else.
+ * true: the truth lives in the room assignment and nowhere else.
  */
 export type DeliveryMode = 'onsite' | 'hybrid' | 'online';
 
@@ -88,7 +88,7 @@ export function deliveryMode(
     settings: DisplaySettings = DISPLAY_DEFAULTS,
 ): DeliveryMode {
     if (!settings.highlightOnline || !rooms?.length) {
-        // No rooms is "unplaced", which is a different fact from "on site" — but
+        // No rooms is "unplaced", which is a different fact from "on site", but
         // it is not a delivery mode either, and the off-grid tray is where that
         // one is reported.
         return 'onsite';

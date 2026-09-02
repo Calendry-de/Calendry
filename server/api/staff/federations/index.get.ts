@@ -5,7 +5,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Staff'],
         summary: 'Calendry staff: list every Federation',
-        description: 'Cross-tenant Federation list for Calendry staff (issue #64) — the "no door to create one" gap TAXONOMY.md and this endpoint\'s sibling POST close together. Requires a staff session, never routed through withRequestTenant/RLS: `federation`\'s own RLS policy is read-only to a caller already IN that federation, which a staff request never is, so this reads through the OWNER connection instead — same reasoning as GET /api/staff/tenants.',
+        description: 'Cross-tenant Federation list for Calendry staff (issue #64): the "no door to create one" gap TAXONOMY.md and this endpoint\'s sibling POST close together. Requires a staff session, never routed through withRequestTenant/RLS: `federation`\'s own RLS policy is read-only to a caller already IN that federation, which a staff request never is, so this reads through the OWNER connection instead, the same reasoning as GET /api/staff/tenants.',
         responses: {
             200: {
                 description: 'Every Federation, newest first, with its member Tenant slugs.',

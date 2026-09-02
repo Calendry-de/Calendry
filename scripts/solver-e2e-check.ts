@@ -1,11 +1,11 @@
 /**
- * Stage 3b/3e verification — assembles a REAL SolverInput from tenant data and
+ * Stage 3b/3e verification: assembles a REAL SolverInput from tenant data and
  * runs it against a live calendry-solver.
  *
  * Exercises the same `assembleSolverInput()` the route uses, so what is proven
  * here is the actual production path, not a parallel implementation. What it
  * does NOT cover is the HTTP layer (auth, the one-active-run index, the
- * transport-failure trap) — all of which Stage 2 proved separately.
+ * transport-failure trap), all of which Stage 2 proved separately.
  *
  * `--seed-relations` first fills in offering→lecturer/group links and raises
  * frequency, because the demo tenant's offerings had none. That is
@@ -31,8 +31,8 @@ const DO_CANCEL = process.argv.includes('--cancel');
  * Multiplies required_session_count IN MEMORY ONLY, to make the instance hard
  * enough that the solver stays RUNNING long enough to be cancelled.
  *
- * The real data converges in zero moves — 48 sessions into 760 slots is not a
- * search problem — so without this the RUNNING state is unobservable, which is
+ * The real data converges in zero moves (48 sessions into 760 slots is not a
+ * search problem), so without this the RUNNING state is unobservable, which is
  * exactly why Stage 2 could not test cancellation. Nothing is written to the
  * database; the demo tenant is untouched.
  */
@@ -113,7 +113,7 @@ try {
         line('    The database is not modified. This exists only to make the run long enough to cancel.');
     }
 
-    rule(`ASSEMBLED SolverInput — tenant '${tenant.slug}', term '${term.name}'`);
+    rule(`ASSEMBLED SolverInput: tenant '${tenant.slug}', term '${term.name}'`);
     line(`  requestingTenantId  ${input.requestingTenantId}`);
     line(`  federationId        '${input.federationId}'  (empty by scope decision, Stages 1–6)`);
     line(`  referenceSlot       week=${referenceSlot.week} day=${referenceSlot.day} block=${referenceSlot.block}`);
@@ -132,7 +132,7 @@ try {
     line(`  externalOccupancy   ${input.externalOccupancy.length}  (empty by scope decision)`);
     line(`  constraints         ${report.counts.constraints} sent`);
 
-    rule('ASSEMBLY REPORT — everything narrowed on the way to the wire');
+    rule('ASSEMBLY REPORT: everything narrowed on the way to the wire');
     line(`  federation rooms excluded       ${report.excludedFederationRooms}`);
     line(`  federation offerings excluded   ${report.excludedFederationOfferings}`);
     line(`  multi-room sessions flattened   ${report.multiRoomSessions.length}`);
@@ -156,7 +156,7 @@ try {
     const maxMoves = DO_CANCEL ? 4_000_000_000 : 200_000;
     const maxWallMillis = DO_CANCEL ? 600_000 : 20_000;
 
-    rule(`SOLVER RUN — maxMoves=${maxMoves.toLocaleString()} maxWallMillis=${maxWallMillis}`);
+    rule(`SOLVER RUN: maxMoves=${maxMoves.toLocaleString()} maxWallMillis=${maxWallMillis}`);
 
     const started = await startRun({
         input,
@@ -167,7 +167,7 @@ try {
         },
         budget: { maxWallMillis: toWireU64(maxWallMillis), maxMoves: toWireU64(maxMoves) },
         seed: toWireU64(42),
-        // Stress changes the problem, so it must change the key — otherwise the
+        // Stress changes the problem, so it must change the key, otherwise the
         // solver returns the earlier, easy run and the cancel test observes
         // nothing.
         idempotencyKey: `${inputHash}:42:${STRESS}:${DO_CANCEL ? 'c' : 'n'}`,
@@ -251,7 +251,7 @@ try {
         for (const placed of result.sessions.slice(0, 6)) {
             line(`      ${placed.offeringId.slice(0, 14)}…  week=${placed.startSlot?.week}`
                 + ` day=${placed.startSlot?.day} block=${placed.startSlot?.block}`
-                + ` room=${(placed.roomId || '—').slice(-12)}`
+                + ` room=${(placed.roomId || 'none').slice(-12)}`
                 + ` lecturers=[${placed.lecturerIds.length}] groups=[${placed.groupIds.length}]`);
         }
     }

@@ -14,12 +14,12 @@ import { blockedSlotSummary, resolveHolidayWeeks } from '#shared/availability';
  * debug backwards.
  *
  * The suite is written to FAIL if the `status` filter in `approvedBlackoutsFor`
- * is removed — that was checked by removing it, not assumed. A test that seeds
+ * is removed: that was checked by removing it, not assumed. A test that seeds
  * only approved rows would pass against a build with no filter at all.
  *
  * It also pins the thing that made this feature necessary: `blackouts` was `[]`
- * unconditionally, so `lecturer_veto` — a hard constraint enabled by default in
- * every tenant — ran against an empty set in every solve since it was
+ * unconditionally, so `lecturer_veto` (a hard constraint enabled by default in
+ * every tenant) ran against an empty set in every solve since it was
  * catalogued and could never once fire.
  */
 let f: Fixtures;
@@ -51,7 +51,7 @@ beforeAll(async () => {
             {
                 tenantId: f.tenantA, personId: f.personA, ...WEEK_SEVEN,
                 // A week index counts ONE term's calendar, so the column is not
-                // optional here — the database CHECK refuses the pair otherwise.
+                // optional here: the database CHECK refuses the pair otherwise.
                 termId: f.termA,
                 status: 'APPROVED', createdByPersonId: f.personA,
                 decidedByPersonId: f.personA, decidedAt: new Date(),
@@ -76,7 +76,7 @@ describe('the single read path', () => {
         const windows = byPerson.get(f.personA) ?? [];
 
         // Two approved: the Friday and the week-scoped one. The PENDING and the
-        // REJECTED must be absent — with the filter removed this is 4.
+        // REJECTED must be absent: with the filter removed this is 4.
         expect(windows).toHaveLength(2);
         expect(windows.map((w) => w.days)).toEqual([[5], [1]]);
         expect(windows.some((w) => w.blocks.length === 1 && w.blocks[0] === 0 && w.days.length === 0)).toBe(false);
@@ -109,7 +109,7 @@ describe('assembleSolverInput carries them into Person.blackouts', () => {
         expect(person!.blackouts).toHaveLength(2);
         expect(person!.blackouts.map((w) => w.days)).toEqual([[5], [1]]);
 
-        // The wire field exists and the app deliberately does not populate it —
+        // The wire field exists and the app deliberately does not populate it:
         // a veto's reason is often personal and changes no placement.
         expect(person!.blackouts.every((w) => w.reason === '')).toBe(true);
     });
@@ -153,7 +153,7 @@ describe('the veto-load report', () => {
     });
 
     it('reports a person whose approved windows clear the threshold', async () => {
-        // Three whole days of a five-day week is 24 of 40 — past HEAVY_VETO_RATIO.
+        // Three whole days of a five-day week is 24 of 40, past HEAVY_VETO_RATIO.
         await ownerDb.personUnavailability.create({
             data: {
                 tenantId: f.tenantA, personId: f.personViewerA, days: [1, 2, 3], blocks: [], weeks: [],
@@ -172,7 +172,7 @@ describe('the veto-load report', () => {
 
         expect(flagged, 'a mostly-unavailable person must be reported').toBeDefined();
         // BOTH numbers travel, so the threshold decides only whether to mention
-        // it — never how bad it is.
+        // it, never how bad it is.
         expect(flagged!.blocked).toBeGreaterThan(0);
         expect(flagged!.total).toBeGreaterThan(flagged!.blocked);
 
@@ -188,7 +188,7 @@ describe('the veto-load report', () => {
  * WHY THIS EXISTS. `Unavailability.weeks` is "index into
  * AcademicCalendar.weeks", and that calendar is built per solve for the term
  * being solved. Before `term_id`, one stored `weeks:[2]` was sent to every
- * term — measured against the demo tenant, where week 2 begins 2026-09-07 in one
+ * term, measured against the demo tenant, where week 2 begins 2026-09-07 in one
  * term and 2027-10-11 in the other. Harmless for a recurring Friday; a
  * correctness hole the moment a date-range absence exists, which is what the
  * previous slice's UI narrowing had kept out of reach.
@@ -238,7 +238,7 @@ describe('week-scoped windows are anchored to their term', () => {
  * A date range blocks every week it TOUCHES.
  *
  * The same rule `classifyWeeks` applies to EXAM periods, and deliberately not
- * the "covers the whole week" rule it applies to BREAK and HOLIDAY — see
+ * the "covers the whole week" rule it applies to BREAK and HOLIDAY; see
  * `resolveHolidayWeeks` for why the two failure directions are not symmetric.
  */
 describe('resolving a date range to weeks', () => {
@@ -251,7 +251,7 @@ describe('resolving a date range to weeks', () => {
         const out = resolveHolidayWeeks(START, END, new Date('2027-10-13'), new Date('2027-10-22'));
 
         expect(out.weeks).toEqual([1, 2]);
-        // Neither end is covered in full, so both are reported as over-blocked —
+        // Neither end is covered in full, so both are reported as over-blocked,
         // which is what the form shows before anything is submitted.
         expect(out.partial.map((week) => week.index)).toEqual([1, 2]);
     });

@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * A lecturer sets their OWN module's `schedulingPattern` (issue #28) — the
+ * A lecturer sets their OWN module's `schedulingPattern` (issue #28), the
  * self-service half of a field `offering.update` could already write for an
  * administrator.
  *
@@ -41,7 +41,7 @@ beforeAll(async () => {
     viewerA = (await login(ACCOUNTS.viewerA, TEST_PASSWORD)).cookie;
 
     // personA (adminA) leads offeringA. personViewerA also leads it, to
-    // prove leading a module is not BY ITSELF enough — viewerA's role holds
+    // prove leading a module is not BY ITSELF enough: viewerA's role holds
     // only session.read.
     await ownerDb.offeringLecturer.createMany({
         data: [
@@ -87,7 +87,7 @@ describe('leading the module is required, even with the permission', () => {
 
         expect(res.status).toBe(404);
 
-        // Refused before any write — the unled Offering is untouched.
+        // Refused before any write: the unled Offering is untouched.
         const row = await ownerDb.offering.findUniqueOrThrow({ where: { id: unledOfferingA } });
 
         expect(row.schedulingPattern).toBeNull();
@@ -125,8 +125,8 @@ describe('the write schema', () => {
     });
 
     it('refuses an unrecognised pattern, naming neither the caps nor the missing third mode', async () => {
-        // "Multiple in a day" (issue #28's third mode) is not built — see
-        // CLAUDE.md's own note on this ticket — so it must not be an
+        // "Multiple in a day" (issue #28's third mode) is not built (see
+        // CLAUDE.md's own note on this ticket), so it must not be an
         // accepted value here either.
         const res = await setPattern(offeringA, adminA, 'MULTIPLE_PER_DAY');
 

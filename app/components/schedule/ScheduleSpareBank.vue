@@ -28,11 +28,11 @@ import type { ScheduleSession } from '~/composables/schedule';
 import { sessionLabel } from '~/composables/schedule';
 
 /**
- * Cancelled Sessions with nowhere to sit (issue #22) — still counted toward
+ * Cancelled Sessions with nowhere to sit (issue #22): still counted toward
  * their Offering's frequency, still carrying their Groups/People/Rooms, but
  * banked rather than placed. Read-only, like `ScheduleOffGridTray`: selecting
  * one shows it in the Inspector, whose existing "Move…" action (relabelled
- * "Place…" for a banked subject) is the whole restore path — this list does
+ * "Place…" for a banked subject) is the whole restore path; this list does
  * not duplicate that machinery.
  */
 defineProps<{

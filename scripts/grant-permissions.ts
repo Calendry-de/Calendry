@@ -5,7 +5,7 @@
  * ---------------
  * `prisma db seed` keeps the `permission` catalogue in step with
  * `shared/permissions.ts`, but it deliberately does not touch
- * `access_role_permission` — which permissions a tenant's roles *hold* is
+ * `access_role_permission`: which permissions a tenant's roles *hold* is
  * tenant configuration, not reference data, and a seed that silently widened
  * every tenant's admin role on every deploy would be a privilege escalation
  * with no audit trail.
@@ -21,7 +21,7 @@
  * Operating across several tenants in one run would mean re-entering tenant
  * context per tenant as the app role; the owner bypasses RLS and can do it in
  * one transaction. That is the same authority `provision:tenant` already needs,
- * and it is why this is a CLI rather than an endpoint — see below.
+ * and it is why this is a CLI rather than an endpoint: see below.
  *
  * WHY A CLI, NOT AN ENDPOINT
  * --------------------------
@@ -82,8 +82,8 @@ async function main() {
         requested = (permissionsArg as string).split(',').map((k) => k.trim()).filter(Boolean);
 
         // A typo'd permission key would otherwise fail on the foreign key with
-        // an opaque message, or — worse, if it happened to be a prefix of a real
-        // one — grant nothing and report success.
+        // an opaque message, or, worse, if it happened to be a prefix of a real
+        // one, grant nothing and report success.
         const unknown = requested.filter((key) => !isPermissionKey(key));
 
         if (unknown.length) {
@@ -106,7 +106,7 @@ async function main() {
         if (notSeeded.length) {
             console.error(`\n${notSeeded.length} permission(s) are in the code but not in the database:`);
             console.error(`  ${notSeeded.slice(0, 8).join(', ')}${notSeeded.length > 8 ? ' …' : ''}`);
-            console.error('\nRun `bun run db-seed` first — the catalogue is seeded, not migrated.\n');
+            console.error('\nRun `bun run db-seed` first: the catalogue is seeded, not migrated.\n');
             process.exit(1);
         }
 
@@ -159,7 +159,7 @@ async function main() {
             }
         }
 
-        // "Nothing to do" is reported as itself and exits 0 — distinguishable
+        // "Nothing to do" is reported as itself and exits 0, distinguishable
         // from a run that matched no roles (which exits 1 above).
         if (totalMissing === 0) {
             console.log('\nNothing to grant. Every listed role already holds every requested permission.\n');
@@ -220,7 +220,7 @@ async function main() {
         console.log('Sessions are NOT revoked: permissions are read per request, so');
         console.log('signed-in users pick this up on their next call.\n');
 
-        // Same reasoning as reset:password — stdout to an external collector,
+        // Same reasoning as reset:password: stdout to an external collector,
         // not a table the operator running this could rewrite.
         console.log(`AUDIT ${JSON.stringify(record)}`);
     } catch (error) {

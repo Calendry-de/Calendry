@@ -20,7 +20,7 @@ export interface PaletteResult {
  * The Ctrl+K palette's interaction machine.
  *
  * OWNERSHIP BOUNDARY: open state, the query, which result is highlighted, and
- * what activating one does. It does NOT decide what exists or who may see it —
+ * what activating one does. It does NOT decide what exists or who may see it:
  * that is `useNavEntries()`, whose output is already permission-filtered.
  *
  * That distinction is the security-relevant part: this file has no permission
@@ -73,7 +73,7 @@ export function useCommandPalette() {
         });
     });
 
-    // A shrinking result list must never leave the highlight past the end —
+    // A shrinking result list must never leave the highlight past the end:
     // Enter would then activate nothing and look like a dead key.
     watch(results, (rows) => {
         if (highlighted.value >= rows.length) {
@@ -84,7 +84,7 @@ export function useCommandPalette() {
     /**
      * The keyboard claim follows the OPEN STATE, not the function that changed
      * it. `open` is shared state, so the header's search button flips it
-     * directly without going through `openPalette` — hanging claim/release off
+     * directly without going through `openPalette`; hanging claim/release off
      * the functions would leave that path unclaimed, and Escape on /schedule
      * would silently cancel a placement while the palette was open. Watching the
      * state means every opener is correct by construction.

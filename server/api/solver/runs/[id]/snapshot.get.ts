@@ -4,13 +4,13 @@ import { requirePermission } from '../../../../utils/requirePermission';
 import { withRequestTenant } from '../../../../utils/tenantDb';
 
 /**
- * The full `SolverInput` one run actually sent (issue #24) — answers "what
+ * The full `SolverInput` one run actually sent (issue #24): answers "what
  * was configured when this calendar was generated" beyond what `inputHash`
  * alone can prove.
  *
  * Gated on `solver.snapshot.read`, separate from `solver.trigger`: this is a
- * tenant's whole scheduling configuration at one moment — people, groups,
- * rooms, preferences — the single most sensitive payload the app stores.
+ * tenant's whole scheduling configuration at one moment (people, groups,
+ * rooms, preferences), the single most sensitive payload the app stores.
  */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
 
         if (!snapshot) {
             // A run started before this feature shipped, or one whose write
-            // genuinely failed — distinguishable from "no such run" above.
+            // genuinely failed: distinguishable from "no such run" above.
             throw createError({ statusCode: 404, statusMessage: 'No snapshot stored for this run.' });
         }
 

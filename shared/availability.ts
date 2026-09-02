@@ -1,7 +1,7 @@
 import { addDays, isoDate, mondayOf, weekCountOf, weekIndexOf } from './academicCalendar';
 
 /**
- * Declared unavailability and soft preferences — one definition, read by the
+ * Declared unavailability and soft preferences: one definition, read by the
  * API's write boundary, by `assembleSolverInput`'s report and by the
  * self-service page's "you have blocked N of M" note.
  */
@@ -9,7 +9,7 @@ import { addDays, isoDate, mondayOf, weekCountOf, weekIndexOf } from './academic
 /**
  * One unavailability window, `calendry.solver.v1.Unavailability` verbatim.
  *
- * EMPTY MEANS EVERY VALUE ON THAT AXIS — `{days:[5]}` is every Friday, all three
+ * EMPTY MEANS EVERY VALUE ON THAT AXIS: `{days:[5]}` is every Friday, all three
  * empty is "never available". `PersonPreference` below INVERTS this, where empty
  * means "no preference"; the two sit next to each other meaning opposite things.
  */
@@ -25,7 +25,7 @@ export const ISO_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 export interface BlockedSlotSummary {
     /** Distinct (day, block) pairs of the grid this person has blocked. */
     blocked: number;
-    /** `blocksPerDay × activeDays` — the whole weekly index space. */
+    /** `blocksPerDay × activeDays`: the whole weekly index space. */
     total: number;
     /**
      * Excluded from the count and reported instead: a week-scoped absence is not
@@ -79,7 +79,7 @@ export function blockedSlotSummary(
 
 /**
  * Fraction of the weekly grid above which a solve REPORTS a person's veto load.
- * The threshold decides only WHETHER to mention it — both numbers travel, so
+ * The threshold decides only WHETHER to mention it; both numbers travel, so
  * 20-of-40 and 39-of-40 both surface as obviously different problems.
  */
 export const HEAVY_VETO_RATIO = 0.5;
@@ -94,7 +94,7 @@ export interface WindowProblem {
  *
  * `blocksPerDay` is the MAXIMUM across the tenant's TimeGrids: a veto is not
  * term-scoped, so validating against one grid would reject a window meaningful
- * under another. Days are checked against 1..7, not the ACTIVE days — "never
+ * under another. Days are checked against 1..7, not the ACTIVE days: "never
  * available on Saturdays" is legitimate to record before Saturday is activated,
  * and it counts as zero in `blockedSlotSummary`.
  */
@@ -111,7 +111,7 @@ export function validateWindow(
     if (window.blocks.some((block) => !Number.isInteger(block) || block < 0 || block >= limits.blocksPerDay)) {
         problems.push({
             field: 'blocks',
-            message: `Blocks must be between 0 and ${limits.blocksPerDay - 1} — the largest time grid in this tenant has ${limits.blocksPerDay} blocks per day.`,
+            message: `Blocks must be between 0 and ${limits.blocksPerDay - 1}; the largest time grid in this tenant has ${limits.blocksPerDay} blocks per day.`,
         });
     }
 
@@ -123,7 +123,7 @@ export function validateWindow(
 }
 
 /**
- * A window naming nothing on any axis means "never available, ever" — legal to
+ * A window naming nothing on any axis means "never available, ever". Legal to
  * store and to send, but almost always a mis-click and the most destructive thing
  * a veto can say, so the API and the form both refuse it rather than routing it
  * through approval.
@@ -133,7 +133,7 @@ export function isTotalBlackout(window: UnavailabilityWindow): boolean {
 }
 
 /**
- * A Person's soft scheduling preferences. EMPTY MEANS NO PREFERENCE — the
+ * A Person's soft scheduling preferences. EMPTY MEANS NO PREFERENCE: the
  * opposite of `UnavailabilityWindow`. An absent row and a row of two empty arrays
  * are the same state, which is why the write path deletes rather than storing the
  * second representation.
@@ -141,7 +141,7 @@ export function isTotalBlackout(window: UnavailabilityWindow): boolean {
  * SOLVER-EFFECTIVE since 2026-08-27: these cross as `Person.preferred` (proto
  * 0.7.0) and the solver prices `person_preference_fit` against them. This line
  * said "no wire field exists for these", which stopped being true when the field
- * shipped; the write boundary's own asymmetry is the part still worth knowing —
+ * shipped; the write boundary's own asymmetry is the part still worth knowing:
  * it validates against the tenant's WIDEST grid, so a stored value can name a
  * slot the solved Term has not got, and `assembleSolverInput` narrows and counts
  * the drop rather than sending an impossible slot.
@@ -160,7 +160,7 @@ export interface TermWindow {
  * the administrator write path, the control that edits the value, and the database
  * CHECK (which cannot import this, so the migration restates the range).
  *
- * A multiplier, not an absolute weight — an absolute override rots when the
+ * A multiplier, not an absolute weight: an absolute override rots when the
  * tenant default changes.
  */
 export const WEIGHT_MULTIPLIER_MIN = 0.5;
@@ -173,14 +173,14 @@ export const WEIGHT_MULTIPLIER_MAX = 2;
  * In `shared/` rather than beside the other label helpers in `app/utils/` for a
  * plain reason: those import `~/composables/schedule`, which only resolves
  * inside Nuxt, so anything there is unreachable from a unit test. The rule
- * itself — default says nothing, an override names its factor — is worth
+ * itself, default says nothing, an override names its factor, is worth
  * testing directly.
  */
 export function describeWeightMultiplier(value: number | null | undefined): string | null {
     return value == null ? null : `counts ${value}×`;
 }
 
-/** True when a multiplier is a legal override. `null` is legal — it means "default". */
+/** True when a multiplier is a legal override. `null` is legal: it means "default". */
 export function isWeightMultiplierInRange(value: number | null): boolean {
     return value === null
         || (Number.isFinite(value) && value >= WEIGHT_MULTIPLIER_MIN && value <= WEIGHT_MULTIPLIER_MAX);
@@ -199,14 +199,14 @@ export interface PersonPreferences {
      * Administrator-set multiplier on the tenant-wide preference weight.
      * `null`/absent means "use the tenant default". Optional here because
      * `preferencesAreEmpty` and the self-service page only ever deal in the
-     * axes — the weight is not part of what makes a preference exist.
+     * axes; the weight is not part of what makes a preference exist.
      */
     weightMultiplier?: number | null;
 }
 
 /**
  * Whether a preference says nothing at all, and so should be a DELETED row
- * rather than a stored empty one — an absent row is the single representation
+ * rather than a stored empty one: an absent row is the single representation
  * of "no opinion".
  *
  * ROOM FEATURES COUNT. A person who clears both time axes but still prefers a
@@ -225,7 +225,7 @@ export function preferencesAreEmpty(preferences: PersonPreferences): boolean {
  *
  * The dates are what the form SHOWS. Week indices are meaningless to a person
  * picking "the 14th to the 18th", and the mapping from a date range to week
- * numbers is genuinely unpredictable — which is the same reason the calendar
+ * numbers is genuinely unpredictable, which is the same reason the calendar
  * period editor renders a week-reclassification preview rather than trusting
  * two dates to speak for themselves.
  */
@@ -233,7 +233,7 @@ export interface TouchedWeek {
     index: number;
     start: string;
     end: string;
-    /** False when the range covers only part of this week — the over-block. */
+    /** False when the range covers only part of this week: the over-block. */
     whole: boolean;
 }
 
@@ -247,7 +247,7 @@ export interface HolidayResolution {
 /**
  * Which term weeks a date range blocks.
  *
- * A WEEK IS BLOCKED IF THE RANGE TOUCHES IT AT ALL — the same rule
+ * A WEEK IS BLOCKED IF THE RANGE TOUCHES IT AT ALL: the same rule
  * `classifyWeeks` applies to EXAM periods, and deliberately NOT the "covers the
  * whole week" rule it applies to BREAK and HOLIDAY.
  *
@@ -266,7 +266,7 @@ export interface HolidayResolution {
  * fail-closed direction.
  *
  * THE PRECISE ALTERNATIVE WAS CONSIDERED AND COSTS MORE THAN IT SAVES. A window
- * is conjunctive within a row — `{days, blocks, weeks}` all AND together — so
+ * is conjunctive within a row (`{days, blocks, weeks}` all AND together), so
  * "all of week 5, but only Wednesday onward in week 4" cannot be said in ONE
  * row. It needs up to three, and then a holiday is three rows in the approval
  * queue that can be approved separately: an administrator could approve
@@ -301,7 +301,7 @@ export function resolveHolidayWeeks(
         const weekStart = addDays(mondayOf(termStart), index * 7);
         const weekEnd = addDays(weekStart, 6);
         // "Whole" means the ABSENCE covers the week, not that the week lies
-        // inside the term — a range ending on Wednesday leaves Thu/Fri blocked
+        // inside the term; a range ending on Wednesday leaves Thu/Fri blocked
         // for nothing, and that is exactly what `partial` reports.
         const whole = from.getTime() <= weekStart.getTime() && to.getTime() >= weekEnd.getTime();
 

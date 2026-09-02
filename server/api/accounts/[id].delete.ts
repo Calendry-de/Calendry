@@ -5,7 +5,7 @@ import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
 /**
- * Delete a login. The Person stays — they are the timetable's data, this was
+ * Delete a login. The Person stays: they are the timetable's data, this was
  * only their way in.
  *
  * REFUSED FOR A SHARED LOGIN, and this is the sharp edge the whole

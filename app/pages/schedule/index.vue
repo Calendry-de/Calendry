@@ -28,7 +28,7 @@
             content and carries `aria-hidden`, so the same sentence is not read
             twice.
 
-            It sits above every branch on purpose — an edit's outcome must be
+            It sits above every branch on purpose: an edit's outcome must be
             announceable whichever state the body is in.
         -->
         <p
@@ -99,7 +99,7 @@
 
         <!--
             THE ACKNOWLEDGEMENT. A move, swap, lock or room change used to end in
-            silence — the mode dropped, the grid refetched, and nothing said what
+            silence: the mode dropped, the grid refetched, and nothing said what
             had happened or what it cost. Same slot and same shape as the placing
             strip above, because it is the other half of that conversation: one
             line says what to do next, this one says what was done.
@@ -123,7 +123,7 @@
         <!--
             DISMISSIBLE, unlike before: `editing.error` is cleared only by the
             next mutation attempt, so a failed move's message sat above the grid
-            indefinitely — including long after the reader had moved on to
+            indefinitely, including long after the reader had moved on to
             something unrelated, where it reads as a fresh failure of whatever
             they are doing now.
         -->
@@ -174,7 +174,7 @@
             v-else-if="!data.pending.value && !data.grid.value"
             title="No time grid configured"
         >
-            A schedule needs a TimeGrid — how long a block is, how many run per day,
+            A schedule needs a TimeGrid: how long a block is, how many run per day,
             and which days this institution teaches on. Nothing is assumed on your behalf.
         </ScheduleEmptyState>
 
@@ -188,8 +188,8 @@
         <!--
             PENDING IS A STATE ON THE GRID, NOT A BRANCH THAT REPLACES THE BODY.
             `week` is a member of `filters.query`, this page's fetch watch source,
-            so as a sibling branch it destroyed the whole frame on every week step
-            — losing focus to `<body>` and killing the label's transition with its
+            so as a sibling branch it destroyed the whole frame on every week step,
+            losing focus to `<body>` and killing the label's transition with its
             parent. Only the chips change with the query, so the frame stays
             mounted and reports its own staleness.
 
@@ -387,9 +387,9 @@ import { useWheelStep } from '~/composables/wheelStep';
  * Composition only. Three composables own the state, seven components own the
  * rendering; this file decides what sits next to what.
  *
- *   useScheduleFilters  — what changes the API query
- *   useScheduleData     — server state and everything derived from it
- *   useScheduleEditing  — selection, placement mode, mutations
+ *   useScheduleFilters:  what changes the API query
+ *   useScheduleData:     server state and everything derived from it
+ *   useScheduleEditing:  selection, placement mode, mutations
  */
 useHead({ title: 'Schedule' });
 
@@ -431,7 +431,7 @@ const canUpdateSession = useHasPermission('session.update');
 const canAssignLecturer = useHasPermission('session.assign_lecturer');
 const canSubstitute = useHasPermission('session.substitute');
 /**
- * A placement carries the week on screen — the grid does not know which week it
+ * A placement carries the week on screen: the grid does not know which week it
  * shows, so the page supplies it. That is what makes a cross-week move possible.
  */
 /**
@@ -440,7 +440,7 @@ const canSubstitute = useHasPermission('session.substitute');
  * needs a kind, which no click can supply.
  */
 /**
- * The dates this week covers — "13–17 Oct". A week number is an abstraction over
+ * The dates this week covers, such as "13–17 Oct". A week number is an abstraction over
  * the term; the dates are what someone checks against a calendar. Resolved from
  * the grid's own active days, and empty until a term does rather than guessed.
  */
@@ -483,12 +483,12 @@ const stepWeekOnWheel = useWheelStep({
  *
  * `.schedule_main--pending` sets `pointer-events: none` while the week
  * refetches, which stops a MOUSE from reaching a chip that is one render from
- * being replaced — and does nothing at all about the keyboard, so a focused chip
+ * being replaced, but does nothing at all about the keyboard, so a focused chip
  * could still be Entered against a list about to be discarded. That is the
  * precise hazard the rule's own comment says it exists to prevent.
  *
  * The guard lives here rather than in the two grids because every selection
- * path — grid, agenda, off-grid tray, violations panel — already funnels
+ * path (grid, agenda, off-grid tray, violations panel) already funnels
  * through this page, and none of them needs to know why.
  */
 function onSelect(id: string) {
@@ -516,9 +516,9 @@ function placeAt(target: { dayOfWeek: number; blockIndex: number }) {
 const pendingSlot = ref<{ dayOfWeek: number; blockIndex: number } | null>(null);
 
 /**
- * Issue #109's Today button. A ONE-OFF read of `localNow` at click time —
- * unlike the grid's live now-indicator, a click has no need for a ticking
- * ref — resolved in the TENANT's zone (`data.tenantTimezone`), never the
+ * Issue #109's Today button. A ONE-OFF read of `localNow` at click time
+ * (unlike the grid's live now-indicator, a click has no need for a ticking
+ * ref), resolved in the TENANT's zone (`data.tenantTimezone`), never the
  * browser's: CLAUDE.md, timezone is per-Person and display-only, and this is
  * exactly the "same day" logic that rule says must stay tenant-local.
  *
@@ -541,7 +541,7 @@ function jumpToToday() {
     filters.week.value = clampedWeek;
 
     // Only meaningful when today landed inside the week just selected AND is
-    // a day this grid actually teaches — otherwise the mobile agenda is left
+    // a day this grid actually teaches; otherwise the mobile agenda is left
     // on whichever day it already showed, same as the desktop grid draws no
     // now-line for a day it does not teach.
     if (clampedWeek === weekIndex + 1) {
@@ -580,7 +580,7 @@ function cancelCreate() {
 
 /**
  * Routed through the page rather than `useScheduleEditing` because deletion is
- * not a grid MODE — it changes nothing about what a click on the grid means.
+ * not a grid MODE: it changes nothing about what a click on the grid means.
  */
 /**
  * One request per control, matching how rooms already save. Not a form with a
@@ -592,7 +592,7 @@ function cancelCreate() {
  * that run during SSR: on the server `$fetch` sends no browser cookie, so an
  * authenticated call 401s and the page renders its empty state. These three
  * handlers only ever run from a click, on the client, where `$fetch` carries
- * cookies natively — `useRequestFetch()` would add a setup-scope binding and
+ * cookies natively, so `useRequestFetch()` would add a setup-scope binding and
  * change nothing. What would make them wrong is moving one into a setup path.
  */
 async function saveEventDetails(patch: Record<string, unknown>) {
@@ -613,7 +613,7 @@ async function saveEventDetails(patch: Record<string, unknown>) {
 }
 
 /**
- * A locked Session's lecturer, or an Event's — the two cases `lecturers.post.ts`
+ * A locked Session's lecturer, or an Event's: the two cases `lecturers.post.ts`
  * accepts. No `offeringId !== null` bail-out here, unlike `saveEventDetails`:
  * that guard exists because `details.post.ts` refuses every Offering-linked
  * Session outright, and this route does not.
@@ -639,7 +639,7 @@ async function saveLecturers(personIds: string[]) {
  * Cover this Session's occurrence (issue #30). No `offeringId` bail-out and no
  * lock requirement, unlike `saveLecturers`: a substitution is an overlay the
  * solver never reads, so it is safe on any Session regardless of Offering or
- * lock state — `substitute.post.ts`'s whole point is needing neither guard.
+ * lock state; needing neither guard is `substitute.post.ts`'s whole point.
  */
 async function saveSubstitute(personId: string) {
     const target = editing.selected.value;
@@ -658,7 +658,7 @@ async function saveSubstitute(personId: string) {
     }
 }
 
-/** Undoes a substitution — "wrong person picked", not "session cancelled". */
+/** Undoes a substitution: "wrong person picked", not "session cancelled". */
 async function removeSubstitute() {
     const target = editing.selected.value;
 
@@ -704,7 +704,7 @@ async function onEventCreated() {
 }
 
 /**
- * Whether an empty `data.kinds` means "none configured" or "not readable" — the
+ * Whether an empty `data.kinds` means "none configured" or "not readable": the
  * reference wave degrades to `[]` on a 403 so one missing permission cannot blank
  * the page, which makes the two indistinguishable at the point of use.
  */
@@ -727,7 +727,7 @@ const filters = useScheduleFilters();
  * after hydration. `termId` decides WHICH term's data the awaited SSR fetch
  * below asks for, so reading it client-only would render the wrong term's
  * whole schedule and then replace it once hydration catches up. `density`
- * decides the grid's row height in the first HTML the same way — client-only
+ * decides the grid's row height in the first HTML the same way: client-only
  * would render every visit at 60px and then jump to the stored value. The
  * violations panel is the same story one step smaller: a timetabler keeps it
  * open all day, and it closed on every return from the proposals list.
@@ -748,11 +748,11 @@ const DENSITIES = [44, 60, 84];
 const COOKIE_YEAR = 60 * 60 * 24 * 365;
 
 /**
- * A COOKIE IS USER INPUT TOO — hand-edited, written by an older build that
+ * A COOKIE IS USER INPUT TOO: hand-edited, written by an older build that
  * only knew one or two of these fields, or otherwise not shaped like
  * `ScheduleSettings`. Every read of the cookie goes through this, never
  * `settingsCookie.value` directly, so a garbled or partial cookie degrades
- * to defaults FIELD BY FIELD — a bad `density` cannot blank the toolbar's
+ * to defaults FIELD BY FIELD: a bad `density` cannot blank the toolbar's
  * `<select>`, and a missing `termId` cannot throw out a valid `density`.
  */
 function coerceScheduleSettings(raw: unknown): ScheduleSettings {
@@ -783,10 +783,10 @@ function patchScheduleSettings(patch: Partial<ScheduleSettings>) {
  * rather than duplicating it: that composable already owns reading AND
  * writing every filter's query param (`term`/`week`/`group`/`room`/`person`/
  * `nested`), coalescing rapid writes so two sets in one tick cannot silently
- * lose one of them — a second, page-level write-back would just fight it for
+ * lose one of them; a second, page-level write-back would just fight it for
  * the query string. The ONE thing it does not do is remember a Term across a
  * fresh navigation with no `?term=` at all, which is what #73 actually asked
- * for — so this seeds ONLY that gap, through the composable's own setter,
+ * for, so this seeds ONLY that gap, through the composable's own setter,
  * before the first fetch fires. `resolveTermId(undefined, …)` reads oddly
  * with a literal `undefined`, but it is the same precedence rule #73/#74
  * agreed on: empty here always means "the URL had nothing to say".
@@ -801,15 +801,15 @@ if (!filters.termId.value) {
 
 // The composable is synchronous by design; this is the single await, at setup
 // top level where Nuxt keeps its instance context. SSR must resolve before the
-// first render — a page that hydrates from an empty render is indistinguishable
+// first render, because a page that hydrates from an empty render is indistinguishable
 // from a tenant with no schedule.
 const data = useScheduleData(filters);
 
 await data.ready;
 
 /*
- * Whichever Term ends up selected — from the URL, the cookie, or the
- * server's own default once `useScheduleData`'s watchEffect resolves one —
+ * Whichever Term ends up selected (from the URL, the cookie, or the
+ * server's own default once `useScheduleData`'s watchEffect resolves one)
  * becomes the cookie's remembered Term, so the NEXT navigation OR reload
  * (#73) can fall back to it.
  */
@@ -829,7 +829,7 @@ const editing = useScheduleEditing({
 
 /**
  * The selection's placement, or null when nothing is selected OR it is
- * banked — the one guard standing between `slotDateOf` and a null
+ * banked: the one guard standing between `slotDateOf` and a null
  * `termWeek`/`dayOfWeek` (issue #22).
  */
 const selectedPlacement = computed(() => (
@@ -837,7 +837,7 @@ const selectedPlacement = computed(() => (
 ));
 
 /**
- * PAGE-LOCAL because neither value reaches the API query — and PERSISTED via
+ * PAGE-LOCAL because neither value reaches the API query, and PERSISTED via
  * `scheduleSettings` above, because that is a different question from being
  * addressable.
  */
@@ -856,14 +856,14 @@ const showViolations = computed<boolean>({
 });
 
 /**
- * Whether `ScheduleFilterPanel` is open — UI-only, unlike the filter VALUES
+ * Whether `ScheduleFilterPanel` is open: UI-only, unlike the filter VALUES
  * it edits (those stay URL-backed via `useScheduleFilters()`). A plain ref,
  * not persisted: reopening the panel on the next visit is not a state worth
  * remembering.
  */
 const filtersOpen = ref(false);
 
-/** How many of Group/Room/Person are narrowing the view — the toolbar's badge. */
+/** How many of Group/Room/Person are narrowing the view: the toolbar's badge. */
 const activeFilterCount = computed(() => [
     filters.groupId.value, filters.roomId.value, filters.personId.value,
 ].filter(Boolean).length);
@@ -882,13 +882,13 @@ function plural(count: number, noun: string): string {
  * What an edit COST, named at the moment it lands.
  *
  * Warn-and-allow means a hard violation survives the edit that caused it
- * (TAXONOMY.md §3), so the reader has to be told — the alternative, which is
+ * (TAXONOMY.md §3), so the reader has to be told. The alternative, which is
  * what shipped until now, is a schedule that quietly acquires clashes while the
  * only signal is a colour shift on one chip and a count in the far corner.
  *
  * SILENT WHEN THE CALLER CANNOT READ VIOLATIONS. "Nothing flagged" would be a
  * claim about state this screen is not allowed to see, and the reference wave
- * degrades a 403 to `[]` — so an empty list means "none" and "not permitted"
+ * degrades a 403 to `[]`, so an empty list means "none" and "not permitted"
  * indistinguishably. Saying nothing is the honest branch.
  */
 function violationClause(sessionId: string): string {
@@ -900,7 +900,7 @@ function violationClause(sessionId: string): string {
 
     if (!rows.length) {
         // "violations", matching the toolbar, the inspector, the panel and the
-        // solver summary. "Nothing flagged" was a fifth word for one quantity —
+        // solver summary. "Nothing flagged" was a fifth word for one quantity,
         // mine, from the pass that added this sentence.
         return ' No violations.';
     }
@@ -949,7 +949,7 @@ const announcement = computed(() => {
 });
 
 /**
- * A filter named in the URL that this caller cannot see — see `reconcileFilters`.
+ * A filter named in the URL that this caller cannot see: see `reconcileFilters`.
  * Reported rather than silently corrected: a link that said "week 7, Class A"
  * and renders the whole institution has lied to whoever opened it.
  */
@@ -962,7 +962,7 @@ const feedback = computed(() => announcement.value || filterNotice.value);
  * FOCUS FOLLOWS THE EDIT, for the two actions whose control disappears under it.
  *
  * A grid cell carries `:disabled="!placing"`, so the cell just activated is
- * disabled the instant the move resolves and focus falls to `<body>` — verified
+ * disabled the instant the move resolves and focus falls to `<body>`, verified
  * over CDP for the create flow, which is why `restoreCreateFocus` exists. The
  * move path is the same failure on the interaction taken hundreds of times a
  * session rather than once.
@@ -973,17 +973,17 @@ const feedback = computed(() => announcement.value || filterNotice.value);
  *
  * Found by attribute rather than threaded through two components, for the reason
  * `restoreCreateFocus` gives: what matters is that a control still exists to
- * receive focus. When the edit sent the session out of this view entirely —
- * another week, or outside the active filter — no chip exists, and focus goes to
+ * receive focus. When the edit sent the session out of this view entirely
+ * (another week, or outside the active filter), no chip exists, and focus goes to
  * the inspector, which still describes it.
  */
 function restoreEditFocus(sessionId: string) {
     nextTick(() => {
         /*
          * ALL matches, then the one actually rendered. The week grid and the day
-         * agenda are BOTH mounted at every width — each is hidden by
+         * agenda are BOTH mounted at every width: each is hidden by
          * `display: none` at the other's breakpoint rather than unmounted, which
-         * is what lets a breakpoint change keep the selection — so this session
+         * is what lets a breakpoint change keep the selection, so this session
          * has two chips and `querySelector` returns whichever comes first in the
          * document. `focus()` on a `display: none` element is a silent no-op, so
          * taking the first match would have left focus on `<body>` on exactly one
@@ -1048,13 +1048,13 @@ onBeforeUnmount(() => {
  * empty grid indistinguishable from a term with nothing in it.
  *
  * `?week=999` outruns the term. `?group=<id>` may name a cohort this caller
- * cannot see, or one that has since been deleted — and then the toolbar's
+ * cannot see, or one that has since been deleted, and then the toolbar's
  * `<select>` finds no matching option and sits blank while the filter is
  * demonstrably active, so the screen misrepresents its own state.
  *
  * THE EMPTY-LIST GUARD IS THE WHOLE SUBTLETY. The directory fetches degrade a
  * 403 to `[]` on purpose (`scheduleData.optional`), so "not in the list" means
- * either "no such group" or "you may not enumerate groups" — and clearing a
+ * either "no such group" or "you may not enumerate groups", and clearing a
  * perfectly valid filter because the reader lacks `group.read` would break the
  * one case the filter exists for. Reconciliation therefore only runs against a
  * list that actually arrived.
@@ -1077,7 +1077,7 @@ function reconcileFilters() {
         && data.terms.value.length
         && !data.terms.value.some((term) => term.id === filters.termId.value)) {
         filters.termId.value = '';
-        filterNotice.value = 'That term no longer exists — showing the current one.';
+        filterNotice.value = 'That term no longer exists. Showing the current one.';
 
         return;
     }
@@ -1103,7 +1103,7 @@ function reconcileFilters() {
     }
 
     if (dropped.length) {
-        filterNotice.value = `Could not apply the ${dropped.join(' and ')} filter from this link — showing everything.`;
+        filterNotice.value = `Could not apply the ${dropped.join(' and ')} filter from this link. Showing everything.`;
     }
 }
 
@@ -1120,7 +1120,7 @@ watch(
      * THREE INTERVALS, NOT ONE. Every region was separated by the same 14px, so
      * the screen had two levels of hierarchy: the grid, and everything else.
      * `--space-7` between REGIONS, `--space-5` between members of a region,
-     * `--space-3/4` inside a group — all steps on the documented scale, which
+     * `--space-3/4` inside a group: all steps on the documented scale, which
      * 14 / 20 / 10 / 18 were not.
      */
     display: flex;
@@ -1209,7 +1209,7 @@ watch(
     }
 
     /*
-     * THE OUTCOME LINE, in the placing strip's shape and slot — one line says
+     * THE OUTCOME LINE, in the placing strip's shape and slot: one line says
      * what to do next, the other says what was done, so they read as one
      * conversation rather than two systems. `$success` rather than the accent:
      * the accent is spent on "where a session may land" (DESIGN.md) and an
@@ -1261,7 +1261,7 @@ watch(
             align-items: center;
             justify-content: center;
 
-            /* 28px of hit area for a 16px glyph — the smallest control on the
+            /* 28px of hit area for a 16px glyph: the smallest control on the
                page still has to be hittable. */
             width: var(--space-7);
             height: var(--space-7);
@@ -1306,7 +1306,7 @@ watch(
         min-width: 0;
 
         /*
-         * STALE, NOT GONE — the frame stays mounted while the week refetches, so
+         * STALE, NOT GONE: the frame stays mounted while the week refetches, so
          * the grid says it is out of date instead of being replaced. Pointer
          * events go with it: a click on a chip about to be replaced would select
          * a session the next render may not contain.
@@ -1325,7 +1325,7 @@ watch(
     /*
      * THE SIDE COLUMN EARNS ITS WIDTH OR GIVES IT BACK. A permanent 320px
      * reservation left ~199px per day column at 1440px, and `FAN_LIMIT = 3` is
-     * calibrated on that number — so a third of the width was held for a panel
+     * calibrated on that number, so a third of the width was held for a panel
      * that is usually empty. It now sizes to its content and takes none when
      * there is none.
      *

@@ -46,7 +46,7 @@ defineRouteMeta({
  * Choose (or switch) which tenant this session is acting in.
  *
  * The requested tenant is validated against the identities the ACCOUNT actually
- * has — the client names a tenant, but the server decides whether a Person
+ * has: the client names a tenant, but the server decides whether a Person
  * exists there for this account. That check is why a client-supplied tenant is
  * safe here and was not safe as a header in Step 4.
  *

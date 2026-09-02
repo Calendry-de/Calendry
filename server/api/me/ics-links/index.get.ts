@@ -4,7 +4,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Calendar links'],
         summary: 'List my calendar-subscription links',
-        description: 'The ics_links the signed-in Person has created — including the full streamable URL. Unlike an API token or screen key this is NOT shown once: the whole point is a link a person can come back and re-copy, so the secret is returned every time. Session only; a link cannot enumerate its siblings.',
+        description: 'The ics_links the signed-in Person has created, including the full streamable URL. Unlike an API token or screen key this is NOT shown once: the whole point is a link a person can come back and re-copy, so the secret is returned every time. Session only; a link cannot enumerate its siblings.',
         responses: {
             200: {
                 description: 'Bare array of the callers links, newest first.',

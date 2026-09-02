@@ -4,7 +4,7 @@ import { describeScheduleFailure, statusCodeOf } from '../app/composables/httpEr
 /**
  * A failure to LOAD the schedule must never be reported as a failure to CONFIGURE
  * one. The page's first empty state is reached whenever `grid` is null, which a
- * 500 or an expired session also produces — telling the reader to create a
+ * 500 or an expired session also produces, telling the reader to create a
  * TimeGrid their tenant already has.
  *
  * Pure, so the branch is verified rather than only read: forcing a mid-SSR

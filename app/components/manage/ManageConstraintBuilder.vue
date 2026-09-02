@@ -15,7 +15,7 @@
                     A fixed catalogue, not a free-form expression editor.
                     TAXONOMY.md §2: "predefined constraint types + parameters,
                     not a free-form expression DSL". The list comes from
-                    shared/constraintTypes.ts, which the evaluator reads too — a
+                    shared/constraintTypes.ts, which the evaluator reads too: a
                     rule this offered but nothing evaluated would be a constraint
                     that is enabled, reports nothing, and means nothing.
                 -->
@@ -30,8 +30,8 @@
                         :id="typeId"
                         class="builder_static"
                     >
-                        {{ selectedType?.label ?? draft.type ?? '—' }}
-                        <em v-if="mode === 'edit' && !readonly">Cannot be changed — create a new constraint instead.</em>
+                        {{ selectedType?.label ?? draft.type ?? '(none)' }}
+                        <em v-if="mode === 'edit' && !readonly">Cannot be changed. Create a new constraint instead.</em>
                         <em v-else-if="typeIsPreset && selectedType?.relation">Name its offerings below, then save.</em>
                         <em v-else-if="typeIsPreset">A scoped variant of this rule. Scope it below, then save.</em>
                     </p>
@@ -107,11 +107,11 @@
                         <option
                             :selected="draft.severity !== 'SOFT'"
                             value="HARD"
-                        >Hard — a breach is a defect</option>
+                        >Hard: a breach is a defect</option>
                         <option
                             :selected="draft.severity === 'SOFT'"
                             value="SOFT"
-                        >Soft — a weighted preference</option>
+                        >Soft: a weighted preference</option>
                     </select>
                 </div>
 
@@ -131,7 +131,7 @@
 
                 <!--
                     Here rather than in the field's `help` slot, which is a hint
-                    ManageField REPLACES with the validation error — the part people
+                    ManageField REPLACES with the validation error: the part people
                     get wrong must not disappear the moment the field is invalid.
                     What it corrects: weight is not a score out of ten, it is a ratio
                     against whatever else is enabled.
@@ -146,7 +146,7 @@
                     influence the result, while at 5 against rules weighted 1 it
                     will dominate them. Multiplying every weight by the same
                     number changes nothing at all. There is no ceiling and no
-                    "correct" value — pick a number that reflects this rule's
+                    "correct" value: pick a number that reflects this rule's
                     importance <em>relative to your other active rules</em>, and
                     raise it if the schedule is not respecting it enough.
                 </p>
@@ -154,14 +154,14 @@
                 <!--
                     SCOPES. Kind only, deliberately: `assembleSolverInput` SKIPS a
                     constraint scoped to offerings entirely, because the wire's
-                    ConstraintConfig carries `applies_to_kinds` and nothing else —
+                    ConstraintConfig carries `applies_to_kinds` and nothing else,
                     so an offering picker here would be a control whose main
                     effect is to switch the rule off in the next solve.
                 -->
                 <!--
                     THE GRID SELECTOR EXISTS ONLY WHEN THERE ARE TWO GRIDS.
 
-                    A filter exists when it has more than one option — never
+                    A filter exists when it has more than one option, never
                     because a flag is set. On a tenant with one grid every rule
                     is on it, "which grid" has a single answer, and offering the
                     control would invite a choice that cannot change anything
@@ -204,7 +204,7 @@
                 </fieldset>
 
                 <!--
-                    A RELATION TYPE HAS NO KIND SCOPE — see the fieldset below
+                    A RELATION TYPE HAS NO KIND SCOPE. See the fieldset below
                     instead. Showing this one would offer a control that saves
                     and does nothing (`assembleSolverInput` never reads
                     `ConstraintScope` for these), the same trap the derived-type
@@ -234,7 +234,7 @@
                             class="builder_hint"
                         >
                             Every session kind marked
-                            <strong>{{ derivedTypeLabel }}</strong> —
+                            <strong>{{ derivedTypeLabel }}</strong>:
                             {{ derivedKinds.map((kind) => kind.name).join(', ') }}.
                         </p>
 
@@ -271,7 +271,7 @@
                         <p
                             v-else-if="!scopeKinds.length"
                             class="builder_hint"
-                        >Every session kind — this is the tenant-wide rule.</p>
+                        >Every session kind: this is the tenant-wide rule.</p>
 
                         <label
                             v-for="kind in kinds"
@@ -295,7 +295,7 @@
                 </fieldset>
 
                 <!--
-                    RELATION MEMBERS — a relation type's whole configuration
+                    RELATION MEMBERS: a relation type's whole configuration
                     (ADR-0028 in calendry-solver). Not one more param: the
                     generic `ManageField`/`constraintParamControls` machinery
                     renders scalars, and this is an ordered set of Offerings.
@@ -366,7 +366,7 @@ import type { SessionKindType } from '#shared/sessionKindType';
 /**
  * Bespoke because these four fields CONSTRAIN EACH OTHER: the chosen type fixes the
  * severity and dictates which parameters exist, and `weight` is meaningful only when
- * severity is SOFT — a pairing the database enforces with a CHECK. As four
+ * severity is SOFT, a pairing the database enforces with a CHECK. As four
  * independent generic controls they would compose states the server rejects.
  */
 const props = defineProps<{
@@ -392,7 +392,7 @@ const selectedType = computed(() => findConstraintType(draft.value.type as strin
  * whether a scope is REQUIRED.
  *
  * `useRequestFetch()` rather than bare `$fetch`: this renders during SSR, and
- * `$fetch` does not carry the browser's cookie there — the call would 401 on
+ * `$fetch` does not carry the browser's cookie there, so the call would 401 on
  * the server and the picker would render empty, which is indistinguishable from
  * a tenant with no kinds.
  */
@@ -415,7 +415,7 @@ const kinds = computed(() => kindsData.data.value?.rows ?? []);
 
 /**
  * Fetched unconditionally, and cheap: a tenant has a handful of grids. The
- * decision this drives — whether the selector exists at all — has to be made
+ * decision this drives (whether the selector exists at all) has to be made
  * during setup, and a watcher-assigned ref is undefined at first render on the
  * server.
  */
@@ -427,7 +427,7 @@ const gridsData = useAsyncData(
 const grids = computed(() => gridsData.data.value?.rows ?? []);
 
 /**
- * For the relation-member picker. Fetched unconditionally like grids above —
+ * For the relation-member picker. Fetched unconditionally like grids above:
  * a relation type can be chosen at any time, and a watcher-assigned ref would
  * render empty on the server regardless.
  */
@@ -453,7 +453,7 @@ const derivedTypeLabel = computed(() => (derivedKindType.value
     ? SESSION_KIND_TYPE_LABELS[derivedKindType.value]
     : ''));
 
-/** The kinds this rule will actually reach — named, not counted. */
+/** The kinds this rule will actually reach: named, not counted. */
 const derivedKinds = computed(() => (derivedKindType.value
     ? kinds.value.filter((kind) => kind.type === derivedKindType.value)
     : []));
@@ -469,7 +469,7 @@ const scopeKinds = computed<string[]>(() => {
 /**
  * Whether the server will REFUSE this row without a scope.
  *
- * Mirrors `RESOURCES.constraints.beforeCreate`, which is the authority — this
+ * Mirrors `RESOURCES.constraints.beforeCreate`, which is the authority; this
  * only stops the user reaching a 422 they could have been warned about. A
  * default row of the same type means an unscoped sibling would apply
  * tenant-wide alongside it, which is the duplicate-constraint defect.
@@ -507,14 +507,14 @@ const relationMemberIds = computed<string[]>({
 });
 
 /**
- * `/manage/constraints/new?type=<key>` — the "Add scoped variant" entry.
+ * `/manage/constraints/new?type=<key>`: the "Add scoped variant" entry.
  *
  * Applied SYNCHRONOUSLY at setup, never from a watcher: a watcher does not flush
  * during SSR, so the server would render the picker unset and the client correct it
  * on hydration.
  *
  * When preset the picker renders as static text, which is what makes the
- * mislabelled-name defect unreachable from this path — that bug needed
+ * mislabelled-name defect unreachable from this path: that bug needed
  * `selectType()` to run a second time, after the name had auto-filled.
  */
 const presetType = props.mode === 'create'
@@ -530,7 +530,7 @@ if (presetType) {
 /**
  * `min: 0`, matching the API and the solver rather than being stricter than both. It
  * was 1, which rejected a weight the solver accepts: zero means "evaluate and report
- * breaches, but do not steer the search". No maximum, deliberately — there is no
+ * breaches, but do not steer the search". No maximum, deliberately: there is no
  * value at which a weight becomes wrong.
  *
  * The `help` line stays a sentence because ManageField replaces it with the
@@ -541,7 +541,7 @@ const weightField: FieldDef = {
     label: 'Penalty weight',
     type: 'number',
     min: 0,
-    help: 'Relative to your other enabled soft rules, not an absolute score — see below.',
+    help: 'Relative to your other enabled soft rules, not an absolute score. See below.',
 };
 
 /**
@@ -564,7 +564,7 @@ function selectType(key: string) {
     /**
      * Rename ONLY when the name is still auto-filled. Filling it merely when blank
      * produced real bad data: pick one type (name auto-fills), change your mind, and
-     * the type updates while the name does not — and since `type` is createOnly the
+     * the type updates while the name does not, and since `type` is createOnly the
      * row cannot be corrected by editing, only deleted and recreated.
      */
     const wasAutoFilled = !draft.value.name
@@ -600,7 +600,7 @@ function setParam(key: string, value: unknown) {
  * The type's parameters, each already resolved to the control it needs.
  *
  * The mapping lives in `~/utils/constraintFields` because the constraint GRID
- * renders the same parameters and the two copies had already diverged — see the
+ * renders the same parameters and the two copies had already diverged. See the
  * note there.
  */
 const paramControls = computed(() => (selectedType.value ? constraintParamControls(selectedType.value) : []));
@@ -745,7 +745,7 @@ onMounted(() => {
     }
 
     /* Guidance, not a hint: it stands beside the weight control rather than
-       inside it, and unlike `_hint` it must survive a validation error —
+       inside it, and unlike `_hint` it must survive a validation error:
        ManageField renders help and error as `v-else-if`, so help vanishes
        exactly when someone is most likely to be reading it.
 

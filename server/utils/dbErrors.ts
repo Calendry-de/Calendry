@@ -1,7 +1,7 @@
 /**
  * Translates PostgreSQL/Prisma failures into HTTP responses.
  *
- * The database is a real participant in correctness here — RLS policies, CHECK
+ * The database is a real participant in correctness here: RLS policies, CHECK
  * constraints and the group-cycle trigger all reject work that the application
  * layer permitted. Those rejections are expected outcomes, not crashes, so they
  * deserve meaningful status codes rather than a blanket 500.
@@ -16,7 +16,7 @@ interface PgLikeError {
  * Digs the PostgreSQL SQLSTATE out of an error.
  *
  * The Prisma driver adapter wraps driver errors in its own error type, so the
- * SQLSTATE is not on the object that reaches us — it sits further down the
+ * SQLSTATE is not on the object that reaches us; it sits further down the
  * `cause` chain. Walking it is what makes constraint failures classifiable
  * rather than blanket 500s.
  */
@@ -52,7 +52,7 @@ function collectMessages(error: unknown, depth = 0): string {
  * True when an error is a unique-constraint violation.
  *
  * Exported so a caller that OWNS a specific unique index can turn it into a
- * domain answer instead of a generic 409 "Already exists." — the solver run
+ * domain answer instead of a generic 409 "Already exists.": the solver run
  * route needs to say "a run is already active for this term" and name it, which
  * only it has the context to do.
  *
@@ -91,7 +91,7 @@ export function toHttpError(error: unknown): never {
         case '23505':
             throw createError({ statusCode: 409, statusMessage: 'Already exists.' });
 
-        // FK RESTRICT — e.g. deleting a Group that still has children.
+        // FK RESTRICT, e.g. deleting a Group that still has children.
         case '23503':
             throw createError({
                 statusCode: 409,
@@ -145,7 +145,7 @@ export async function mapDbErrors<T>(fn: () => Promise<T>): Promise<T> {
     try {
         return await fn();
     } catch (error) {
-        // Already an H3 error (e.g. from validation) — pass through untouched.
+        // Already an H3 error (e.g. from validation): pass through untouched.
         if ((error as { statusCode?: number })?.statusCode) {
             throw error;
         }

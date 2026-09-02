@@ -9,7 +9,7 @@
 
                 A disabled control reads as "unavailable right now"; a stated
                 value reads as "this is the setting, and it is not yours to
-                change" — which is what a missing update permission actually
+                change", which is what a missing update permission actually
                 means. Same rule ManageField follows for every generic field.
             -->
             <p
@@ -42,10 +42,10 @@
                 <!--
                     WHICH EVALUATOR OWNS THIS RULE. The four structural types are
                     checked by this app on every manual edit; the rest only ever
-                    reach the solver. Both are switchable — `violations.ts` and
+                    reach the solver. Both are switchable: `violations.ts` and
                     `assembleSolverInput` each filter on `isEnabled`, and the
                     solver only enforces a structural rule when its config is
-                    present (convert.rs) — so the distinction to surface is not
+                    present (convert.rs), so the distinction to surface is not
                     "can I turn it off" but "who acts on it".
                 -->
                 <!--
@@ -71,7 +71,7 @@
                 >Superseded</span>
 
                 <!--
-                    NEVER REPLACES THE TOGGLE — issue #8 is a suggestion, not
+                    NEVER REPLACES THE TOGGLE: issue #8 is a suggestion, not
                     a restriction. This tenant is in SCHOOL mode and this rule
                     is the kind whose value shows up in a large, multi-building,
                     partly-online institution; it stays fully switchable here.
@@ -93,7 +93,7 @@
             class="crow_superseded-note"
         >
             Replaced by <strong>{{ supersededBy }}</strong>. It still applies while it is on, and
-            can still be turned off — but it cannot be recreated once removed, because a rule's
+            can still be turned off, but it cannot be recreated once removed, because a rule's
             type is fixed when it is created.
         </p>
 
@@ -115,8 +115,8 @@
             <!--
                 THE WEIGHT SLOT IS THE HARD/SOFT SIGNAL.
 
-                A hard row has no weight cell at all — not an empty one, not a
-                disabled one — and a soft row always has one, in the same place
+                A hard row has no weight cell at all (not an empty one, not a
+                disabled one), and a soft row always has one, in the same place
                 on every row of its section. An absent control cannot be misread
                 the way a badge can, and the incident this guards against was
                 someone reading a label: a `minimize_exam_week_sessions` row
@@ -153,7 +153,7 @@
 
             Not a nested form: every control inside writes on change, exactly
             like the toggle and the weight above. A Save button here would make
-            several independent rules succeed or fail together — the same
+            several independent rules succeed or fail together, the same
             objection ManageRelationsPanel already records for PUT-set
             sub-resources.
         -->
@@ -165,7 +165,7 @@
                 <legend>Session kinds</legend>
 
                 <p class="crow_hint">
-                    Nothing selected means <strong>every kind</strong> — the tenant-wide rule.
+                    Nothing selected means <strong>every kind</strong>, the tenant-wide rule.
                     Selecting kinds narrows this rule to them.
                 </p>
 
@@ -175,7 +175,7 @@
                     role="status"
                 >
                     This rule needs at least one kind. Its type already has a tenant-wide version,
-                    so clearing them all would make this a second rule applying everywhere — which
+                    so clearing them all would make this a second rule applying everywhere, which
                     the server refuses.
                 </p>
 
@@ -201,7 +201,7 @@
                 <p
                     v-else-if="!canUpdate"
                     class="crow_hint"
-                >{{ scopedKindIds.length ? '' : 'Not narrowed — this rule applies to every kind.' }}</p>
+                >{{ scopedKindIds.length ? '' : 'Not narrowed: this rule applies to every kind.' }}</p>
 
                 <div
                     v-if="kinds.length"
@@ -296,7 +296,7 @@ export interface ConstraintRowData {
  *
  * OWNERSHIP BOUNDARY: this component owns how ONE rule is presented and what
  * the user can express about it. It does no fetching, resolves no permissions
- * and performs no writes — every change leaves as an intent, and
+ * and performs no writes; every change leaves as an intent, and
  * `ManageConstraintGrid` decides what to do with it. That is what lets the same
  * component render both a catalogue rule and a scoped variant without either
  * one growing its own copy of the toggle, weight, scope and parameter controls.
@@ -309,7 +309,7 @@ const props = defineProps<{
     /** The catalogue entry this row is an instance of. */
     type: ConstraintTypeDef;
     row: ConstraintRowData;
-    /** Overrides the catalogue label — a variant carries its own name. */
+    /** Overrides the catalogue label; a variant carries its own name. */
     heading: string;
     /** Overrides the catalogue description. */
     subtitle?: string;
@@ -327,7 +327,7 @@ const props = defineProps<{
     supersededBy?: string;
     /**
      * Issue #8: this tenant's mode does not suggest this type first. A
-     * labelling difference only — the toggle, weight and scope controls
+     * labelling difference only; the toggle, weight and scope controls
      * behave identically either way.
      */
     lessRelevant?: boolean;
@@ -352,7 +352,7 @@ const open = ref(false);
 /**
  * Severity comes from the CATALOGUE, not the row.
  *
- * A row's stored severity can contradict its type — `severityMismatch()` exists
+ * A row's stored severity can contradict its type: `severityMismatch()` exists
  * because the generic CRUD API accepted such rows before the write boundary was
  * tightened, and legacy ones may still be out there. The wire has no severity
  * field at all: the TYPE decides, and any weight on a hard row is ignored. So
@@ -384,7 +384,7 @@ function toggleKind(kindId: string) {
         ? scopedKindIds.value.filter((id) => id !== kindId)
         : [...scopedKindIds.value, kindId];
 
-    // The whole set travels, because `writeChildren` replaces it wholesale —
+    // The whole set travels, because `writeChildren` replaces it wholesale:
     // the submitted list is the authority, like every other PUT-set here.
     emit('update:scopes', next);
 }
@@ -591,7 +591,7 @@ function toggleKind(kindId: string) {
     }
 
     /* Fixed position on every soft row, so the column reads down the section.
-       Hard rows render nothing here at all — see the template note. */
+       Hard rows render nothing here at all; see the template note. */
     &_weight {
         display: flex;
         gap: var(--space-3);

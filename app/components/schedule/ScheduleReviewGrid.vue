@@ -18,7 +18,7 @@
             <span>{{ weekdayShort(day) }}</span>
             <!--
                 Named only where this day's own breaks put its blocks somewhere
-                other than the shared timeline — with one set of rows that
+                other than the shared timeline: with one set of rows that
                 divergence cannot be DRAWN, so it is stated.
             -->
             <span
@@ -135,7 +135,7 @@ import type { Placement, ReviewPlacement } from '~/composables/generationReview'
  * The proposed timetable, rendered as a diff.
  *
  * A separate component rather than a mode on ScheduleGrid: the data genuinely
- * differs — a CREATED placement has no Session row and therefore no id, so it
+ * differs. A CREATED placement has no Session row and therefore no id, so it
  * cannot be selected or key into the violations map, and ScheduleGrid's whole
  * vocabulary is session ids.
  *
@@ -145,12 +145,12 @@ import type { Placement, ReviewPlacement } from '~/composables/generationReview'
  * rather than drawn. The block/break walk is still shared via
  * `shared/timeGrid.ts` and `useGridGeometry`.
  *
- * NOT THE MOBILE PRESENTATION — `ScheduleReviewAgenda` renders the same data
+ * NOT THE MOBILE PRESENTATION: `ScheduleReviewAgenda` renders the same data
  * below 1365px.
  *
  * AN EMPTY WEEK IS NOT THIS COMPONENT'S TO DRAW. It used to render the message
  * as the last child of the grid element, which auto-placed into a row after all
- * the explicitly-assigned ones — 869.75px of empty cells above a centred
+ * the explicitly-assigned ones: 869.75px of empty cells above a centred
  * sentence. The page now renders the grid only when there is something in it.
  */
 const props = defineProps<{
@@ -164,7 +164,7 @@ const props = defineProps<{
 }>();
 
 
-/** "Monday 09:00" — the shared sentence builder's slot formatter for this grid. */
+/** "Monday 09:00": the shared sentence builder's slot formatter for this grid. */
 const slotLabel = (placement: Placement) => (
     `${weekdayName(placement.dayOfWeek)} `
     + `${blockTime(props.grid, placement.blockIndex, placement.dayOfWeek).start}`
@@ -241,7 +241,7 @@ const slots = computed(() => {
 .rgrid {
     /*
      * Rows come from `gridTemplateRows` inline, because the row COUNT is data.
-     * Nothing auto-places — every child names its own row and column.
+     * Nothing auto-places: every child names its own row and column.
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
@@ -297,11 +297,11 @@ const slots = computed(() => {
      * An unlabelled row keeps its cell and its TIME for assistive tech: it is a
      * row header, and one with no name is worse than a quiet one.
      */
-    // is the grid's, not the label's — and simply says nothing.
+    // is the grid's, not the label's, and simply says nothing.
 
     /*
-     * A row the gutter chose not to label keeps its cell — the column's rhythm
-     * is the grid's, not the label's — and keeps its TIME for assistive tech.
+     * A row the gutter chose not to label keeps its cell: the column's rhythm
+     * is the grid's, not the label's, and keeps its TIME for assistive tech.
      *
      * Hidden rather than dropped: it is a `rowheader`, and a row header with no
      * name is worse than a quiet one. The eye gets an uncluttered hour column;
@@ -396,7 +396,7 @@ const slots = computed(() => {
 
         /*
          * DETECTOR EXCEPTION `side-tab`, kept deliberately: the stripe is the
-         * diff encoding, not decoration — each state overrides only
+         * diff encoding, not decoration: each state overrides only
          * `border-left-color`/`-style`, and a left gutter marking added and
          * removed lines is the convention every diff tool already taught.
          */
@@ -409,7 +409,7 @@ const slots = computed(() => {
 
         /*
          * THE FOUR STATES, ENCODED TO BE TOLD APART. They differed only in
-         * `border-left-color` between three near-blacks — create against move
+         * `border-left-color` between three near-blacks; create against move
          * measured 1.09:1. Colour is spent on the two states with consequences:
          * a proposal typically moves almost everything (256 of 260 in one run),
          * so tinting moves would flood the grid and leave removals nothing.
@@ -432,12 +432,12 @@ const slots = computed(() => {
          * then need to meet a contrast floor it cannot.
          *
          * RECESSION BY TOKEN, NOT BY OPACITY. This was `opacity: 0.6`, which
-         * measured 4.19:1 on the 12px/600 title — an AA failure, and the
+         * measured 4.19:1 on the 12px/600 title, an AA failure, and the
          * majority state on almost every proposal (264 of 264 on the applied
          * one). Opacity is the trap: it flattens the chip's own background
          * TOGETHER with its text into one layer before compositing, so the
          * rendered colour is neither the computed `color` nor anything the token
-         * ramp can predict — a reviewer reading what did NOT change was reading
+         * ramp can predict, so a reviewer reading what did NOT change was reading
          * the least legible text on the screen.
          *
          * Recessing the surface toward the ground and the text one ramp step
@@ -457,7 +457,7 @@ const slots = computed(() => {
             /*
              * DASHED is the greyscale channel: green and red sit at almost the
              * same luminance (1.29:1), so hue alone cannot tell "added" from
-             * "removed" — the one pair this grid must never confuse.
+             * "removed", the one pair this grid must never confuse.
              */
             border-left-style: dashed;
             background: varToRgba('error600', 0.12);
@@ -512,7 +512,7 @@ const slots = computed(() => {
     }
 
     /*
-     * The same chip, one line high. Nothing is removed — state icon, offering,
+     * The same chip, one line high. Nothing is removed: state icon, offering,
      * room and the move's origin survive, inline and ellipsised. Four fit where
      * one full chip did, which is what shows every member instead of a count.
      */
@@ -527,7 +527,7 @@ const slots = computed(() => {
 
         .rgrid_chip-tag { flex: none; }
 
-        // The word is redundant on one line — the icon and the border already
+        // The word is redundant on one line: the icon and the border already
         // carry the state, and the accessible name still says it in full.
         .rgrid_chip-tag-text {
             position: absolute;

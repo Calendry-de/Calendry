@@ -5,7 +5,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Calendar links'],
         summary: 'Delete a calendar-subscription link',
-        description: 'Deletes one of the signed-in Person’s links. The token stops resolving immediately — deletion is a row lookup, not a cache. Session only.',
+        description: 'Deletes one of the signed-in Person’s links. The token stops resolving immediately: deletion is a row lookup, not a cache. Session only.',
         parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         ],

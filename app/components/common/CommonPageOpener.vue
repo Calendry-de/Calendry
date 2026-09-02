@@ -94,7 +94,7 @@
 
 <script setup lang="ts">
 /**
- * The page opener — the 11C mark assembling itself on a dark stage, then
+ * The page opener: the 11C mark assembling itself on a dark stage, then
  * zooming through the viewport to hand over to the page behind it. Imported
  * from `Calendry Intro.dc.html` in the "Calendry logo concepts" project.
  *
@@ -112,8 +112,8 @@
  * slot renders identically whether or not it is playing, so nothing downstream
  * needs to know.
  *
- * WHY THE ANIMATION IS PURE CSS AND JS ONLY TIDIES UP. Every step — the rows,
- * the node, the zoom, the veil, the reveal — is a keyframe with
+ * WHY THE ANIMATION IS PURE CSS AND JS ONLY TIDIES UP. Every step (the rows,
+ * the node, the zoom, the veil, the reveal) is a keyframe with
  * `animation-fill-mode: both`, ending at the state the page needs: veil
  * transparent, content at opacity 1. So if hydration is slow, fails, or never
  * happens, the opener still finishes and the page is still usable. JS removes
@@ -135,7 +135,7 @@ const props = withDefaults(defineProps<{
     modelValue?: boolean;
     /**
      * Multiplies the whole timeline: 2 runs it twice as fast, 0.5 half speed.
-     * One knob rather than five, because the steps overlap — the zoom starts
+     * One knob rather than five, because the steps overlap: the zoom starts
      * before the rows have settled and the reveal starts before the veil has
      * gone, and independent durations would let a caller pull those apart into
      * something that no longer reads as one movement.
@@ -178,7 +178,7 @@ function finish() {
 }
 
 /*
- * Reduced motion is settled in CSS — the veil is `display: none` from the first
+ * Reduced motion is settled in CSS: the veil is `display: none` from the first
  * byte, so there is nothing to see and nothing to wait for. But `display: none`
  * also means no `animationend`, so without this the component would sit
  * `playing` forever and never tell its caller it was over. This is bookkeeping
@@ -205,7 +205,7 @@ function onVeilEnd(event: AnimationEvent) {
 </script>
 
 <style scoped lang="scss">
-// The stage is dark in BOTH themes — it is a brand moment, not a surface — so
+// The stage is dark in BOTH themes: it is a brand moment, not a surface, so
 // it is drawn from the `*Orig` values, which are the palette's light-base
 // constants and do not follow the theme swap. `$content0` would invert to
 // near-white in dark mode and open the site with a full-screen flash.
@@ -224,7 +224,7 @@ $accent: $primary400Orig; // one step up from the brand, which is what a ramp is
         z-index: 100;
         inset: 0;
 
-        // The mark reaches scale(17) — several thousand px — so without this it
+        // The mark reaches scale(17), several thousand px, so without this it
         // would extend the document and put scrollbars on the page it is
         // covering.
         overflow: hidden;
@@ -413,7 +413,7 @@ $accent: $primary400Orig; // one step up from the brand, which is what a ramp is
  * No opener at all, rather than a fast one.
  *
  * The source design collapses every duration to 0.01s under reduced motion,
- * which still puts a full-screen dark panel on screen for a frame — the exact
+ * which still puts a full-screen dark panel on screen for a frame, the exact
  * hard cut the setting exists to avoid. Removing the veil outright and leaving
  * the content unanimated is the honest reading: nothing here carries
  * information, so nothing is lost by not showing it.

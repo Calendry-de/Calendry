@@ -7,7 +7,7 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
  * `session_event.session_id` is `ON DELETE SET NULL` so that an event outlives
  * the Session it describes (the schema says so in as many words: "Nullable so a
  * DELETE event survives its Session being removed"). But the FK action is an
- * UPDATE, and `deny_mutation()` used to refuse every UPDATE — so deleting a
+ * UPDATE, and `deny_mutation()` used to refuse every UPDATE, so deleting a
  * Session that had ever been created, moved, swapped or locked was impossible.
  *
  * Nothing had ever deleted a Session, so nothing had ever found out. Stage 5's
@@ -15,7 +15,7 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
  * hit it immediately.
  *
  * These tests pin both halves: the detach is permitted, and every other way of
- * touching the log is still refused. The second half is the one that matters —
+ * touching the log is still refused. The second half is the one that matters:
  * a fix that merely made the error go away would also make the history
  * rewritable, and no existing test would have noticed.
  */
@@ -122,7 +122,7 @@ describe('session_event permits exactly the FK detach', () => {
         const after = await ownerDb.sessionEvent.findUniqueOrThrow({ where: { id: eventId } });
 
         expect(after.sessionId).toBeNull();
-        // Detached, not deleted — the audit trail is what the log is for.
+        // Detached, not deleted: the audit trail is what the log is for.
         expect(after.type).toBe('MOVE');
         expect(after.payload).toEqual({ from: { blockIndex: 0 }, to: { blockIndex: 2 } });
     });

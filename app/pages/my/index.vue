@@ -3,9 +3,9 @@
         <p class="intro">Things you set for yourself. Nobody else's data is reachable from here.</p>
 
         <!--
-            A NAMED landmark. The page carried two `<nav>` elements — the
+            A NAMED landmark. The page carried two `<nav>` elements: the
             header's `aria-label="Main"` and this one with no accessible name at
-            all — so navigating by landmark offered "navigation" twice, one of
+            all, so navigating by landmark offered "navigation" twice, one of
             them anonymous.
         -->
         <nav
@@ -25,8 +25,8 @@
                 />
                 <!--
                     An `h2`, not a `span`: the page rendered an `h1` and nothing
-                    else, so browsing by heading — how a screen-reader user skims
-                    — found no structure below the title.
+                    else, so browsing by heading (how a screen-reader user skims)
+                    found no structure below the title.
                 -->
                 <h2 class="cards_label">{{ entry.label }}</h2>
                 <span class="cards_hint">{{ entry.description }}</span>
@@ -79,7 +79,7 @@ const entries = computed(() => useNavEntries().value.filter((entry) => entry.sec
 
         /*
          * A visible EDGE, because these are click targets and their fill was
-         * `$surface1` on a `$surface1` page ground — 1.00:1, so the card only
+         * `$surface1` on a `$surface1` page ground (1.00:1), so the card only
          * became visible on hover, at 1.09:1. The palette has no raised surface
          * to give them, so the boundary does the work; 3.14:1 clears 1.4.11.
          */
@@ -102,8 +102,8 @@ const entries = computed(() => useNavEntries().value.filter((entry) => entry.sec
         width: 22px;
 
         /*
-         * NOT the accent. DESIGN.md spends `$primary` on one idea — "where a
-         * session may land" — and states it is never decorative; a hub icon is
+         * NOT the accent. DESIGN.md spends `$primary` on one idea, "where a
+         * session may land", and states it is never decorative; a hub icon is
          * decoration. It also measured 2.94:1 on this ground, failing 1.4.11 as
          * a 22px glyph. `$content7` is 7.28:1 and spends nothing.
          */

@@ -12,22 +12,22 @@ import type { PrismaClient } from '@prisma/client';
  * WHAT IT DERIVES, AND WHAT IT DELIBERATELY DOES NOT
  *
  * A Group is scoped to a Term when it is ALREADY attached to something in that
- * Term — an Offering (`offering_group`) or a Session (`session_group`). Both
+ * Term: an Offering (`offering_group`) or a Session (`session_group`). Both
  * sources, because a Session can carry a Group its Offering does not (a one-off
  * added to a single occurrence), and scoping from Offerings alone would then
  * narrow a Group out of a Term it is visibly used in.
  *
  * ANCESTORS ARE NOT AUTO-SCOPED. "IT Security" is the parent of a cohort
- * scheduled this Term, but a degree programme is not Term-bound — it persists
+ * scheduled this Term, but a degree programme is not Term-bound: it persists
  * across all of them and is never directly scheduled. Walking the closure
  * upward would pin the programme to whichever Terms its cohorts happen to
  * occupy, which is both wrong and self-narrowing over time. It stays unscoped,
- * which under the fail-open rule means available everywhere — exactly right.
+ * which under the fail-open rule means available everywhere, exactly right.
  *
  * IDEMPOTENT, AND NON-DESTRUCTIVE. `skipDuplicates` on the insert and no
  * deletes: re-running adds only what is missing. It never removes a scope
  * somebody set by hand, because "this Group is no longer used in that Term" is
- * not evidence that the tenant wants it unavailable there — they may be about
+ * not evidence that the tenant wants it unavailable there; they may be about
  * to build next Term's timetable.
  *
  * Consequently it is a NO-OP on a fresh database, and safe on every deploy.
@@ -36,7 +36,7 @@ export interface GroupTermBackfillResult {
     created: number;
     /** Groups that gained at least one scope row. */
     scopedGroups: number;
-    /** Groups left with no scope at all — i.e. still available in every Term. */
+    /** Groups left with no scope at all, i.e. still available in every Term. */
     universalGroups: number;
 }
 
@@ -47,8 +47,8 @@ export async function backfillGroupTerms(prisma: PrismaClient): Promise<GroupTer
      * reads and the rows it writes.
      *
      * `tenant_id` is taken from the GROUP, not from the Offering or Session.
-     * They are necessarily the same tenant — every one of these tables is
-     * tenant-scoped and joined by id — but taking it from the group makes the
+     * They are necessarily the same tenant (every one of these tables is
+     * tenant-scoped and joined by id), but taking it from the group makes the
      * row's tenant match the entity the scope is ABOUT, which is what the RLS
      * policy on `group_term` checks.
      */

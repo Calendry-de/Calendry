@@ -15,7 +15,7 @@
 
                 <p class="grants_summary">
                     <strong>{{ granted.size }}</strong> of {{ catalogueSize }} granted.
-                    Permissions are fixed — they are code, one per action the software implements.
+                    Permissions are fixed: they are code, one per action the software implements.
                     A tenant composes them into roles; it cannot invent one.
                 </p>
 
@@ -29,7 +29,7 @@
                     v-else-if="!readonly && granted.size === 0"
                     class="grants_note grants_note--warn"
                 >
-                    A role holding nothing is a role that does nothing — it will be granted to
+                    A role holding nothing is a role that does nothing: it will be granted to
                     somebody who then cannot act, with nothing on screen to say why. Pick at
                     least one.
                 </p>
@@ -151,7 +151,7 @@ import { isPermissionKey, permissionCategories } from '#shared/permissions';
  * no categories and no descriptions, would also be a worse control than the one
  * it replaced.
  *
- * THE ROWS COME FROM THE CATALOGUE, NOT FROM THE FETCH — the same rule
+ * THE ROWS COME FROM THE CATALOGUE, NOT FROM THE FETCH, the same rule
  * `ManageConstraintGrid` follows. Every permission the code implements gets a
  * checkbox whether or not this tenant's database has been seeded with it, and a
  * stored grant the catalogue does NOT describe is reported rather than dropped
@@ -159,7 +159,7 @@ import { isPermissionKey, permissionCategories } from '#shared/permissions';
  * see was missing survived a whole stage.
  *
  * The grants save WITH the row, through the form's own Save button, because
- * they are a child collection on the payload rather than a relation — see
+ * they are a child collection on the payload rather than a relation, see
  * `RESOURCES['access-roles'].childKeys`. So there is no second save here and no
  * window in which the role grants nothing.
  */
@@ -188,7 +188,7 @@ interface Grant {
  * `unknown` becomes a typed list exactly here and nowhere else. It genuinely can
  * be several things: an array of rows on an existing role, and the empty string
  * on the create page, because `toInputValue` coerces an absent value for a
- * `text`-typed field — the same shape `constraint.scopes` lives with.
+ * `text`-typed field, the same shape `constraint.scopes` lives with.
  */
 function grantsOf(value: unknown): Grant[] {
     if (!Array.isArray(value)) {
@@ -214,7 +214,7 @@ const granted = computed(() => new Set(grantsOf(draft.value.permissions).map((gr
 const unknownGrants = computed(() => [...granted.value].filter((key) => !isPermissionKey(key)));
 
 /**
- * Written back NORMALISED — `{ permissionKey }` and nothing else.
+ * Written back NORMALISED: `{ permissionKey }` and nothing else.
  *
  * The read includes the join row's own columns (`accessRoleId`, `tenantId`), and
  * echoing those back would send the server data it must never take from a
@@ -242,7 +242,7 @@ function toggle(key: PermissionKey) {
  * Which permissions of each category are granted, resolved once per change.
  *
  * The read-only branch filtered inside its own `v-for` expression, so every
- * render built a fresh array — a new identity for `v-for` to diff against — and
+ * render built a fresh array (a new identity for `v-for` to diff against), and
  * `countIn` filtered the same list again for each of its three call sites. One
  * pass over the catalogue, keyed by category, serves all of them.
  */
@@ -262,7 +262,7 @@ function countIn(category: PermissionCategory): number {
 }
 
 /**
- * All-or-nothing within one category — never across the whole catalogue.
+ * All-or-nothing within one category: never across the whole catalogue.
  *
  * `create:role` deliberately has no `--all` flag: a role granted "everything"
  * once silently stops being everything the next time a permission is added, and
@@ -286,7 +286,7 @@ function toggleCategory(category: PermissionCategory) {
 
 /**
  * `time_grid` → `Time grid`. Derived rather than listed, so a new category
- * cannot arrive with no heading — the failure the constraint grid's
+ * cannot arrive with no heading, the failure the constraint grid's
  * derived-count label exists to prevent, one screen over.
  */
 function categoryLabel(key: string): string {
@@ -300,7 +300,7 @@ function categoryLabel(key: string): string {
  *
  * `useAsyncData` + `useRequestFetch`, not an `onMounted` fetch: a client-only
  * hook does not run on the server, and a bare `$fetch` carries no cookie there.
- * Degraded to an empty list on failure — the warning is advisory, and this page
+ * Degraded to an empty list on failure: the warning is advisory, and this page
  * already requires `access_role.manage`, so the only thing an empty list costs
  * is the warning itself.
  */
@@ -423,8 +423,8 @@ const nameClash = computed(() => {
 
         &:hover {
             // Border may be `primary500`; TEXT may not. On `$surface0` the fill
-            // step measures 2.9:1 — the palette's own note calls it fills and
-            // icons only — while `primary700` is 5.6:1.
+            // step measures 2.9:1 (the palette's own note calls it fills and
+            // icons only), while `primary700` is 5.6:1.
             border-color: $primary500;
             color: $primary700;
         }

@@ -19,8 +19,8 @@
                 </p>
 
                 <p class="confirm_note">
-                    If anything still references it — a session, an offering, a child
-                    group — the database refuses the delete and nothing is lost.
+                    If anything still references it (a session, an offering, a child
+                    group), the database refuses the delete and nothing is lost.
                 </p>
 
                 <p
@@ -55,7 +55,7 @@ import { useOverlay } from '~/composables/overlay';
  *
  * It claims the keyboard through `useOverlay` for the same reason the command
  * palette does: Escape here must cancel the dialog and nothing else. That the
- * mechanism is shared is the point — a second overlay that invented its own
+ * mechanism is shared is the point: a second overlay that invented its own
  * Escape handling is how the schedule's placement mode starts getting cancelled
  * by unrelated dialogs again.
  */
@@ -100,7 +100,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
     padding: var(--space-6);
 
-    // `black`, not the theme-relative `content0` — see `ScheduleFilterPanel`'s
+    // `black`, not the theme-relative `content0`; see `ScheduleFilterPanel`'s
     // own comment on this exact backdrop rule for why: `content0` flips to
     // near-white in dark mode, turning a dimming scrim into a light wash.
     background: varToRgba('black', 0.45);

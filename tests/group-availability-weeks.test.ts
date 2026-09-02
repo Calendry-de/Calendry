@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { blackedOutWeeks, weekCountOf } from '../shared/academicCalendar';
 
 /**
- * `blackedOutWeeks` — the one place a Group's availability polarity flips.
+ * `blackedOutWeeks`: the one place a Group's availability polarity flips.
  *
  * A tenant states when a Group IS available, because that is the question an
  * academic calendar answers ("this cohort runs the first six weeks"). The wire
@@ -18,7 +18,7 @@ import { blackedOutWeeks, weekCountOf } from '../shared/academicCalendar';
  *     week indices rather than counting them.
  *  2. **The rounding direction is a decision, not arithmetic.** Weeks are the
  *     wire's granularity, so a window ending mid-week has to round somewhere. It
- *     rounds toward AVAILABLE — a partially-covered week is not blocked —
+ *     rounds toward AVAILABLE (a partially-covered week is not blocked)
  *     because this rule is HARD and the other direction would refuse placements
  *     that are legitimately fine.
  *
@@ -89,7 +89,7 @@ describe('an open-ended window', () => {
         /*
          * Which is what an ABSENT row already means. The database forbids
          * storing this state (`group_term_availability_needs_a_bound`), so it
-         * cannot arrive from a query — the function is total rather than
+         * cannot arrive from a query: the function is total rather than
          * throwing because "no bounds" has an honest answer, and it is this one.
          */
         expect(blackedOutWeeks(TERM_START, TERM_END, {
@@ -137,7 +137,7 @@ describe('the edges', () => {
 
     it('blocks every week when the window falls outside the term', () => {
         /*
-         * Reachable only by editing a term's dates after setting a window — the
+         * Reachable only by editing a term's dates after setting a window: the
          * write boundary clamps the inputs to the term. The honest reading of
          * "available only in April" during an autumn term IS "never available",
          * so it is not softened here; the UI's preview says so in words

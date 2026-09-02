@@ -12,7 +12,7 @@ import { PERMISSIONS } from '#shared/permissions';
  * direction and the failure is quiet:
  *
  *   too weak    a tile is offered for a resource the caller cannot read, the
- *               request 403s, and the tile reads "Unavailable" forever — which
+ *               request 403s, and the tile reads "Unavailable" forever, which
  *               looks like a broken server rather than a missing permission
  *   too strong  the tile is hidden from somebody whose `/manage` link is right
  *               there in the sidebar, so the page understates the institution

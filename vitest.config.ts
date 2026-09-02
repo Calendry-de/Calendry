@@ -18,7 +18,7 @@ export default defineConfig({
          * chosen for this suite.
          *
          * Every integration file's `beforeAll` calls `seed()`, which calls
-         * `teardown()`, which DELETEs the fixture tenants — a cascade across
+         * `teardown()`, which DELETEs the fixture tenants: a cascade across
          * some forty tables with row-level security and append-only triggers on
          * several of them. That legitimately takes seconds, and it runs once per
          * file with `fileParallelism` off, so the files contend for one

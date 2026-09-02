@@ -11,8 +11,8 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * was wrong in a way only the navigation made visible: everybody who could look
  * at a schedule was offered "Proposals" in the header and could read every
  * solver run this tenant had ever produced. A Generation is a set of PROPOSED
- * placements — a different data set from the applied timetable, and one a
- * lecturer has no business reading — so it gets its own key.
+ * placements: a different data set from the applied timetable, and one a
+ * lecturer has no business reading. So it gets its own key.
  *
  * `generation.read` is NOT implied by `generation.apply`, deliberately: the
  * catalogue has no implication mechanism, so a role holding only the apply key
@@ -36,7 +36,7 @@ export default defineEventHandler(async (event) => {
                 ...(query.status ? { status: query.status } : {}),
                 /*
                  * IN THE QUERY, so `take` applies to the filtered set. This used
-                 * to filter AFTER the fetch, on `run.termId` — which meant
+                 * to filter AFTER the fetch, on `run.termId`, which meant
                  * `?termId=X&limit=100` took the newest 100 proposals across
                  * every term and then kept whichever happened to belong to X, so
                  * a term with older proposals showed none of them and the list
@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
             /*
              * BY DATE, not by version. Versions restart at 1 per term, so
              * ordering an unfiltered list by version interleaves terms by an
-             * index that means nothing across them — Semester 1's v3 would
+             * index that means nothing across them: Semester 1's v3 would
              * outrank Semester 2's v1 for no reason. `createdAt` is what "newest
              * proposal first" always meant; it simply used to coincide with
              * version while the series was tenant-wide.
@@ -57,7 +57,7 @@ export default defineEventHandler(async (event) => {
             take: query.limit ?? 25,
         });
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const withRuns: Array<typeof generations[number] & { run: Awaited<ReturnType<typeof runSummaryFor>> }> = [];
 
@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
          * its own `term_id`. One behaviour changed with it and is worth naming:
          * a tenant-wide MANUAL_BASELINE (`term_id IS NULL`) is excluded from a
          * term-filtered list, which is the same answer the old run-based filter
-         * gave — a baseline has no run, so it never matched either.
+         * gave: a baseline has no run, so it never matched either.
          */
         return withRuns;
     });

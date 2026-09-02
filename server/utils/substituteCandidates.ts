@@ -2,11 +2,11 @@ import type { Tx } from './tenantDb';
 import { LECTURER_ROLE_KEY } from '../../shared/roles';
 
 /**
- * Who may cover a Session's occurrence — issue #30, "Substitutions".
+ * Who may cover a Session's occurrence (issue #30, "Substitutions").
  *
  * SCOPE: filters the picker to people who are FREE at the Session's own slot,
  * mirroring `no_double_booking_lecturer` (`server/utils/violations.ts`) but
- * applied BEFORE a clash can be created rather than warned about after — the
+ * applied BEFORE a clash can be created rather than warned about after, the
  * ticket's own words. Restricted to holders of the tenant's `lecturer` Role,
  * matching every other "who can teach" lookup in this codebase
  * (`lecturers.post.ts`, `affected-persons.get.ts`, `solverInput.ts`).
@@ -57,15 +57,22 @@ async function overlappingSessionIds(tx: Tx, options: SlotOptions): Promise<stri
         select: { id: true, blockIndex: true, durationBlocks: true },
     });
 
-    return sameDay.filter((other) => blocksOverlap(session, other)).map((other) => other.id);
+    // `blockIndex` is nullable on the Prisma type, but a row matching a
+    // concrete `dayOfWeek`/`termWeek` above cannot actually be banked: the
+    // three are null together or not at all (`session_placement_sane`). This
+    // narrows the type honestly rather than asserting past it.
+    return sameDay
+        .filter((other): other is typeof other & { blockIndex: number } => other.blockIndex !== null)
+        .filter((other) => blocksOverlap(session, other))
+        .map((other) => other.id);
 }
 
 /**
  * Everyone who cannot cover this Session right now: already attached to it
- * (lecturer or otherwise — re-substituting somebody already on the roster is
+ * (lecturer or otherwise; re-substituting somebody already on the roster is
  * meaningless), OR attached to / already COVERING a Session that overlaps its
  * slot. The second half is checked against BOTH `session_person` and
- * `session_substitution` — a person standing in for one Session at 10:00 is
+ * `session_substitution`: a person standing in for one Session at 10:00 is
  * exactly as unavailable for another at 10:00 as someone with a real
  * `session_person` row, and checking only the first table would let one
  * person cover two clashing Sessions at once.
@@ -73,7 +80,7 @@ async function overlappingSessionIds(tx: Tx, options: SlotOptions): Promise<stri
 async function busyPersonIds(tx: Tx, options: SlotOptions): Promise<Set<string>> {
     const overlappingIds = await overlappingSessionIds(tx, options);
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection, and concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const attachedHere = await tx.sessionPerson.findMany({
         where: { sessionId: options.session.id }, select: { personId: true },
@@ -93,7 +100,7 @@ async function busyPersonIds(tx: Tx, options: SlotOptions): Promise<Set<string>>
 }
 
 /**
- * The tenant's `lecturer` Role, or a named refusal — matching
+ * The tenant's `lecturer` Role, or a named refusal, matching
  * `lecturers.post.ts`'s handling of the same precondition.
  */
 async function requireLecturerRole(tx: Tx, tenantId: string): Promise<{ id: string }> {
@@ -109,7 +116,7 @@ async function requireLecturerRole(tx: Tx, tenantId: string): Promise<{ id: stri
     return role;
 }
 
-/** A page of free, search-matching candidates — the inspector's picker. */
+/** A page of free, search-matching candidates: the inspector's picker. */
 export async function freeSubstituteCandidates(tx: Tx, options: SlotOptions & {
     query?: string;
     limit?: number;
@@ -133,7 +140,7 @@ export async function freeSubstituteCandidates(tx: Tx, options: SlotOptions & {
             : {}),
     };
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection, and concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const rows = await tx.person.findMany({
         where,
@@ -147,13 +154,13 @@ export async function freeSubstituteCandidates(tx: Tx, options: SlotOptions & {
 }
 
 /**
- * Re-checked at WRITE time, not just trusted from the picker's earlier fetch —
+ * Re-checked at WRITE time, not just trusted from the picker's earlier fetch:
  * the list can go stale between a fetch and a click, and a substitute created
  * double-booked is exactly the outcome this ticket asked to prevent BEFORE
  * creation, never warn about after (contrast `refreshViolations`'s
  * warn-and-allow, which is for placements, not for this overlay).
  *
- * ASSUMES THE CALLER ALREADY CONFIRMED `personId` EXISTS IN THIS TENANT — same
+ * ASSUMES THE CALLER ALREADY CONFIRMED `personId` EXISTS IN THIS TENANT: same
  * split as `lecturers.post.ts`: "not found" (404) and "not qualified" (422)
  * are different problems, and folding them into one query here would report
  * another tenant's person as "lacks the lecturer role" instead of missing.

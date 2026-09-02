@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { describeCollision } from '../server/utils/violations';
 
 /**
- * Nested-group conflict detection — the sibling false positive.
+ * Nested-group conflict detection: the sibling false positive.
  *
  * `describeCollision` used to intersect the EXPANDED conflict closure of both
  * Sessions. Every group expands to include its ancestors, so two groups sharing
@@ -11,7 +11,7 @@ import { describeCollision } from '../server/utils/violations';
  * `group_double_booked` violations on a timetable the solver reported as clean.
  *
  * The rule (TAXONOMY.md §6) is that a Session blocks its group's ANCESTORS and
- * DESCENDANTS — not everything under a shared root. So exactly one side is
+ * DESCENDANTS, not everything under a shared root. So exactly one side is
  * expanded, and it is matched against the other side's DIRECTLY assigned groups
  * by identity.
  *
@@ -27,7 +27,7 @@ const CLASS_A = 'g-class-a';
 const CLASS_B = 'g-class-b';
 const SEMINAR_A1 = 'g-seminar-a1';
 
-/** self ∪ ancestors ∪ descendants — what `conflictGroupIds()` returns. */
+/** self ∪ ancestors ∪ descendants: what `conflictGroupIds()` returns. */
 const CLOSURE: Record<string, string[]> = {
     [INFORMATICS]: [INFORMATICS, CLASS_A, CLASS_B, SEMINAR_A1],
     [CLASS_A]: [CLASS_A, INFORMATICS, SEMINAR_A1],
@@ -90,7 +90,7 @@ describe('no_double_booking_group', () => {
         expect(result).toMatchObject({ reason: 'group_double_booked', groupIds: [SEMINAR_A1] });
     });
 
-    it('flags a child against its parent — detection is symmetric', () => {
+    it('flags a child against its parent: detection is symmetric', () => {
         // Only one side is expanded, so this direction is worth pinning
         // separately: the reported ids differ, the verdict must not.
         const result = collide([SEMINAR_A1], [CLASS_A]);

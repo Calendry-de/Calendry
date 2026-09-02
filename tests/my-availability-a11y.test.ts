@@ -14,14 +14,14 @@ import { api, login } from './helpers/client';
  *
  * 1. `AvailabilityBlockPicker` set `display: none` on its checkbox, which removes
  *    a control from the focus order AND the accessibility tree. All eight block
- *    toggles were unreachable by keyboard on both pages — and the block axis is
+ *    toggles were unreachable by keyboard on both pages, and the block axis is
  *    the only way to say "not this time of day", so the sole window a keyboard
  *    user could express was the whole day, the most destructive one.
  * 2. The mode switcher was two bare `<button>`s whose only difference was a CSS
  *    class: no role, no `aria-selected`, no `aria-controls`, no `tabindex`.
  *
  * Both look perfect rendered. That is the whole problem, and it is the repo's
- * "guards must fail loudly" rule in its most literal form — so the guard is a
+ * "guards must fail loudly" rule in its most literal form, so the guard is a
  * test, not a comment.
  *
  * ONE CHECK IS SOURCE-LEVEL, deliberately. `display: none` is a CSS fact and
@@ -43,7 +43,7 @@ let cookie = '';
  * The page's RENDERED markup, with template comments removed.
  *
  * Vue serves `<!-- -->` template comments in development, and this repo comments
- * its templates heavily — including comments that quote the very attributes and
+ * its templates heavily, including comments that quote the very attributes and
  * sentences these tests look for. An assertion that matched a comment would pass
  * while the feature was broken, and one that forbade a string would fail because
  * the string appears in prose EXPLAINING it. Both happened while writing this
@@ -87,7 +87,7 @@ describe('the block picker is operable', () => {
     });
 
     /*
-     * On /my/preferences, which is now the picker's only caller —
+     * On /my/preferences, which is now the picker's only caller:
      * /my/availability paints its window on a week grid instead.
      */
     it('names its group with a fieldset and legend rather than a loose span', async () => {
@@ -127,7 +127,7 @@ describe('the mode switcher is a complete tablist', () => {
             const panelId = controls![1]!;
 
             /*
-             * The PANEL's own open tag, not the first mention of the id — the
+             * The PANEL's own open tag, not the first mention of the id: the
              * tab's `aria-controls` carries the same string and comes first in
              * the document, which is what an earlier version of this assertion
              * matched instead.
@@ -169,7 +169,7 @@ describe('the form does not accuse the visitor before they act', () => {
 
         /*
          * `wouldBlockEverything` is true for an UNTOUCHED form, because both
-         * drafts start empty — so this page used to open with an amber warning
+         * drafts start empty, so this page used to open with an amber warning
          * above a disabled submit, reporting a mistake the visitor had not had
          * the chance to make.
          *
@@ -179,14 +179,14 @@ describe('the form does not accuse the visitor before they act', () => {
          */
         /*
          * The precondition is stated ONCE, beside the grid, and the disabled
-         * button names it — rather than a second sentence under the form saying
+         * button names it, rather than a second sentence under the form saying
          * the same thing, which is how a message stops being read.
          */
         expect(html).toContain('choose one corner of the week, then the opposite one');
 
         /*
          * And that the gesture REPEATS. One window is one rectangle, but a real
-         * week is rarely one rectangle — the first version of the painter held a
+         * week is rarely one rectangle: the first version of the painter held a
          * single draft, so a second drag silently replaced the first and only
          * one entry could ever be submitted.
          */
@@ -215,7 +215,7 @@ describe('the week painter is the tenant\'s own week', () => {
         expect(paintable.length).toBe(40);
 
         /*
-         * A break band is never paintable — it has no block index, so a cell
+         * A break band is never paintable: it has no block index, so a cell
          * there could not be stored and offering one would be an affordance that
          * silently does nothing.
          *
@@ -253,7 +253,7 @@ describe('the week painter is the tenant\'s own week', () => {
     it('names every cell by day, block and clock time', async () => {
         const html = await page('/my/availability');
 
-        expect(html).toMatch(/aria-label="Monday block 1, \d\d:\d\d to \d\d:\d\d — free"/);
+        expect(html).toMatch(/aria-label="Monday block 1, \d\d:\d\d to \d\d:\d\d, free"/);
         expect(html).toContain('role="columnheader"');
         expect(html).toContain('role="rowheader"');
     });
@@ -303,7 +303,7 @@ describe('the warning text colour reaches the browser', () => {
 
         /*
          * `warning800` exists because `warning700` measured 3.73:1 on this
-         * page's ground — below AA for the most important sentence on it. The
+         * page's ground, below AA for the most important sentence on it. The
          * generated SCSS resolves it as `var(--warning800, <compile-time
          * fallback>)`, which means a MISSING custom property is invisible in the
          * light theme (the fallback IS the light value) and wrong in the dark

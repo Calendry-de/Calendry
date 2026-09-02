@@ -3,7 +3,7 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, seed, teardown } from './helper
 import { api, login } from './helpers/client';
 
 /**
- * GDPR data export (issue #84) — per-Person (self-service and admin) and
+ * GDPR data export (issue #84): per-Person (self-service and admin) and
  * tenant-wide. Erasure lives in its own file (`gdpr-erasure.test.ts`): it
  * needs a throwaway tenant, never the shared fixture every other file here
  * depends on.
@@ -31,7 +31,7 @@ interface PersonExportBundle {
 }
 
 describe('GET /api/me/export', () => {
-    it('exports the caller\'s own data — profile, groups and sessions included', async () => {
+    it('exports the caller\'s own data: profile, groups and sessions included', async () => {
         const res = await api<PersonExportBundle>('/api/me/export', { cookie: adminACookie });
 
         expect(res.status).toBe(200);
@@ -61,7 +61,7 @@ describe('GET /api/person-export/:id', () => {
         expect(res.body.person.id).toBe(f.personViewerA);
     });
 
-    it('404s a Person in a different tenant — cross-tenant ids are invisible, not forbidden', async () => {
+    it('404s a Person in a different tenant: cross-tenant ids are invisible, not forbidden', async () => {
         const res = await api(`/api/person-export/${f.personB}`, { cookie: adminACookie });
 
         expect(res.status).toBe(404);

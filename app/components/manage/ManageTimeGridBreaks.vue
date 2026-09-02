@@ -9,12 +9,12 @@
         </header>
 
         <p class="breaks_hint">
-            A longer gap at one position — lunch, an afternoon break. Everywhere
+            A longer gap at one position: lunch, an afternoon break. Everywhere
             else keeps the default gap above.
         </p>
 
         <!--
-            Read-only renders as TEXT, not disabled controls — the same rule the
+            Read-only renders as TEXT, not disabled controls, the same rule the
             rest of the management area follows (see ManageField). A row of
             greyed selects reads as "unavailable right now"; a sentence reads as
             "this is the configuration, and it is not yours to change".
@@ -51,7 +51,7 @@
                         class="breaks_control"
                         @change="updateBreak(i, { afterBlockIndex: Number(($event.target as HTMLSelectElement).value) })"
                     >
-                        <!-- :selected, not :value on the select — a
+                        <!-- :selected, not :value on the select: a
                              select's value is a property, so SSR
                              drops it and the browser falls back to
                              the first option. -->
@@ -127,7 +127,7 @@
         <p
             v-else
             class="breaks_empty"
-        >No named breaks — every gap is the default.</p>
+        >No named breaks: every gap is the default.</p>
 
         <CommonButton
             v-if="!readonly"
@@ -150,7 +150,7 @@ import { weekdayName } from '~/composables/schedule';
  * COLLECTION (what rows exist and what each one says), while the editor owns
  * the draft and the preview that shows what the collection does to a day.
  *
- * It holds no draft access of its own — breaks arrive and leave through the
+ * It holds no draft access of its own; breaks arrive and leave through the
  * model, so dirty tracking, the single Save and the PUT-set persistence all
  * stay exactly where they were.
  */
@@ -165,7 +165,7 @@ const props = defineProps<{
 const model = defineModel<TimeGridBreak[]>({ required: true });
 
 function addBreak() {
-    // Position defaults to the middle of the day and "all days" — the lunch
+    // Position defaults to the middle of the day and "all days": the lunch
     // case, which is what someone reaching for this button usually wants.
     //
     // `blockChoices` is every block but the last, so the day's block count is
@@ -180,7 +180,7 @@ function addBreak() {
         // Deliberately NOT 'Lunch'. A default that is usually right gets left in
         // place; a default that names one specific break gets left in place too,
         // and then it is wrong. The demo tenant ended up with two breaks both
-        // labelled "Lunch" — a 10:00 morning break and a 13:00 lunch — because
+        // labelled "Lunch": a 10:00 morning break and a 13:00 lunch, because
         // the second one kept this default. A neutral word is one nobody
         // mistakes for a considered answer.
         label: 'Break',

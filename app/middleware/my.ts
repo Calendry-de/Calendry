@@ -3,7 +3,7 @@ import { MY_HUB_PERMISSIONS, MY_SECTION_PERMISSIONS } from '~/utils/mySectionPer
 import { useSession } from '~/composables/session';
 
 /**
- * Guards the /my self-service routes — on WHATEVER PERMISSION THAT SPECIFIC
+ * Guards the /my self-service routes: on WHATEVER PERMISSION THAT SPECIFIC
  * PAGE NEEDS (`MY_SECTION_PERMISSIONS`), not one hardcoded key.
  *
  * ISSUE #108: this used to check `availability.manage_own` unconditionally,
@@ -11,20 +11,20 @@ import { useSession } from '~/composables/session';
  * `/my/availability` and `/my/preferences` existed, and silently wrong once
  * `/my/exams` (`exam.request_own`) and `/my/teaching-pattern`
  * (`offering.set_scheduling_pattern`) joined the section: a lecturer holding
- * exactly the permission their OWN page's nav entry names — say,
- * `exam.request_own` and nothing else — was turned away from `/my/exams`
+ * exactly the permission their OWN page's nav entry names (say,
+ * `exam.request_own` and nothing else) was turned away from `/my/exams`
  * with a 403 that named a permission (`availability.manage_own`) the page
  * never actually needed. The route's own API
  * (`GET /api/me/exam-requests`) never required it either; only this shared
  * gate did.
  *
- * `/my` itself (the hub) checks `MY_HUB_PERMISSIONS` — ANY section's key is
+ * `/my` itself (the hub) checks `MY_HUB_PERMISSIONS`: ANY section's key is
  * enough to open it, the same reasoning `SCHEDULE_PERMISSIONS` uses: a
  * lecturer with only one of the four self-service capabilities must still be
  * able to reach the hub and see the one card that applies to them.
  *
- * A path this map does not name — today, only `/my/account`, which needs no
- * permission at all and does not carry this middleware for that reason — is
+ * A path this map does not name (today, only `/my/account`, which needs no
+ * permission at all and does not carry this middleware for that reason) is
  * let through: nothing here to check beyond being signed in, which
  * `auth.global.ts` already enforces.
  *

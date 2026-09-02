@@ -23,7 +23,7 @@ export async function appendEvent(
     /**
      * Structurally `{ tenantId, actorPersonId }` rather than a full
      * `TenantScopedIdentity`, because those are the only two fields used and
-     * the materialize layer has no request identity to offer — it runs from a
+     * the materialize layer has no request identity to offer; it runs from a
      * plan. A `TenantScopedIdentity` still satisfies this, so every existing
      * caller is unchanged. NOT `RequestIdentity` (issue #76): `StaffIdentity`
      * has no `tenantId` at all, and an event can never be attributed to a
@@ -55,14 +55,14 @@ export async function appendEvent(
     /**
      * Cache invalidation for issue #66, hooked in HERE rather than at each of
      * this function's 14+ call sites. Every write that changes what a cached
-     * schedule response would contain — a manual edit, a Generation apply, a
-     * materialized solver result — appends a SessionEvent, so this is the one
+     * schedule response would contain (a manual edit, a Generation apply, a
+     * materialized solver result) appends a SessionEvent, so this is the one
      * choke point all of them already pass through. Finding and hooking each
      * call site individually is exactly the way to miss one, which the issue
      * calls out explicitly: "a stale cache is worse than no cache."
      *
      * The Generation's OWN `termId` decides the blast radius (null = a
-     * tenant-wide Generation, so every bucket for the tenant is dropped) —
+     * tenant-wide Generation, so every bucket for the tenant is dropped);
      * see `invalidateScheduleCache`. Never allowed to fail the write: this
      * runs inside the same transaction as the event it is reacting to, and a
      * cache-invalidation problem must not become a reason a manual edit
@@ -79,7 +79,7 @@ export async function appendEvent(
         console.error('[cache] schedule cache invalidation failed after appendEvent:', error);
     }
 
-    // `seq` is a BigInt, which JSON.stringify refuses to serialize — returning
+    // `seq` is a BigInt, which JSON.stringify refuses to serialize; returning
     // the row as-is makes every editing route throw at response time. Converted
     // here, at the single point events are created, rather than in each route.
     return { ...created, seq: created.seq.toString() };
@@ -114,7 +114,7 @@ export async function requireBaselineGeneration(tx: Tx, tenantId: string, sessio
  * Placement fields captured in event payloads.
  *
  * `termWeek`/`dayOfWeek`/`blockIndex` are nullable so this also accepts a
- * BANKED Session — `bank.post.ts` records the placement it is leaving in
+ * BANKED Session: `bank.post.ts` records the placement it is leaving in
  * exactly the same shape `move.post.ts` and `delete.ts` already use, and
  * `move.post.ts` records one going the other way. Every existing caller
  * passes an already-placed Session, so their payloads are unaffected;

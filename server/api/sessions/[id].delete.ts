@@ -33,14 +33,14 @@ defineRouteMeta({
 });
 
 /**
- * Delete an EVENT — a Session with no Offering.
+ * Delete an EVENT: a Session with no Offering.
  *
  * WHY ONLY EVENTS
  *
  * An Offering-linked Session is demand made concrete: its Offering declares how
  * many times it must happen, so deleting one leaves `frequency` unsatisfied and
  * the next solve simply re-creates it. The delete would appear to work and then
- * silently undo itself — which is worse than refusing, and is the failure shape
+ * silently undo itself, which is worse than refusing, and is the failure shape
  * this codebase keeps designing against.
  *
  * Removing a real Session properly means deciding whether it should be
@@ -54,8 +54,8 @@ defineRouteMeta({
  * WHY 409 AND NOT 404 FOR A REAL SESSION
  *
  * "This Session belongs to an Offering" and "no such Session" are different
- * facts. Collapsing them would make a genuine bug — a mis-typed id, a
- * cross-tenant read — indistinguishable from the rule working.
+ * facts. Collapsing them would make a genuine bug (a mis-typed id, a
+ * cross-tenant read) indistinguishable from the rule working.
  */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
@@ -76,7 +76,7 @@ export default defineEventHandler(async (event) => {
                 statusCode: 409,
                 statusMessage: 'This Session belongs to an Offering, so deleting it would leave that '
                     + "Offering's frequency unmet and the next solve would place it again. Only an "
-                    + 'Event — a Session with no Offering — can be deleted here.',
+                    + 'Event (a Session with no Offering) can be deleted here.',
                 data: { offeringId: session.offeringId },
             });
         }
@@ -84,7 +84,7 @@ export default defineEventHandler(async (event) => {
         /**
          * The baseline the event hangs off. An Event's own `generationId` is
          * NULL by design (a human placed it, no Generation did), and an event
-         * with no baseline cannot be replayed — so this resolves the tenant's
+         * with no baseline cannot be replayed, so this resolves the tenant's
          * current one, exactly as the create route does.
          */
         const generationId = await requireBaselineGeneration(tx, identity.tenantId, null);
@@ -95,7 +95,7 @@ export default defineEventHandler(async (event) => {
         });
 
         /**
-         * EVENT FIRST, THEN THE ROW — the same order and the same helper
+         * EVENT FIRST, THEN THE ROW: the same order and the same helper
          * `executePlan()` uses for solver-driven deletes.
          *
          * `session_event.session_id` is ON DELETE SET NULL, and the append-only

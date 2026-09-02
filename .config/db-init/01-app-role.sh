@@ -2,8 +2,8 @@
 # Provisions the runtime database role at cluster init.
 #
 # Calendry uses two roles by design (see the RLS migration):
-#   $POSTGRES_USER  — owner. Owns the schema, runs migrations, never used at runtime.
-#   $APP_DB_USER    — runtime. DML only, no ownership, subject to FORCE ROW LEVEL SECURITY.
+#   $POSTGRES_USER  : owner. Owns the schema, runs migrations, never used at runtime.
+#   $APP_DB_USER    : runtime. DML only, no ownership, subject to FORCE ROW LEVEL SECURITY.
 #
 # An owning role bypasses RLS unless FORCE is set, and can always drop FORCE.
 # Keeping the runtime connection on a non-owner role is what makes tenant
@@ -11,7 +11,7 @@
 #
 # This runs only on first initialisation of an empty data directory. The
 # migration creates the same role NOLOGIN if it is missing, so migrating a
-# database that never ran this script still succeeds — it just has no password
+# database that never ran this script still succeeds; it just has no password
 # until one is set here or by hand.
 
 set -e

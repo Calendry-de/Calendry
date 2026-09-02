@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    // Through authDb — the one module allowed to touch the pre-tenant auth
+    // Through authDb, the one module allowed to touch the pre-tenant auth
     // plane (CLAUDE.md exception 2). Revokes every open session with the write,
     // for the same reason a reset does: whoever prompted the change may be
     // locking someone out.

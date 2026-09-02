@@ -7,7 +7,7 @@ import { api, login } from './helpers/client';
  *
  * THE BUG. `useEntityForm` fetches the row and one list per `reference` field in a
  * single `Promise.all`. Those list endpoints carry permissions the page's own gate
- * does not imply — `offerings` fetches `/api/terms`, `/api/session-kinds` and
+ * does not imply: `offerings` fetches `/api/terms`, `/api/session-kinds` and
  * `/api/roles`; `terms` fetches `/api/time-grids`; `screens` fetches
  * `/api/rooms`. One 403 rejects the whole wave, and because the page awaits the
  * useAsyncData HANDLE (which resolves rather than rejects) it does not blank:
@@ -15,11 +15,11 @@ import { api, login } from './helpers/client';
  *
  * WORSE THAN THE RELATION CASE, which merely rendered an empty option list. Here
  * the form shows blank inputs over a record that has data, and Save is gated on
- * `isDirty` alone — so editing ONE field makes `save()` PATCH every field,
+ * `isDirty` alone, so editing ONE field makes `save()` PATCH every field,
  * most of them blank. That is silent data destruction, not a confusing screen.
  *
  * The relation fix does not transfer: a picker can be omitted, a `reference` field
- * cannot — omitting it drops it from saves.
+ * cannot: omitting it drops it from saves.
  */
 const TENANT_A = 'test-tenant-a';
 const EDITOR = 'offering-editor@test.local';
@@ -34,7 +34,7 @@ const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
  *
  * `offerings` declares reference fields onto terms, session-kinds and roles, so
  * this role can read and edit an Offering while every one of its option lists
- * answers 403 — the exact asymmetry the bug needs.
+ * answers 403, the exact asymmetry the bug needs.
  */
 async function seedOfferingEditor() {
     await ownerDb.$executeRawUnsafe(`DELETE FROM account WHERE email = '${EDITOR}'`);
@@ -102,7 +102,7 @@ describe('the row survives a reference list it may not read', () => {
         /*
          * `Databases` is the fixture Offering's title, held in a plain text
          * field with no reference of its own. If the wave took the row down with
-         * it, this is the assertion that says so — the title input is empty and
+         * it, this is the assertion that says so: the title input is empty and
          * the record's own name is nowhere on the page.
          */
         expect(html, 'the row was lost with the reference wave').toContain('Databases');
@@ -122,7 +122,7 @@ describe('the row survives a reference list it may not read', () => {
 
     it('pins the SERVER property the fix relies on: an omitted key is left alone', async () => {
         /*
-         * SCOPE, STATED HONESTLY. This does not exercise `save()` — it PATCHes
+         * SCOPE, STATED HONESTLY. This does not exercise `save()`; it PATCHes
          * the API directly, and it passes against the unfixed composable too.
          * What it pins is the server contract the client-side fix DEPENDS on:
          * a field absent from the body keeps its stored value rather than being
@@ -130,7 +130,7 @@ describe('the row survives a reference list it may not read', () => {
          * that is only safe while this holds.
          *
          * Driving the real `save()` would need a browser; the payload decision
-         * is asserted where it lives instead — see the composable's
+         * is asserted where it lives instead; see the composable's
          * `isFieldLocked`, and the rendered read-only state above, which is the
          * observable half.
          *
@@ -146,7 +146,7 @@ describe('the row survives a reference list it may not read', () => {
         // Exactly what the UI does when somebody edits the one field they can:
         // the payload omits the locked references.
         // `api()`, not a raw `fetch`: a state-changing call needs the CSRF
-        // pairing `api()` attaches (issue #113) — a raw `fetch` here has no
+        // pairing `api()` attaches (issue #113): a raw `fetch` here has no
         // way to learn or send it and always 403s.
         const res = await api(`/api/offerings/${offeringId}`, {
             method: 'PATCH',
@@ -165,7 +165,7 @@ describe('the row survives a reference list it may not read', () => {
         expect(after[0]?.kind_id, 'the kind was blanked by an unrelated edit').toBe(before[0]!.kind_id);
     });
 
-    it('keeps the ROW fetch fatal — its rejection is rethrown, not absorbed', async () => {
+    it('keeps the ROW fetch fatal, its rejection is rethrown, not absorbed', async () => {
         /*
          * The counter-example for `allSettled`: degrading the REFERENCE fetches
          * must not also degrade the ROW fetch, which is why `rowResult` is
@@ -173,7 +173,7 @@ describe('the row survives a reference list it may not read', () => {
          *
          * ASSERTED ON THE API, and that is a deliberate limit rather than
          * laziness. `/manage/offerings/<missing id>` answers **200 with an empty
-         * form** — a SEPARATE, PRE-EXISTING bug, on the mechanism
+         * form**, a SEPARATE, PRE-EXISTING bug, on the mechanism
          * `manage-relation-gates.test.ts` already describes: the page awaits the
          * useAsyncData HANDLE, which resolves rather than rejects, so a throw
          * inside the handler never reaches Nuxt's error path.
@@ -196,7 +196,7 @@ describe('the row survives a reference list it may not read', () => {
          * The other half, fixed in the same pass: `useAsyncData`'s handle
          * resolves even when its handler throws, so the page used to answer 200
          * with every field blank while the API answered 404. The status is
-         * carried through rather than flattened — a 404 and a 403 are different
+         * carried through rather than flattened: a 404 and a 403 are different
          * facts for whoever is looking.
          */
         const res = await fetch(`${BASE}/manage/offerings/does-not-exist-at-all`, {
@@ -206,7 +206,7 @@ describe('the row survives a reference list it may not read', () => {
         expect(res.status).toBe(404);
     });
 
-    it('does NOT turn a locked reference into a page error — the boundary', async () => {
+    it('does NOT turn a locked reference into a page error: the boundary', async () => {
         /*
          * The counter-example for the throw above, and the reason `loadError` is
          * the ROW's failure alone. This role's `/api/terms` 403s on every

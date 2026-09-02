@@ -15,13 +15,13 @@ import { api, login } from './helpers/client';
  *      panel rendered "No terms defined yet" for a tenant with two.
  *   2. `/api/constraints` had the same wrong shape and did NOT have a fallback,
  *      so it threw `Cannot read properties of undefined (reading 'find')`
- *      during SSR. The crash was the lucky half — it is why (1) was found.
+ *      during SSR. The crash was the lucky half; it is why (1) was found.
  *   3. The PUT body was sent as `{ rows }` where `[relation].put.ts` parses
  *      `z.array(config.item)`. A flat 400, nothing saved.
  *
  * `request<T>()` is an unchecked assertion about what a server sends, so a wrong
  * `T` is a lie the compiler believes. The only thing that catches it is calling
- * the route and rendering the page — which is what this does.
+ * the route and rendering the page, which is what this does.
  */
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
@@ -29,7 +29,7 @@ let cookie = '';
 let groupId = '';
 let termId = '';
 
-/** Rendered markup with template comments stripped — see my-availability-a11y. */
+/** Rendered markup with template comments stripped: see my-availability-a11y. */
 async function page(path: string): Promise<string> {
     const res = await fetch(`${BASE}${path}`, { headers: { cookie } });
 
@@ -90,7 +90,7 @@ describe('the window round-trips', () => {
 
     it('clears the window when the set is empty, rather than needing a delete verb', async () => {
         // A PUT-set gives this for nothing, and it matters because an absent row
-        // and a boundless one mean the same thing — so there must be exactly one
+        // and a boundless one mean the same thing, so there must be exactly one
         // way to say it.
         const put = await api<unknown>(`/api/groups/${groupId}/availability`, {
             method: 'PUT',
@@ -120,7 +120,7 @@ describe('the write boundary refuses the two unrepresentable states', () => {
     });
 
     it('refuses an inverted range', async () => {
-        // Not a narrow window — an EMPTY one, which would black out every week of
+        // Not a narrow window: an EMPTY one, which would black out every week of
         // the term and surface as nothing more specific than "no feasible
         // placement".
         const res = await api<unknown>(`/api/groups/${groupId}/availability`, {
@@ -142,7 +142,7 @@ describe('the editor renders', () => {
         expect(html).toContain('Availability within a term');
         /*
          * THE SILENT HALF of bug (1). With the wrong response shape this said
-         * "No terms defined yet" — a sentence that is indistinguishable from a
+         * "No terms defined yet", a sentence that is indistinguishable from a
          * correctly-empty tenant, which is the failure mode CLAUDE.md names: if
          * "no data" and "fetch failed" render identically, the bug is invisible.
          */
@@ -163,7 +163,7 @@ describe('the editor renders', () => {
             /*
              * Vue does not flush watchers during SSR, so a draft seeded by
              * `watch(data, seed, { immediate: true })` would be empty here and
-             * correct only after hydration — visible as a flash, and wrong for
+             * correct only after hydration: visible as a flash, and wrong for
              * anything reading the HTML. Seeded from the awaited promise instead,
              * which this asserts by looking for the VALUE, not the input.
              */
@@ -181,7 +181,7 @@ describe('the editor renders', () => {
         /*
          * The state EVERY existing tenant is in until `backfill:constraints`
          * runs, and the one the first version of this condition treated as
-         * nothing to mention — it checked `rule && !rule.isEnabled`, so silence
+         * nothing to mention: it checked `rule && !rule.isEnabled`, so silence
          * fell exactly where the reader cannot fix it from this page.
          */
         const html = await page(`/manage/groups/${groupId}`);

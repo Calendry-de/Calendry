@@ -38,9 +38,9 @@
                 <!--
                     The person this login acts AS. Bespoke rather than a
                     `reference` field because the options come from
-                    /api/accounts/candidates — people who do not already have one
-                    — and a picker whose options are mostly invalid is worse than
-                    a short one. See the registry entry.
+                    /api/accounts/candidates, which lists only people who do not
+                    already have one; a picker whose options are mostly invalid is
+                    worse than a short one. See the registry entry.
                 -->
                 <div
                     class="field"
@@ -73,7 +73,7 @@
                         <option
                             :selected="!draft.personId"
                             value=""
-                        >— Choose a person —</option>
+                        >Choose a person</option>
                         <option
                             v-for="person in options"
                             :key="person.id"
@@ -93,7 +93,7 @@
                         class="field_hint field_hint--warn"
                     >
                         Everybody in this institution already has a login, or there is nobody
-                        here yet. Add a person under People first — a login has to act as one.
+                        here yet. Add a person under People first, since a login has to act as one.
                     </p>
 
                     <p
@@ -115,7 +115,7 @@
                         v-if="!readonly && atCandidateLimit"
                         class="field_hint field_hint--warn"
                     >
-                        Showing the first {{ CANDIDATE_LIMIT }} people without a login — there are
+                        Showing the first {{ CANDIDATE_LIMIT }} people without a login; there are
                         more. Until this picker can search, issue the login from a terminal:
                         <code>bun run create:account -- --tenant &lt;slug&gt; --email &lt;email&gt;
                         --attach</code>
@@ -184,7 +184,7 @@
                         class="field_hint field_hint--warn"
                     >
                         Copy it now. Only a hash is stored, so this exact value is never
-                        readable again — though a new one can be issued from this login’s page
+                        readable again, though a new one can be issued from this login’s page
                         at any time. At least {{ PASSWORD_MIN_LENGTH }} characters.
                     </p>
                 </div>
@@ -194,7 +194,7 @@
                     credential acting in several institutions is the model working
                     as intended, and a lecturer arriving from a partner university
                     is the ordinary case. Detected from the server's own flag, not
-                    from its wording — see `form.errorData`.
+                    from its wording; see `form.errorData`.
                 -->
                 <div
                     v-if="mode === 'create' && accountExists"
@@ -205,8 +205,8 @@
 
                     <p class="account_attach_body">
                         It can be attached to {{ selectedPersonLabel }} instead of creating a
-                        second one. They would sign in with the password they already have —
-                        this institution never sees it — and because the login would then be
+                        second one. They would sign in with the password they already have, which
+                        this institution never sees, and because the login would then be
                         shared, its address, activation and password could no longer be changed
                         from here.
                     </p>
@@ -323,7 +323,7 @@
                     change at the next sign-in.
                 </template>
                 <template v-else>
-                    Only this institution’s link can be changed here — issuing a password would
+                    Only this institution’s link can be changed here; issuing a password would
                     change how the login behaves at the others too.
                 </template>
                 Signing out reaches every institution the login is used at, which is allowed
@@ -332,11 +332,11 @@
 
             <!--
                 API tokens this Person has minted, scoped to THIS institution
-                (`ApiToken.tenantId`) — unlike the rest of this section, nothing
+                (`ApiToken.tenantId`). Unlike the rest of this section, nothing
                 here reaches other tenants a shared login also serves. Listing and
                 revoking only; minting stays self-service on the holder's own
                 account page, because a token is a delegation of whatever the
-                CALLER currently holds — an admin has no permission set of the
+                CALLER currently holds, and an admin has no permission set of the
                 holder's to delegate from.
             -->
             <section class="account_tokens">
@@ -407,7 +407,7 @@ import { CANDIDATE_LIMIT } from '#shared/accounts';
 
 /**
  * Account's detail: the shared form, plus the two things a login has that no
- * other managed entity does — a person it acts as, and a secret.
+ * other managed entity does: a person it acts as, and a secret.
  *
  * WHY THIS IS BESPOKE
  *
@@ -415,7 +415,7 @@ import { CANDIDATE_LIMIT } from '#shared/accounts';
  * data:
  *
  *   1. the person picker's options come from `/api/accounts/candidates`, not from
- *      `/api/persons` — most people already have a login and offering them
+ *      `/api/persons`, because most people already have a login and offering them
  *      produces a 409 after the form is filled in;
  *   2. a password is a value that must be VISIBLE exactly once and is generated
  *      in the browser, so the create page can navigate away without losing it;
@@ -466,7 +466,7 @@ const row = computed(() => props.form.row.value as {
  * DEFAULTS TO "SOLE TENANT" ONLY ON THE CREATE PAGE, where there is no row yet
  * and a login being created is necessarily this institution's alone.
  *
- * On the edit page it reads the row, and a missing value falls to `false` — the
+ * On the edit page it reads the row, and a missing value falls to `false`, the
  * restrictive side. A guard that fails open would offer a reset button on a
  * shared login and answer 409 when pressed; failing closed offers one button
  * fewer than it could, which is the cheaper mistake.
@@ -490,11 +490,11 @@ const lastLogin = computed(() => {
  * The people this login may act as.
  *
  * `include` keeps the CURRENT person in the list even though they already have a
- * login — this one. Without it the select would open on an option that is not
+ * login: this one. Without it the select would open on an option that is not
  * there and read as unset, and the first save would clear the link.
  *
  * TOLERANT: this endpoint is gated on `account.manage`, so a caller holding only
- * `account.read` gets a 403 and the page must still render — read-only, where the
+ * `account.read` gets a 403 and the page must still render read-only, where the
  * picker prints the stored name and never needs the list at all.
  */
 const candidatesData = useAsyncData(
@@ -506,7 +506,7 @@ const candidatesData = useAsyncData(
         default: () => [] as Candidate[],
         /*
          * CLIENT ONLY, and the one place this component departs from the
-         * codebase's "first render comes from the awaited promise" rule — because
+         * codebase's "first render comes from the awaited promise" rule, because
          * it is a CHILD of the page, and the page holds the single top-level
          * await. Awaiting here would make this an async component; not awaiting
          * while fetching on the server would render the options list twice from
@@ -527,14 +527,14 @@ const candidates = computed(() => candidatesData.data.value ?? []);
  * Whether the list is an ANSWER yet.
  *
  * Without this the picker announces "everybody already has a login" for the
- * moment before its own fetch resolves — a guard that cannot tell "found nothing"
+ * moment before its own fetch resolves: a guard that cannot tell "found nothing"
  * from "have not looked", which is the failure mode CLAUDE.md names outright.
  */
 const candidatesLoaded = computed(() => candidatesData.status.value === 'success');
 
 /**
  * Whether the endpoint's cap was reached. Compared against ITS constant, not a
- * repeated literal — two copies of a limit are two chances for the message to
+ * repeated literal: two copies of a limit are two chances for the message to
  * stop matching the query.
  */
 const atCandidateLimit = computed(() => candidates.value.length >= CANDIDATE_LIMIT);
@@ -542,7 +542,7 @@ const atCandidateLimit = computed(() => candidates.value.length >= CANDIDATE_LIM
 function personLabel(person: Candidate): string {
     const name = `${person.givenName} ${person.familyName}`.trim();
 
-    return person.email ? `${name} — ${person.email}` : name;
+    return person.email ? `${name} (${person.email})` : name;
 }
 
 /**
@@ -551,8 +551,8 @@ function personLabel(person: Candidate): string {
  *
  * THE CURRENT PERSON COMES FROM THE ROW, not from the fetch, and that is what
  * makes the first render true. The candidates arrive client-side, so a select
- * built from them alone renders on the server as "— Choose a person —" with the
- * placeholder selected — a page stating that a login belongs to nobody, on a
+ * built from them alone renders on the server as "Choose a person" with the
+ * placeholder selected: a page stating that a login belongs to nobody, on a
  * login that plainly belongs to somebody, corrected a moment later. The row is
  * part of the page's own awaited data, so this option is there from the first
  * byte.
@@ -585,14 +585,14 @@ const options = computed<Candidate[]>(() => {
 /**
  * What the read-only view prints. Resolves through `options`, so it works before
  * the candidates arrive and for a caller without `account.manage`, who never
- * gets them at all — printing a raw uuid under "Acts as" is worse than printing
+ * gets them at all: printing a raw uuid under "Acts as" is worse than printing
  * nothing.
  */
 const selectedPersonLabel = computed(() => {
     const id = String(draft.value.personId ?? '');
     const match = options.value.find((person) => person.id === id);
 
-    return match ? personLabel(match) : (row.value?.personName || '—');
+    return match ? personLabel(match) : (row.value?.personName || '-');
 });
 
 /** The server's flag, never its wording. See `useEntityForm().errorData`. */
@@ -609,7 +609,7 @@ const emailPrefill = ref<string | null>(null);
  * Only on create: the login's address is free-text days before it is anyone's
  * real credential, so defaulting it to the acted-as Person's contact email
  * saves a retype in the common case while staying fully editable. Never
- * overwrites a value the visitor put there themselves — matched against the
+ * overwrites a value the visitor put there themselves: matched against the
  * last value THIS function wrote, not against "empty", so re-picking a person
  * after a manual edit leaves that edit alone.
  */
@@ -725,13 +725,13 @@ function revokeSessions() {
         revokedNotice.value = result.sessionsRevoked === 0
             ? 'There were no active sessions to revoke.'
             : `${result.sessionsRevoked} session(s) revoked. `
-                + 'The login still works — they can sign back in with their own password.';
+                + 'The login still works: they can sign back in with their own password.';
     });
 }
 
 /**
  * Detach this institution's link. Only reachable for a shared login, because for
- * any other one it would leave a working password nobody can see — the server
+ * any other one it would leave a working password nobody can see: the server
  * refuses that outright (`assertDetachable`) and this button is hidden.
  */
 function detach() {
@@ -759,8 +759,8 @@ function formatWhen(iso: string): string {
 /**
  * TOLERANT and CLIENT-ONLY, same reasoning as `candidatesData` above: a
  * secondary list on a page whose own top-level await is the row itself.
- * Guarded on `mode === 'edit'` because there is no account id — and therefore
- * no Person — until the row exists.
+ * Guarded on `mode === 'edit'` because there is no account id, and therefore
+ * no Person, until the row exists.
  */
 const tokensData = useAsyncData(
     `account-form:tokens:${row.value?.id ?? 'new'}`,
@@ -1039,7 +1039,7 @@ async function revokeToken(tokenId: string) {
 /*
  * The bespoke controls above borrow `ManageField`'s classes so a hand-written
  * select is indistinguishable from a generated one. Scoped styles cannot reach
- * another component's stylesheet, so the shapes are restated here — deliberately
+ * another component's stylesheet, so the shapes are restated here: deliberately
  * the shapes only, with every value still coming from the same tokens.
  */
 .field {

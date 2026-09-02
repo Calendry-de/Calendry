@@ -5,7 +5,7 @@ import type { NamedRow, TimeGrid } from '~/composables/schedule';
 /**
  * Everything the review screen reads and decides with: one proposal under review,
  * the preview it is judged by, and the two actions that end it. It owns no live
- * schedule state — the point is that applying has not happened yet.
+ * schedule state: the point is that applying has not happened yet.
  *
  * SYNCHRONOUS, like every composable here that calls useAsyncData: an `await`
  * before the last Nuxt-context call detaches everything after it.
@@ -60,7 +60,7 @@ export interface ReviewPreview {
         /**
          * The subset of `moved` outside the run's scope. Optional because a
          * Generation captured before this counter existed has no value for it,
-         * and 0 would be a claim rather than a gap — those runs were all hard
+         * and 0 would be a claim rather than a gap: those runs were all hard
          * locked, so the honest reading is "the same as none", which `?? 0`
          * gives without pretending the field was stored.
          */
@@ -83,7 +83,7 @@ export interface ReviewPreview {
      * What the run asked the solver for, against what its answer covered.
      *
      * `verified: false` means the run predates the demand ledger, so its deletes
-     * rest on the assumption that the output is complete — the assumption that
+     * rest on the assumption that the output is complete: the assumption that
      * cost this tenant eleven live Sessions per run. Optional because an older
      * client payload has no field, and absent must not read as verified.
      */
@@ -94,10 +94,10 @@ export interface ReviewPreview {
         shortOfferings: number;
     };
     deletedByOffering: { offeringId: string; title: string; code: string | null; count: number }[];
-    /** The kept Sessions, named — a count alone is not something a human can act on. */
+    /** The kept Sessions, named: a count alone is not something a human can act on. */
     withheldByOffering?: { offeringId: string; title: string; code: string | null; count: number }[];
     /**
-     * What the proposal does to each Offering over the whole term — the page's
+     * What the proposal does to each Offering over the whole term: the page's
      * primary evidence. Server-aggregated because `placements` is fetched one
      * `termWeek` at a time, so no client holds the term.
      */
@@ -123,7 +123,7 @@ export interface ReviewPreview {
 }
 
 /** One Offering's whole-term change record. `title`/`code` are null when the
- *  caller cannot read that Offering — never the raw id, which is unreadable. */
+ *  caller cannot read that Offering, never the raw id, which is unreadable. */
 export interface OfferingChange {
     offeringId: string;
     title: string | null;
@@ -135,7 +135,7 @@ export interface OfferingChange {
     /** Term weeks this Offering changes in, ascending. Empty is impossible here. */
     weeks: number[];
     /**
-     * The solver moved this Offering's Sessions without being asked to — the
+     * The solver moved this Offering's Sessions without being asked to: the
      * per-Offering resolution of the plan's `movedCollateral` integer. Always
      * true for every moved Offering under a repair, where the scope is empty by
      * design and that is the mode working.
@@ -144,7 +144,7 @@ export interface OfferingChange {
 }
 
 /**
- * Termination reason as a sentence — the single field that most changes the
+ * Termination reason as a sentence: the single field that most changes the
  * decision. `null` is its own case: runs captured before Stage 6a have no reason
  * recorded, and claiming reproducibility there would be a guess.
  */
@@ -152,24 +152,24 @@ export function terminationSentence(reason: string | null): string {
     /**
      * NULL AND UNRECOGNISED ARE DIFFERENT SENTENCES, and merging them told the
      * reviewer a lie. Every unknown string fell into the `default` branch and
-     * read "this run predates termination capture" — so when the solver gained
+     * read "this run predates termination capture", so when the solver gained
      * `stagnated`, a run that GAVE UP without placing everything was described
      * as an old run from before the field existed. The one reason a reviewer
      * most needs to see was the one rendered as archaeology.
      */
     if (!reason) {
-        return 'Unknown — this run predates termination capture.';
+        return 'Unknown. This run predates termination capture.';
     }
 
     switch (reason) {
         case 'converged':
             return 'Found an optimal solution and stopped.';
         case 'move_budget':
-            return 'Ran out of move budget — a longer run may do better.';
+            return 'Ran out of move budget. A longer run may do better.';
         case 'time_budget':
-            return 'Ran out of time. Not reproducible — a re-run may differ.';
+            return 'Ran out of time. Not reproducible. A re-run may differ.';
         case 'stagnated':
-            return 'Gave up before placing everything — some sessions have no slot in this proposal.';
+            return 'Gave up before placing everything: some sessions have no slot in this proposal.';
         case 'cancelled':
             return 'The run was cancelled.';
         default:
@@ -180,7 +180,7 @@ export function terminationSentence(reason: string | null): string {
 /**
  * Why the preview could not be read. The primary fetch is the one thing here that
  * is NOT tolerant, so a rejection nulled `summary.data` and the template fell
- * through to "this proposal proposes nothing" — a 403, a 404, a dropped
+ * through to "this proposal proposes nothing": a 403, a 404, a dropped
  * connection and a genuine manual baseline all rendered the same false claim.
  */
 export interface ReviewLoadError {
@@ -219,7 +219,7 @@ function describeLoadError(error: unknown): ReviewLoadError {
             return {
                 kind: 'failed',
                 title: 'Could not load this proposal',
-                detail: 'The preview did not come back. Nothing has been changed — try again.',
+                detail: 'The preview did not come back. Nothing has been changed. Try again.',
                 retryable: true,
             };
     }
@@ -251,7 +251,7 @@ export function shownAt(item: ReviewPlacement): Placement {
 
 /**
  * The grid encodes WHEN in `grid-column`/`grid-row`, which no assistive
- * technology reads — a moved chip said its action, offering, room and origin, and
+ * technology reads. A moved chip said its action, offering, room and origin, and
  * never when it now is: the one fact a move consists of.
  */
 export function describePlacement(
@@ -283,8 +283,8 @@ export function describePlacement(
  * actually made. Built from the same `plan` the summary renders, so the sentence
  * cannot claim a different change than the screen shows.
  *
- * Ordered by how much each clause should worry someone: removals first — they
- * are the destructive part — then additions, then moves. Zero-count clauses are
+ * Ordered by how much each clause should worry someone: removals first (they
+ * are the destructive part), then additions, then moves. Zero-count clauses are
  * omitted, because "0 removed" spends a reviewer's attention on nothing.
  */
 export function applyConsequence(
@@ -304,7 +304,7 @@ export function applyConsequence(
     if (plan.moved > 0) {
         /*
          * THE COLLATERAL SUBSET IS NAMED, not folded in. A minimize-movement
-         * repair moves Sessions of Offerings the reviewer never selected — that
+         * repair moves Sessions of Offerings the reviewer never selected: that
          * is the mode working, and it is the one thing about the plan they
          * cannot infer from "6 moved", which reads as six consequences of what
          * they asked for. Applying a repair that quietly reshuffles an untouched
@@ -321,7 +321,7 @@ export function applyConsequence(
     }
 
     const changes = clauses.length ? clauses.join(', ') : 'no placement changes';
-    const parts = [`Replace this term's timetable — ${changes}.`];
+    const parts = [`Replace this term's timetable: ${changes}.`];
 
     if (proposedHard > 0) {
         parts.push(
@@ -359,7 +359,7 @@ export function useGenerationReview(generationId: string) {
          * must never show.
          *
          * TOLERANT, one fetch at a time. A single 403 inside a `Promise.all`
-         * rejects the whole thing and renders a BLANK page — which is exactly
+         * rejects the whole thing and renders a BLANK page. That is exactly
          * what `/api/offerings` did to a viewer, because it requires
          * `offering.read` while this screen is gated on `generation.read` alone.
          * A page must only depend on what its own gate guarantees.
@@ -416,7 +416,7 @@ export function useGenerationReview(generationId: string) {
     /**
      * How many weeks the TERM has, not how many the proposal touches:
      * `weekSummary` carries only weeks that receive placements, so a proposal
-     * pulling 258 sessions into weeks 1–5 of 13 left 6–13 unselectable —
+     * pulling 258 sessions into weeks 1–5 of 13 left 6–13 unselectable:
      * precisely the weeks being emptied.
      */
     const weekCount = computed<number | null>(() => {
@@ -480,7 +480,7 @@ export function useGenerationReview(generationId: string) {
      *
      * Default `list`, and that is the redesign: the week grid was the primary
      * view, and a proposal moving 187 of 260 Sessions cannot be read one week at
-     * a time — the grid answers "what is in week 4", never "what does this do".
+     * a time: the grid answers "what is in week 4", never "what does this do".
      * It is now where you go once you know which Offering you are checking.
      */
     const view = ref<'list' | 'grid'>('list');
@@ -538,10 +538,10 @@ export function useGenerationReview(generationId: string) {
     /**
      * A THIRD flag, for the same reason as the two above.
      *
-     * `refresh()` awaits `summary.refresh()` and then `weekData.refresh()` — two
-     * sequential round trips — and reported nothing for their whole duration, so
+     * `refresh()` awaits `summary.refresh()` and then `weekData.refresh()`
+     * (two sequential round trips) and reported nothing for their whole duration, so
      * the control the staleness notice actively tells the reviewer to press
-     * ("over 2h ago — refresh before applying") looked inert when pressed.
+     * ("over 2h ago, refresh before applying") looked inert when pressed.
      *
      * Deliberately NOT folded into `busy`: that gates Apply and Discard, and a
      * refresh must not disable the decision it exists to make safe.
@@ -549,7 +549,7 @@ export function useGenerationReview(generationId: string) {
     const refreshing = ref(false);
 
     /**
-     * `apply()` used to end in `navigateTo('/schedule')` — the highest-stakes
+     * `apply()` used to end in `navigateTo('/schedule')`: the highest-stakes
      * action in the product finishing as a silent screen change. The outcome is
      * held here and the page stays put to say so.
      */
@@ -592,13 +592,13 @@ export function useGenerationReview(generationId: string) {
         /*
          * THE RE-READ IS NOT PART OF THE WRITE. Inside the same `try`, a refresh
          * that failed after a SUCCESSFUL apply was reported as "Could not apply
-         * this proposal. The schedule is unchanged." — a flat falsehood at the
-         * moment the reviewer most needs the truth.
+         * this proposal. The schedule is unchanged." That is a flat falsehood at
+         * the moment the reviewer most needs the truth.
          */
         try {
             await summary.refresh();
         } catch {
-            actionError.value = 'Applied. The view could not be refreshed — reload to see it.';
+            actionError.value = 'Applied. The view could not be refreshed. Reload to see it.';
         } finally {
             applying.value = false;
         }
@@ -622,7 +622,7 @@ export function useGenerationReview(generationId: string) {
         try {
             await summary.refresh();
         } catch {
-            actionError.value = 'Discarded. The view could not be refreshed — reload to see it.';
+            actionError.value = 'Discarded. The view could not be refreshed. Reload to see it.';
         } finally {
             discarding.value = false;
         }
@@ -647,7 +647,7 @@ export function useGenerationReview(generationId: string) {
                 refreshing.value = false;
             }
         },
-        /** The page awaits this — the one await, at setup top level. */
+        /** The page awaits this: the one await, at setup top level. */
         ready: summary,
     };
 }

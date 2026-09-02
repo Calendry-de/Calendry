@@ -1,4 +1,4 @@
-// Calendry — multi-tenant calendar/timetabling platform.
+// Calendry: multi-tenant calendar/timetabling platform.
 //
 // This file is the FIXED CORE TAXONOMY (TAXONOMY.md §1): entity types and their
 // relationships. Changing anything here is a migration, not a config change.
@@ -23,7 +23,7 @@ generator client {
 }
 
 // ---------------------------------------------------------------------------
-// Enums — structural, therefore fixed. Anything tenant-extensible is a table.
+// Enums are structural, therefore fixed. Anything tenant-extensible is a table.
 // ---------------------------------------------------------------------------
 
 /// Kinds of academic-calendar period. Structural (TAXONOMY.md §2 names these
@@ -58,7 +58,7 @@ enum CalendarPeriodKind {
 /// Whether a declared unavailability window is actually in force.
 ///
 /// Self-declared windows land PENDING and are INERT until an administrator
-/// approves them — `Person.blackouts` on the wire carries approved rows only.
+/// approves them. `Person.blackouts` on the wire carries approved rows only.
 /// That gate exists because a veto is a HARD constraint: an unreviewed one can
 /// make a term infeasible, and the failure surfaces as unplaced Sessions with
 /// nothing pointing back at the cause.
@@ -87,7 +87,7 @@ enum GenerationSource {
 /// PENDING for the window this app owns alone.
 ///
 /// There is deliberately no SUCCEEDED_WITH_VIOLATIONS. RunStatus describes the
-/// run's lifecycle, not the solution's quality — a completed run carrying
+/// run's lifecycle, not the solution's quality: a completed run carrying
 /// residual hard violations is a normal outcome under warn-and-allow
 /// (CLAUDE.md), and the violations live in the result, not in this column.
 /// Encoding them here would bake in the classification the wire protocol
@@ -110,7 +110,7 @@ enum SolverRunStatus {
 ///
 /// The solver is stateless and persists nothing beyond an in-flight run, so
 /// this table is the app's only record that a run happened. It holds the
-/// request (scope, budget, seed) and the last status snapshot — enough to
+/// request (scope, budget, seed) and the last status snapshot, enough to
 /// explain or reproduce a run without asking the solver anything.
 model SolverRun {
   id       String @id @default(uuid(7))
@@ -126,12 +126,12 @@ model SolverRun {
   scope Json @default("{}")
 
   /// Reproducibility inputs. `seed` is what the solver reported USING, echoed
-  /// back from StartRunResponse — a request of 0 means it chose its own.
+  /// back from StartRunResponse; a request of 0 means it chose its own.
   seed          BigInt?
   maxWallMillis Int?    @map("max_wall_millis")
   maxMoves      BigInt? @map("max_moves")
 
-  /// Last GetStatus snapshot. Overwritten per poll, not appended — the run's
+  /// Last GetStatus snapshot. Overwritten per poll, not appended: the run's
   /// history is not something anything needs.
   progress          Float   @default(0)
   bestObjective     Float?  @map("best_objective")
@@ -154,7 +154,7 @@ model SolverRun {
 
   /// The {week, day, block} that "now" mapped to when this run was started.
   /// Stored because it is derived from the clock and therefore the one input a
-  /// replay cannot reconstruct — without it the determinism guarantee is
+  /// replay cannot reconstruct: without it the determinism guarantee is
   /// quietly false. Written by Stage 3.
   referenceSlot Json? @map("reference_slot")
 
@@ -172,15 +172,15 @@ model SolverRun {
   /// genuinely gone and retrying forever would be a lie told slowly.
   resultRecoveryAttempts Int @default(0) @map("result_recovery_attempts")
 
-  /// Set when recovery gave up. The run STILL SUCCEEDED — only the capture
-  /// failed — which is why this is a separate fact rather than a status.
+  /// Set when recovery gave up. The run STILL SUCCEEDED (only the capture
+  /// failed), which is why this is a separate fact rather than a status.
   /// "Result lost" is `status = SUCCEEDED AND result_lost_at IS NOT NULL`.
   resultLostAt DateTime? @map("result_lost_at") @db.Timestamptz(3)
 
   /// The solver's SolverOutput, captured the moment the run went terminal.
   ///
   /// Captured eagerly because the solver keeps runs in an in-memory registry
-  /// with no persistence — a restart loses the answer. Storing it here makes
+  /// with no persistence: a restart loses the answer. Storing it here makes
   /// applying it (Stage 5) a database→database transform that cannot fail
   /// because a service bounced.
   result Json? @db.JsonB
@@ -200,7 +200,7 @@ model SolverRun {
   /// At most one PENDING/QUEUED/RUNNING run per term, enforced by the partial
   /// unique index `solver_run_one_active_per_term` in migration
   /// 20260816120000_solver_run. Prisma cannot express a partial unique index,
-  /// so it exists in SQL only — `prisma migrate dev` will offer to drop it as
+  /// so it exists in SQL only. `prisma migrate dev` will offer to drop it as
   /// drift. Do not let it (see CLAUDE.md).
   @@index([tenantId])
   @@index([tenantId, termId])
@@ -215,19 +215,19 @@ model SolverRun {
 /// only one of them is "the run that produced this Generation"
 /// (`SolverRun.generationId`). Answering "what was configured when this
 /// calendar was generated" is `SolverRun.findFirst({ where: { generationId } })`,
-/// then this table — the snapshot follows the same owner its hash already has
+/// then this table: the snapshot follows the same owner its hash already has,
 /// rather than inventing a second relationship to the same fact.
 ///
 /// A DEDICATED table, not a column on `solver_run`: this is the single
 /// largest and most sensitive payload the app stores (a tenant's whole
-/// scheduling configuration — people, groups, rooms, preferences — at one
+/// scheduling configuration (people, groups, rooms, preferences) at one
 /// moment), so it must not bloat the hot `solver_run` table that every
 /// ordinary status query touches, and its own read path can carry a stricter
 /// permission (`solver.snapshot.read`) than triggering or watching a run
 /// needs.
 ///
 /// Compressed rather than raw: gzip over the SAME ENCODED PROTOBUF BYTES
-/// `inputHash` is a SHA-256 digest of — never a JSON rendering, for the exact
+/// `inputHash` is a SHA-256 digest of, never a JSON rendering, for the exact
 /// reason `hashInput`'s own doc comment gives (key order, BigInt stringifying).
 /// Storing the encoding `inputHash` already committed to, rather than
 /// re-deriving one, is what keeps the two facts about the same run from ever
@@ -266,12 +266,12 @@ enum SessionEventType {
   MOVE
   SWAP
   DELETE
-  /// Changing what an Event IS — title, kind, groups, people — as opposed to
+  /// Changing what an Event IS (title, kind, groups, people), as opposed to
   /// where it sits, which is MOVE. Only ever written for an Event: an
   /// Offering-linked Session takes those from its Offering and from solver
   /// output, so the route that emits this refuses one.
   UPDATE_DETAILS
-  /// A manual override of who leads a Session — #7 item 4. Only ever written
+  /// A manual override of who leads a Session (#7 item 4). Only ever written
   /// when the Session is safe from the next solve: an Event (structurally out
   /// of scope) or a Session already LOCKED. `lecturers.post.ts` refuses
   /// anything else, matching `UPDATE_DETAILS`'s refusal for an unlocked
@@ -286,19 +286,19 @@ enum SessionEventType {
   /// ambiguous (apply the snapshot, the events, or both?).
   APPLY_GENERATION
 
-  /// Somebody else covers a Session's placement — Vertretung (issue #30). NOT
+  /// Somebody else covers a Session's placement (Vertretung, issue #30). NOT
   /// `SET_LECTURERS`: that overwrites `session_person` permanently and needs the
   /// Session locked first, because it collides with the next solve. A
-  /// substitution changes nothing the solver touches — it is a `SessionSubstitution`
-  /// overlay read at display/read time — so it needs no lock and the original
+  /// substitution changes nothing the solver touches: it is a `SessionSubstitution`
+  /// overlay read at display/read time, so it needs no lock and the original
   /// lecturer assignment is never edited. Written for BOTH covering and
   /// reverting (`payload.to: null`), so the log states "who, when" for each.
   SUBSTITUTE
   /// Cancel an Offering-linked Session to the spare bank (issue #22): nulls
   /// its placement but keeps the row, so the teaching stays owed rather than
-  /// silently forgotten. Deliberately NOT `DELETE` — the row survives, so
+  /// silently forgotten. Deliberately NOT `DELETE`: the row survives, so
   /// `sessionId` stays populated, unlike `DELETE`'s payload-only record.
-  /// `MOVE` restores it, exactly as it repositions any other Session — the
+  /// `MOVE` restores it, exactly as it repositions any other Session: the
   /// same event type FROM a null placement TO a real one.
   BANK
 
@@ -319,7 +319,7 @@ enum ConstraintSeverity {
 // ---------------------------------------------------------------------------
 
 /// Optional parent grouping of Tenants that share resources. Owns resources
-/// member tenants may reference — the deliberate, narrow exception to tenant
+/// member tenants may reference: the deliberate, narrow exception to tenant
 /// isolation. NOT tenant-scoped (it is above the tenant).
 model Federation {
   id        String   @id @default(uuid(7))
@@ -337,7 +337,7 @@ model Federation {
   @@map("federation")
 }
 
-/// A single institution. THE isolation boundary — every tenant-scoped table
+/// A single institution. THE isolation boundary: every tenant-scoped table
 /// carries tenant_id and is filtered by row-level security, not app code.
 model Tenant {
   id           String  @id @default(uuid(7))
@@ -415,7 +415,7 @@ model Tenant {
 // People & roles
 // ---------------------------------------------------------------------------
 
-/// The ONLY person entity (TAXONOMY.md §2). No Student/Lecturer/Staff tables —
+/// The ONLY person entity (TAXONOMY.md §2). No Student/Lecturer/Staff tables:
 /// what someone *is* comes from PersonRole, which is tenant vocabulary.
 model Person {
   id       String @id @default(uuid(7))
@@ -432,7 +432,7 @@ model Person {
   timezone String?
 
   /// BCP-47 tag (e.g. "de-DE"). NULL = inherit the tenant's `defaultLocale`,
-  /// which itself falls back to the request's Accept-Language header — see
+  /// which itself falls back to the request's Accept-Language header, see
   /// `server/utils/locale.ts`'s `resolveLocale`. Display/formatting only,
   /// same as `timezone`: never affects what UI text says (issue #19's
   /// territory), only how dates and numbers are drawn (issue #17).
@@ -459,14 +459,14 @@ model Person {
 
   /// Unavailability declared ABOUT this person (TAXONOMY.md §7, LecturerVeto).
   unavailability          PersonUnavailability[] @relation("PersonUnavailabilitySubject")
-  /// Rows this person SUBMITTED — their own, or somebody else's as an admin.
+  /// Rows this person SUBMITTED: their own, or somebody else's as an admin.
   unavailabilitySubmitted PersonUnavailability[] @relation("PersonUnavailabilityAuthor")
   /// Rows this person approved or rejected.
   unavailabilityDecided   PersonUnavailability[] @relation("PersonUnavailabilityDecider")
 
   preference PersonPreference?
 
-  /// Sessions this Person is COVERING for somebody else (issue #30) — never the
+  /// Sessions this Person is COVERING for somebody else (issue #30), never the
   /// original lecturer's own row, which stays in `sessionPeople`.
   substitutionsCovering SessionSubstitution[]
 
@@ -480,7 +480,7 @@ model Person {
 
 /// Tenant-defined vocabulary. `lecturer` is the one universal key (the person
 /// who leads a Session) and is marked is_system so tenants cannot delete it;
-/// everything else — student, auditor, TA, external — is theirs to define.
+/// everything else (student, auditor, TA, external) is theirs to define.
 model Role {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -533,13 +533,13 @@ model PersonRole {
 /// Maps 1:1 to `calendry.solver.v1.Unavailability`, INCLUDING its emptiness
 /// convention: an EMPTY array means "every value on that axis", so `{days:[5]}`
 /// is every Friday and `{blocks:[0]}` is every first block. NOTE that
-/// `person_preference` below INVERTS this — there an empty array means "no
+/// `person_preference` below INVERTS this: there an empty array means "no
 /// preference". Two adjacent tables with opposite emptiness semantics is
 /// exactly what a later reader gets wrong, so both say so.
 ///
 /// Rows are IMMUTABLE once submitted: editing is delete-then-resubmit. An edit
 /// would need its own re-enters-pending state machine, and every deletion
-/// RELAXES the problem — approval exists to stop unilateral tightening, so a
+/// RELAXES the problem. Approval exists to stop unilateral tightening, so a
 /// person may always delete their own row whatever its status.
 model PersonUnavailability {
   id       String @id @default(uuid(7))
@@ -555,7 +555,7 @@ model PersonUnavailability {
   /// Index into the term's calendar weeks. Empty = every week.
   ///
   /// Only meaningful alongside `termId`, because the index counts weeks of ONE
-  /// term's calendar — the same index is thirteen months apart between this
+  /// term's calendar: the same index is thirteen months apart between this
   /// tenant's two terms. A database CHECK enforces the pairing.
   weeks  Int[]
 
@@ -571,7 +571,7 @@ model PersonUnavailability {
 
   status PersonUnavailabilityStatus @default(PENDING)
 
-  /// Who submitted it — the person themselves, or an administrator acting for
+  /// Who submitted it: the person themselves, or an administrator acting for
   /// them. NULLABLE with ON DELETE SET NULL for the same reason
   /// `session_event.session_id` is: an audit pointer must be allowed to outlive
   /// the row it names, and deleting an administrator must not cascade away the
@@ -604,12 +604,12 @@ model PersonUnavailability {
   @@map("person_unavailability")
 }
 
-/// Soft scheduling preferences for one Person — "prefers mornings", "prefers
+/// Soft scheduling preferences for one Person: "prefers mornings", "prefers
 /// Tuesdays".
 ///
 /// THE TWO AXES ARE ADDITIVE: each earns credit independently, so a Tuesday
 /// first block earns both. The data deliberately cannot express "Tuesday
-/// mornings only" — that conjunction would need a (day x block) matrix rather
+/// mornings only": that conjunction would need a (day x block) matrix rather
 /// than two arrays, and is a separate preference kind if anyone ever needs it.
 /// Stated here because nothing else states it, and the first evaluator to read
 /// these columns would otherwise fix the semantics by accident.
@@ -620,8 +620,8 @@ model PersonUnavailability {
 /// (`calendry-solver` 41f6227) by charging the mean UNMET fraction per
 /// placement.
 ///
-/// This comment said the opposite until stage 5 landed — "nothing reads this,
-/// because the wire has no field for it" — and all three clauses had become
+/// This comment said the opposite until stage 5 landed ("nothing reads this,
+/// because the wire has no field for it"), and all three clauses had become
 /// false: something reads it, the field exists, and it is `Person.preferred`
 /// rather than the `preferred_days` / `preferred_blocks` named here. Corrected
 /// rather than left to be deleted later, because a stale comment on a schema
@@ -632,7 +632,7 @@ model PersonUnavailability {
 /// mistake prices rather than refuses), it is OFF BY DEFAULT (no tenant's
 /// timetable moves without someone choosing it), and the assembly report counts
 /// the wholly-inert case so "configured but silent" is distinguishable from
-/// "configured and satisfied" — which is exactly what nothing did for
+/// "configured and satisfied", which is exactly what nothing did for
 /// `lecturer_veto`.
 ///
 /// An ABSENT row means "no preferences", so the write path DELETES the row when
@@ -644,7 +644,7 @@ model PersonPreference {
   personId String @id @map("person_id")
   tenantId String @map("tenant_id")
 
-  /// ISO weekday numbers, 1 = Monday. EMPTY MEANS NO PREFERENCE — the opposite
+  /// ISO weekday numbers, 1 = Monday. EMPTY MEANS NO PREFERENCE, the opposite
   /// of `person_unavailability` above, where empty means every value.
   preferredDays   Int[] @map("preferred_days")
   /// 0-based block index within the day. Empty means no preference.
@@ -667,7 +667,7 @@ model PersonPreference {
   /// clamp bounds are exactly representable.
   ///
   /// ADMINISTRATOR-ONLY. The self-service path REFUSES this field rather than
-  /// dropping it — a person raising their own weight is the unilateral
+  /// dropping it: a person raising their own weight is the unilateral
   /// escalation that soft preferences are otherwise free of, and it is the one
   /// place the two write paths stop being the same operation.
   weightMultiplier Float? @map("weight_multiplier")
@@ -684,7 +684,7 @@ model PersonPreference {
   @@map("person_preference")
 }
 
-/// Which room types this Person would rather teach in — the second axis of
+/// Which room types this Person would rather teach in: the second axis of
 /// `PersonPreference`, after day/block.
 ///
 /// A JOIN with an FK rather than a `String[]` of keys on the parent row.
@@ -695,7 +695,7 @@ model PersonPreference {
 /// preference and leaves an inert string nothing contradicts.
 ///
 /// Cascades from the PREFERENCE, not from the Person, so the parent's
-/// delete-when-every-axis-is-empty discipline keeps working — otherwise an
+/// delete-when-every-axis-is-empty discipline keeps working; otherwise an
 /// absent preference and an empty one become two states again.
 model PersonPreferenceRoomFeature {
   personId    String @map("person_id")
@@ -715,7 +715,7 @@ model PersonPreferenceRoomFeature {
 }
 
 // ---------------------------------------------------------------------------
-// Grouping — nested (TAXONOMY.md §2, §6)
+// Grouping: nested (TAXONOMY.md §2, §6)
 // ---------------------------------------------------------------------------
 
 /// A class, cohort, seminar group. Self-referential: Cohort → Class → Seminar.
@@ -730,20 +730,20 @@ model Group {
   name        String
   description String?
 
-  /// Denormalized headcount hint for room-capacity checks. Advisory only —
+  /// Denormalized headcount hint for room-capacity checks. Advisory only:
   /// Membership is the source of truth.
   expectedSize Int? @map("expected_size")
 
-  /// The curriculum plan this Group is INTENDED to follow — an administrative
+  /// The curriculum plan this Group is INTENDED to follow: an administrative
   /// hint, set once (typically at creation), before this Group has a single
   /// Offering yet.
   ///
-  /// NEVER READ TO ANSWER "what plan is this Group currently on" — that
+  /// NEVER READ TO ANSWER "what plan is this Group currently on": that
   /// question is `deriveGroupPlanApplications()`, computed fresh from
   /// `Offering.createdFromTemplateId` on the Offerings this Group already has
   /// (see that function's own comment on why nothing is stored for it). This
-  /// field answers a different, earlier question — "which plan should this
-  /// Group's offerings come from, once someone applies one" — which has no
+  /// field answers a different, earlier question, "which plan should this
+  /// Group's offerings come from, once someone applies one", which has no
   /// derivable answer before that first apply, and is the intent
   /// `ManageOfferingPlanBulkApply` pre-selects a Group by.
   ///
@@ -760,13 +760,13 @@ model Group {
   children       Group[]       @relation("GroupHierarchy")
   curriculumPlan OfferingPlan? @relation(fields: [curriculumPlanId], references: [id], onDelete: SetNull)
 
-  /// When `sources` were last copied into `memberships`. NULL means never —
+  /// When `sources` were last copied into `memberships`. NULL means never,
   /// which is a different fact from "generated and unchanged since", and the
   /// two read identically in a UI that only counts members.
   membersGeneratedAt DateTime? @map("members_generated_at") @db.Timestamptz(3)
 
-  /// Groups this one draws its members from. A COMBINED group — two cohorts'
-  /// Management tracks taught together — is an ordinary root-level Group whose
+  /// Groups this one draws its members from. A COMBINED group (two cohorts'
+  /// Management tracks taught together) is an ordinary root-level Group whose
   /// membership was copied from these, not a second parent above them: the
   /// hierarchy is a tree on the wire and in every closure walk.
   ///
@@ -838,10 +838,10 @@ model Membership {
 // ---------------------------------------------------------------------------
 
 /// Federation-ownable (a consortium's shared lecture hall). Exactly one of
-/// tenant_id / federation_id is set — enforced by a CHECK constraint in the
+/// tenant_id / federation_id is set, enforced by a CHECK constraint in the
 /// companion migration, not by convention.
 ///
-/// Online delivery is a virtual Room (is_virtual), not a boolean on Session —
+/// Online delivery is a virtual Room (is_virtual), not a boolean on Session:
 /// keeps room-assignment logic uniform (TAXONOMY.md §2).
 model Room {
   id           String  @id @default(uuid(7))
@@ -852,7 +852,7 @@ model Room {
   name     String
   capacity Int     @default(0)
 
-  /// Separate, optional capacity for EXAM sittings — spacing and invigilation
+  /// Separate, optional capacity for EXAM sittings: spacing and invigilation
   /// reduce usable seats below normal teaching capacity. NULL falls back to
   /// `capacity`, same "NULL is a meaningful fallback" pattern as
   /// `Offering.color`/`Offering.requiredCapacity` above.
@@ -932,7 +932,7 @@ model RoomEquipment {
 }
 
 // ---------------------------------------------------------------------------
-// Time — per-tenant configuration, never global (TAXONOMY.md §2)
+// Time: per-tenant configuration, never global (TAXONOMY.md §2)
 // ---------------------------------------------------------------------------
 
 /// Block length, blocks/day, active days, start hour. The prototype's
@@ -962,7 +962,7 @@ model TimeGrid {
   /// At most one per tenant, enforced by the partial unique index
   /// `time_grid_one_default_per_tenant` in migration
   /// 20260814120000_time_grid_single_default. Prisma cannot express a partial
-  /// unique index, so it exists in SQL only — `prisma migrate dev` will offer to
+  /// unique index, so it exists in SQL only. `prisma migrate dev` will offer to
   /// drop it as "drift". Do not let it (see CLAUDE.md).
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -980,7 +980,7 @@ model TimeGrid {
   @@map("time_grid")
 }
 
-/// A named, non-uniform gap on a TimeGrid — lunch, an afternoon break.
+/// A named, non-uniform gap on a TimeGrid: lunch, an afternoon break.
 ///
 /// Sparse: a grid with none behaves exactly as it did when `breakMinutes` was
 /// the whole story. The unique index on (grid, position, day) is what makes
@@ -995,7 +995,7 @@ model TimeGridBreak {
   timeGridId String @map("time_grid_id")
 
   /// The gap FOLLOWS this 0-based block index. A row naming the final block is
-  /// inert — there is no later block for it to push.
+  /// inert: there is no later block for it to push.
   afterBlockIndex Int    @map("after_block_index")
   durationMinutes Int    @map("duration_minutes")
   label           String
@@ -1010,14 +1010,14 @@ model TimeGridBreak {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   timeGrid TimeGrid @relation(fields: [timeGridId], references: [id], onDelete: Cascade)
 
-  /// NULLS NOT DISTINCT in SQL, which Prisma cannot express — see the migration.
+  /// NULLS NOT DISTINCT in SQL, which Prisma cannot express: see the migration.
   @@unique([timeGridId, afterBlockIndex, dayOfWeek])
   @@index([tenantId])
   @@index([timeGridId])
   @@map("time_grid_break")
 }
 
-/// Academic term / semester. Core from day one — constraints like "minimize
+/// Academic term / semester. Core from day one: constraints like "minimize
 /// sessions in exam weeks" resolve against CalendarPeriod, never `weeks[-n:]`.
 model Term {
   id       String @id @default(uuid(7))
@@ -1062,7 +1062,7 @@ model Term {
 /// two lifetimes. A cohort like "dIT22 S1 4.Semester" belongs to one Term; its
 /// parent "IT Security" is a degree programme that persists across all of them
 /// and is never directly scheduled. Owning a Group by a Term would force either
-/// a cross-Term parent — abandoning the model — or a duplicated programme node
+/// a cross-Term parent (abandoning the model) or a duplicated programme node
 /// per Term, which destroys the identity of the thing it names and orphans
 /// every `membership` row pointing at last Term's copy.
 model GroupTerm {
@@ -1082,7 +1082,7 @@ model GroupTerm {
   @@map("group_term")
 }
 
-/// When a Group is available WITHIN one Term — the cohort that runs only the
+/// When a Group is available WITHIN one Term: the cohort that runs only the
 /// first six weeks.
 ///
 /// AN ABSENT ROW MEANS THE WHOLE TERM. Fail-open, matching `GroupTerm`'s choice
@@ -1090,7 +1090,7 @@ model GroupTerm {
 /// and a new one is schedulable immediately rather than after a second step.
 ///
 /// NOT columns on `GroupTerm`, deliberately, and the reason is a trap rather
-/// than taste. That table's row EXISTENCE already means something — and the
+/// than taste. That table's row EXISTENCE already means something, and the
 /// opposite kind of thing: no row means "every Term", a row means "only these".
 /// A date range there would make narrowing a Group inside one Term silently
 /// scope it OUT of all the others. It also keeps `GroupTerm` what it is
@@ -1098,7 +1098,7 @@ model GroupTerm {
 /// this table exists precisely in order to reach it.
 ///
 /// ONE WINDOW PER (GROUP, TERM), by primary key, so a second is unrepresentable
-/// rather than rejected — the same construction as `TenantDisplaySettings`
+/// rather than rejected, the same construction as `TenantDisplaySettings`
 /// being keyed by `tenantId` alone. The wire could carry several disjoint
 /// windows; this is a narrowing of what the tenant can SAY, not of what the
 /// solver can honour.
@@ -1113,7 +1113,7 @@ model GroupTermAvailability {
   tenantId String @map("tenant_id")
 
   /// Both nullable, at least one required (DB CHECK). One-sided is a real
-  /// request — "joins in week 5, runs to the end" — and making the caller
+  /// request ("joins in week 5, runs to the end"), and making the caller
   /// restate the Term's own boundary would store a second copy of it that goes
   /// stale when the Term moves.
   availableFrom DateTime? @map("available_from") @db.Date
@@ -1137,7 +1137,7 @@ model GroupTermAvailability {
 /// Holds no AccessRole and no acting Person, which is what settles the
 /// authority question by construction rather than by policy: `heldPermissions()`
 /// throws 403 the moment `actorPersonId` is null, so a screen key cannot satisfy
-/// any permission check — including ones added later. Its authority is its room
+/// any permission check, including ones added later. Its authority is its room
 /// scope and nothing else.
 ///
 /// NOT a fourth RLS exception. Resolution goes through
@@ -1151,7 +1151,7 @@ model Screen {
   /// What a human calls it when revoking the right one.
   name String
 
-  /// SHA-256 of the presented key, never the key itself — same treatment
+  /// SHA-256 of the presented key, never the key itself, same treatment
   /// `auth_session` gives its token, and unique GLOBALLY because the lookup
   /// happens before any tenant is known.
   tokenHash String @map("token_hash")
@@ -1160,7 +1160,7 @@ model Screen {
   /// name and room scope.
   isActive Boolean @default(true) @map("is_active")
 
-  /// Last successful board fetch — the only way to tell a working display from
+  /// Last successful board fetch: the only way to tell a working display from
   /// a dark one without walking to it.
   lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(3)
 
@@ -1175,7 +1175,7 @@ model Screen {
   @@map("screen")
 }
 
-/// Which Rooms a Screen shows. NO ROWS MEANS EVERY ROOM — fail-open, matching
+/// Which Rooms a Screen shows. NO ROWS MEANS EVERY ROOM. Fail-open, matching
 /// `GroupTerm`, because a scopeless screen should show the building rather than
 /// a blank wall that looks exactly like a broken display.
 model ScreenRoom {
@@ -1218,11 +1218,11 @@ model CalendarPeriod {
 }
 
 // ---------------------------------------------------------------------------
-// Scheduling — the Offering / Session split (TAXONOMY.md §2)
+// Scheduling: the Offering / Session split (TAXONOMY.md §2)
 // ---------------------------------------------------------------------------
 
 /// Tenant-defined vocabulary replacing a fixed Lecture/Exam/Event split.
-/// A kind may legitimately have no Group at all (e.g. staff_meeting) — which
+/// A kind may legitimately have no Group at all (e.g. staff_meeting), which
 /// is exactly why Constraints must declare the kinds they apply to.
 /// The fixed classification behind a tenant-named Session kind. See
 /// `SessionKind.type`; values are schema-level and adding one is a migration.
@@ -1244,8 +1244,8 @@ model SessionKind {
 
   /// What ROLE this kind plays, as opposed to what the tenant calls it.
   ///
-  /// THE FIXED HALF OF AN OPEN VOCABULARY. `key` and `name` stay tenant-owned —
-  /// "Klausur" is as valid as "exam" — while this is schema-level, so a rule can
+  /// THE FIXED HALF OF AN OPEN VOCABULARY. `key` and `name` stay tenant-owned:
+  /// "Klausur" is as valid as "exam", while this is schema-level, so a rule can
   /// act on the DECLARATION instead of guessing at the string. The two columns
   /// are TAXONOMY.md's open/fixed split drawn through one table.
   ///
@@ -1320,7 +1320,7 @@ model Offering {
   /// descendants closure, falling back to summed `expectedSize` over the
   /// MAXIMAL attached Groups when that closure holds no real membership.
   ///
-  /// This comment described the derivation for months before anything did it —
+  /// This comment described the derivation for months before anything did it:
   /// `assembleSolverInput` mapped `?? 0`, and the solver's filter is
   /// `room.capacity < min_capacity`, so 0 meant every Room qualified. An
   /// explicit value still wins; only NULL derives.
@@ -1330,7 +1330,7 @@ model Offering {
   /// by the solver from that pool rather than all of them together.
   ///
   /// NULL derives to `min(1, pool size)` at assembly time
-  /// (`assembleSolverInput`) — one lecturer's-worth of attendance is what an
+  /// (`assembleSolverInput`): one lecturer's-worth of attendance is what an
   /// unedited Offering has always meant, and a NULL row (every row today)
   /// applies that reading retroactively rather than freezing whatever the
   /// pool happened to contain. An explicit value is a deliberate co-teaching
@@ -1340,7 +1340,7 @@ model Offering {
   /// table is written through a separate request (the generic `relations`
   /// picker, not `childKeys`), so no single transaction ever holds both
   /// counts at once. `assembleSolverInput` clamps to the pool size and
-  /// reports the mismatch instead — the wire is never sent an impossible
+  /// reports the mismatch instead: the wire is never sent an impossible
   /// demand, but nothing here refuses the save.
   requiredLecturerCount Int? @map("required_lecturer_count")
 
@@ -1352,27 +1352,27 @@ model Offering {
   ///
   /// CAPPED AT 4 BY A DATABASE CHECK, mirroring the solver's structural limit
   /// (1 primary + `MAX_ADDITIONAL_ROOMS`). Above it `convert.rs` REFUSES the
-  /// whole input rather than truncating, so a stored 5 is not a big number —
+  /// whole input rather than truncating, so a stored 5 is not a big number:
   /// it is every run failing for the tenant. `MAX_ROOMS_PER_SESSION` in
   /// `shared/rooms.ts` is the same 4 for the write schema and the form.
   ///
-  /// Capacity is SUMMED across the chosen Rooms, not required of each — see the
+  /// Capacity is SUMMED across the chosen Rooms, not required of each; see the
   /// migration and `Offering.required_room_count` in the proto.
   requiredRoomCount Int @default(1) @map("required_room_count")
 
   /// May the solver place this Offering in a VIRTUAL Room? Not "is this
-  /// online" — online delivery is a virtual Room, not a Session flag
+  /// online": online delivery is a virtual Room, not a Session flag
   /// (TAXONOMY.md §2). This is permission for the solver to choose one.
   /// False by default: opting into online delivery is a tenant decision.
   allowOnline Boolean @default(false) @map("allow_online")
 
-  /// Issue #8. PROVENANCE ONLY — which OfferingTemplate this was seeded from,
-  /// for UI convenience ("created from Maths — 4x/week") and analytics.
+  /// Issue #8. PROVENANCE ONLY: which OfferingTemplate this was seeded from,
+  /// for UI convenience ("created from Maths (4x/week)") and analytics.
   ///
   /// NOTHING MAY READ THIS TO RESOLVE A CURRENT FIELD VALUE. The template's
   /// shape is COPIED onto the row at creation time, once; editing the template
   /// afterward must not reach back into Offerings already made from it, or a
-  /// term's history changes under it. SET NULL on delete for the same reason —
+  /// term's history changes under it. SET NULL on delete for the same reason:
   /// deleting a template must not touch a single field of an Offering that
   /// merely started from it.
   createdFromTemplateId String? @map("created_from_template_id")
@@ -1410,13 +1410,13 @@ model Offering {
 /// migration to undo later.
 /// What this tenant's schedule highlights, and where a colour comes from.
 ///
-/// A SINGLETON per tenant — `tenantId` is the primary key, with no surrogate
+/// A SINGLETON per tenant: `tenantId` is the primary key, with no surrogate
 /// `id`, so "at most one settings row per tenant" is unrepresentable-otherwise
 /// rather than enforced by a constraint someone could drop.
 ///
 /// An ABSENT row means defaults. Provisioning deliberately does not seed one, so
 /// a tenant that has never opened the page behaves exactly like one that opened
-/// it and changed nothing — there is no third state where settings exist but say
+/// it and changed nothing; there is no third state where settings exist but say
 /// nothing.
 ///
 /// It stores no copy of any fact it displays: online delivery is a virtual Room
@@ -1440,14 +1440,14 @@ model TenantDisplaySettings {
   /// fallback, and an unauthenticated/unconfigured request falls back
   /// further still to Accept-Language. NULL = no tenant default, defer
   /// straight to the header. Wrong for a Federation whose member
-  /// institutions may want different languages — that is why this is
+  /// institutions may want different languages, which is why this is
   /// per-tenant, not per-Federation, matching the issue's own framing.
   defaultLocale String? @map("default_locale")
 
   /// Issue #8. A DEFAULT-BEHAVIOUR bias, not a fork: it decides which Offering
   /// fields the form leads with and which constraint types the catalogue
   /// suggests first, never what an Offering IS or which rules exist. Living on
-  /// THIS singleton — rather than a table of its own — is deliberate: the
+  /// THIS singleton, rather than a table of its own, is deliberate: the
   /// ticket that added it was explicit that a tenant must not gain a second
   /// "settings exist, absent means defaults" mechanism to keep straight
   /// alongside this one. UNIVERSITY is the default because it is what every
@@ -1463,7 +1463,7 @@ model TenantDisplaySettings {
 }
 
 /// Issue #8. UI/UX bias only (form field prominence, suggested constraint
-/// types) — TAXONOMY.md's fixed entity model does not branch on this, and
+/// types); TAXONOMY.md's fixed entity model does not branch on this, and
 /// never should: a mode that changed what an Offering IS would be two
 /// products sharing a database.
 enum TenantMode {
@@ -1529,7 +1529,7 @@ model OfferingEquipment {
 
 /// Issue #8. A REUSABLE SHAPE, not a live link: creating an Offering "from" a
 /// template COPIES these field values onto the new row once, at creation time.
-/// Nothing may resolve an Offering's current fields through this table — see
+/// Nothing may resolve an Offering's current fields through this table; see
 /// `Offering.createdFromTemplateId`'s own comment. Editing a template only
 /// ever affects Offerings created from it AFTER the edit, which is what keeps
 /// a term's already-scheduled history from changing under a tenant editing
@@ -1537,7 +1537,7 @@ model OfferingEquipment {
 ///
 /// Closest existing machinery is `defaultConstraintRow` (`shared/
 /// constraintTypes.ts`): a stored shape a NEW row is seeded from. The
-/// difference is authorship — that catalogue is code, this one is tenant data,
+/// difference is authorship: that catalogue is code, this one is tenant data,
 /// so it is a table and CRUD routes rather than a function and a backfill
 /// script.
 ///
@@ -1548,7 +1548,7 @@ model OfferingTemplate {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
-  /// The template's own name in the picker — "Maths — 4x/week", not the
+  /// The template's own name in the picker, e.g. "Maths (4x/week)", not the
   /// Offering title it seeds. Kept distinct from `title` below because a
   /// template is reused across many concrete Offerings, each of which may want
   /// its own title (a specific class, a specific cohort).
@@ -1568,7 +1568,7 @@ model OfferingTemplate {
 
   /// The "lecturer pool" hint (TAXONOMY.md's Role, not a specific Person): a
   /// school's "Mr Schmidt" is named on the created Offering's `lecturers`
-  /// relation, one Person at a time, through the ordinary Offering form —
+  /// relation, one Person at a time, through the ordinary Offering form;
   /// this stays a Role reference so the shape itself never hardcodes an
   /// individual.
   requiredRoleId String? @map("required_role_id")
@@ -1594,17 +1594,17 @@ model OfferingTemplate {
   @@map("offering_template")
 }
 
-/// A reusable, ORDERED set of `OfferingTemplate`s — "this is what a cohort's
+/// A reusable, ORDERED set of `OfferingTemplate`s: "this is what a cohort's
 /// whole term looks like" (Math, German, PE, ...), so applying one to a Group
 /// creates its entire course load in one action instead of one Offering at a
 /// time. A template fixes ONE Offering's shape; a plan bundles several.
 ///
-/// The plan does not copy its items' shapes into itself — `OfferingPlanItem`
+/// The plan does not copy its items' shapes into itself; `OfferingPlanItem`
 /// only references a template's id. Applying a plan reads each template's
 /// CURRENT shape at apply time, the same "copy happens at use, not at
 /// authoring" rule `OfferingTemplate` itself already follows for Offerings.
 /// Editing a template after a plan that references it has already been
-/// applied changes nothing about the Offerings that earlier apply created —
+/// applied changes nothing about the Offerings that earlier apply created,
 /// only what the NEXT apply produces.
 model OfferingPlan {
   id       String @id @default(uuid(7))
@@ -1613,13 +1613,13 @@ model OfferingPlan {
   name        String
   description String?
 
-  /// This plan's successor — "Semester 3" points at "Semester 4" — so a Group
+  /// This plan's successor ("Semester 3" points at "Semester 4"), so a Group
   /// already on this plan can move forward with no picker: the Term defaults
   /// to whichever starts next after the one it's currently on, per
   /// `nextPlanId`'s own read site. SET NULL on delete: a chain losing its
   /// next link degrades to "no suggested successor", never a dangling id.
   ///
-  /// NOT a chain the schema verifies is acyclic or single-stranded — a self
+  /// NOT a chain the schema verifies is acyclic or single-stranded: a self
   /// link, a cycle, or two plans both pointing at a third are all storable.
   /// Nothing here walks more than one hop, so nothing is CORRUPTED by one;
   /// it would just make a bad suggestion, the same failure mode as pointing
@@ -1633,13 +1633,13 @@ model OfferingPlan {
   nextPlan OfferingPlan? @relation("PlanSuccession", fields: [nextPlanId], references: [id], onDelete: SetNull)
   items    OfferingPlanItem[]
 
-  /// The plan(s) that name this one as their successor — never walked in
+  /// The plan(s) that name this one as their successor, never walked in
   /// application code (a plan doesn't need to know who points at it), kept
   /// only because Prisma requires the relation's other side to exist.
   precededBy OfferingPlan[] @relation("PlanSuccession")
 
   /// Groups that intend to follow this plan (`Group.curriculumPlanId`) but
-  /// have not necessarily had it applied yet — read by the bulk-apply picker
+  /// have not necessarily had it applied yet, read by the bulk-apply picker
   /// to pre-select candidates, never to answer "who is on this plan now".
   intendedByGroups Group[]
 
@@ -1648,13 +1648,13 @@ model OfferingPlan {
   @@map("offering_plan")
 }
 
-/// One template's membership in one plan, ordered. No shape data of its own —
+/// One template's membership in one plan, ordered. No shape data of its own;
 /// see `OfferingPlan`'s own comment for why applying reads the template
 /// fresh rather than a shape frozen at the time it was added.
 ///
 /// CASCADES ON BOTH FOREIGN KEYS, unlike `Offering.createdFromTemplateId`'s
 /// SET NULL: that column is pure provenance on a row that is already a
-/// complete Offering without it, but a plan item IS the reference — deleting
+/// complete Offering without it, but a plan item IS the reference: deleting
 /// its template leaves nothing behind worth keeping a dangling row for, so it
 /// simply drops out of the plan rather than becoming a phantom entry no UI
 /// can name.
@@ -1665,7 +1665,7 @@ model OfferingPlanItem {
   planId     String @map("plan_id")
   templateId String @map("template_id")
 
-  /// Display/apply order within the plan. Not unique — a full reorder writes
+  /// Display/apply order within the plan. Not unique: a full reorder writes
   /// every item's position in one request rather than shuffling by delta.
   position Int
 
@@ -1686,14 +1686,14 @@ model OfferingPlanItem {
 ///
 /// Placement is stored as TimeGrid coordinates (term_week / day_of_week /
 /// block_index) because that is what constraints reason about. starts_at and
-/// ends_at are DERIVED convenience columns for iCal export and UI rendering —
+/// ends_at are DERIVED convenience columns for iCal export and UI rendering,
 /// never the source of truth for "same day" or "adjacent slot" logic.
 model Session {
   id String @id @default(uuid(7))
 
   /// Exactly one of tenantId / federationId is set, enforced by the
   /// `session_one_owner` CHECK. A federation-owned Session is a genuinely
-  /// shared event (TAXONOMY.md §2 amendment) — readable by every member tenant,
+  /// shared event (TAXONOMY.md §2 amendment), readable by every member tenant,
   /// writable by none of them.
   tenantId     String? @map("tenant_id")
   federationId String? @map("federation_id")
@@ -1706,7 +1706,7 @@ model Session {
   /// than storing one nothing will ever render.
   title String?
 
-  /// NULL means this Session is an EVENT — a placement with no recurring
+  /// NULL means this Session is an EVENT: a placement with no recurring
   /// demand behind it (TAXONOMY.md §2). An Event carries no Offering, so it is
   /// in no solve's scope and `planMaterialization()`'s delete partition
   /// (`inScope.has(offeringId)`) cannot reach it. Sent to the solver as
@@ -1716,29 +1716,29 @@ model Session {
   kindId     String  @map("kind_id")
   timeGridId String? @map("time_grid_id")
 
-  /// 1-based week within the Term. NULL means this Session is BANKED — see the
+  /// 1-based week within the Term. NULL means this Session is BANKED: see the
   /// note above `dayOfWeek`.
   termWeek Int? @map("term_week")
 
   /// ISO weekday, 1 = Monday … 7 = Sunday. Resolved against TimeGrid.activeDays.
   ///
-  /// NULLABLE TOGETHER WITH `termWeek` AND `blockIndex` (never one alone —
+  /// NULLABLE TOGETHER WITH `termWeek` AND `blockIndex` (never one alone;
   /// `session_placement_sane` enforces all-or-nothing): the "cancel to spare
   /// bank" state (issue #22). A cancelled Offering-linked Session keeps its
-  /// row — still counted toward `Offering.frequency`, still carrying its
-  /// Groups/People/Rooms — but sits nowhere until a human places it again.
+  /// row, still counted toward `Offering.frequency`, still carrying its
+  /// Groups/People/Rooms, but sits nowhere until a human places it again.
   /// `isPlacedSession()` (`shared/sessionPlacement.ts`) is the one predicate
   /// that reads this; nothing should compare `termWeek` to `null` directly.
   dayOfWeek Int? @map("day_of_week")
 
-  /// 0-based block within the day. Resolved against TimeGrid.blocksPerDay —
+  /// 0-based block within the day. Resolved against TimeGrid.blocksPerDay,
   /// never `timeslot % 3`.
   blockIndex Int? @map("block_index")
 
   /// Length in blocks; defaults from Offering.durationBlocks.
   durationBlocks Int @default(1) @map("duration_blocks")
 
-  /// Excluded from the next solve when true — the solver fills empty slots and
+  /// Excluded from the next solve when true: the solver fills empty slots and
   /// never overwrites a lock (TAXONOMY.md §3). Boolean rather than a status
   /// enum because locking is orthogonal to placement state; backed by a
   /// partial index on the solver's exclusion path.
@@ -1771,7 +1771,7 @@ model Session {
   counterpartEvents SessionEvent[] @relation("EventCounterpart")
 
   /// Who is covering THIS occurrence right now, if anyone (issue #30). At most
-  /// one active substitute per Session — see the model's own comment for why a
+  /// one active substitute per Session; see the model's own comment for why a
   /// unique `session_id` needs no date range.
   substitution SessionSubstitution?
 
@@ -1784,14 +1784,14 @@ model Session {
   examRequests ExamRequest[]
 }
 
-/// An overlay recording who COVERS one Session occurrence — Vertretung (issue
+/// An overlay recording who COVERS one Session occurrence: Vertretung (issue
 /// #30). The original lecturer assignment (`session_person`, role = lecturer)
 /// is never touched: "Frau Müller's lesson, covered by Herr Schmidt" is a fact
 /// ON TOP of "Frau Müller's lesson", not a replacement of it.
 ///
 /// KEYED 1:1 BY `session_id`, NOT A DATE RANGE. A Session already IS one placed
-/// occurrence (TAXONOMY.md §2) — a recurring lecture is many Session rows, one
-/// per week — so "next week it reverts" is automatic: next week's Session is a
+/// occurrence (TAXONOMY.md §2): a recurring lecture is many Session rows, one
+/// per week, so "next week it reverts" is automatic: next week's Session is a
 /// DIFFERENT row with no substitution of its own. Covering a run of Sessions
 /// while somebody is ill is calling this route once per Session in that range,
 /// not a temporal concept the storage needs to express.
@@ -1822,7 +1822,7 @@ model SessionSubstitution {
 // --- Assignment: three explicit tables, not one polymorphic table. ----------
 // A polymorphic assignment(target_type, target_id) cannot carry real foreign
 // keys, so the database would stop guaranteeing that an assignment points at a
-// live row — unacceptable on the table both the solver and the notification
+// live row, unacceptable on the table both the solver and the notification
 // fan-out read. The three relations also have different cardinality rules and
 // want different indexes (double-booking checks are per-target).
 
@@ -1883,12 +1883,12 @@ model SessionRoom {
 }
 
 // ---------------------------------------------------------------------------
-// Constraints — structured rule builder, not an expression DSL
+// Constraints: structured rule builder, not an expression DSL
 // ---------------------------------------------------------------------------
 
 /// A configured instance of a predefined constraint type. `params` is JSONB
 /// because rule-builder parameters vary per type (max_online_ratio takes a
-/// percentage, lecturer_veto takes day/slot lists) — modelling each type's
+/// percentage, lecturer_veto takes day/slot lists); modelling each type's
 /// params as columns would mean a migration per constraint type.
 model Constraint {
   id       String @id @default(uuid(7))
@@ -1912,7 +1912,7 @@ model Constraint {
 
   /// The tenant's single always-present row for this catalogue type
   /// (TAXONOMY.md §2). Exactly one per (tenant, type), enforced by the partial
-  /// unique index `constraint_one_default_per_type` — which Prisma cannot
+  /// unique index `constraint_one_default_per_type`, which Prisma cannot
   /// express, so it lives in SQL only. `prisma migrate dev` will offer to drop
   /// it as drift; do not let it (see CLAUDE.md).
   ///
@@ -1928,8 +1928,8 @@ model Constraint {
   /// while a grid is an AND filter on the rule itself. One table carrying both
   /// would make a row's meaning depend on which column is set.
   ///
-  /// For rules stated in units the grid defines — a gap between lessons, a cap
-  /// on consecutive blocks, a daily span — which two grids cannot mean the same
+  /// For rules stated in units the grid defines (a gap between lessons, a cap
+  /// on consecutive blocks, a daily span) which two grids cannot mean the same
   /// numbers by. The wire carries nothing for it: `SolverInput.time_grid` is
   /// singular, so a rule naming a different grid than the run's Term is simply
   /// not sent.
@@ -1981,11 +1981,11 @@ model ConstraintScope {
 /// One Offering's membership in an OfferingRelation (ADR-0028 in
 /// calendry-solver: "a relation is an ordered set of Offering references, a
 /// relation type, and that type's parameters"). The `Constraint` row IS the
-/// relation — its `type` names the relation type (e.g. `different_time`),
+/// relation: its `type` names the relation type (e.g. `different_time`),
 /// `severity`/`weight`/`isEnabled` behave exactly as they do for every other
 /// type. This table is only the ordered membership.
 ///
-/// A NEW CARRIER, NEVER `ConstraintScope` — scope and membership are opposite
+/// A NEW CARRIER, NEVER `ConstraintScope`: scope and membership are opposite
 /// meanings that would share a table. For a kind-scoped rule, the named
 /// Offering is a FILTER ("this rule applies to X's Sessions"); for a relation,
 /// the named Offerings are OPERANDS ("the rule is about the relationship
@@ -1995,7 +1995,7 @@ model ConstraintScope {
 /// `position` is stored even though `DifferentTime` (symmetric) ignores it,
 /// because a future order-dependent relation type (e.g. Precedence) cannot
 /// retrofit an order onto rows that never had one without leaving every
-/// existing relation order-ambiguous — cheaper to carry one integer now than
+/// existing relation order-ambiguous, cheaper to carry one integer now than
 /// to migrate every relation ever created later.
 model ConstraintRelationMember {
   id           String @id @default(uuid(7))
@@ -2017,13 +2017,13 @@ model ConstraintRelationMember {
 }
 
 // ---------------------------------------------------------------------------
-// History — Generation snapshots + append-only event log (TAXONOMY.md §3)
+// History: Generation snapshots + append-only event log (TAXONOMY.md §3)
 // ---------------------------------------------------------------------------
 
 /// An immutable, versioned snapshot: a solver run or a manual baseline.
 /// Manual edits are events applied ON TOP of a Generation to produce current
 /// state. UPDATE and DELETE are revoked from the app role in the companion
-/// migration — "immutable" enforced by the database.
+/// migration, with "immutable" enforced by the database.
 model Generation {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -2031,7 +2031,7 @@ model Generation {
   /// The Term this snapshot describes, or NULL for a tenant-wide one.
   ///
   /// NULL is a real case, not a gap: a MANUAL_BASELINE covers the whole tenant,
-  /// and an IMPORT may span terms. A solver Generation always has one — it is
+  /// and an IMPORT may span terms. A solver Generation always has one: it is
   /// backfilled from the SolverRun that produced it.
   ///
   /// Frozen by `generation_content_immutable`: which term a snapshot describes
@@ -2039,7 +2039,7 @@ model Generation {
   termId String? @map("term_id")
 
   /// Sequential per TERM (per tenant for a term-less one). Two partial unique
-  /// indexes in the companion migration enforce the two cases separately —
+  /// indexes in the companion migration enforce the two cases separately;
   /// Prisma cannot express either, and a single `@@unique([tenantId, termId,
   /// version])` would treat every tenant-wide row as unique against itself.
   ///
@@ -2057,7 +2057,7 @@ model Generation {
   /// enforced by two partial unique indexes in the companion migration.
   ///
   /// It was one per TENANT, which meant a tenant could not hold an applied
-  /// schedule for two terms at once — and `apply` superseded across terms
+  /// schedule for two terms at once, and `apply` superseded across terms
   /// because of it. § 20260901040000.
   isCurrent Boolean @default(false) @map("is_current")
 
@@ -2105,7 +2105,7 @@ model SessionEvent {
 
   type SessionEventType
 
-  /// Nullable so a DELETE event survives its Session being removed — the log
+  /// Nullable so a DELETE event survives its Session being removed: the log
   /// must outlive its subject.
   sessionId String? @map("session_id")
 
@@ -2139,7 +2139,7 @@ model SessionEvent {
 /// A manual edit that breaks a hard constraint is permitted, so the violation
 /// must live somewhere queryable rather than in a one-time response. Rows are
 /// refreshed synchronously in the same transaction that emits the
-/// SessionEvent — never on a lag or a batch job.
+/// SessionEvent, never on a lag or a batch job.
 model ConstraintViolation {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -2176,7 +2176,7 @@ model ConstraintViolation {
   detectedByEvent SessionEvent? @relation(fields: [detectedByEventId], references: [id], onDelete: SetNull)
   generation      Generation?   @relation(fields: [generationId], references: [id], onDelete: SetNull)
 
-  /// NULLS NOT DISTINCT in the migration — Postgres would otherwise treat
+  /// NULLS NOT DISTINCT in the migration: Postgres would otherwise treat
   /// every offering-scoped row as unique against itself and duplicate on each
   /// refresh. Prisma cannot express that, so the index lives in SQL.
   @@unique([constraintId, sessionId, offeringId])
@@ -2186,7 +2186,7 @@ model ConstraintViolation {
 }
 
 // ---------------------------------------------------------------------------
-// AUTHENTICATION — the pre-tenant data plane
+// AUTHENTICATION: the pre-tenant data plane
 // ---------------------------------------------------------------------------
 //
 // These three tables sit OUTSIDE row-level security, and that is a deliberate,
@@ -2195,7 +2195,7 @@ model ConstraintViolation {
 //
 // The reason is structural rather than convenient: a session must be read
 // BEFORE the tenant is known, because the session is what determines the
-// tenant. An RLS policy on these tables could never be satisfied — there is no
+// tenant. An RLS policy on these tables could never be satisfied: there is no
 // tenant context to compare against yet. They are therefore only ever queried
 // by primary key or unique token from a verified cookie, never by tenant
 // filter, and no route may expose them directly.
@@ -2214,14 +2214,14 @@ model Account {
   isActive     Boolean @default(true) @map("is_active")
 
   /// Set by the operator reset CLI. While true, login authenticates but issues
-  /// NO session — the account must change its password first. Deliberately not
+  /// NO session: the account must change its password first. Deliberately not
   /// a "restricted session": a half-privileged session is a worse failure mode
   /// than asking for the password twice.
   mustChangePassword Boolean @default(false) @map("must_change_password")
 
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
 
-  /// When the password itself last changed — NOT `updatedAt`, which any field
+  /// When the password itself last changed, NOT `updatedAt`, which any field
   /// touches. Drives expiry (issue #13): an account whose password has stood
   /// unchanged past the policy's maximum age is treated the same way a forced
   /// reset is, at login.
@@ -2236,13 +2236,13 @@ model Account {
   @@map("account")
 }
 
-/// Guards `login` and `change-password` — the two routes that accept a
+/// Guards `login` and `change-password`, the two routes that accept a
 /// password as proof and answer a generic failure either way, deliberately,
 /// so neither is an account-existence oracle. NO RLS, matching `account` /
 /// `account_person` / `auth_session`: a rate-limit check runs BEFORE the
 /// tenant is known, because the routes it guards are pre-tenant themselves.
 ///
-/// `key` names the ROUTE as well as the account — `login:<email>` and
+/// `key` names the ROUTE as well as the account: `login:<email>` and
 /// `change_password:<email>` are counted separately, because succeeding at
 /// one door must not consume the guessing budget for the other.
 model AuthRateLimit {
@@ -2262,7 +2262,7 @@ model AccountPerson {
   account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
   person  Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
 
-  /// A Person answers to exactly one Account — two credentials controlling the
+  /// A Person answers to exactly one Account: two credentials controlling the
   /// same tenant identity would make audit attribution ambiguous.
   @@id([accountId, personId])
   @@unique([personId])
@@ -2303,12 +2303,12 @@ model AuthSession {
   @@map("auth_session")
 }
 
-/// Calendry's OWN staff — issue #76, the fourth tenant-isolation exception
+/// Calendry's OWN staff, issue #76, the fourth tenant-isolation exception
 /// (CLAUDE.md "The deliberate exceptions to tenant isolation";
-/// DECISIONS.md "Staff principal — the fourth tenant-isolation exception").
+/// DECISIONS.md "Staff principal: the fourth tenant-isolation exception").
 ///
 /// A SEPARATE credential, not a flag on `Account`. `Account` exists to let
-/// one human act as several tenant-scoped Persons — every row is reachable
+/// one human act as several tenant-scoped Persons; every row is reachable
 /// only via `account_person` -> `person.tenant_id`. Calendry staff act as no
 /// Person in any tenant; there is nothing in that graph to hang a flag off
 /// without making every Account query ask "or is this staff" forever.
@@ -2323,13 +2323,13 @@ model StaffAccount {
   isActive     Boolean @default(true) @map("is_active")
 
   /// Set by the operator (`provision-staff.ts`, or a future reset CLI). While
-  /// true, staff login authenticates but issues NO session — same policy as
+  /// true, staff login authenticates but issues NO session, same policy as
   /// `Account.mustChangePassword`, issue #106.
   mustChangePassword Boolean @default(false) @map("must_change_password")
 
   lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(3)
 
-  /// When the password itself last changed — drives expiry via the SAME
+  /// When the password itself last changed: drives expiry via the SAME
   /// `MAX_PASSWORD_AGE_MS` constant `Account.passwordChangedAt` uses
   /// (`server/utils/auth.ts`), not a second policy. Issue #106.
   passwordChangedAt DateTime @default(now()) @map("password_changed_at") @db.Timestamptz(3)
@@ -2342,13 +2342,13 @@ model StaffAccount {
   @@map("staff_account")
 }
 
-/// A staff session, addressed by an opaque token in `STAFF_SESSION_COOKIE` —
+/// A staff session, addressed by an opaque token in `STAFF_SESSION_COOKIE`,
 /// a cookie DISTINCT from `SESSION_COOKIE` (`server/utils/auth.ts`) by name,
 /// so a staff session and a tenant session can never be confused by a code
 /// path that forgot which one it was reading.
 ///
 /// Deliberately carries NO `tenantId`, unlike `AuthSession`: a staff
-/// principal is never "in" a tenant at all, not even transiently — see
+/// principal is never "in" a tenant at all, not even transiently; see
 /// `StaffIdentity` in `server/utils/tenantResolver.ts`.
 model StaffSession {
   id             String @id @default(uuid(7))
@@ -2371,14 +2371,14 @@ model StaffSession {
 }
 
 // ---------------------------------------------------------------------------
-// AUTHORIZATION — permissions and tenant-defined access roles
+// AUTHORIZATION: permissions and tenant-defined access roles
 // ---------------------------------------------------------------------------
 
 /// The fixed catalogue of actions the system can perform.
 ///
 /// Tenants cannot invent permissions, because a permission corresponds to a
 /// code path and tenants do not write code. This table is reference data
-/// maintained by migration — the one deliberate exception to "no seed data" —
+/// maintained by migration, the one deliberate exception to "no seed data",
 /// so that access_role_permission can carry a real foreign key instead of
 /// unvalidated strings.
 model Permission {
@@ -2395,7 +2395,7 @@ model Permission {
 /// A tenant-defined, named bundle of Permissions (TAXONOMY.md §4).
 ///
 /// DELIBERATELY SEPARATE from the domain `Role` entity, which is scheduling
-/// vocabulary (Lecturer, Student, Auditor — TAXONOMY.md §2). The taxonomy uses
+/// vocabulary (Lecturer, Student, Auditor; TAXONOMY.md §2). The taxonomy uses
 /// the word "role" for both concepts, but they are not the same thing:
 /// `offering.required_role_id` means "this Offering needs a Lecturer", and if
 /// permission bundles lived on that entity the schema would happily accept an
@@ -2419,7 +2419,7 @@ model AccessRole {
 
   permissions AccessRolePermission[]
   people      PersonAccessRole[]
-  /// Tenants whose default-for-new-People setting points at this role — see
+  /// Tenants whose default-for-new-People setting points at this role; see
   /// `TenantAuthSettings.defaultAccessRoleId`'s `onDelete: Restrict`.
   defaultForTenants TenantAuthSettings[]
 
@@ -2467,7 +2467,7 @@ model PersonAccessRole {
   @@map("person_access_role")
 }
 
-/// Authorization configuration — deliberately NOT part of
+/// Authorization configuration: deliberately NOT part of
 /// `TenantDisplaySettings`, which is a display singleton (issue #25 is
 /// explicit that this does not belong there).
 ///
@@ -2510,7 +2510,7 @@ enum ExamRequestStatus {
 ///
 /// A REQUEST TABLE, NOT A STATUS ON `Session`. A pending Session would have to
 /// be excluded by the schedule view, the solver snapshot, the violation checker
-/// and every export — four places the exclusion can be forgotten, and a
+/// and every export: four places the exclusion can be forgotten, and a
 /// forgotten filter shows MORE rather than fewer. Nothing queries this table
 /// but its own routes.
 ///
@@ -2522,14 +2522,14 @@ model ExamRequest {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
 
-  /// The module this is an exam FOR — what "my own Offering" is checked
+  /// The module this is an exam FOR: what "my own Offering" is checked
   /// against, and what the created Event borrows its groups and title from.
   /// Never becomes the Session's `offeringId`.
   offeringId String @map("offering_id")
   termId     String @map("term_id")
 
   /// Must name a kind whose `type` is EXAM. A cross-row condition, so the write
-  /// boundary enforces it rather than a CHECK — a non-exam kind would create a
+  /// boundary enforces it rather than a CHECK: a non-exam kind would create a
   /// Session no exam rule can see.
   kindId String @map("kind_id")
 
@@ -2597,14 +2597,14 @@ model GroupSource {
 }
 
 /// A personal API credential (import scripts, integrations). Acts AS ITS
-/// PERSON, but only within the permission subset selected at creation — and
+/// PERSON, but only within the permission subset selected at creation, and
 /// never more than that Person holds at the moment of use: `heldPermissions()`
 /// intersects `permissions` with the Person's live set on every request, so
 /// revoking an AccessRole also narrows every token derived from it.
 ///
 /// Bound to a Person, not an Account: permissions are per-Person, so a token is
-/// one tenant identity. Resolution is privileged the same way `Screen` is —
-/// `calendry_internal.api_token_identity()`, by the secret alone — and the
+/// one tenant identity. Resolution is privileged the same way `Screen` is:
+/// `calendry_internal.api_token_identity()`, by the secret alone, and the
 /// table itself is tenant-scoped and RLS-protected like everything else.
 model ApiToken {
   id       String @id @default(uuid(7))
@@ -2628,7 +2628,7 @@ model ApiToken {
   /// NULL = does not expire. Enforced at resolution, not by a sweep.
   expiresAt DateTime? @map("expires_at") @db.Timestamptz(3)
 
-  /// Last successful resolution, throttled to once a minute in SQL — the only
+  /// Last successful resolution, throttled to once a minute in SQL: the only
   /// way to answer "is anything still using this?" before revoking it.
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
@@ -2654,30 +2654,30 @@ enum IcsLinkScope {
   @@map("ics_link_scope")
 }
 
-/// A personal calendar-subscription link (issue #15, the stream half — the
+/// A personal calendar-subscription link (issue #15, the stream half; the
 /// one-off download it replaces was the other half, `buildIcs`/
 /// `schedule.ics.get.ts`). A signed-in Person mints one and pastes it into an
 /// external calendar app, which re-fetches it on its own schedule.
 ///
 /// THE SECRET IS STORED PLAIN, unlike ApiToken/Screen. Deliberately: this is
 /// not a one-time bearer credential, it is a "capability URL" a person must be
-/// able to come back and re-copy — into a second device, after clearing a
-/// calendar app's subscriptions — without losing sync elsewhere by rotating
+/// able to come back and re-copy (into a second device, after clearing a
+/// calendar app's subscriptions) without losing sync elsewhere by rotating
 /// it. It is read-only and revoked by deleting the row.
 ///
-/// Resolution is privileged the same way Screen/ApiToken are —
-/// `calendry_internal.ics_link_identity()`, by the token alone — and the
+/// Resolution is privileged the same way Screen/ApiToken are:
+/// `calendry_internal.ics_link_identity()`, by the token alone, and the
 /// table itself is tenant-scoped and RLS-protected like everything else.
 ///
 /// SUBJECT, as opposed to `scope`'s TIME WINDOW (issue #115): absent `groups`
 /// rows means "this Person's own Sessions" (`ownSessionClause`, unchanged
-/// from issue #15) — the default and the only shape `ics_link.generate_own`
+/// from issue #15), the default and the only shape `ics_link.generate_own`
 /// may create. One or more `groups` rows means "these Groups' Sessions
 /// instead", resolved the same ancestor-closure way a member's own timetable
-/// is (`ancestorGroupIds` — a Session assigned to a Group's ANCESTOR belongs
+/// is (`ancestorGroupIds`: a Session assigned to a Group's ANCESTOR belongs
 /// to it too), just seeded from the link's chosen Groups rather than a
 /// Person's memberships. Minting a GROUPS link needs `ics_link.generate`, the
-/// wider of the two keys — see that permission's own comment.
+/// wider of the two keys; see that permission's own comment.
 model IcsLink {
   id       String @id @default(uuid(7))
   tenantId String @map("tenant_id")
@@ -2686,7 +2686,7 @@ model IcsLink {
   /// What a human calls it when deleting the right one.
   name String
 
-  /// The bearer secret itself — see the model comment for why this is not a
+  /// The bearer secret itself; see the model comment for why this is not a
   /// hash. Unique GLOBALLY because the lookup happens before any tenant is
   /// known.
   token String
@@ -2702,7 +2702,7 @@ model IcsLink {
   /// how many Terms this Person has ever had a Session in.
   weeksAhead Int? @map("weeks_ahead")
 
-  /// Last successful stream fetch, throttled to once a minute in SQL — the
+  /// Last successful stream fetch, throttled to once a minute in SQL: the
   /// only way to tell a link a calendar app still polls from one nobody uses.
   lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
@@ -2720,10 +2720,10 @@ model IcsLink {
   @@map("ics_link")
 }
 
-/// IcsLink ↔ Group — issue #115. Same shape as `SessionGroup`: a link may
+/// IcsLink ↔ Group (issue #115). Same shape as `SessionGroup`: a link may
 /// name several Groups, each just a row here, cascade-deleted with either
 /// side. An IcsLink with no rows here streams its creator's own Sessions
-/// instead — see the model's own comment.
+/// instead; see the model's own comment.
 model IcsLinkGroup {
   icsLinkId String @map("ics_link_id")
   groupId   String @map("group_id")
@@ -2740,7 +2740,7 @@ model IcsLinkGroup {
 }
 
 // ---------------------------------------------------------------------------
-// AUDIT LOG — persisted trail for permission changes, login attempts, and
+// AUDIT LOG: persisted trail for permission changes, login attempts, and
 // denied cross-tenant access (issue #78)
 // ---------------------------------------------------------------------------
 
@@ -2757,12 +2757,12 @@ enum AuditOutcome {
 /// An append-only record of a security-relevant event: a login attempt, an
 /// AccessRole/permission change, or a denied cross-tenant access attempt.
 ///
-/// NO RLS — same family of exception as `account`/`auth_session`/
+/// NO RLS, same family of exception as `account`/`auth_session`/
 /// `account_person` (CLAUDE.md, exception 2), for a related but distinct
 /// reason: a denied cross-tenant attempt is BY DEFINITION about more than one
 /// tenant, and this table must be writable and (for cross-tenant auditing)
 /// readable without any one tenant's RLS context ever applying to it. Writes
-/// go through `server/utils/auditLog.ts` on the base Prisma client — the same
+/// go through `server/utils/auditLog.ts` on the base Prisma client, the same
 /// "read/write without `withTenant()`" pattern `server/utils/authDb.ts`
 /// already uses for the pre-tenant plane, not a new mechanism.
 ///
@@ -2772,14 +2772,14 @@ enum AuditOutcome {
 /// human-readable name/email captured at write time. `tenantId` is plain for
 /// the same reason, with one more: for a denied cross-tenant attempt it names
 /// the tenant that was DENIED, never the actor's own tenant, and a login
-/// attempt may predate tenant selection entirely — hence nullable.
+/// attempt may predate tenant selection entirely, hence nullable.
 model AuditLog {
   id String @id @default(uuid(7))
 
   /// Free-form event key, e.g. "login.success", "login.failure",
   /// "access_role.permissions_updated", "person_access_role.granted",
   /// "access.denied", "access.denied_cross_tenant". Deliberately NOT drawn
-  /// from the fixed Permission catalogue (shared/permissions.ts) — this names
+  /// from the fixed Permission catalogue (shared/permissions.ts): this names
   /// an EVENT that happened, not a grantable capability, and the two sets
   /// must stay free to diverge.
   action String
@@ -2788,7 +2788,7 @@ model AuditLog {
 
   /// The Person/Account that performed the action, when one could be
   /// resolved. Both null for, e.g., a login attempt against an email with no
-  /// matching Account — there is no actor to name, only an attempt.
+  /// matching Account, there is no actor to name, only an attempt.
   actorPersonId  String? @map("actor_person_id")
   actorAccountId String? @map("actor_account_id")
 
@@ -2797,13 +2797,13 @@ model AuditLog {
   /// deleted. See the model comment for why this is not a relation.
   actorLabel String? @map("actor_label")
 
-  /// What was acted on: an AccessRole name, an email, a permission key — free
+  /// What was acted on: an AccessRole name, an email, a permission key. Free
   /// text because the target varies per action and is sometimes absent (a
   /// bare login attempt names no target beyond the actor).
   target String?
 
-  /// The tenant this event belongs to, or — for a denied cross-tenant
-  /// attempt — the tenant that was DENIED. Never a foreign key: see the model
+  /// The tenant this event belongs to, or, for a denied cross-tenant
+  /// attempt, the tenant that was DENIED. Never a foreign key: see the model
   /// comment. Null for an event that predates tenant selection.
   tenantId String? @map("tenant_id")
 

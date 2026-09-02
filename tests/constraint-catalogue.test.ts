@@ -18,7 +18,7 @@ import { toWireConstraint } from '../server/utils/solverInput';
  *
  * The rule builder offers what the catalogue declares; `server/utils/violations.ts`
  * evaluates what the two type lists name. If those diverge, a tenant can
- * configure a constraint that is enabled, reports nothing, and means nothing —
+ * configure a constraint that is enabled, reports nothing, and means nothing:
  * a failure with no symptom, which is the kind this codebase keeps designing
  * against.
  *
@@ -103,7 +103,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     it('maps every catalogue type to a distinct wire field', () => {
-        // Types awaiting their proto field have no wireField yet — see below.
+        // Types awaiting their proto field have no wireField yet; see below.
         const fields = CONSTRAINT_TYPES
             .map((type) => type.wireField)
             .filter((field): field is NonNullable<typeof field> => field !== undefined);
@@ -127,7 +127,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         /*
          * INVERTED ON 2026-08-27, and the pair of assertions it replaced is
          * worth remembering rather than deleting. This test used to assert the
-         * opposite — that the rule was SKIPPED — with a sibling asserting
+         * opposite, that the rule was SKIPPED, with a sibling asserting
          * `wireField` was undefined, precisely so that flipping one would fail
          * the other and force whoever did it to read why.
          *
@@ -161,13 +161,13 @@ describe('constraint → wire mapping (Stage 3d)', () => {
          * decided scope, and widening the counted set would let a 200-student
          * cohort's aggregate preference outweigh the person teaching.
          *
-         * So an empty `roles` is the only ACCEPTED value, not an unfinished one
-         * — a future `roles` param on this catalogue entry would fail every
+         * So an empty `roles` is the only ACCEPTED value, not an unfinished one:
+         * a future `roles` param on this catalogue entry would fail every
          * solve until the solver decides that scope. Asserted exactly, so adding
          * a role in `buildVariant` fails here rather than at StartRun.
          *
          * EMPTY BUT PRESENT, and that distinction cost a real failure. This
-         * originally asserted `{}`, matching every other parameterless variant —
+         * originally asserted `{}`, matching every other parameterless variant,
          * and `{}` CRASHES for this message, because ts-proto iterates a
          * repeated field without a presence check and `hashInput` encodes the
          * input before anything is sent. The whole assembly threw
@@ -187,7 +187,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
      *
      * `buildVariant` ends in `default: return {}`, and the result becomes the
      * whole variant message. So a type that declares parameters and has no case
-     * sends an EMPTY message — every field at its proto zero — while the tenant
+     * sends an EMPTY message (every field at its proto zero) while the tenant
      * sees their configured values saved, rendered and never applied. No error,
      * no report, and the numbers on screen are real; only the timetable
      * disagrees.
@@ -225,7 +225,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
                     /*
                      * A type declaring `appliesToKindType` derives its scope from
                      * the tenant's Session-kind classification and SKIPS when
-                     * nothing is classified — deliberately, since an empty
+                     * nothing is classified, deliberately, since an empty
                      * `applies_to_kinds` means every kind on the wire.
                      *
                      * Supplied here so the skip cannot happen: this test is about
@@ -249,26 +249,26 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     it('has a wire field for every catalogue type', () => {
         /*
          * The replacement tripwire, pointing the other way. `person_preference_fit`
-         * was the last type without a field, so the catalogue is complete — and
+         * was the last type without a field, so the catalogue is complete, and
          * the skip-when-unmapped branch in `toWireConstraint` is currently
          * unreachable from it.
          *
          * That branch STAYS: the situation recurs whenever a catalogue entry
          * ships ahead of the schema, and dropping a rule silently is the failure
          * it exists to prevent. This assertion is what makes the next such entry
-         * announce itself — it fails, and whoever added the type decides
+         * announce itself: it fails, and whoever added the type decides
          * deliberately whether the field exists yet, instead of discovering
          * months later that an enabled rule never crossed.
          *
          * TWO NAMED, PERMANENT EXEMPTIONS. `PER_SESSION_CONSTRAINT_TYPES` are
-         * evaluator:'app' and never reach the solver AT ALL — unlike the
+         * evaluator:'app' and never reach the solver AT ALL, unlike the
          * pairwise structural types (also 'app', but dual-enforced: sent to the
          * solver as a hard filter too, which is why THEY carry a wireField). A
          * per-session type's missing field is not "ahead of the schema", it is
-         * "there is no schema to be ahead of" — see its catalogue comment.
+         * "there is no schema to be ahead of"; see its catalogue comment.
          *
          * `RELATION_CONSTRAINT_TYPES` are also 'app' and ARE sent to the
-         * solver, just never through `ConstraintConfig`/`wireField` — they are
+         * solver, just never through `ConstraintConfig`/`wireField`: they are
          * `SolverInput.offeringRelations`, assembled separately in
          * `assembleSolverInput`, which skips them before `toWireConstraint`
          * ever sees them (see that function's relation carve-out).
@@ -321,7 +321,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         // The UI counts blocks from 1 because that is how a human reads a day;
         // the wire and the solver are 0-based. Converting at the boundary is the
         // same discipline as `percent`, and getting it wrong shifts every
-        // penalised block by one — a rule that avoids the wrong lesson.
+        // penalised block by one, a rule that avoids the wrong lesson.
         const result = toWireConstraint(
             row({
                 type: 'minimize_block_usage',
@@ -369,7 +369,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
             .toEqual({ blocks: [], first: true, last: false });
 
         // And the deprecated types still convert, because rows configured before
-        // the replacement existed must keep working — `type` is createOnly, so
+        // the replacement existed must keep working: `type` is createOnly, so
         // they cannot be edited across.
         const legacy = toWireConstraint(
             row({ type: 'minimize_first_block', severity: 'SOFT', weight: 1, params: {} }),
@@ -395,7 +395,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     it('accepts 0 as a real threshold rather than reading it as unset', () => {
-        // rankThreshold 0 means "penalize every room" — a genuine policy.
+        // rankThreshold 0 means "penalize every room", a genuine policy.
         const result = toWireConstraint(
             row({ type: 'minimize_high_ranking_rooms', severity: 'SOFT', weight: 2, params: { rankThreshold: 0 } }),
             noKinds,
@@ -409,7 +409,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
      * The direction has to REACH the wire, and an absent one has to stay false.
      *
      * Both halves matter. Until calendry-proto 0.5.0 the field did not exist in
-     * the generated encoder, so an `invert` key was silently dropped — a control
+     * the generated encoder, so an `invert` key was silently dropped: a control
      * that would have saved, rendered and passed every test while changing
      * nothing about the solve. And a row written before the parameter existed
      * carries no key at all; reading that as anything but false would flip a
@@ -432,8 +432,8 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     /*
      * A PROTECTED BLOCK NAMING NOTHING RESERVES EVERYTHING.
      *
-     * `BlockedWindow` follows `Unavailability`'s convention — an empty axis
-     * means EVERY value on that axis — so a window with no days and no blocks
+     * `BlockedWindow` follows `Unavailability`'s convention: an empty axis
+     * means EVERY value on that axis, so a window with no days and no blocks
      * is the whole grid reserved as a HARD rule, not nothing reserved. The
      * solver accepts it without complaint and every session of the applying
      * kinds becomes unplaceable, surfacing as "no feasible placement" with
@@ -468,7 +468,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     });
 
     /*
-     * BOTH IS AN EMPTY SCOPE, for every rule that carries one — not just
+     * BOTH IS AN EMPTY SCOPE, for every rule that carries one, not just
      * `compactness`, which is why the mapping is one shared function.
      *
      * The proto defines empty as "both axes counted independently", so naming
@@ -503,7 +503,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
      *
      * The absent-reads-as-false half is sharper here than for room rank. This
      * type shipped with NO parameters, so every row any tenant already has
-     * carries `params: {}` — and the wire field's own encoder writes the byte
+     * carries `params: {}`, and the wire field's own encoder writes the byte
      * whenever the value is not literally `false`, so a mapper returning `{}`
      * relies on `undefined` reaching the encoder and landing on zero. Pinning
      * the value means the direction is something this mapper decided.
@@ -523,7 +523,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
     /*
      * UNLIKE room rank, this one seeds FALSE. The inverted direction exists for
      * exam-kind sessions specifically, so a rule created without a thought about
-     * direction should keep exam weeks clear — which is what this type has
+     * direction should keep exam weeks clear, which is what this type has
      * always done.
      */
     it('provisions the exam-period rule pointing away from exam weeks', () => {
@@ -543,7 +543,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         expect(seeded.params).toEqual({ invert: true });
 
         // `defaultEnabled: true` (2026-08-31), tuned to match the `test`
-        // tenant's live settings — a per-type opt-in, not the structural-only
+        // tenant's live settings: a per-type opt-in, not the structural-only
         // default every OTHER unlisted solver-steering type still gets.
         expect(seeded.isEnabled).toBe(true);
     });
@@ -572,7 +572,7 @@ describe('constraint → wire mapping (Stage 3d)', () => {
 
     it('SKIPS an offering-scoped constraint rather than widening it', () => {
         // ConstraintConfig has applies_to_kinds only. Sending it unscoped would
-        // apply the rule to EVERY offering — the opposite of what was configured.
+        // apply the rule to EVERY offering, the opposite of what was configured.
         const result = toWireConstraint(
             row({ scopes: [{ offeringId: 'offering-1', kindId: null }] }),
             noKinds,

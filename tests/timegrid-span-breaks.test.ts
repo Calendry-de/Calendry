@@ -10,8 +10,8 @@ let cookie: string | null;
  *
  * THE BUG THIS DEFINES AWAY. `durationBlocks` counts block INDICES, and every
  * consumer treated that as one contiguous stretch of clock. It is not, whenever a
- * gap separates the blocks: on the dev tenant's `Standard week` grid — 8 × 45min,
- * `breakMinutes: 0`, named breaks after blocks 0, 1 and 3 — a two-block Session
+ * gap separates the blocks: on the dev tenant's `Standard week` grid (8 × 45min,
+ * `breakMinutes: 0`, named breaks after blocks 0, 1 and 3), a two-block Session
  * starting at block 3 occupies 120 minutes and teaches 90, and rendered
  * identically to a genuine 90-minute one. One live Session was already in that
  * state when this was written.
@@ -19,7 +19,7 @@ let cookie: string | null;
  * WHY THE SOLVER CANNOT ANSWER IT. `toWireTimeGrid` deliberately sends no
  * breaks, on the stated grounds that the solver reasons in block indices where a
  * gap "changes no adjacency". That is true of a single-block Session and false of
- * a multi-block one — but the answer is not to send breaks. See DECISIONS.md
+ * a multi-block one, but the answer is not to send breaks. See DECISIONS.md
  * § "A Session that spans a break".
  */
 const STANDARD = {
@@ -63,7 +63,7 @@ describe('gapsWithinSpan', () => {
     it('finds nothing for a single block, which has no interior', () => {
         /*
          * Enforced by the LOOP BOUND (`durationBlocks - 1`), not by the early
-         * return above it — that branch is a fast path and removing it changes
+         * return above it: that branch is a fast path and removing it changes
          * no result, confirmed by mutation. Block 0 and block 3 are both
          * immediately followed by a break, so this fails the moment the bound
          * is wrong.
@@ -91,7 +91,7 @@ describe('gapsWithinSpan', () => {
 
     it('includes the UNNAMED default gap, with a null label', () => {
         // Both occupy real time. Reporting only named breaks would draw a
-        // timeline that does not add up on any grid with `breakMinutes > 0` —
+        // timeline that does not add up on any grid with `breakMinutes > 0`,
         // where EVERY multi-block session spans a gap.
         const gaps = gapsWithinSpan(UNIFORM, 1, 3);
 
@@ -207,7 +207,7 @@ describe('the schedule chip reports it', () => {
         expect(html).toContain('30 minutes not taught');
     });
 
-    it('says nothing when the same Session spans no gap — the counter-example', async () => {
+    it('says nothing when the same Session spans no gap (the counter-example)', async () => {
         // Blocks 4-5 are back to back: the only break on this grid follows block
         // 0. Without this, a chip that announced an interruption unconditionally
         // would pass the test above.

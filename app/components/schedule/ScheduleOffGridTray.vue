@@ -28,13 +28,13 @@ import type { PlacedScheduleSession, TimeGrid } from '~/composables/schedule';
 import { offGridReason, sessionLabel } from '~/composables/schedule';
 
 /**
- * Sessions the grid cannot position — a day the TimeGrid does not schedule, or
+ * Sessions the grid cannot position: a day the TimeGrid does not schedule, or
  * a block range running past the end of the day. Both are representable in the
  * schema (the CHECK only bounds 1-7 and >= 0), so a grid that positions by
  * index would drop them invisibly. They surface here instead.
  *
  * `PlacedScheduleSession`, not `ScheduleSession`: a banked Session (issue #22)
- * has no placement to be "outside the grid" — it belongs to the spare bank
+ * has no placement to be "outside the grid": it belongs to the spare bank
  * (`ScheduleSpareBank`), a different surfacing for a different reason.
  * `useScheduleData`'s `offGridSessions` already excludes it.
  */

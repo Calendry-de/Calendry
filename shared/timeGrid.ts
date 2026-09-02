@@ -2,7 +2,7 @@
  * Block boundaries: the one definition of when each block starts.
  *
  * In `shared/` because two consumers answer inverse questions about the same
- * timeline and must not drift — `blockTime()` in the app, `blockOfMinute()` on
+ * timeline and must not drift: `blockTime()` in the app, `blockOfMinute()` on
  * the server. Disagreement would render one time while `reference_slot` believed
  * another, invisible until the solver refused to move a Session plainly still in
  * the future.
@@ -10,7 +10,7 @@
  * A WALK, not a stride. `dayStart + index * (blockLength + breakMinutes)` is
  * right only while every gap is equal; a 45-minute lunch after block 3 shifts
  * every later block and no divisor expresses it. The uniform case is not a
- * special path but what the walk produces with no override — asserted by the
+ * special path but what the walk produces with no override; asserted by the
  * equivalence property in `tests/time-grid-breaks.test.ts`.
  *
  * None of it reaches the solver: the wire carries block INDICES, and a gap's
@@ -46,7 +46,7 @@ export interface BlockGrid {
  * day-specific → universal → grid default, resolved per POSITION: a Friday
  * override at block 6 does not displace the universal lunch at block 3.
  *
- * `dayOfWeek === null` sees only universal overrides — the honest answer for a
+ * `dayOfWeek === null` sees only universal overrides: the honest answer for a
  * caller that has not said which day it means.
  */
 export function gapAfter(
@@ -69,7 +69,7 @@ export function gapAfter(
  * The named break filling that gap, or null when it is the grid's unnamed
  * default. SAME PRECEDENCE AS `gapAfter`, which is why it exists: the editor grew
  * its own `breaks.find(...)`, which returns whichever row comes first in the
- * array — so previewing Friday could show the universal break's label while
+ * array, so previewing Friday could show the universal break's label while
  * `gapAfter` returned the Friday duration.
  */
 export function breakAfter(
@@ -78,7 +78,7 @@ export function breakAfter(
     dayOfWeek: number | null = null,
 ): TimeGridBreak | null {
     // Never after the final block: a gap there has no meaning.
-    // meaning — the same boundary `blockBoundaries` refuses to walk.
+    // meaning, the same boundary `blockBoundaries` refuses to walk.
     if (afterBlockIndex >= grid.blocksPerDay - 1) {
         return null;
     }
@@ -93,7 +93,7 @@ export function breakAfter(
 }
 
 /**
- * Every gap on `dayOfWeek` that occupies real time — what a RENDERER needs in one
+ * Every gap on `dayOfWeek` that occupies real time: what a RENDERER needs in one
  * call. Derived from `gapAfter`/`breakAfter` rather than the break rows, so an
  * unnamed default gap is included: it occupies time on screen exactly as a named
  * one does, and omitting it would draw a timeline that does not add up.
@@ -116,7 +116,7 @@ export function gapsOfDay(
 }
 
 /**
- * The gaps that fall INSIDE a multi-block span — the time it occupies but does
+ * The gaps that fall INSIDE a multi-block span: the time it occupies but does
  * not teach.
  *
  * WHY THIS IS A SHARED DEFINITION AND NOT A RENDERER DETAIL. A Session with
@@ -126,7 +126,7 @@ export function gapsOfDay(
  * grid with a 30-minute break after block 3, a two-block Session starting at
  * block 3 occupies 120 minutes and teaches 90.
  *
- * The solver cannot answer this — `toWireTimeGrid` deliberately sends no breaks,
+ * The solver cannot answer this: `toWireTimeGrid` deliberately sends no breaks,
  * because the solver reasons in block indices where a gap changes no adjacency.
  * True of a single-block Session, false of a multi-block one. So the definition
  * lives here, with `gapAfter`/`breakAfter`, and every consumer asks the same
@@ -138,7 +138,7 @@ export function gapsOfDay(
  * the span, so a caller needs no second boundary walk to place it.
  *
  * A span of 1 has no interior, and a gap after the span's FINAL block is outside
- * it — the same boundary `breakAfter` refuses to walk.
+ * it: the same boundary `breakAfter` refuses to walk.
  */
 export function gapsWithinSpan(
     grid: BlockGrid,
@@ -147,7 +147,7 @@ export function gapsWithinSpan(
     dayOfWeek: number | null = null,
 ): { afterBlockIndex: number; minutes: number; label: string | null; fromMinute: number }[] {
     /*
-     * A FAST PATH, not a correctness guard — the loop bound below already yields
+     * A FAST PATH, not a correctness guard: the loop bound below already yields
      * no iterations for a span of 1, which is why no test can tell this branch
      * from its absence (checked by mutation). It stays because the single-block
      * case is the overwhelming majority of chips on a grid and this skips a
@@ -180,7 +180,7 @@ export function gapsWithinSpan(
 }
 
 /**
- * Start minute of every block, plus a final entry for when teaching ends — always
+ * Start minute of every block, plus a final entry for when teaching ends, always
  * `blocksPerDay + 1` long, so a caller never re-derives the last block's length.
  *
  * Minutes are from local midnight and NOT wrapped at 24h: a grid running past
@@ -217,7 +217,7 @@ export function blockSpan(
 /**
  * Which block contains `minutesSinceMidnight`, or the number of blocks finished
  * when the time falls in a gap or past the last block. A scan, not a division,
- * because a time inside a BREAK counts as the preceding block being finished —
+ * because a time inside a BREAK counts as the preceding block being finished,
  * which fell out of `Math.floor` under a uniform stride and has to be stated here.
  */
 export function blockAtMinute(
@@ -240,6 +240,6 @@ export function blockAtMinute(
     }
 
     // Past the end of teaching: the COUNT of blocks finished, not an index.
-    // finished — rather than an index that does not exist.
+    // finished, rather than an index that does not exist.
     return grid.blocksPerDay;
 }

@@ -33,7 +33,7 @@
 
         <!--
             THE PREVIEW IS THE POINT, not decoration. A date range does not map
-            to whole weeks in any way somebody can predict from two dates —
+            to whole weeks in any way somebody can predict from two dates. That is
             exactly the reasoning that earned the calendar-period editor its own
             week-reclassification preview. And because a touched week is blocked
             in FULL, the preview is also where the over-block becomes an informed
@@ -56,7 +56,7 @@
                     :class="{ 'holiday_week--partial': !week.whole }"
                 >
                     Week {{ week.index + 1 }} · {{ week.start }} – {{ week.end }}
-                    <span v-if="!week.whole">(you are away for part of it — the whole week is blocked)</span>
+                    <span v-if="!week.whole">(you are away for part of it, but the whole week is blocked)</span>
                 </li>
             </ul>
 
@@ -68,7 +68,7 @@
                 {{ preview.partial.length === 1 ? 'One week is' : `${preview.partial.length} weeks are` }}
                 blocked in full even though your absence covers only part of
                 {{ preview.partial.length === 1 ? 'it' : 'them' }}. A week is blocked
-                if your absence touches it at all — the scheduler cannot be told about
+                if your absence touches it at all: the scheduler cannot be told about
                 part of a week in one entry.
             </p>
         </div>
@@ -102,7 +102,7 @@ import { overlaps } from '#shared/academicCalendar';
 /**
  * Pick real dates; see the weeks they block.
  *
- * THE PREVIEW USES THE SAME RESOLVER THE SERVER DOES — `resolveHolidayWeeks`
+ * THE PREVIEW USES THE SAME RESOLVER THE SERVER DOES: `resolveHolidayWeeks`
  * from `shared/`, not a local date walk. A client-side copy would drift from
  * what is actually stored and would do it invisibly, which is the failure this
  * codebase has recorded for `blockTime`, for `weekIndexOf` and for
@@ -163,7 +163,7 @@ const problem = computed(() => {
 
     if (matching.length > 1) {
         return `That range spans ${matching.map((term) => term.name).join(' and ')}. `
-            + 'Enter one absence per term — a single entry counts the weeks of one term only.';
+            + 'Enter one absence per term. A single entry counts the weeks of one term only.';
     }
 
     return '';
@@ -298,7 +298,7 @@ defineExpose({ reset });
         color: $content7;
 
         &--warn {
-            // The over-block disclosure — "the whole week is blocked" — was the
+            // The over-block disclosure ("the whole week is blocked") was the
             // other 3.73:1 string in this component. An earlier edit replaced
             // only the first of the two.
             color: $warning800;

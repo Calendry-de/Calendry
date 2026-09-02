@@ -6,7 +6,7 @@ import type { TenantMode } from '#shared/tenantMode';
 import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
 
 /**
- * The management area's entity registry — a client mirror of the server's
+ * The management area's entity registry: a client mirror of the server's
  * `RESOURCES`.
  *
  * A MIRROR AND NOT A FETCH because the server registry holds zod schemas, which
@@ -15,7 +15,7 @@ import { offeringFieldsToDeemphasize } from '#shared/tenantMode';
  *
  * ALSO THE NAVIGATION SOURCE: `useNavEntries()` projects the manage section out
  * of this array, so adding an entity here puts it in the sidebar, index, header
- * and palette in one edit. Entities appear only once they have a working editor —
+ * and palette in one edit. Entities appear only once they have a working editor:
  * an entry whose detail page cannot edit the entity is a nav item that lies.
  */
 
@@ -43,7 +43,7 @@ export interface FieldDef {
     /**
      * A read-only value COMPUTED server-side, shown beneath the control while
      * editing. Exists because `Offering.requiredCapacity` promised to derive from
-     * the attached Groups when left blank and nothing did — the gap survived
+     * the attached Groups when left blank and nothing did: the gap survived
      * because the real number was never on screen.
      *
      * Generic on purpose: making Offering bespoke for one read-only line would
@@ -68,7 +68,7 @@ export interface FieldDef {
      *
      * This is what keeps "bespoke" down to one slot: the field still takes part
      * in draft seeding, dirty tracking, payload building and server-error
-     * mapping — all of which stay in `useEntityForm` — and only its CONTROL is
+     * mapping, all of which stay in `useEntityForm`, and only its CONTROL is
      * hand-written. A field left out of the registry entirely would be missing
      * from the draft and silently dropped on save.
      */
@@ -101,8 +101,8 @@ export interface ColumnDef {
 /**
  * A join table hanging off this entity, edited as a SET.
  *
- * Declaring these as data is what stops Offering — which references a Term, a
- * Kind, a Role, plus Groups, Lecturers and Equipment — from needing a bespoke
+ * Declaring these as data is what stops Offering (which references a Term, a
+ * Kind, a Role, plus Groups, Lecturers and Equipment) from needing a bespoke
  * page. It is the hub of the model, but nothing about editing it is structurally
  * new; only the number of relations is.
  */
@@ -112,7 +112,7 @@ export interface ColumnDef {
  * TWO SOURCES, ONE LABEL, and a searchable picker mixes them in a single list:
  * `/api/persons` returns the name in parts, while the schedule page's directory
  * pre-composes `name` for the grid's own lookups. A label function written for
- * one renders `"undefined undefined"` for the other — silently, since both are
+ * one renders `"undefined undefined"` for the other, silently, since both are
  * `EntityRow` and neither typechecks the field it reads.
  */
 export function personOptionLabel(row: EntityRow): string {
@@ -152,7 +152,7 @@ export function relationOptionsUrl(
     const ids = [...new Set(assignedIds.filter(Boolean))];
 
     // Nothing assigned means nothing to label, and `?ids=` with an empty list
-    // is a deliberate 400 — so the answer is known without asking.
+    // is a deliberate 400, so the answer is known without asking.
     return ids.length
         ? `/api/${def.resource}?ids=${ids.map(encodeURIComponent).join(',')}`
         : null;
@@ -174,8 +174,8 @@ export interface RelationDef {
      * Choose from a SERVER-SIDE SEARCH instead of a pre-fetched option list.
      *
      * Set it when the referenced resource can plausibly hold thousands of rows.
-     * It changes what `options` means for this relation — see the prop's own
-     * comment on `ManageRelationPicker` — so it is not a cosmetic flag: the
+     * It changes what `options` means for this relation (see the prop's own
+     * comment on `ManageRelationPicker`), so it is not a cosmetic flag: the
      * parent must supply labels for the assigned rows and nothing else.
      *
      * REQUIRES `searchFields` on the resource server-side, or `?q=` answers 400
@@ -192,7 +192,7 @@ export interface RelationDef {
     /** Per-row count, for countable equipment. */
     quantity?: { key: string; label: string };
     /**
-     * Per-row reference to a second entity — currently only a lecturer's
+     * Per-row reference to a second entity: currently only a lecturer's
      * SCHEDULING role (TAXONOMY.md §2), which is vocabulary, never permissions.
      */
     extraReference?: {
@@ -203,7 +203,7 @@ export interface RelationDef {
     };
     emptyHint?: string;
     /**
-     * Advisory shown when NOTHING IS ASSIGNED — a different question from
+     * Advisory shown when NOTHING IS ASSIGNED: a different question from
      * `emptyHint`, which explains why the option list is empty.
      *
      * Exists because an empty set is ambiguous in exactly the way this codebase
@@ -213,7 +213,7 @@ export interface RelationDef {
      * a person can sign in and be shown nothing.
      *
      * Phrase it as a FACT, not an instruction: it renders in read-only mode too,
-     * for a viewer who cannot act on it. And never name a specific role —
+     * for a viewer who cannot act on it. And never name a specific role:
      * AccessRole keys are tenant vocabulary (CLAUDE.md: never hardcode an open
      * value into logic), so there is no role this string is allowed to assume
      * exists.
@@ -222,7 +222,7 @@ export interface RelationDef {
     /**
      * What makes this relation EDITABLE. Absent means the parent's `.update`.
      *
-     * Separate from VISIBILITY (derived — see `relationReadRequirement`): seeing
+     * Separate from VISIBILITY (derived; see `relationReadRequirement`): seeing
      * which roles somebody holds rides on `person.read`, while granting one is
      * `person_access_role.assign`. Collapsing them would either hide information
      * a person editor may see or offer a control whose every change answers 403.
@@ -242,14 +242,14 @@ export interface RelationDef {
      *
      * Fetched with the filter rather than filtered client-side, because
      * "scoped to this Term OR scoped to none" is a relation query the client
-     * cannot answer from a flat row list — it would need each Group's scope
+     * cannot answer from a flat row list: it would need each Group's scope
      * rows, which is the request it is trying to avoid.
      */
     scopeBy?: { filter: string; from: string };
 }
 
 export interface ManageEntity {
-    /** Route segment AND API resource name — deliberately the same string. */
+    /** Route segment AND API resource name, deliberately the same string. */
     key: string;
     /** Permission prefix from the server catalogue, e.g. 'person'. */
     permissionPrefix: string;
@@ -279,8 +279,8 @@ export interface ManageEntity {
     fields: FieldDef[];
     /**
      * True when a Federation can own rows of this entity (TAXONOMY.md §2).
-     * Such rows are readable but not writable — the RLS write policy is
-     * tenant-only — so the list marks them and the detail renders read-only.
+     * Such rows are readable but not writable (the RLS write policy is
+     * tenant-only), so the list marks them and the detail renders read-only.
      */
     federationOwnable?: boolean;
     /**
@@ -290,20 +290,20 @@ export interface ManageEntity {
     systemFlag?: string;
     /**
      * Fields to collapse behind "More fields" for the given tenant mode
-     * (issue #8) — a UI/UX bias only, never a change to what is stored or
+     * (issue #8): a UI/UX bias only, never a change to what is stored or
      * required. Absent means no field is ever de-emphasised, which is the
      * correct answer for every entity except Offering today.
      *
      * A function of `TenantMode` rather than a flat set, so a mode's meaning
-     * lives in `shared/tenantMode.ts` — the one place a role author or this
-     * file's own reviewer needs to check the classification — instead of
+     * lives in `shared/tenantMode.ts`, the one place a role author or this
+     * file's own reviewer needs to check the classification, instead of
      * being duplicated per entity here.
      */
     advancedFieldsForMode?: (mode: TenantMode) => ReadonlySet<string>;
     /**
      * Issue #8: an optional "start from a template" picker shown above the
      * CREATE form. Copies field VALUES from the chosen row onto the draft
-     * once, at selection time — never a live link, and never anything this
+     * once, at selection time: never a live link, and never anything this
      * entity's own save path treats differently afterward. Only Offering
      * declares this today; kept generic (a resource, a label and an `apply`
      * function) so a future entity can reuse the same picker rather than
@@ -315,15 +315,15 @@ export interface ManageEntity {
         label: (row: EntityRow) => string;
         /** Mutates `draft` in place with the chosen row's shape. */
         apply: (row: EntityRow, draft: Record<string, unknown>) => void;
-        /** Gates the picker's own fetch — absent permission hides it rather than 403ing. */
+        /** Gates the picker's own fetch: absent permission hides it rather than 403ing. */
         readPermission: string;
     };
     /**
      * The reverse of `startFromTemplate`: capture an EXISTING row's shape into a
      * new template, shown on the EDIT page only (a template needs values to
      * copy, and the create page has none yet). Kept generic for the same
-     * reason `startFromTemplate` is — a resource, a permission and a builder
-     * function, not Offering-specific machinery — even though Offering is the
+     * reason `startFromTemplate` is: a resource, a permission and a builder
+     * function, not Offering-specific machinery, even though Offering is the
      * only declarer today.
      */
     saveAsTemplate?: {
@@ -331,14 +331,14 @@ export interface ManageEntity {
         resource: string;
         /** Row → template creation payload. Only the fields worth fixing. */
         buildTemplate: (row: EntityRow) => Record<string, unknown>;
-        /** Gates the action — absent permission hides it rather than 403ing. */
+        /** Gates the action: absent permission hides it rather than 403ing. */
         createPermission: string;
     };
     /** Bespoke detail body, resolved by name. Generic form when absent. */
     detailComponent?: string;
     /**
      * Bespoke LIST body, for an entity whose rows do not read as a flat table.
-     * Only Group needs this — a hierarchy shown as a flat list loses the one
+     * Only Group needs this: a hierarchy shown as a flat list loses the one
      * property that makes it a hierarchy.
      */
     listComponent?: string;
@@ -351,8 +351,8 @@ export interface ManageEntity {
     /**
      * Suppresses the list header's "New <entity>" button.
      *
-     * For an entity whose rows are PROVISIONED rather than collected — the
-     * constraint catalogue — a prominent "New" action frames a fixed set of
+     * For an entity whose rows are PROVISIONED rather than collected (the
+     * constraint catalogue), a prominent "New" action frames a fixed set of
      * switches as a collection you populate, which is how tenants ended up with
      * types that had no row and were therefore never evaluated. Creation is
      * still reachable (a scoped variant, from within its type's row); it is
@@ -381,7 +381,7 @@ export const OFFERING_ENTITY: ManageEntity = {
     label: 'Offering',
     plural: 'Offerings',
     icon: 'material-symbols:book-outline',
-    description: 'What must be scheduled — the recurring demand sessions are placed from.',
+    description: 'What must be scheduled: the recurring demand sessions are placed from.',
     keywords: ['offering', 'course', 'module', 'subject', 'demand', 'curriculum', 'lecture'],
     federationOwnable: true,
     advancedFieldsForMode: offeringFieldsToDeemphasize,
@@ -392,7 +392,7 @@ export const OFFERING_ENTITY: ManageEntity = {
         apply: (row, draft) => {
             /*
              * SKIP NULL, DO NOT COERCE. A template field left blank means
-             * "let whoever creates the offering decide" — copying a coerced
+             * "let whoever creates the offering decide": copying a coerced
              * '' or 0 over the freshly-seeded draft would silently overwrite
              * that choice with a value nobody chose.
              */
@@ -404,7 +404,7 @@ export const OFFERING_ENTITY: ManageEntity = {
                 }
             }
 
-            // Informational only — see `Offering.createdFromTemplateId`'s
+            // Informational only; see `Offering.createdFromTemplateId`'s
             // own comment. Nothing ever reads this back to resolve a field.
             draft.createdFromTemplateId = row.id;
         },
@@ -412,7 +412,7 @@ export const OFFERING_ENTITY: ManageEntity = {
     saveAsTemplate: {
         resource: 'offering-templates',
         createPermission: 'offering_template.create',
-        // The reverse copy — same fields, same reasoning about null meaning
+        // The reverse copy: same fields, same reasoning about null meaning
         // "not fixed", just read from an Offering instead of written to one.
         buildTemplate: (row) => Object.fromEntries(
             OFFERING_TEMPLATE_SHAPE_FIELDS
@@ -436,7 +436,7 @@ export const OFFERING_ENTITY: ManageEntity = {
             label: 'Colour',
             type: 'color',
             help: 'Tints every session of this offering. Leave it empty to inherit the '
-                + 'session kind\'s colour — empty means inherit, not grey.',
+                + 'session kind\'s colour: empty means inherit, not grey.',
         },
         {
             key: 'termId',
@@ -449,7 +449,7 @@ export const OFFERING_ENTITY: ManageEntity = {
             reference: {
                 resource: 'terms',
                 label: (row) => String(row.name),
-                emptyHint: 'Create a term first — an offering has to belong to one.',
+                emptyHint: 'Create a term first: an offering has to belong to one.',
             },
         },
         {
@@ -460,7 +460,7 @@ export const OFFERING_ENTITY: ManageEntity = {
             reference: {
                 resource: 'session-kinds',
                 label: (row) => String(row.name ?? row.key),
-                emptyHint: 'Create a session kind first — lecture, lab, seminar, whatever you call them.',
+                emptyHint: 'Create a session kind first: lecture, lab, seminar, whatever you call them.',
             },
         },
         {
@@ -482,7 +482,7 @@ export const OFFERING_ENTITY: ManageEntity = {
             label: 'How the sessions spread',
             type: 'select',
             /*
-             * NOT `required`, and the blank option is not "none" — it is
+             * NOT `required`, and the blank option is not "none". It is
              * UNCLASSIFIED, which is where every existing offering starts and
              * the honest answer for one nobody has decided about. Making this
              * required would force a choice at the point of least information,
@@ -517,7 +517,7 @@ export const OFFERING_ENTITY: ManageEntity = {
             min: 1,
             help: 'Leave blank to require exactly one, chosen by the solver from '
                 + '“Who leads it” below. Set higher only for genuine '
-                + 'co-teaching — the list below is a candidate pool, not a '
+                + 'co-teaching: the list below is a candidate pool, not a '
                 + 'guaranteed roster.',
         },
         {
@@ -529,7 +529,7 @@ export const OFFERING_ENTITY: ManageEntity = {
              * THE CEILING IS STATED, NOT DISCOVERED. Past
              * `MAX_ROOMS_PER_SESSION` the solver refuses the whole input rather
              * than degrading, so the failure is not "this offering scheduled
-             * badly" — it is every run failing for the tenant, reported against
+             * badly": it is every run failing for the tenant, reported against
              * an offering edited weeks earlier.
              *
              * The help text also names the SUMMING reading, because the
@@ -540,7 +540,7 @@ export const OFFERING_ENTITY: ManageEntity = {
              */
             max: MAX_ROOMS_PER_SESSION,
             help: `One for almost everything. Above one, a session occupies that many rooms `
-                + `simultaneously and their capacities are ADDED — 120 students fit two `
+                + `simultaneously and their capacities are ADDED: 120 students fit two `
                 + `60-seat halls. Use it for a cohort too large for any single room, not for a `
                 + `practical where each room must hold everyone. At most ${MAX_ROOMS_PER_SESSION}.`,
         },
@@ -560,9 +560,9 @@ export const OFFERING_ENTITY: ManageEntity = {
 
                     if (capacity === null) {
                         return groups === 0
-                            ? 'No groups attached, so nothing can be derived \u2014 every room would qualify.'
+                            ? 'No groups attached, so nothing can be derived: every room would qualify.'
                             : 'The attached groups have neither members nor an expected size, so nothing '
-                                + 'can be derived \u2014 every room would qualify.';
+                                + 'can be derived: every room would qualify.';
                     }
 
                     const source = basis === 'membership'
@@ -597,12 +597,12 @@ export const OFFERING_ENTITY: ManageEntity = {
         { key: 'isActive', label: 'Active', type: 'boolean' },
         { key: 'notes', label: 'Notes', type: 'textarea' },
         /*
-         * NEVER RENDERED — `custom: true` with no bespoke component to supply
+         * NEVER RENDERED: `custom: true` with no bespoke component to supply
          * a control, which is deliberate here rather than the usual
          * "picker lives in the detail component" reading of that flag.
          * `startFromTemplate.apply()` is the only writer, so the field still
          * has to be declared to take part in the draft and the save payload
-         * at all (an undeclared key is silently dropped — see `splitChildren`
+         * at all (an undeclared key is silently dropped; see `splitChildren`
          * on the server and `useEntityForm.save()`'s per-field loop here).
          */
         { key: 'createdFromTemplateId', label: 'Started from template', type: 'text', custom: true, createOnly: true },
@@ -626,7 +626,7 @@ export const OFFERING_ENTITY: ManageEntity = {
         {
             key: 'lecturers',
             label: 'Who leads it',
-            help: 'Eligible to lead it — a candidate pool the solver chooses from, '
+            help: 'Eligible to lead it: a candidate pool the solver chooses from, '
                 + 'sized by “Lecturers needed at once” above. Optionally state '
                 + 'the scheduling role each person fills here.',
             resource: 'persons',
@@ -657,7 +657,7 @@ export const OFFERING_ENTITY: ManageEntity = {
 
 /**
  * Issue #8. A REUSABLE SHAPE, structurally mirroring `defaultConstraintRow`
- * (`shared/constraintTypes.ts`) — a stored shape a new row is seeded from —
+ * (`shared/constraintTypes.ts`), a stored shape a new row is seeded from,
  * except tenant-authored, so it is a resource here rather than a catalogue
  * function.
  *
@@ -665,7 +665,7 @@ export const OFFERING_ENTITY: ManageEntity = {
  * unlike `OFFERING_ENTITY`: a template states only the part of the shape it
  * wants to fix, and a blank field leaves that decision to whoever creates an
  * Offering from it. `createOnly` is absent for the same reason it is absent
- * from most of Offering's own fields — nothing here is an identifier fixed
+ * from most of Offering's own fields: nothing here is an identifier fixed
  * at creation, just a value that may or may not be copied later.
  */
 export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
@@ -674,7 +674,7 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
     label: 'Offering template',
     plural: 'Offering templates',
     icon: 'material-symbols:content-copy-outline',
-    description: 'Reusable offering shapes — "Maths, 4x/week" — a new offering can start from.',
+    description: 'Reusable offering shapes, such as "Maths, 4x/week", a new offering can start from.',
     keywords: ['template', 'offering', 'shape', 'reuse', 'preset', 'copy'],
     title: (row) => String(row.name ?? 'Offering template'),
     columns: [
@@ -689,7 +689,7 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
             label: 'Template name',
             type: 'text',
             required: true,
-            help: 'What you pick this template by — not the title it gives the offering.',
+            help: 'What you pick this template by, not the title it gives the offering.',
         },
         { key: 'title', label: 'Offering title', type: 'text', help: 'Leave blank to name each offering individually.' },
         {
@@ -700,7 +700,7 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
                 resource: 'session-kinds',
                 label: (row) => String(row.name ?? row.key),
                 nullable: true,
-                emptyHint: 'Create a session kind first — lecture, lesson, whatever you call them.',
+                emptyHint: 'Create a session kind first: lecture, lesson, whatever you call them.',
             },
         },
         { key: 'code', label: 'Code', type: 'text' },
@@ -738,13 +738,13 @@ export const OFFERING_TEMPLATE_ENTITY: ManageEntity = {
 };
 
 /**
- * A reusable, ORDERED bundle of Offering templates — "this is what Jahrgang
- * 10 takes this term" — so applying one to a Group creates that Group's
+ * A reusable, ORDERED bundle of Offering templates ("this is what Jahrgang
+ * 10 takes this term"), so applying one to a Group creates that Group's
  * whole course load in one action instead of one Offering at a time.
  *
  * BESPOKE DETAIL, unlike Offering itself: the item list is an ORDERED
  * sequence (`OfferingPlanItem.position`), which the generic `relations`
- * mechanism cannot express — it replaces a SET. See `ManageOfferingPlanItems`.
+ * mechanism cannot express: it replaces a SET. See `ManageOfferingPlanItems`.
  */
 export const OFFERING_PLAN_ENTITY: ManageEntity = {
     key: 'offering-plans',
@@ -752,7 +752,7 @@ export const OFFERING_PLAN_ENTITY: ManageEntity = {
     label: 'Curriculum plan',
     plural: 'Curriculum plans',
     icon: 'material-symbols:playlist-add-check',
-    description: 'A cohort’s whole course load, bundled — apply it to a group to create every offering at once.',
+    description: 'A cohort’s whole course load, bundled: apply it to a group to create every offering at once.',
     keywords: ['plan', 'curriculum', 'jahrgang', 'cohort', 'bundle', 'template', 'load'],
     title: (row) => String(row.name ?? 'Curriculum plan'),
     detailComponent: 'OfferingPlanForm',
@@ -766,10 +766,10 @@ export const OFFERING_PLAN_ENTITY: ManageEntity = {
         {
             key: 'nextPlanId',
             label: 'Successor plan',
-            help: 'What a Group on this plan moves to next — "Semester 3" names "Semester 4". '
+            help: 'What a Group on this plan moves to next: "Semester 3" names "Semester 4". '
                 + 'Lets a Group advance with no picker: the Term defaults to whichever starts next.',
             type: 'reference',
-            // A plan cannot name itself as its own successor — the option
+            // A plan cannot name itself as its own successor: the option
             // list excludes the row being edited, which no static registry
             // entry can express (it depends on which row that is). See
             // `ManageOfferingPlanForm`.
@@ -796,7 +796,7 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
     detailComponent: 'ConstraintBuilder',
     /**
      * The catalogue is thirteen live types and every tenant holds one default
-     * row for each, plus any scoped variants — bounded and small. The grid
+     * row for each, plus any scoped variants: bounded and small. The grid
      * needs the WHOLE set to group it correctly, and reports loudly rather than
      * silently truncating if it ever stops being complete.
      */
@@ -813,7 +813,7 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
     /*
      * `type`, `severity`, `weight` and `params` are all `custom`: they constrain
      * each other. The chosen type fixes the severity and dictates which
-     * parameters exist, and weight is meaningful only when severity is SOFT — a
+     * parameters exist, and weight is meaningful only when severity is SOFT, a
      * pairing the database CHECK enforces. Rendered as four independent controls
      * they would compose states the server rejects.
      */
@@ -825,7 +825,7 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
         { key: 'params', label: 'Parameters', type: 'json', custom: true },
         /*
          * Kind scopes. `custom` because the builder renders the picker, and
-         * because the value is an ARRAY — the shape that produced
+         * because the value is an ARRAY: the shape that produced
          * "[object Object]" when a structured field reached ManageField. It is
          * declared here so it takes part in the draft, dirty tracking and the
          * payload, exactly as `time_grid.breaks` does.
@@ -833,11 +833,11 @@ export const CONSTRAINT_ENTITY: ManageEntity = {
         { key: 'scopes', label: 'Applies to kinds', type: 'text', custom: true },
         /*
          * A relation type's ordered Offering operands (ADR-0028 in
-         * calendry-solver) — `ConstraintRelationMember`, never
+         * calendry-solver), `ConstraintRelationMember`, never
          * `ConstraintScope`. Same reasoning as `scopes` just above: `custom`
          * because `ManageOfferingRelationMembers` renders the picker and the
          * value is an array, and it has to be declared here to take part in
-         * the draft, dirty tracking and the save payload at all — undeclared,
+         * the draft, dirty tracking and the save payload at all; undeclared,
          * `useEntityForm.save()`'s generic per-field loop never sends it.
          */
         { key: 'members', label: 'Related offerings', type: 'text', custom: true },
@@ -855,7 +855,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         description: 'Everyone the timetable places or notifies.',
         keywords: ['people', 'staff', 'student', 'lecturer', 'teacher', 'roster', 'directory'],
         title: (row) => `${row.givenName ?? ''} ${row.familyName ?? ''}`.trim() || 'Person',
-        // Every field below is plain — this exists solely to add issue #84's
+        // Every field below is plain; this exists solely to add issue #84's
         // GDPR export action outside the generic form. See detailComponents.ts.
         detailComponent: 'PersonForm',
         columns: [
@@ -887,7 +887,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             {
                 key: 'roles',
                 label: 'Scheduling roles',
-                help: 'What this person can be scheduled AS — Lecturer, Auditor. Not permissions.',
+                help: 'What this person can be scheduled AS: Lecturer, Auditor. Not permissions.',
                 resource: 'roles',
                 valueKey: 'roleId',
                 optionLabel: (row) => String(row.name ?? row.key),
@@ -903,9 +903,9 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 optionLabel: (row) => String(row.name ?? row.key),
                 emptyHint: 'No access roles defined yet.',
                 emptyWarning: 'No access role assigned. This person can sign in and will be '
-                    + 'shown an empty application — no schedule, no navigation.',
+                    + 'shown an empty application: no schedule, no navigation.',
                 /*
-                 * No read gate declared: it is DERIVED from `resource` — see
+                 * No read gate declared: it is DERIVED from `resource`; see
                  * `relationReadRequirement`. `/api/access-roles` accepts either
                  * administration permission, and the derivation says so without
                  * this entry having to know.
@@ -933,7 +933,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         icon: 'material-symbols:badge-outline',
         // The Role/AccessRole distinction is load-bearing (TAXONOMY.md §2 vs §4)
         // and the two share a word, so the UI says which one this is.
-        description: 'Scheduling vocabulary — Lecturer, Auditor. Not permissions.',
+        description: 'Scheduling vocabulary: Lecturer, Auditor. Not permissions.',
         keywords: ['role', 'lecturer', 'auditor', 'vocabulary', 'title'],
         title: (row) => String(row.name ?? 'Role'),
         systemFlag: 'isSystem',
@@ -985,7 +985,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 /* Stated, because 0 is the column's DEFAULT: a room saved
                  * without a capacity gets it, and the reading has to be the one
                  * that keeps such a room usable. */
-                help: 'Seats. Leave it 0 for no limit — an online room, or one nobody has measured.',
+                help: 'Seats. Leave it 0 for no limit: an online room, or one nobody has measured.',
             },
             {
                 key: 'examCapacity',
@@ -994,7 +994,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 min: 0,
                 /* Nullable, unlike `capacity`: unset is a real, distinct state
                  * ("this room has no separate exam limit"), not "zero seats". */
-                help: 'Seats available for an exam sitting, if fewer than the normal capacity — '
+                help: 'Seats available for an exam sitting, if fewer than the normal capacity: '
                     + 'exam spacing and invigilation often use more room per person. '
                     + "Leave unset to fall back to this room's normal capacity.",
             },
@@ -1022,7 +1022,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 key: 'equipment',
                 label: 'Equipment in this room',
                 help: 'What this room provides. Offerings requiring it can only be placed '
-                    + 'here — and a count is what an offering asking for a minimum is '
+                    + 'here, and a count is what an offering asking for a minimum is '
                     + 'measured against. Left blank, this room answers presence only.',
                 resource: 'equipment',
                 valueKey: 'equipmentId',
@@ -1110,10 +1110,10 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 key: 'curriculumPlanId',
                 label: 'Curriculum plan',
                 type: 'reference',
-                help: 'The plan this group is meant to follow — an intent, set before it has '
+                help: 'The plan this group is meant to follow: an intent, set before it has '
                     + 'any offerings. Lets the plan’s own "roll out to several groups" panel '
                     + 'pre-select this group instead of it being picked by hand every time. '
-                    + 'Not the same as which plan this group already has offerings from — see '
+                    + 'Not the same as which plan this group already has offerings from; see '
                     + 'the "Curriculum plans" panel below for that.',
                 reference: {
                     resource: 'offering-plans',
@@ -1162,7 +1162,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         /*
          * Every field is `custom`: the editor renders them against a live
          * preview of the resulting day, because these numbers are meaningless in
-         * isolation — "45 minutes, 8 blocks, break 15" only becomes checkable
+         * isolation: "45 minutes, 8 blocks, break 15" only becomes checkable
          * when you can see it lands at 17:00. They stay declared here so draft
          * seeding, dirty tracking, payload building and server-side field errors
          * all keep working exactly as they do for a generic entity.
@@ -1184,7 +1184,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             // custom: true keeps it in the draft, dirty tracking and the payload
             // while ManageTimeGridEditor supplies the control. Leaving it out of
             // the registry instead would drop it from the draft and silently
-            // from saves — the trap Step 13 documented.
+            // from saves: the trap Step 13 documented.
             { key: 'breaks', label: 'Named breaks', type: 'text', custom: true },
             { key: 'activeDays', label: 'Teaching days', type: 'select', required: true, custom: true },
             { key: 'isDefault', label: 'Default grid', type: 'boolean', custom: true },
@@ -1197,7 +1197,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         label: 'Session kind',
         plural: 'Session kinds',
         icon: 'material-symbols:label-outline',
-        description: 'Your own vocabulary — lecture, lab, seminar. Nothing here is built in.',
+        description: 'Your own vocabulary: lecture, lab, seminar. Nothing here is built in.',
         keywords: ['kind', 'type', 'lecture', 'lab', 'seminar', 'exam', 'vocabulary', 'category'],
         title: (row) => String(row.name ?? 'Session kind'),
         columns: [
@@ -1228,7 +1228,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                  * second one and re-point every offering.
                  *
                  * No blank option: every kind is one of these, and the default
-                 * is the honest answer for a kind nobody has thought about —
+                 * is the honest answer for a kind nobody has thought about,
                  * unlike `schedulingPattern`, where "not decided" is a real
                  * third state.
                  */
@@ -1243,7 +1243,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 key: 'color',
                 label: 'Colour',
                 type: 'color',
-                help: 'Tints this kind on the schedule. Chips stay legible without it — colour is never the only cue.',
+                help: 'Tints this kind on the schedule. Chips stay legible without it: colour is never the only cue.',
             },
             {
                 key: 'requiresGroup',
@@ -1262,7 +1262,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
     {
         /*
          * Lobby displays. Own handlers under `server/api/screens/`, not the
-         * generic scaffold — a Screen carries a secret, and the scaffold returns
+         * generic scaffold: a Screen carries a secret, and the scaffold returns
          * the row it wrote. The gate is still declared in `RESOURCE_PERMISSIONS`
          * so this registry can predict it, exactly as `accounts` does.
          */
@@ -1296,7 +1296,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 label: 'Name',
                 type: 'text',
                 required: true,
-                help: 'Where the display physically is — "Main entrance", "B-block corridor" — '
+                help: 'Where the display physically is (e.g. "Main entrance", "B-block corridor"), '
                     + 'so the right one can be revoked without a guess.',
             },
             {
@@ -1322,7 +1322,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                  * of rooms. Shipped exactly that way once.
                  *
                  * `custom` because the control is a multi-select whose EMPTY
-                 * state means "every room" — a meaning no generic reference
+                 * state means "every room": a meaning no generic reference
                  * control can convey, and the opposite of what a blank select
                  * looks like.
                  */
@@ -1336,7 +1336,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 },
             },
             /*
-             * The device key, generated in the BROWSER and shown once — the same
+             * The device key, generated in the BROWSER and shown once: the same
              * shape as an account's initial password, and for the same reason:
              * the create page navigates away on success, so a server-generated
              * secret would be gone before it could be read. `custom` because the
@@ -1381,7 +1381,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
 
     {
         key: 'calendar-periods',
-        // A child of Term, so `term.update` governs it — changing when a term's
+        // A child of Term, so `term.update` governs it: changing when a term's
         // exam period falls IS editing the term. Same reasoning as
         // `time_grid_break` living under `time_grid.update`.
         permissionPrefix: 'term',
@@ -1405,7 +1405,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 type: 'reference',
                 required: true,
                 createOnly: true,
-                help: 'Which term this period falls in. Cannot be changed afterwards — '
+                help: 'Which term this period falls in. Cannot be changed afterwards: '
                     + 'moving a period to another term is creating a different period.',
                 reference: {
                     resource: 'terms',
@@ -1438,31 +1438,31 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 type: 'text',
                 // Rendered by ManageCalendarPeriodPreview. `custom` keeps the key
                 // out of the payload while leaving the field in the form's
-                // layout — there is no `weekPreview` column.
+                // layout; there is no `weekPreview` column.
                 custom: true,
             },
         ],
     },
 
     /**
-     * Account — the LOGIN, which is not a Person.
+     * Account: the LOGIN, which is not a Person.
      *
      * THE DISTINCTION THIS SECTION EXISTS TO MAKE VISIBLE: a Person is who the
      * timetable places and notifies (TAXONOMY.md §2); an Account is a credential
      * that can act as one Person per institution (§4). Creating a Person
-     * therefore does not create a login — which is exactly the gap that sent
+     * therefore does not create a login, which is exactly the gap that sent
      * admins to `bun run create:account`, where an already-existing Person
      * answered "already exists" and the trail ended.
      *
      * SECTION GATE IS `account.read`, and reading the API additionally accepts
-     * `account.manage` — the same deliberate divergence `access-roles` carries in
+     * `account.manage`, the same deliberate divergence `access-roles` carries in
      * the opposite direction. A role that may issue logins therefore needs
      * `account.read` as well to see the section; the API stays usable either way
      * so a create response and the person picker never 403 under a manage-only
      * role.
      *
      * Second-to-last, immediately before Access roles: the two administration
-     * sections belong together, and this is the one you visit first — a login is
+     * sections belong together, and this is the one you visit first: a login is
      * what makes an access role reach anybody.
      */
     {
@@ -1479,7 +1479,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         label: 'Login',
         plural: 'Logins',
         icon: 'material-symbols:key-outline',
-        description: 'How people sign in — credentials, separate from the people they act as.',
+        description: 'How people sign in: credentials, separate from the people they act as.',
         keywords: [
             'account', 'accounts', 'login', 'logins', 'credential', 'password',
             'sign in', 'signin', 'user', 'users', 'reset',
@@ -1499,7 +1499,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 label: 'Email',
                 type: 'email',
                 required: true,
-                help: 'The sign-in address, and unique across the whole deployment — one '
+                help: 'The sign-in address, and unique across the whole deployment: one '
                     + 'credential can act in several institutions.',
             },
             /*
@@ -1508,7 +1508,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
              * every Person. Most people already have a login, and offering them
              * produces a 409 from `@@unique([personId])` after the form is
              * filled in. Declared here so the key still takes part in the draft,
-             * dirty tracking and the payload — omitting it drops it from saves
+             * dirty tracking and the payload: omitting it drops it from saves
              * silently.
              */
             { key: 'personId', label: 'Acts as', type: 'text', required: true, custom: true },
@@ -1523,7 +1523,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
              * Explicit consent to reuse the credential that already holds the
              * typed address, rather than minting a second one. A FIELD and not a
              * second endpoint, because it has to ride along in the create payload
-             * the shared form builds — and because it belongs to the draft: the
+             * the shared form builds, and because it belongs to the draft: the
              * admin's answer to "attach instead?" is part of what they are about
              * to submit, not a separate action.
              */
@@ -1533,7 +1533,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
                 label: 'Must choose a new password at first sign-in',
                 type: 'boolean',
                 help: 'A password an administrator knows is a shared secret. This is what makes '
-                    + 'that temporary — sign-in succeeds but issues no session until it is changed.',
+                    + 'that temporary: sign-in succeeds but issues no session until it is changed.',
             },
             {
                 key: 'isActive',
@@ -1546,7 +1546,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
     },
 
     /**
-     * AccessRole — who may DO what, as opposed to the domain Role directly
+     * AccessRole: who may DO what, as opposed to the domain Role directly
      * above, which is scheduling vocabulary and grants nothing (TAXONOMY.md §4
      * vs §2). The two share a word and nothing else, so both descriptions say
      * which one they are.
@@ -1568,12 +1568,12 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
         label: 'Access role',
         plural: 'Access roles',
         icon: 'material-symbols:admin-panel-settings-outline',
-        description: 'Who may do what — bundles of permissions people are granted.',
+        description: 'Who may do what: bundles of permissions people are granted.',
         keywords: ['access', 'permission', 'role', 'admin', 'rights', 'authorization', 'security'],
         title: (row) => String(row.name ?? 'Access role'),
         detailComponent: 'AccessRoleForm',
         // `tenant-admin` is provisioning's own row: renamable, never deletable.
-        // The server refuses it too — this only stops offering the button.
+        // The server refuses it too; this only stops offering the button.
         systemFlag: 'isSystem',
         columns: [
             { key: 'key', label: 'Key', format: 'code' },
@@ -1595,7 +1595,7 @@ export const MANAGE_ENTITIES: ManageEntity[] = [
             /*
              * The grants. `custom` because the control is a matrix over the
              * fixed catalogue rather than a field, and because the value is an
-             * ARRAY — the shape that renders as "[object Object]" if it ever
+             * ARRAY: the shape that renders as "[object Object]" if it ever
              * reaches ManageField. Declared here so it takes part in the draft,
              * dirty tracking and the payload, exactly as `constraint.scopes`
              * does.
@@ -1626,10 +1626,10 @@ export function relationOptionResources(def: RelationDef): string[] {
 }
 
 /**
- * What a caller needs to be OFFERED this relation — derived, never declared.
+ * What a caller needs to be OFFERED this relation, derived, never declared.
  *
  * Every relation's option list is fetched in ONE `Promise.all`, so a single 403
- * takes down the whole wave — and because `useEntityRelations` awaits a
+ * takes down the whole wave, and because `useEntityRelations` awaits a
  * useAsyncData handle that RESOLVES rather than rejects, the result is not a blank
  * page but every picker rendering empty. Measured: without this gating a person
  * editor's Person page says "No roles defined yet" over a tenant that has them.
@@ -1637,14 +1637,14 @@ export function relationOptionResources(def: RelationDef): string[] {
  * Derived rather than declared so a new relation is gated by construction and one
  * that changes what it fetches cannot drift from its own gate. The result is an
  * AND of ORs: every endpoint must be reachable, and one may accept several
- * permissions — `lecturers` fetches persons AND roles.
+ * permissions: `lecturers` fetches persons AND roles.
  */
 export function relationReadRequirement(def: RelationDef): PermissionRequirement {
     return relationOptionResources(def).map((resource) => {
         const permissions = resourcePermissions(resource, 'read');
 
         /*
-         * A resource nothing can name fails CLOSED — an empty clause is
+         * A resource nothing can name fails CLOSED: an empty clause is
          * unsatisfiable, so the picker is hidden rather than offered against an
          * endpoint whose gate nobody can predict. That would be a silent
          * vanishing, which this codebase treats as worse than a loud failure,
@@ -1661,7 +1661,7 @@ export function entityPermission(entity: ManageEntity, action: 'read' | 'create'
 
 /**
  * Fields the form should render for this mode. `createOnly` fields are dropped
- * on edit because the server's update schema rejects them — rendering them
+ * on edit because the server's update schema rejects them: rendering them
  * would offer an edit that silently does nothing.
  */
 export function fieldsFor(entity: ManageEntity, mode: 'create' | 'edit'): FieldDef[] {

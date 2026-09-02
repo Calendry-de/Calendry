@@ -6,7 +6,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
 /**
  * Set (or clear) this tenant's default AccessRole for new People (issue #25).
  *
- * GATED ON BOTH `tenant.update` AND `person_access_role.assign` — this is
+ * GATED ON BOTH `tenant.update` AND `person_access_role.assign`: this is
  * the same authority as granting a role by hand, wearing a default's
  * clothes, so it needs both the permission that lets somebody change tenant
  * configuration and the permission that lets them grant access at all. A
@@ -17,7 +17,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * default", same convention `tenant_display_settings` uses.
  */
 const schema = z.object({
-    /** `null` clears the default — explicit, not `undefined`, so a caller
+    /** `null` clears the default: explicit, not `undefined`, so a caller
      *  cannot "clear" by simply omitting the field. */
     defaultAccessRoleId: z.string().min(1).nullable(),
 });

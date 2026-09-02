@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
 
     /*
      * ISSUE #101. `assertTeachingComplete` used to run ONLY inside
-     * `POST .../approve`'s response — a fact shown once, as a side effect of
+     * `POST .../approve`'s response: a fact shown once, as a side effect of
      * the very decision it should have informed, then gone. A reviewer
      * scanning the pending queue saw nothing distinguishing a module whose
      * teaching plan is fully placed from one that is not, which is the

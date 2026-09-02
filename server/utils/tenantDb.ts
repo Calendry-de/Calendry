@@ -19,7 +19,7 @@ export type Tx = Prisma.TransactionClient;
  *     tenant's context into the next request that borrows it.
  *
  *  2. Context and queries share one connection. Prisma only guarantees that
- *     inside an interactive transaction — issuing set_config on the base client
+ *     inside an interactive transaction: issuing set_config on the base client
  *     would set it on an arbitrary pooled connection and then run the query on
  *     a different one.
  *
@@ -30,7 +30,7 @@ export type Tx = Prisma.TransactionClient;
  * A handler that forgets to use this sees zero rows rather than every row,
  * because the policies compare against NULL.
  *
- * Takes a `TenantScopedIdentity`, not the full `RequestIdentity` — issue #76.
+ * Takes a `TenantScopedIdentity`, not the full `RequestIdentity` (issue #76).
  * `StaffIdentity` carries no `tenantId` at all (a staff principal is never IN
  * a tenant), so passing one here is a COMPILE ERROR, not a runtime check
  * `withRequestTenant()` below has to remember to make.
@@ -78,13 +78,13 @@ export function requireIdentity(event: H3Event): RequestIdentity {
 /**
  * Convenience: resolve identity and open a tenant transaction in one step.
  *
- * Refuses `kind === 'staff'` BEFORE calling `withTenant()` — issue #76. This
+ * Refuses `kind === 'staff'` BEFORE calling `withTenant()` (issue #76). This
  * is what makes "staff routes must not be reachable by a tenant-scoped
  * identity, and vice versa" hold for the tenant-scoped half: a `StaffIdentity`
  * is not a `TenantScopedIdentity` at all (see that type's comment in
  * `tenantResolver.ts`), so `withTenant(identity, …)` a few lines down would
  * not even compile without this guard narrowing `identity` first. The 403,
- * not 401, matters too — a staff session IS authenticated, just never as this
+ * not 401, matters too: a staff session IS authenticated, just never as this
  * kind of principal, the same distinction `requirePermission` draws for a
  * signed-in Account missing a permission.
  */
@@ -106,11 +106,11 @@ export async function withRequestTenant<T>(
 }
 
 /**
- * Identity for the current request, asserted NOT to be staff — issue #76.
+ * Identity for the current request, asserted NOT to be staff (issue #76).
  *
  * `heldPermissions()`/`requirePermission()`/`requireAnyPermission()`
  * (`requirePermission.ts`) are only ever reachable from a route already
- * holding a `tx` from `withTenant()`, which a `StaffIdentity` cannot obtain —
+ * holding a `tx` from `withTenant()`, which a `StaffIdentity` cannot obtain,
  * so in practice `identity.kind` is never `'staff'` there. TypeScript does not
  * know that fact from `requireIdentity()`'s return type alone, and
  * `StaffIdentity` carries no `tenantId` for those call sites' audit-log writes
@@ -131,12 +131,12 @@ export function requireTenantScopedIdentity(event: H3Event): TenantScopedIdentit
 }
 
 /**
- * Identity for the current request, asserted to be staff — issue #76.
+ * Identity for the current request, asserted to be staff (issue #76).
  *
  * The guard `server/api/staff/*` routes use INSTEAD OF `withRequestTenant`,
  * never alongside it: a staff principal has no tenant, so there is no RLS
  * context for those routes to open, and `withTenant()`'s parameter type does
- * not even accept a `StaffIdentity` (see its own comment) — this function
+ * not even accept a `StaffIdentity` (see its own comment); this function
  * only adds the runtime check that a NON-staff caller (an `account` session, a
  * `token`, anything else) is turned away before a staff route does anything
  * with the owner database connection.

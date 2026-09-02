@@ -15,7 +15,7 @@ import { deriveCapacity } from '../../shared/groupCapacity';
  *
  * WHY THIS IS NOT `POST /api/sessions` WITH A NARROWER GATE. That route creates
  * a Session anywhere, for anyone, immediately. The whole point of the exam flow
- * is that a lecturer creates NOTHING until somebody decides — so the request is
+ * is that a lecturer creates NOTHING until somebody decides, so the request is
  * a different object with a different lifetime, and the Session only exists on
  * the far side of an approval.
  */
@@ -108,7 +108,7 @@ export interface ExamPlacement {
  *
  * Same two guards `POST /api/sessions` applies, for the same reason: zod cannot
  * know how many blocks a tenant's grid has or which days it teaches, and a
- * placement outside that space is not a constraint violation to warn about — it
+ * placement outside that space is not a constraint violation to warn about: it
  * is a placement that resolves to no slot at all.
  */
 export async function assertPlacementFits(
@@ -157,22 +157,22 @@ export interface TeachingCompleteness {
 }
 
 /**
- * Has the module's whole teaching plan actually been PLACED — not whether any
+ * Has the module's whole teaching plan actually been PLACED, not whether any
  * of it has already happened.
  *
  * COUNT-BASED, deliberately: it does not matter whether the placed Sessions'
  * dates are in the past or future, only that `offering.frequency` worth of
  * them exist on the calendar. `isPlacedSession` is the one predicate for "has
- * a real placement" — a banked/cancelled Session (issue #22) has
+ * a real placement"; a banked/cancelled Session (issue #22) has
  * `termWeek: null` and must not count as taught.
  *
- * WARN, DON'T BLOCK — same convention as a manual edit's hard-constraint
+ * WARN, DON'T BLOCK: same convention as a manual edit's hard-constraint
  * violations: this returns a result rather than throwing, so a caller can
  * surface it as queryable state instead of refusing the request or the
  * approval. An exam on a module whose teaching is not yet fully scheduled is
  * a fact worth showing, not a reason to stop someone.
  *
- * PURE READ, no side effects — safe to call from both the request and the
+ * PURE READ, no side effects: safe to call from both the request and the
  * approval routes, and safe to call twice with the same DB state.
  */
 export async function assertTeachingComplete(
@@ -185,7 +185,7 @@ export async function assertTeachingComplete(
         select: { frequency: true },
     });
 
-    // No such Offering is not this function's question to answer — callers
+    // No such Offering is not this function's question to answer; callers
     // that need it to exist already assert that themselves. Reporting
     // "complete" here would be a lie; reporting a fixed 0/0 keeps the shape
     // honest without inventing a verdict.
@@ -207,9 +207,9 @@ export async function assertTeachingComplete(
     };
 }
 
-/** Result of {@link assertExamRoomCapacity} — a room's exam capacity checked against the expected sitting size. */
+/** Result of {@link assertExamRoomCapacity}: a room's exam capacity checked against the expected sitting size. */
 export interface ExamCapacityCheck {
-    /** False when there is no preferred room, or nothing to compare it against — nothing was actually checked. */
+    /** False when there is no preferred room, or nothing to compare it against: nothing was actually checked. */
     checked: boolean;
     /** `room.examCapacity ?? room.capacity`. Null when `checked` is false. */
     roomCapacity: number | null;
@@ -223,7 +223,7 @@ export interface ExamCapacityCheck {
  * Is the request's preferred room big enough for an exam sitting of this
  * module?
  *
- * EXAM CAPACITY, NOT TEACHING CAPACITY — `Room.examCapacity` exists because
+ * EXAM CAPACITY, NOT TEACHING CAPACITY: `Room.examCapacity` exists because
  * exam spacing/invigilation reduces usable seats below a room's normal
  * teaching capacity; `null` there falls back to `Room.capacity`, same as
  * `Offering.requiredCapacity` falling back to a derived number.
@@ -233,13 +233,13 @@ export interface ExamCapacityCheck {
  * wins, otherwise the number is derived from the attached Groups' membership
  * closure. Two independent notions of "how many people" would drift.
  *
- * WARN, DON'T BLOCK — mirrors `materializeExam`'s own room-clash comment
+ * WARN, DON'T BLOCK: mirrors `materializeExam`'s own room-clash comment
  * ("an approved exam that double-books a room is carried out and the clash is
  * reported"). A too-small room is surfaced on the approval response, not
  * refused: the reviewer already chose to grant the request, and the room was
  * only ever a PREFERENCE (see `ExamRequest.roomId`'s own comment).
  *
- * PURE READ — safe to call repeatedly.
+ * PURE READ: safe to call repeatedly.
  */
 export async function assertExamRoomCapacity(
     tx: Tx,
@@ -274,11 +274,11 @@ export async function assertExamRoomCapacity(
     let requiredCapacity = offering.requiredCapacity;
 
     // NULL means "derive it", exactly as it does for the solver's own
-    // room-capacity check — never treated as "no requirement".
+    // room-capacity check; never treated as "no requirement".
     if (requiredCapacity === null) {
         const groupIds = offering.groups.map((link) => link.groupId);
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const groups = await tx.group.findMany({ where: { tenantId }, select: { id: true, parentGroupId: true, expectedSize: true } });
         const memberships = await tx.membership.findMany({ where: { tenantId }, select: { groupId: true, personId: true } });
@@ -301,7 +301,7 @@ export async function assertExamRoomCapacity(
  * the whole feature rests on. `ExactFrequency` is HARD: the solver expects
  * exactly `offering.frequency` Sessions for an Offering, so an extra one is
  * either deleted by the next apply or reported as violating the module's own
- * demand. An Event — `offeringId` NULL — is structurally out of every solve's
+ * demand. An Event (`offeringId` NULL) is structurally out of every solve's
  * scope, because `planMaterialization` tests `inScope.has(s.offeringId)` and
  * `inScope` is a Set of ids.
  *
@@ -310,7 +310,7 @@ export async function assertExamRoomCapacity(
  * aggregates over placements, so an exam attached to nobody is an exam no
  * spacing rule can space.
  *
- * Locked on top of the structural exemption — belt and braces, and the lock is
+ * Locked on top of the structural exemption: belt and braces, and the lock is
  * the weaker of the two since it is one UPDATE away from being cleared.
  */
 export async function materializeExam(
@@ -342,7 +342,7 @@ export async function materializeExam(
             tenantId: identity.tenantId,
             termId: term.id,
             kindId: request.kindId,
-            // The whole point — see this function's own comment.
+            // The whole point; see this function's own comment.
             offeringId: null,
             // An Event has nothing else to be called, and "Klausur" alone does
             // not distinguish two exams in one week.
@@ -426,7 +426,7 @@ export async function materializeExam(
  * What KIND of week each `termWeek` in a Term is.
  *
  * WHY THE EXAM FLOW NEEDS THIS AT ALL. An approved exam is a locked Event, and
- * the solver never places an Event — so `MinimizeExamWeek`, the rule whose whole
+ * the solver never places an Event, so `MinimizeExamWeek`, the rule whose whole
  * job is steering sessions relative to the exam period, cannot reach it. The
  * lecturer's chosen week IS the final answer, which makes "is that week actually
  * the exam period" a question the UI has to answer rather than the objective.
@@ -437,8 +437,8 @@ export async function materializeExam(
  * declaration is right here.
  *
  * ADVISORY, NEVER A GATE. A Nachklausur legitimately sits in an ordinary
- * teaching week — the real timetable this project's demo data came from is full
- * of them — so refusing a non-exam week would forbid a thing institutions
+ * teaching week (the real timetable this project's demo data came from is full
+ * of them), so refusing a non-exam week would forbid a thing institutions
  * actually do. Warn and allow, as everywhere else.
  */
 export async function classifyTermWeeks(

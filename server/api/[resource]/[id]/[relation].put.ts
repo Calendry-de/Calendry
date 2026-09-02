@@ -234,7 +234,7 @@ export default defineEventHandler(async (event) => {
 
     return withRequestTenant(event, async (tx, identity) => {
         /**
-         * Editing what an Offering requires IS editing the Offering — so the
+         * Editing what an Offering requires IS editing the Offering, so the
          * default is the parent's own `.update`, per the rule at the top of
          * relations.ts.
          *
@@ -253,7 +253,7 @@ export default defineEventHandler(async (event) => {
         const parentConfig = getResource(config.parent);
 
         /*
-         * issue #78 — granting or revoking a Person's AccessRoles is audited.
+         * issue #78: granting or revoking a Person's AccessRoles is audited.
          * `resource`/`relation` come straight off the URL, not `config`,
          * which has no field naming which relation it is.
          */
@@ -264,7 +264,7 @@ export default defineEventHandler(async (event) => {
              * The parent must exist IN THIS TENANT before anything is written.
              *
              * Without this, a PUT naming another tenant's id would delete zero
-             * rows and insert rows the RLS WITH CHECK then rejects — a 500
+             * rows and insert rows the RLS WITH CHECK then rejects: a 500
              * dressed up as a server fault, when the honest answer is 404. It
              * also means a caller cannot use the insert's success or failure to
              * probe whether an id exists elsewhere.
@@ -301,7 +301,7 @@ export default defineEventHandler(async (event) => {
             });
 
             if (rows.length > 0) {
-                // tenant_id comes from the resolved identity, never the body —
+                // tenant_id comes from the resolved identity, never the body,
                 // the same rule as every create route.
                 await relationDelegate(tx, config.model).createMany({
                     data: rows.map((row) => ({
@@ -325,7 +325,7 @@ export default defineEventHandler(async (event) => {
 
             /*
              * An invariant about what the tenant is LEFT with, measured after
-             * the replacement and inside the same transaction — so a revocation
+             * the replacement and inside the same transaction, so a revocation
              * that would strip the last administrator rolls back rather than
              * being reported once it is too late. Runs BEFORE the warnings,
              * which describe a set that stood.

@@ -9,8 +9,8 @@ import { RESOURCES } from '../server/utils/resources';
  * The searchable relation picker, over HTTP and across the two files that have
  * to agree about it.
  *
- * WHY IT CALLS THE ROUTE. `/api/[resource]` switches response shape on `limit`
- * — no `limit` gives a bare array, `limit` gives `{ rows, total }` — and the
+ * WHY IT CALLS THE ROUTE. `/api/[resource]` switches response shape on `limit`:
+ * no `limit` gives a bare array, `limit` gives `{ rows, total }`, and the
  * picker uses `limit`, so it reads `.rows`. `request<T>()` is an unchecked
  * assertion about what the server sends, so getting that backwards typechecks
  * clean and renders an empty result list: "no matches" for a search that
@@ -19,7 +19,7 @@ import { RESOURCES } from '../server/utils/resources';
  *
  * The `ids` half is new here and carries the sharper hazard. It exists so a
  * searchable picker can still label the rows already assigned without loading
- * the tenant's whole directory — and an `ids` parameter that degraded to
+ * the tenant's whole directory, and an `ids` parameter that degraded to
  * "unfiltered" when empty would answer a request for nothing with everything.
  */
 const ids = { a: '', b: '', viewer: '', multiA: '', multiB: '' };
@@ -147,7 +147,7 @@ describe('the declaration and the route agree', () => {
      * The route answers 400 for a `q=` against a resource declaring no
      * `searchFields`, rather than ignoring the parameter and returning
      * everything. That branch is NOT exercised over HTTP here because no
-     * resource currently omits them — all twelve declare some — so there is
+     * resource currently omits them (all twelve declare some), so there is
      * nothing to point it at without inventing a fake resource.
      *
      * What actually protects the picker is the check below: it is the searchable
@@ -159,7 +159,7 @@ describe('the declaration and the route agree', () => {
             const config = RESOURCES[def.resource];
 
             // Without this the picker's every keystroke answers 400 and the
-            // list stays empty — which looks exactly like "nobody matches".
+            // list stays empty, which looks exactly like "nobody matches".
             expect(config, `${entity}/${def.key} -> ${def.resource}`).toBeDefined();
             expect(
                 config!.searchFields?.length ?? 0,
@@ -228,7 +228,7 @@ describe('what the option wave fetches', () => {
     });
 
     it('makes no request when nothing is assigned', () => {
-        // `null`, not `/api/persons` — the distinction between "nothing to
+        // `null`, not `/api/persons`: the distinction between "nothing to
         // label" and "load the institution".
         expect(relationOptionsUrl(searchable, [], '/api/persons')).toBeNull();
     });

@@ -39,7 +39,7 @@ defineRouteMeta({
 /**
  * Who am I, where am I, and what may I do.
  *
- * The permission list is what a client should drive its UI from — hiding a
+ * The permission list is what a client should drive its UI from: hiding a
  * button the caller cannot use. It is emphatically not the enforcement point:
  * every route re-checks server-side, because a client is free to ignore this.
  */
@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
             activeTenant: null,
             permissions: [],
             availableTenants,
-            // No Person or Tenant resolved yet — the header is all there is.
+            // No Person or Tenant resolved yet: the header is all there is.
             locale: resolveLocale({ acceptLanguage }),
             tenantMode: DEFAULT_TENANT_MODE,
         };
@@ -91,7 +91,7 @@ export default defineEventHandler(async (event) => {
             sessionId: session.session_id,
         },
         async (tx) => {
-            // Sequential — `tx` is one shared connection; concurrent queries on
+            // Sequential: `tx` is one shared connection, and concurrent queries on
             // it trip pg's deprecated overlapping-query warning.
             const perms = await loadPermissions(tx, session.person_id as string);
             const person = await tx.person.findUnique({ where: { id: session.person_id as string }, select: { locale: true } });

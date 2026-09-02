@@ -8,7 +8,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * NO KEY ROTATION HERE, deliberately. Rotating invalidates the URL typed into a
  * device on a wall, and the person clicking the button is rarely the person who
- * can walk to it — so it belongs behind its own explicit action, not behind a
+ * can walk to it, so it belongs behind its own explicit action, not behind a
  * PATCH that also renames things. Revoking (`isActive: false`) is the
  * recoverable half and lives here.
  */
@@ -18,7 +18,7 @@ const BODY = z.object({
      * `nullish` for the same reason as the create route: the shared form sends
      * `null` for a field nobody touched, and `optional()` rejects it.
      *
-     * The three states are then distinct and all meaningful — absent or null is
+     * The three states are then distinct and all meaningful: absent or null is
      * "leave the scope alone", an ARRAY is "make it exactly this", and an EMPTY
      * array is "clear it", which means every room. That is why the guard below
      * is `Array.isArray` rather than a truthiness check: `[]` is a real value
@@ -39,8 +39,8 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requireAnyPermission(event, tx, ['screen.manage']);
 
-        // RLS makes a cross-tenant id invisible, so this is 404 rather than 403
-        // — the same answer `accounts` gives, and for the same reason: a 403
+        // RLS makes a cross-tenant id invisible, so this is 404 rather than 403,
+        // the same answer `accounts` gives, and for the same reason: a 403
         // would confirm the row exists somewhere.
         const existing = await tx.screen.findFirst({ where: { id } });
 

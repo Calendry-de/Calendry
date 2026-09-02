@@ -9,7 +9,7 @@ import type { FieldDef } from '~/utils/manageRegistry';
  * A parameter needs one of two controls: `weekdays` has a bespoke picker
  * (ManageWeekdayPicker), everything else maps onto the generic `ManageField`.
  * Both call sites used to decide that with their own `v-if` and then map the
- * field with their own copy of the mapper — a branch and a mapper that had to
+ * field with their own copy of the mapper: a branch and a mapper that had to
  * agree, in two places, with nothing checking that they did.
  *
  * They had already stopped agreeing. `ManageConstraintGrid` mapped
@@ -18,7 +18,7 @@ import type { FieldDef } from '~/utils/manageRegistry';
  * depending on which screen you were looking at. Worse, its mapper passed
  * `param.type` straight through for anything it did not special-case, so a
  * `weekdays` param reaching it would have produced a FieldDef with a type
- * outside `FieldType` — invisible, because the `v-if` happened to intercept it
+ * outside `FieldType`; invisible, because the `v-if` happened to intercept it
  * first.
  *
  * Returning the DECISION and the field together removes the branch from the
@@ -37,7 +37,7 @@ export type ConstraintParamControl =
  * `percent` renders as a number labelled "(%)" because the tenant thinks in
  * 0–100 while the wire wants 0.0–1.0. The conversion happens server-side at the
  * mapping boundary (`buildVariant` in solverInput.ts), so what is STORED is
- * what was typed — the label is the only place the unit is stated, which is why
+ * what was typed; the label is the only place the unit is stated, which is why
  * dropping it mattered.
  */
 function paramField(param: ConstraintParamDef): FieldDef {
@@ -47,7 +47,7 @@ function paramField(param: ConstraintParamDef): FieldDef {
             case 'number': return 'number';
             case 'boolean': return 'boolean';
             case 'select': return 'select';
-            // `weekdays` never reaches here — `constraintParamControl` routes it
+            // `weekdays` never reaches here: `constraintParamControl` routes it
             // to its own control before this is called.
             default: return 'text';
         }

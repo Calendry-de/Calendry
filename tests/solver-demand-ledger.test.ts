@@ -7,7 +7,7 @@ import { isReproducible } from '../server/utils/generationRead';
 import { terminationSentence } from '../app/composables/generationReview';
 
 /**
- * THE DEMAND LEDGER — what the app asked the solver for, recorded so the apply
+ * THE DEMAND LEDGER: what the app asked the solver for, recorded so the apply
  * can tell a refusal from a gap.
  *
  * `planMaterialization` deletes an in-scope Session the output does not
@@ -18,8 +18,8 @@ import { terminationSentence } from '../app/composables/generationReview';
  * silence; the next run recreated them and dropped a different eleven.
  *
  * The ledger is the evidence that makes the two cases distinguishable, and it
- * has to say what CROSSED THE WIRE — including the banked subtraction and the
- * per-group split — or the apply reconciles against a request the solver never
+ * has to say what CROSSED THE WIRE, including the banked subtraction and the
+ * per-group split, or the apply reconciles against a request the solver never
  * received. That is what the assembly half below pins.
  */
 let f: Fixtures;
@@ -99,7 +99,7 @@ describe('the ledger records what was sent', () => {
             const { report } = await assemble();
             const entry = report.demand.find((row) => row.offeringId === 'test-offering-a');
 
-            // frequency 2, one banked — the same correction `requiredSessionCount`
+            // frequency 2, one banked: the same correction `requiredSessionCount`
             // makes, since a ledger that recorded the raw frequency would report
             // a shortfall on every run that banks anything.
             expect(entry?.requiredSessionCount).toBe(1);
@@ -154,7 +154,7 @@ describe('reconcileDemand', () => {
         ];
 
         // Both series answered, under the ids the wire actually used. Summed to
-        // the real Offering this is 2 of 2 — a reconciliation that compared wire
+        // the real Offering this is 2 of 2; a reconciliation that compared wire
         // ids to `session.offering_id` would see 0 of 2 and withhold everything.
         expect(reconcileDemand(split, outputWith(['a::g1', 'a::g2'])).short.size).toBe(0);
         expect(reconcileDemand(split, outputWith(['a::g1'])).short.get('a'))
@@ -200,7 +200,7 @@ describe('demandLedgerFrom', () => {
 });
 
 /**
- * `stagnated` — the solver's new "could not place everything and stopped
+ * `stagnated`: the solver's new "could not place everything and stopped
  * searching". Both readers of a termination reason used to answer as though it
  * were good news, for the same reason: each treated its known list as the
  * exception and everything else as the safe default.
@@ -212,7 +212,7 @@ describe('an unrecognised termination reason', () => {
         expect(isReproducible('time_budget')).toBe(false);
         expect(isReproducible(null)).toBeNull();
 
-        // Was `true` — anything that was not `time_budget` passed as reproducible.
+        // Was `true`: anything that was not `time_budget` passed as reproducible.
         expect(isReproducible('stagnated')).toBeNull();
         expect(isReproducible('some_future_reason')).toBeNull();
     });

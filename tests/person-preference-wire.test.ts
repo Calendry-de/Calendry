@@ -14,8 +14,8 @@ import { statedPreferencesFor } from '../server/utils/availability';
  *    multiplier ("ignore this person entirely"), which is why the wire field is
  *    `optional`. A test asserting only "no multiplier set" would pass against a
  *    build sending 0.
- *  - An enabled rule can be entirely INERT — no counted lecturer, or none with a
- *    stated preference — and contribute exactly zero to every placement. That is
+ *  - An enabled rule can be entirely INERT: no counted lecturer, or none with a
+ *    stated preference, and contribute exactly zero to every placement. That is
  *    the `lecturer_veto` shape: a HARD rule enabled by default and fed an empty
  *    list, which looked healthy and could never fire. It went unnoticed there
  *    because nothing counted it.
@@ -29,7 +29,7 @@ let f: Fixtures;
 const LECTURER_ROLE = 'test-role-lecturer-pref';
 const OFFERING_WITH_LECTURER = 'test-offering-pref-lecturer';
 
-/** Grid is `activeDays: [1..5]`, `blocksPerDay: 8` — so 6 and 9 are outside it. */
+/** Grid is `activeDays: [1..5]`, `blocksPerDay: 8`, so 6 and 9 are outside it. */
 const OUT_OF_GRID_DAY = 6;
 const OUT_OF_GRID_BLOCK = 9;
 
@@ -106,7 +106,7 @@ describe('narrowing to the Term grid', () => {
         const person = out.input.persons.find((row) => row.id === f.personA);
 
         expect(person, 'the person must be in the snapshot at all').toBeDefined();
-        // With the grid filter removed these carry 6 and 9 — that is the failure
+        // With the grid filter removed these carry 6 and 9: that is the failure
         // this asserts, not merely the presence of 2 and 0.
         expect(person!.preferred?.days).toEqual([2]);
         expect(person!.preferred?.blocks).toEqual([0]);

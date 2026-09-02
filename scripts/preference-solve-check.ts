@@ -1,5 +1,5 @@
 /**
- * Stage 6 verification — proves `person_preference_fit` FIRES end to end.
+ * Stage 6 verification: proves `person_preference_fit` FIRES end to end.
  *
  * Stage 5 (`calendry-solver` 41f6227) added the evaluator and this repo flipped
  * `wireField` in the same change. What neither of those proves is that the two
@@ -11,14 +11,14 @@
  * That is the `lecturer_veto` shape, and the design record names it as the one
  * failure this feature must not repeat: a rule that is enabled, weighted,
  * rendered as active, and inert. So this script does not ask the solver whether
- * it honoured the preferences. It runs the SAME instance twice — once with the
- * constraint stripped from the assembled input, once as assembled — and scores
+ * it honoured the preferences. It runs the SAME instance twice: once with the
+ * constraint stripped from the assembled input, once as assembled, and scores
  * both placements against an INDEPENDENT re-implementation of the cost rule.
  *
  * Three things have to hold, and only the second is about the solver being good:
  *
  *   1. the constraint is SENT (not in `skippedConstraints`), and at least one
- *      lecturer on a real offering carries a `preferred` — otherwise the run
+ *      lecturer on a real offering carries a `preferred`, otherwise the run
  *      below would agree with itself and the check would pass while proving
  *      nothing;
  *   2. the unmet cost under the rule is LOWER than without it;
@@ -26,9 +26,9 @@
  *      rule working rather than the search wandering.
  *
  * The oracle deliberately does NOT import anything from the solver. It restates
- * ADR-0026's rule from the prose — mean over a placement's counted lecturers of
+ * ADR-0026's rule from the prose: mean over a placement's counted lecturers of
  * `clamp(multiplier) × unmet`, where `unmet` is the fraction of a person's
- * STATED axes the slot misses — because an oracle that shares code with the
+ * STATED axes the slot misses. That is because an oracle that shares code with the
  * thing it checks agrees with it by construction.
  *
  * Nothing is written to the database. The "rule off" run is produced by removing
@@ -36,14 +36,14 @@
  * the rule disabled would have assembled.
  *
  * KEPT, not throwaway like the stage 3 check scripts. It cannot live in the test
- * suite — it needs a running solver and a tenant with real preference data — but
+ * suite: it needs a running solver and a tenant with real preference data. But
  * it is the only thing that would notice the feature going quietly inert again,
  * which is the failure this whole design was shaped around.
  *
  *   bun run scripts/preference-solve-check.ts
  *
  * That talks to the compose solver on 50051. Point it somewhere else when
- * checking a solver you built yourself, which is how stage 6 was verified — the
+ * checking a solver you built yourself, which is how stage 6 was verified: the
  * published image and the submodule can disagree:
  *
  *   CALENDRY_SOLVER_ADDR_HOST=127.0.0.1:50052 bun run scripts/preference-solve-check.ts
@@ -62,7 +62,7 @@ const MAX_MOVES = 2_000_000;
  * "Determinism"), and a starved run is worse than useless here: the first
  * version of this script used 25s, three of four runs stopped on
  * `time_budget`, and the search had made so little progress that the rule-on and
- * rule-off placements came back IDENTICAL — which reads exactly like a rule that
+ * rule-off placements came back IDENTICAL, which reads exactly like a rule that
  * does not fire. Check `termination` in the output; anything but `move_budget`
  * invalidates the comparison rather than failing it.
  */
@@ -70,7 +70,7 @@ const MAX_WALL_MILLIS = 180_000;
 /**
  * Fresh idempotency keys per invocation. The solver's run registry is in-memory
  * and keyed by whatever is passed here, so a stable key would replay the first
- * invocation's answers on every later one — including after a code change, which
+ * invocation's answers on every later one, including after a code change, which
  * is the one moment a stale result is most convincing.
  */
 const TAG = `pref-${Date.now()}`;
@@ -93,7 +93,7 @@ interface Stated {
  * The cost rule restated from ADR-0026, independently of the solver.
  *
  * `unmet` is the fraction of the axes a person actually STATED that this slot
- * misses — the two axes are additive and earn credit independently, so a person
+ * misses. The two axes are additive and earn credit independently, so a person
  * who stated both and gets one right is half-satisfied. A person who stated
  * nothing is not counted at all, which is different from being counted at zero:
  * they must not dilute the mean of the people who did state something.
@@ -200,7 +200,7 @@ async function solve(input: SolverInput, key: string): Promise<Solved> {
     /*
      * THE COMPONENT, not just the total, and the reason is a false negative this
      * check nearly reported as a proof. The first run of this script produced an
-     * objective of 118.5 with the rule off AND on — identical, which reads like
+     * objective of 118.5 with the rule off AND on, identical, which reads like
      * the term was never added. It was not: the search had driven the preference
      * cost to exactly 0, and the remaining soft terms were unmoved by placements
      * that only changed day. A total cannot distinguish "term absent" from "term
@@ -225,7 +225,7 @@ try {
     const tenant = await prisma.tenant.findFirstOrThrow({ where: { slug: 'test' } });
 
     /*
-     * THE TERM WITH THE MOST OFFERINGS, not the earliest — and this was a real
+     * THE TERM WITH THE MOST OFFERINGS, not the earliest, and this was a real
      * false negative rather than a precaution.
      *
      * This originally took the first Term by `startDate`. A second Term was then
@@ -259,7 +259,7 @@ try {
     if (term._count.offerings === 0) {
         throw new Error(
             'No Term in this tenant has any offerings, so there is nothing to solve. '
-            + 'This is a fixture problem, NOT a result — every comparison below would '
+            + 'This is a fixture problem, NOT a result: every comparison below would '
             + 'report 0 and look exactly like a rule that does not fire.',
         );
     }
@@ -271,7 +271,7 @@ try {
     }));
 
     // -- 1. The rule must actually be on the wire ---------------------------
-    rule('PRECONDITIONS — a rule that cannot fire would pass every check below');
+    rule('PRECONDITIONS: a rule that cannot fire would pass every check below');
 
     const skipped = report.skippedConstraints.find((entry) => entry.type === 'person_preference_fit');
     const sent = input.constraints.filter((config) => config.personPreferenceFit !== undefined);
@@ -309,14 +309,14 @@ try {
     line(`  report.preferences.droppedOutOfGridValues   ${report.preferences.droppedOutOfGridValues}`);
 
     if (report.preferences.placementsWithNoSignal === report.preferences.placementsCounted) {
-        line('\n  ⚠ WHOLLY INERT — every placement has no preference signal. The runs below');
+        line('\n  ⚠ WHOLLY INERT: every placement has no preference signal. The runs below');
         line('    would agree with each other and this check would pass while proving nothing.');
         line('    This is the `lecturer_veto` shape. Give a lecturer on a real offering a');
         line('    preference before trusting anything under RESULT.');
     }
 
     // -- 2. Off vs on -------------------------------------------------------
-    rule('RUNS — same instance, same seed, one constraint apart');
+    rule('RUNS: same instance, same seed, one constraint apart');
 
     const withoutRule: SolverInput = {
         ...input,
@@ -327,8 +327,8 @@ try {
      * A deliberately UNSATISFIABLE variant, because a component of 0 and no
      * component at all print the same way in a total. Every stated preference is
      * rewritten in memory to the single slot (day 1, block 0), which 40
-     * placements cannot share — no room double-booking rule would permit it — so
-     * a solver that prices the term MUST report a non-zero component here. If
+     * placements cannot share, since no room double-booking rule would permit it,
+     * so a solver that prices the term MUST report a non-zero component here. If
      * this run also reports 0, the term is not being evaluated and the clean
      * result above is a coincidence rather than a proof.
      */
@@ -351,7 +351,7 @@ try {
     /*
      * ABORT rather than score. Zero scored placements makes every line under
      * RESULT read as a failure of the rule, when what it actually means is that
-     * the instance had nothing for the rule to say anything about — an empty
+     * the instance had nothing for the rule to say anything about: an empty
      * Term, no lecturer links, or preferences on people who teach nothing.
      */
     if (onCost.counted === 0) {
@@ -377,7 +377,7 @@ try {
 
     // Per-lecturer detail, because an aggregate can improve while the person
     // whose preference the tenant actually cares about got worse.
-    rule('PER LECTURER — where each stated preference landed');
+    rule('PER LECTURER: where each stated preference landed');
 
     for (const [personId, person] of stated) {
         const mine = (placements: PlacedSession[]) => placements.filter((p) => p.lecturerIds.includes(personId));
@@ -387,7 +387,7 @@ try {
         const total = mine(on).length;
 
         if (!total) {
-            line(`  ${personId.slice(-12)}  lectures on nothing placed — contributes nothing`);
+            line(`  ${personId.slice(-12)}  lectures on nothing placed, contributes nothing`);
             continue;
         }
 

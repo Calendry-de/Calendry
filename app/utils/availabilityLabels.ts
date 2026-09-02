@@ -36,7 +36,7 @@ export function describeWindow(window: UnavailabilityWindow, grid: TimeGrid | nu
 /**
  * Preferences as a sentence, with the OPPOSITE emptiness rule.
  *
- * Empty means "no preference" here, not "every value" — see the two model
+ * Empty means "no preference" here, not "every value": see the two model
  * comments. Kept next to `describeWindow` on purpose: the two functions are
  * where the inversion is easiest to see and hardest to get wrong by accident.
  */
@@ -55,7 +55,7 @@ export function describePreferences(
 
     /*
      * ROOM TYPES COUNT AS A PREFERENCE. Testing the two time axes alone reported
-     * "No preferences set" for somebody who had stated one — the collapsed row
+     * "No preferences set" for somebody who had stated one; the collapsed row
      * would then contradict the editor that opens beneath it, and an
      * administrator scanning the list for who has spoken would skip them.
      */
@@ -78,7 +78,7 @@ export function describePreferences(
 
     if (roomFeatureIds.length) {
         // Falls back to the id only when the name map was not supplied or has
-        // gone stale — visibly wrong beats silently omitted, since an omission
+        // gone stale: visibly wrong beats silently omitted, since an omission
         // here reads as "they stated no room preference".
         parts.push(roomFeatureIds.map((id) => roomFeatureNames?.get(id) ?? id).join(', '));
     }
@@ -88,7 +88,7 @@ export function describePreferences(
      * editor: "who has a non-default weight" is a question about the whole list,
      * and answering it by opening five hundred rows is not answering it.
      *
-     * Absent by design when there is no override — `null` is the ordinary state
+     * Absent by design when there is no override: `null` is the ordinary state
      * and naming it on every row would bury the exceptions it exists to reveal.
      * A multiplier cannot appear without a preference, since clearing both axes
      * deletes the row it lives on.

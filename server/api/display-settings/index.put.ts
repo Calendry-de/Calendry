@@ -12,26 +12,26 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * UPSERT, because the row is a singleton keyed by `tenant_id` and its absence
  * means defaults. A caller who changes one setting on a tenant that has never
- * saved any should not have to know whether a row exists — and there is no
+ * saved any should not have to know whether a row exists, and there is no
  * create/update distinction to expose when a second row cannot exist.
  *
- * Writing is gated on `tenant.update`. It was `session_kind.update` — an
+ * Writing is gated on `tenant.update`. It was `session_kind.update`, an
  * existing permission borrowed on the reasoning that colours already live on
  * Session kinds, chosen because minting one looked disproportionate for a
  * distinction nobody had asked for.
  *
  * WHAT CHANGED THAT: the page acquired a gate of its own (`tenant.read`). The
  * borrowed pairing then described a role that may change this institution's
- * settings and never see the page it changes them on — the asymmetry this
+ * settings and never see the page it changes them on: the asymmetry this
  * codebase treats as a bug wherever else it appears. Once one key had to be
  * minted, the second cost nothing but a line in the same backfill.
  *
  * A CUSTOM ROLE HOLDING `session_kind.update` LOSES THIS WRITE until
  * `tenant.update` is granted. `tenant-admin` is covered by
  * `grant:permissions --all-missing`; anything hand-composed is not, and that is
- * a deploy step, not a runtime concern — CLAUDE.md § "Bootstrap & deploy".
+ * a deploy step, not a runtime concern; CLAUDE.md § "Bootstrap & deploy".
  *
- * Reading accepts `tenant.read` OR `session.read` — see index.get.ts for why
+ * Reading accepts `tenant.read` OR `session.read`; see index.get.ts for why
  * that is not the same list.
  */
 const schema = z.object({
@@ -39,7 +39,7 @@ const schema = z.object({
     onlineColor: z.string().nullish(),
     /**
      * VALIDATED AGAINST THE KNOWN SOURCES, and deliberately not free-form. An
-     * unknown source would be silently skipped by the resolver — a setting that
+     * unknown source would be silently skipped by the resolver: a setting that
      * saves, displays, and does nothing, which is the failure mode this codebase
      * keeps writing rules about. Duplicates are rejected for the same reason:
      * the second occurrence can never be reached.
@@ -51,7 +51,7 @@ const schema = z.object({
     /**
      * Issue #17. `null` clears the tenant default (defer to Accept-Language);
      * checked against `Intl` here rather than left to degrade silently at
-     * read time — a setting that saves and does nothing is exactly the
+     * read time: a setting that saves and does nothing is exactly the
      * failure shape `colorSourceOrder`'s own comment above warns about.
      */
     defaultLocale: z.string().nullish()
@@ -63,7 +63,7 @@ const schema = z.object({
      */
     mode: z.enum(TENANT_MODES).optional(),
     /**
-     * `Tenant.timezone`, not `tenant_display_settings` — a required column
+     * `Tenant.timezone`, not `tenant_display_settings`: a required column
      * with no "unset" state (grid resolution, constraint evaluation and
      * "same day" logic all run in it, TAXONOMY.md §8), so no `null` here
      * either, same reasoning as `mode`. Written separately below since it
@@ -77,7 +77,7 @@ const schema = z.object({
 export default defineEventHandler(async (event) => {
     /*
      * `readValidatedBody`, not `schema.parse(await readBody(...))`. A bare
-     * ZodError reaches h3 as a 500 — an input mistake dressed up as a server
+     * ZodError reaches h3 as a 500, an input mistake dressed up as a server
      * fault, which sends the caller looking in the wrong place. The generic
      * resource routes already parse this way for exactly that reason.
      */
@@ -86,7 +86,7 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requirePermission(event, tx, 'tenant.update');
 
-        // Split out before the upsert below — `timezone` is not a column on
+        // Split out before the upsert below: `timezone` is not a column on
         // `tenant_display_settings` and `tx.tenantDisplaySettings.upsert`
         // would reject an unknown field.
         const { timezone, ...displayInput } = input;
@@ -96,7 +96,7 @@ export default defineEventHandler(async (event) => {
             /*
              * SKIPPED, not upserted with an empty patch, when the request only
              * touches `timezone`: an unconditional upsert here would CREATE the
-             * singleton — stamping every other field with its default — for a
+             * singleton, stamping every other field with its default, for a
              * caller who asked to change none of them. The GET route's own
              * "absent row means defaults" contract (index.get.ts) would then be
              * lying about this tenant, which never actually saved a display

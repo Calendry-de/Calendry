@@ -15,8 +15,8 @@ import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
  * Bespoke bodies, resolved by the name a registry entry declares.
  *
  * THE SEAM THAT KEEPS THIS FROM BECOMING NINE PAGES: an entity that needs
- * something the generic scaffold cannot express replaces ONE slot — the fields
- * area, or the rows of the list — and keeps the shell, header, permission
+ * something the generic scaffold cannot express replaces ONE slot (the fields
+ * area, or the rows of the list) and keeps the shell, header, permission
  * handling, save/error plumbing and delete confirmation. Nothing here is a
  * whole page, and both bespoke forms below literally render `ManageEntityForm`
  * with their extra control passed into its `fields` slot.
@@ -34,10 +34,10 @@ import ManageTimeGridEditor from '~/components/manage/ManageTimeGridEditor.vue';
  *                    database CHECK rejects
  *   OfferingPlanForm a plan's item list is an ORDERED sequence
  *                    (`OfferingPlanItem.position`), which the generic
- *                    `relations` mechanism cannot express — it replaces a SET
+ *                    `relations` mechanism cannot express: it replaces a SET
  *
  * Offering is NOT here, and that is the point. It references a Term, a Kind and
- * a Role and holds three many-to-many sets — the hub of the whole model — but
+ * a Role and holds three many-to-many sets (the hub of the whole model), but
  * every one of those is registry data (`fields`, `relations`), so it renders on
  * the generic scaffold. "Complex entity" did not turn out to mean "bespoke page".
  */
@@ -65,7 +65,7 @@ export const DETAIL_COMPONENTS: Record<string, Component> = {
      */
     AccountForm: ManageAccountForm,
     /**
-     * PersonForm       every registry field is plain — nothing custom for the
+     * PersonForm       every registry field is plain: nothing custom for the
      *                  generic scaffold to lose. Bespoke purely to add issue
      *                  #84's GDPR export action outside the form, the same
      *                  "explicit verb, not a field" reasoning `AccountForm`

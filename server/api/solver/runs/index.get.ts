@@ -11,7 +11,7 @@ const querySchema = z.object({
 /**
  * Recent runs, newest first.
  *
- * Reads only the database — no solver call. Polling one run for a fresh
+ * Reads only the database, no solver call. Polling one run for a fresh
  * snapshot is `GET /api/solver/runs/:id`; doing it for every row of a list
  * would fan one request out into N calls to a service that is optimising in the
  * background.
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => {
             ...(query.termId ? { termId: query.termId } : {}),
         };
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection, and concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const rows = await tx.solverRun.findMany({
             where,

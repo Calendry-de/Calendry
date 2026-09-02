@@ -4,7 +4,7 @@
 
         <p class="relmembers_help">
             Which Offerings this relates. Order shown is the order they were
-            added — <code>different_time</code> ignores it, a future ordered
+            added; <code>different_time</code> ignores it, a future ordered
             relation type would not.
         </p>
 
@@ -74,7 +74,7 @@
 <script setup lang="ts">
 /**
  * The ordered Offering picker a RELATION-shaped constraint type needs
- * (`ConstraintTypeDef.relation`, ADR-0028 in calendry-solver) — its operands,
+ * (`ConstraintTypeDef.relation`, ADR-0028 in calendry-solver): its operands,
  * not a param the generic `ManageField`/`constraintParamControls` machinery
  * can render, and not `ConstraintScope` either (a relation's Offerings are
  * what the rule is ABOUT, never a filter narrowing it).
@@ -82,12 +82,12 @@
  * PRESENTATIONAL, like `ManageWeekdayPicker` beside it: no fetch, no save of
  * its own. `members` travels as part of the constraint's own `draft` (the
  * `constraints` resource's `members` childKey), saved in the SAME request as
- * the rest of the row — same reasoning `scopes` already follows, and for the
+ * the rest of the row, same reasoning `scopes` already follows, and for the
  * same reason: a relation with fewer than its type's `minMembers` is refused
  * at the write boundary, so members have to arrive with the row that needs
  * them rather than after it exists.
  *
- * ORDER IS INSERTION ORDER, not drag-reordered — no relation type built so
+ * ORDER IS INSERTION ORDER, not drag-reordered: no relation type built so
  * far reads it (`different_time` is symmetric); see `ConstraintRelationMember`
  * schema note for why a position is still stored.
  */
@@ -101,7 +101,7 @@ const props = defineProps<{
     offerings: { id: string; title: string; code?: string | null }[];
     /**
      * Distinguishes "every Offering is already a member" from "the Offering
-     * list failed to load" — both would otherwise render as an empty
+     * list failed to load", both would otherwise render as an empty
      * `available` list and the same disabled control, which is exactly the
      * "no data and fetch failed render identically" trap this codebase keeps
      * getting caught by.
@@ -116,12 +116,12 @@ function titleOf(offeringId: string): string {
 
     if (!offering) {
         // The raw id rather than a blank: an unresolvable member is something
-        // to see, not to paper over — see the dangling-member report in
+        // to see, not to paper over; see the dangling-member report in
         // `assembleSolverInput`.
         return offeringId;
     }
 
-    return offering.code ? `${offering.code} — ${offering.title}` : offering.title;
+    return offering.code ? `${offering.code} - ${offering.title}` : offering.title;
 }
 
 const available = computed(() => {
@@ -132,7 +132,7 @@ const available = computed(() => {
 
 const addPlaceholder = computed(() => {
     if (props.loadFailed) {
-        return 'Could not load offerings — try reloading the page.';
+        return 'Could not load offerings. Try reloading the page.';
     }
 
     return available.value.length ? 'Add an offering…' : 'Every offering is already named';

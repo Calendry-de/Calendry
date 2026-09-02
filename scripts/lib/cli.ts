@@ -5,13 +5,13 @@
  * exact same owner-connected `PrismaClient`, nine independently duplicated
  * the same "could not reach the database" detection and message, and two
  * independently implemented the same type-to-confirm readline prompt. None
- * of that was a designed difference — it was N copies of the same few lines,
+ * of that was a designed difference: it was N copies of the same few lines,
  * found by grepping for one of the error strings and discovering it in nine
  * files. This module is the one copy.
  *
  * Pure extraction: every export here is byte-for-byte what the scripts
  * already did inline, kept working exactly as before. Nothing was
- * "improved" while moving it — see the callers for what genuinely differs
+ * "improved" while moving it; see the callers for what genuinely differs
  * between scripts, which is documented at each export below rather than
  * papered over.
  */
@@ -30,7 +30,7 @@ export function arg(name: string): string | undefined {
 /**
  * Reads every occurrence of a repeatable `--<name> <value>` flag, in the
  * order given. `provision-federation.ts` had this under the name `args()`
- * (its `--attach-tenant`/`--detach-tenant` can each be repeated) — same
+ * (its `--attach-tenant`/`--detach-tenant` can each be repeated), same
  * behavior, renamed only because `args` shadows too easily.
  */
 export function multiArg(name: string): string[] {
@@ -47,14 +47,14 @@ export function multiArg(name: string): string[] {
 
 /**
  * The owner-connected `PrismaClient` every provisioning/backfill/repair/
- * check script needs — see `resolveOwnerDatabaseUrl()`'s own comment for why
+ * check script needs; see `resolveOwnerDatabaseUrl()`'s own comment for why
  * the owner role specifically (RLS is unsatisfiable before a row exists, or
  * a backfill has to cross tenants in one transaction).
  *
  * NOT used by `reset-password.ts`: that script's connection is genuinely
- * conditional — the owner only for `--create` (which reads `person`, behind
+ * conditional: the owner only for `--create` (which reads `person`, behind
  * RLS), the ordinary runtime role for every other reset (see that script's
- * own "WHY THE APP ROLE, NOT THE OWNER" header) — so routing it through an
+ * own "WHY THE APP ROLE, NOT THE OWNER" header), so routing it through an
  * always-owner helper would silently widen its normal-path credential,
  * which is exactly the escalation CLAUDE.md's Accounts section warns
  * against. That script keeps its own conditional construction.
@@ -65,7 +65,7 @@ export function createOwnerPrisma(): PrismaClient {
 
 /**
  * True when a database error's message indicates the SERVER was unreachable
- * (down, wrong host, wrong port) rather than a rejected query — the same
+ * (down, wrong host, wrong port) rather than a rejected query: the same
  * regex nine scripts independently ran against `error.message`.
  */
 export function isUnreachableDatabaseError(message: string): boolean {
@@ -73,7 +73,7 @@ export function isUnreachableDatabaseError(message: string): boolean {
 }
 
 /**
- * The SHORT "Running? / Reachable from here?" unreachable-database message —
+ * The SHORT "Running? / Reachable from here?" unreachable-database message:
  * byte-identical across `create-account.ts`, `create-role.ts`,
  * `grant-permissions.ts`, `list-tenants.ts` and `backfill-dashboard-view.ts`,
  * parameterized only by which env var the "reachable from here" line names.
@@ -86,7 +86,7 @@ export function isUnreachableDatabaseError(message: string): boolean {
  * print a LONGER, differently-worded block of their own (an "Is it
  * running?" phrasing, a shell-resolvability check, and a trailing "Nothing
  * was written. Underlying error: …" line) and are deliberately NOT routed
- * through this helper — the bodies are not the same text, and forcing them
+ * through this helper: the bodies are not the same text, and forcing them
  * through one template would change what they print. They still use
  * `isUnreachableDatabaseError()` above for the detection itself.
  */
@@ -101,7 +101,7 @@ export function formatUnreachableDatabaseError(
 
 /**
  * Prompts for typed confirmation and `process.exit(1)`s with "Does not
- * match. Nothing was changed." on anything else — the readline pattern
+ * match. Nothing was changed." on anything else: the readline pattern
  * `grant-permissions.ts` (expects the role key, case-sensitive) and
  * `backfill-dashboard-view.ts` (expects the literal "yes", case-insensitive)
  * both already had. Only these two scripts print exactly this "Nothing was

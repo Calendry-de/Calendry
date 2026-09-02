@@ -146,7 +146,7 @@ import {
  *
  * The rules live in `~/utils/landingContact` as pure functions so they can be
  * tested without a DOM; this component owns exactly two things the module
- * cannot — the draft state, and the one line that navigates to the composed
+ * cannot: the draft state, and the one line that navigates to the composed
  * `mailto:`. See that module's header for why a POST endpoint would have been
  * the dishonest option here.
  */
@@ -163,7 +163,7 @@ function submit() {
     errors.value = validation.errors;
 
     if (!validation.valid) {
-        // Never claim success over a refused submit — the previous status line
+        // Never claim success over a refused submit: the previous status line
         // has to go, or a second attempt reads as though it worked.
         opened.value = false;
 
@@ -216,7 +216,7 @@ function submit() {
     /*
      * iOS Safari zooms the viewport when a focused field is under 16px, so a
      * one-handed reader ends up zoomed and pannning mid-form. `CommonInputText`
-     * drops to 10px under 1365px — below the type scale's own floor — which is
+     * drops to 10px under 1365px (below the type scale's own floor), which is
      * a defect in the shared component; overriding it here fixes this form
      * without restyling every form in the product in a landing-page change.
      */
@@ -287,17 +287,17 @@ function submit() {
     }
 
     /*
-     * INK TEXT, ERROR-COLOURED ICON — and this is a palette fact, not a
+     * INK TEXT, ERROR-COLOURED ICON: this is a palette fact, not a
      * preference. Only the two NEUTRAL ramps swap between themes; the semantic
      * ramps hold one value for both. Measured against this field surface, no
-     * step of the error ramp clears 4.5:1 in both themes at once — `$error700`
+     * step of the error ramp clears 4.5:1 in both themes at once: `$error700`
      * is 5.71:1 light and 2.44:1 dark, `$error300` is 2.40:1 light and 5.79:1
      * dark, and the middle fails everywhere. `$error500` is the one step that
      * clears the 3:1 NON-TEXT threshold on both grounds (3.83 / 3.63), so the
      * colour goes on the glyph and the sentence is read in ink at 12:1.
      *
      * It is also the pattern the schedule already uses for violations: icon,
-     * plus text, plus a screen-reader path — never hue alone.
+     * plus text, plus a screen-reader path, never hue alone.
      */
     &_error {
         display: flex;
@@ -328,8 +328,8 @@ function submit() {
 
         margin: 0;
 
-        // NOT green. The whole success ramp is too light for a light ground —
-        // $success600 measured 2.53:1 as text — and green is not a state colour
+        // NOT green. The whole success ramp is too light for a light ground:
+        // $success600 measured 2.53:1 as text, and green is not a state colour
         // in this product's palette at all. The check glyph carries "it worked";
         // ink carries the reading.
         font-size: $fontSizeSm;
@@ -374,7 +374,7 @@ function submit() {
     &_link {
         // Ink plus an underline, never the accent. `$primary600` passes on the
         // light ground and measures 2.55:1 on the dark one, because the dark
-        // theme swaps only the surface and content ramps — so accent-coloured
+        // theme swaps only the surface and content ramps, so accent-coloured
         // TEXT cannot be made safe in both themes. The accent stays on fills
         // and the placement target, where it means something.
         color: $content4;

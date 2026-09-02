@@ -2,7 +2,7 @@
  * The demo institution, taken from real documents rather than invented.
  *
  * WHY REAL DATA MATTERS HERE. Invented demo content agrees with whatever the
- * code already does — a made-up grid is uniform, made-up modules all have the
+ * code already does: a made-up grid is uniform, made-up modules all have the
  * same shape, and made-up groups are a flat pair. None of that exercises the
  * parts of this system that exist because reality is irregular: non-uniform
  * breaks, a seminar that splits a cohort in two, a resit sitting in a teaching
@@ -10,10 +10,10 @@
  *
  * Sources, both from Leibniz-FH's IT-Security (dual) B.Sc.:
  *
- *   - `Stundenplan_3. Sem. dIT22_S1.xlsx` — a real published timetable. The
+ *   - `Stundenplan_3. Sem. dIT22_S1.xlsx`, a real published timetable. The
  *     block grid, the break structure, the lecturers and the module
  *     abbreviations all come from it.
- *   - `Studienbuch_2022_IT-Security_B.Sc., dual.pdf` — the study book. The
+ *   - `Studienbuch_2022_IT-Security_B.Sc., dual.pdf`, the study book. The
  *     module list, contact hours per semester and assessment types come from
  *     its Modulübersicht.
  *
@@ -24,7 +24,7 @@
 /**
  * The teaching day, read off the timetable's time column.
  *
- * SIX 90-MINUTE BLOCKS FROM 09:00, and the gaps between them are NOT uniform —
+ * SIX 90-MINUTE BLOCKS FROM 09:00, and the gaps between them are NOT uniform,
  * which is the whole reason this is worth copying exactly:
  *
  *     b0   09:00–10:30        break 15
@@ -36,7 +36,7 @@
  *
  * THREE BIG BLOCKS ARE STILL THE SHAPE OF THE DAY, and they are the gaps rather
  * than the blocks: `b0+b1` is the morning (09:00–12:15), `b2+b3` the afternoon
- * (13:00–16:15), `b4+b5` the evening (16:30–19:45) — three runs of exactly 195
+ * (13:00–16:15), `b4+b5` the evening (16:30–19:45): three runs of exactly 195
  * minutes, separated by the one big break and one short one. The source
  * timetable draws those three as single rows. It is modelled at 90 minutes
  * anyway because that is the unit SESSIONS occupy in it: `Stat1` and
@@ -44,7 +44,7 @@
  *
  * `breakMinutes` is 0 BECAUSE the breaks are named. A uniform gap would
  * separate EVERY pair of consecutive blocks, which would make every two-block
- * session break-spanning and turn the break-related rules into noise — see
+ * session break-spanning and turn the break-related rules into noise; see
  * CLAUDE.md § "TimeGrid breaks". Here five positions carry a gap and they carry
  * three different lengths, which no uniform value can say.
  *
@@ -57,8 +57,8 @@ export const GRID = {
     name: 'Standard week',
     blockLengthMinutes: 90,
     blocksPerDay: 6,
-    /* Saturday is a real teaching day in the source timetable — ST, IT-Risk and
-     * TheoInf all meet on one — so the demo grid includes it rather than
+    /* Saturday is a real teaching day in the source timetable (ST, IT-Risk and
+     * TheoInf all meet on one), so the demo grid includes it rather than
      * assuming the Mon–Fri week most timetables are drawn for. */
     activeDays: [1, 2, 3, 4, 5, 6],
     startHour: 9,
@@ -83,7 +83,7 @@ export const BREAKS = [
  * derives its scope from this classification, and a demo with one exam kind
  * cannot show that the rule covers a set.
  *
- * `NKL` in the source timetable is a Nachklausur — a resit — and it sits in
+ * `NKL` in the source timetable is a Nachklausur (a resit), and it sits in
  * ordinary teaching weeks, not in the exam period. It is the case that makes
  * "exam kind" and "exam week" visibly different things.
  */
@@ -104,7 +104,7 @@ export const KINDS = [
 /**
  * The lecturers named in the source timetable, by their abbreviation there.
  *
- * Family names only in the original — given names are invented, since the
+ * Family names only in the original; given names are invented, since the
  * timetable does not carry them and a Person needs one.
  */
 export const LECTURERS = [
@@ -118,41 +118,41 @@ export const LECTURERS = [
 ];
 
 /**
- * All six semesters' modules, from the study book's Modulübersicht — read out
+ * All six semesters' modules, from the study book's Modulübersicht, read out
  * by exact PDF word coordinates (not just column-aligned text, which reflows
  * across a page break) and cross-checked against the ten Semester-1 rows this
  * array used to hold alone.
  *
- * `hours` is `Kontaktstunden LFH` — academic hours of 45 minutes. A block is
+ * `hours` is `Kontaktstunden LFH`, academic hours of 45 minutes. A block is
  * 90, so a block is TWO of them and `frequency = hours / 2`. Every module meets
  * for one block at a time, which is what the source timetable shows: a module
  * fills one row, and a row is 90 minutes.
  *
- * `term` says which Term the Offering runs in. `groups` says who attends —
+ * `term` says which Term the Offering runs in. `groups` says who attends,
  * and CARRIES ONE OR TWO ENTRIES ON PURPOSE. TAXONOMY.md § "What attaching
  * several Groups to one Offering MEANS": two-or-more is N INDEPENDENT PARALLEL
- * Session series, one per Group, each getting the full `frequency` — not one
+ * Session series, one per Group, each getting the full `frequency`, not one
  * shared Session for the union. `['s1', 's2']` is therefore the whole
  * split mechanism: no `-S1`/`-S2` suffix Offering, no second `code`, the app
  * does the splitting. This is a correction from an earlier version of this
  * file, which modelled the two Semester-1 lab modules as two separate
- * Offerings by hand — exactly the union-shaped workaround the taxonomy note
+ * Offerings by hand, exactly the union-shaped workaround the taxonomy note
  * exists to retire.
  *
- * `S1`/`S2` ARE A STANDING DIVISION, not a Semester-1-only artefact — the
+ * `S1`/`S2` ARE A STANDING DIVISION, not a Semester-1-only artefact: the
  * cohort was taught as two halves for nearly every module, all six semesters
- * (first-hand account, not the Studienbuch — it names no groups at all). So
+ * (first-hand account, not the Studienbuch, which names no groups at all). So
  * `groups: ['s1', 's2']` is the DEFAULT here, not the exception.
  *
  * SEMESTERS 4–6 FORK: from module 19 on, the Studienbuch prints two parallel
- * variants — "Vertiefung Systemtechnik" and "Vertiefung Management" — for a
+ * variants, "Vertiefung Systemtechnik" and "Vertiefung Management", for a
  * few modules per semester, while the rest stay the S1/S2 default. Choosing a
- * Vertiefung RECOMBINED the two halves rather than further splitting them —
- * "S1 and S2 together" in one room per Vertiefung — which is exactly
+ * Vertiefung RECOMBINED the two halves rather than further splitting them:
+ * "S1 and S2 together" in one room per Vertiefung, which is exactly
  * `systemtechnik` / `management` in `GROUPS`: two ordinary top-level Groups
  * built from `s1` + `s2` via `GROUP_SOURCES` (the "Built from other groups"
  * feature), not children of any one semester. A fork module therefore carries
- * `groups: ['systemtechnik']` or `['management']` — ONE group, because the
+ * `groups: ['systemtechnik']` or `['management']`, ONE group, because the
  * recombination already happened; it does not split again.
  *
  * LECTURERS ARE ASSIGNED, NOT SOURCED: only the Semester-1 Stundenplan names
@@ -169,13 +169,13 @@ export const LECTURERS = [
  * management-flavoured common modules), WAR (Digital Wargaming), WPF
  * (Wahlpflichtfach), FOR (Digitale Forensik), THS (the Bachelor modules).
  *
- * `Bachelor-Thesis` carries `hours: 0` IN THE SOURCE — an independent-study
+ * `Bachelor-Thesis` carries `hours: 0` IN THE SOURCE: an independent-study
  * module the Studienbuch itself gives no contact hours. Left at 0 rather than
  * invented upward: `frequency = Math.max(1, Math.round(hours / 2))` in
  * `seed-demo-schedule.ts` still floors it to one 90-minute Session, which is
  * the same real-data edge case the dropped 08:00 row and the `NKL` resit were
- * kept for — a demo built from a real curriculum has quirks a made-up one
- * would not.
+ * kept for, because a demo built from a real curriculum has quirks a made-up
+ * one would not.
  */
 export const MODULES = [
     // --- Semester 1 ---
@@ -262,7 +262,7 @@ export const MODULES = [
 /**
  * Rooms. Capacities are chosen against the group sizes below rather than picked
  * at random: the cohort of 44 fits the lecture hall and the seminar room but
- * not a lab, and each half of 22 fits everything — so room eligibility is a
+ * not a lab, and each half of 22 fits everything, so room eligibility is a
  * real constraint in the demo rather than one every room satisfies.
  */
 export const ROOMS = [
@@ -298,26 +298,26 @@ export const TERMS = [
 ];
 
 /**
- * The group tree — flatter than an earlier version of this file had it, and
+ * The group tree, flatter than an earlier version of this file had it, and
  * deliberately so. `s1`/`s2` are a STANDING division of the cohort (see
  * `MODULES`), not a Semester-1 artefact, so they sit directly under `cohort`
- * rather than nested under one semester — nesting them under `semester1`
+ * rather than nested under one semester: nesting them under `semester1`
  * would have made a Semester-4 Session in `s1` fail to conflict-closure
  * against a Semester-4 Session in `cohort`'s other children, since closure
  * walks ancestors/descendants, not siblings. "Which semester" is the
- * Offering's `term`, not a Group — this tree has no `semesterN` nodes at all.
+ * Offering's `term`, not a Group; this tree has no `semesterN` nodes at all.
  *
  *   IT-Security          the programme
  *     dit22               the cohort (44)
- *       S1                one standing half (22) — taught separately
+ *       S1                one standing half (22), taught separately
  *       S2                the other standing half (22)
- *       Systemtechnik      (22) — built from S1 + S2, see GROUP_SOURCES
- *       Management         (22) — built from S1 + S2, see GROUP_SOURCES
+ *       Systemtechnik      (22), built from S1 + S2, see GROUP_SOURCES
+ *       Management         (22), built from S1 + S2, see GROUP_SOURCES
  *
  * `Systemtechnik`/`Management` are `parent: null` (root-level, like `cohort`
  * itself) for the reason TAXONOMY.md gives for "Built from other groups":
  * a combining group is an ordinary Group with its own membership, not a
- * second parent — nesting it under both `s1` and `s2` would make the tree a
+ * second parent; nesting it under both `s1` and `s2` would make the tree a
  * DAG, which the closure walk cannot be.
  */
 export const GROUPS = [
@@ -334,7 +334,7 @@ export const GROUPS = [
  * (`ManageGroupSources.vue`) rather than plain Groups: each draws its
  * membership from BOTH standing halves, because choosing a Vertiefung
  * recombined S1 and S2 rather than splitting either further. Seeded as
- * `group_source` rows directly — there are no Person-level memberships in
+ * `group_source` rows directly: there are no Person-level memberships in
  * this demo to actually copy (no student Persons are seeded, only the seven
  * lecturers), so "regenerate members" would copy zero rows either way; what
  * matters here is the SOURCES relationship existing to see and to build on.
@@ -351,7 +351,7 @@ export const GROUP_SOURCES: { group: string; source: string }[] = [
  *
  * `s1`/`s2` ATTACH TO EVERY TERM, because every semester's Offerings use them
  * by default. `systemtechnik`/`management` attach only to the three terms
- * that fork — `group_term` is fail-open (a Group with no row is available in
+ * that fork; `group_term` is fail-open (a Group with no row is available in
  * EVERY Term), so linking exactly the terms `MODULES` references for each
  * says something checkable rather than nothing (CLAUDE.md §
  * "Group↔Term scoping").

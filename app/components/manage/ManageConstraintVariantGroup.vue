@@ -23,7 +23,7 @@
         </button>
 
         <p class="cvgroup_sub">
-            {{ group.type.label }} — narrowed from the tenant-wide rule, applied separately to each of:
+            {{ group.type.label }}, narrowed from the tenant-wide rule, applied separately to each of:
         </p>
 
         <ul
@@ -38,7 +38,7 @@
         </ul>
 
         <!--
-            COLLAPSED BY DEFAULT — the whole point of grouping is to save the
+            COLLAPSED BY DEFAULT: the whole point of grouping is to save the
             scroll a tenant would otherwise spend reading N identical panels.
             Expanding reveals the REAL rows, each independently editable:
             grouping is presentational only, so a toggle or weight change
@@ -60,7 +60,7 @@
                 :kinds="kinds"
                 :row="entry.row"
                 :scope-required="true"
-                :subtitle="`${entry.type.label} — narrowed from the tenant-wide rule.`"
+                :subtitle="`${entry.type.label}, narrowed from the tenant-wide rule.`"
                 :type="entry.type"
                 @update:enabled="$emit('update:enabled', { row: entry.row, value: $event })"
                 @update:param="$emit('update:param', { row: entry.row, key: $event.key, value: $event.value })"
@@ -86,11 +86,11 @@ import ManageConstraintRow from '~/components/manage/ManageConstraintRow.vue';
 
 /**
  * ONE collapsible entry for several variant rows that share a configuration
- * (issue #103) — same type, severity, weight, params and enabled state,
+ * (issue #103): same type, severity, weight, params and enabled state,
  * narrowed to different Offerings/Groups/kinds. Presentational only: this
  * component fetches nothing and writes nothing, it just re-emits each inner
  * `ManageConstraintRow`'s event tagged with which underlying row it came
- * from, so `ManageConstraintGrid` can `PATCH` exactly that row — identical
+ * from, so `ManageConstraintGrid` can `PATCH` exactly that row, identical
  * to how an ungrouped variant is written today.
  *
  * `ManageConstraintGrid` renders this ONLY for a group of more than one
@@ -112,7 +112,7 @@ defineEmits<{
     'update:scopes': [{ row: ConstraintRowData; kindIds: string[] }];
 }>();
 
-/** Collapsed by default — see the template note above the expanded list. */
+/** Collapsed by default; see the template note above the expanded list. */
 const open = ref(false);
 </script>
 
@@ -209,7 +209,7 @@ const open = ref(false);
     }
 }
 
-/* Shared with ManageConstraintRow's read state dot — same meaning, same look. */
+/* Shared with ManageConstraintRow's read state dot: same meaning, same look. */
 .crow_dot {
     flex: none;
 

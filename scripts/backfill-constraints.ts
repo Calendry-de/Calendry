@@ -5,7 +5,7 @@
  * ---------------
  * Exactly the shape `grant:permissions --all-missing` exists for, one layer
  * down. `provision:tenant` now creates one default row per live catalogue type
- * (TAXONOMY.md §2), but only at creation time — so every tenant provisioned
+ * (TAXONOMY.md §2), but only at creation time, so every tenant provisioned
  * before a type was added is missing that type's row.
  *
  * That is not cosmetic. `refreshViolations()` evaluates ONLY the types a tenant
@@ -13,13 +13,13 @@
  * neutral absence. The case that proved it: `no_double_booking_person` was
  * added to the catalogue in Stage 7a and never added to the old three-item
  * provisioning list, so the person-clash check had never run in any real
- * tenant — while `tests/violations-person-clash.test.ts` passed, because it
+ * tenant, while `tests/violations-person-clash.test.ts` passed, because it
  * creates its own row.
  *
  * WHY A CLI AND NOT `prisma db seed`
  * ----------------------------------
  * The seed runs on EVERY deploy and is reference-data only: it mirrors the
- * `permission` catalogue, which is code. Constraint rows are TENANT DATA — a
+ * `permission` catalogue, which is code. Constraint rows are TENANT DATA: a
  * tenant's weights, toggles and params are theirs. A seed that wrote them per
  * deploy would be the same category of mistake as one that silently widened
  * every tenant's AccessRole, and CLAUDE.md rejects that explicitly.
@@ -28,7 +28,7 @@
  *
  * WHAT `--all-missing` WILL NOT DO
  * --------------------------------
- * It only ever CREATES rows that are absent. It never edits an existing row —
+ * It only ever CREATES rows that are absent. It never edits an existing row:
  * not its weight, not its enabled state, not its name. A tenant who disabled a
  * rule or retuned a weight keeps that decision; re-running is idempotent and
  * silent.
@@ -36,21 +36,21 @@
  * `--retype` IS THE DELIBERATE EXCEPTION, AND WHY IT EXISTS
  * --------------------------------------------------------
  * The catalogue pins severity per type, because the severity IS the meaning. So
- * when a type's declared severity CHANGES — `online_onsite_same_day_exclusion`
+ * when a type's declared severity CHANGES (`online_onsite_same_day_exclusion`
  * went HARD to SOFT when the tenant asked for mixing to be discouraged rather
- * than forbidden — every stored row is left contradicting the catalogue, and no
+ * than forbidden), every stored row is left contradicting the catalogue, and no
  * amount of creating absent rows fixes it.
  *
  * Leaving them is not a neutral option. `toWireConstraint` reads the CATALOGUE's
  * severity, not the row's, so a stored HARD row under a SOFT catalogue entry
- * ships as `weight: row.weight ?? 0` — and a HARD row's weight is NULL by
+ * ships as `weight: row.weight ?? 0`, and a HARD row's weight is NULL by
  * database CHECK. Zero means "count it, do not steer". The rule would stop
  * filtering AND stop steering in one deploy, reported only as a line in
  * `report.severityMismatches`.
  *
  * So this mode updates `severity` and `weight` TOGETHER in one statement, which
  * is also the only way to satisfy `constraint_weight_matches_severity`
- * (HARD ⇒ weight NULL, SOFT ⇒ weight NOT NULL) — writing either alone would be
+ * (HARD ⇒ weight NULL, SOFT ⇒ weight NOT NULL); writing either alone would be
  * refused by the database mid-flight.
  *
  * It still touches nothing else: `is_enabled`, `name`, `params` and scoped
@@ -78,7 +78,7 @@ import { arg, createOwnerPrisma } from './lib/cli';
  *
  * Severity and weight move together in a single UPDATE, because
  * `constraint_weight_matches_severity` refuses HARD-with-weight and
- * SOFT-without — so writing either alone fails, and writing them in two
+ * SOFT-without, so writing either alone fails, and writing them in two
  * statements would fail on the first.
  *
  * Rows already matching the catalogue are left alone and reported as such, so a
@@ -99,7 +99,7 @@ async function retypeMode(
 
     if (!type.severity) {
         console.error(
-            `\n'${type.key}' declares no fixed severity — the tenant chooses it, so there is\n`
+            `\n'${type.key}' declares no fixed severity: the tenant chooses it, so there is\n`
             + 'nothing to realign to. Nothing was changed.\n',
         );
         process.exit(1);
@@ -107,7 +107,7 @@ async function retypeMode(
 
     /*
      * The catalogue is the authority on what the rows SHOULD be, and
-     * `defaultConstraintRow` is the one function that reads it — including the
+     * `defaultConstraintRow` is the one function that reads it, including the
      * throw for a SOFT type with no `defaultWeight`, which is what stops this
      * command from quietly writing weight 0 and disabling the rule it is
      * repairing.
@@ -179,7 +179,7 @@ async function retypeMode(
     const written = await prisma.constraint.updateMany({
         where: { id: { in: stale.map((row) => row.id) } },
         // BOTH fields, one statement. The CHECK pairs them, so this is not a
-        // stylistic choice — either alone is refused.
+        // stylistic choice: either alone is refused.
         data: { severity: target.severity, weight: target.weight },
     });
 
@@ -265,7 +265,7 @@ async function main() {
             /**
              * Keyed on `isDefault`, not on "any row of this type". A tenant may
              * legitimately hold scoped VARIANTS of a type without holding its
-             * default row, and it is the default row this repairs — matching on
+             * default row, and it is the default row this repairs: matching on
              * type alone would look complete while leaving the rule unreachable.
              */
             const existing = await prisma.constraint.findMany({

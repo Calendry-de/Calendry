@@ -4,7 +4,7 @@ import { api, login } from './helpers/client';
 
 /**
  * OfferingTemplate (issue #8): a reusable Offering SHAPE, copied onto a new
- * Offering once at creation — never a live link.
+ * Offering once at creation, never a live link.
  *
  * THE ASSERTION THAT MATTERS is `copies the shape, then diverges from the
  * template`: an Offering created from a template must keep its own field
@@ -48,7 +48,7 @@ describe('offering-templates: ordinary CRUD', () => {
             method: 'POST',
             cookie: adminCookie,
             body: JSON.stringify({
-                name: 'Maths — 4x/week',
+                name: 'Maths (4x/week)',
                 title: 'Mathematics',
                 frequency: 4,
                 durationBlocks: 1,
@@ -56,7 +56,7 @@ describe('offering-templates: ordinary CRUD', () => {
         });
 
         expect(create.status).toBe(201);
-        expect(create.body.name).toBe('Maths — 4x/week');
+        expect(create.body.name).toBe('Maths (4x/week)');
 
         const list = await api<TemplateRow[]>('/api/offering-templates', { cookie: adminCookie });
 
@@ -99,7 +99,7 @@ describe('copy-not-link: an Offering keeps its own shape after the template chan
             method: 'POST',
             cookie: adminCookie,
             body: JSON.stringify({
-                name: 'Chemistry — 3x/week',
+                name: 'Chemistry (3x/week)',
                 title: 'Chemistry',
                 frequency: 3,
                 durationBlocks: 2,
@@ -108,7 +108,7 @@ describe('copy-not-link: an Offering keeps its own shape after the template chan
 
         expect(template.status).toBe(201);
 
-        // The client's `apply()` step happens before this request — this body
+        // The client's `apply()` step happens before this request; this body
         // is exactly what it would send: the template's values, copied onto
         // the create payload, plus the provenance id.
         const offering = await api<OfferingRow>('/api/offerings', {
@@ -139,7 +139,7 @@ describe('copy-not-link: an Offering keeps its own shape after the template chan
         expect(editTemplate.status).toBe(200);
         expect(editTemplate.body.frequency).toBe(9);
 
-        // The earlier Offering must be completely unaffected by that edit —
+        // The earlier Offering must be completely unaffected by that edit:
         // this is the whole point of "copied, not linked".
         const reread = await api<OfferingRow>(`/api/offerings/${offering.body.id}`, { cookie: adminCookie });
 
@@ -150,7 +150,7 @@ describe('copy-not-link: an Offering keeps its own shape after the template chan
         // Provenance survives the template's edit.
         expect(reread.body.createdFromTemplateId).toBe(template.body.id);
 
-        // Deleting the template must not touch the Offering's fields either —
+        // Deleting the template must not touch the Offering's fields either;
         // only the (informational) provenance link is cleared.
         const deleteTemplate = await api(`/api/offering-templates/${template.body.id}`, {
             method: 'DELETE',

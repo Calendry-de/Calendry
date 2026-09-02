@@ -11,7 +11,7 @@ import type { Tx } from './tenantDb';
  *
  *  - CONFLICT checking needs ancestors AND descendants. A Session booked for a
  *    Cohort blocks its child Seminar groups, and a Session booked for a Seminar
- *    blocks the parent Cohort — §2 says propagation runs both ways.
+ *    blocks the parent Cohort; §2 says propagation runs both ways.
  *
  *  - NOTIFICATION fan-out needs self AND descendants only. Everyone in a child
  *    Seminar is affected by a Cohort-wide lecture, but a member of the Cohort
@@ -42,14 +42,14 @@ export async function conflictGroupIds(tx: Tx, groupIds: string[]): Promise<stri
 }
 
 /**
- * `groupIds` plus everything they are nested BENEATH — the inverse of
+ * `groupIds` plus everything they are nested BENEATH: the inverse of
  * `descendantGroupIds`, and the one a person's own timetable needs.
  *
  * The direction is the whole subtlety, and getting it backwards is a silent
  * over- or under-report exactly as it is in `violations.ts`. Attendance flows
  * DOWN: a Session assigned to a Cohort is attended by everyone in its Seminars.
  * So to ask "which Sessions am I in", start from the Groups I am a MEMBER of and
- * walk UP — a Session assigned to my Seminar's parent Cohort is mine, a Session
+ * walk UP: a Session assigned to my Seminar's parent Cohort is mine, a Session
  * assigned to a sibling Seminar is not.
  *
  * Using `descendantGroupIds` here would answer the other question and show a

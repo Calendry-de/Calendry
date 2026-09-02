@@ -1,14 +1,14 @@
 /**
- * Converting a TENANT-LOCAL wall clock into a real instant — the ONE place
+ * Converting a TENANT-LOCAL wall clock into a real instant: the ONE place
  * this conversion belongs, and nowhere else.
  *
  * Timezone in Calendry is per-Person and DISPLAY-ONLY (TAXONOMY.md §8):
  * grid resolution, constraint evaluation and "same day" logic all run in
  * `Tenant.timezone`, and none of that needs to know what an absolute instant
- * is — a block index and a day-of-week are already unambiguous within one
+ * is: a block index and a day-of-week are already unambiguous within one
  * institution. An exported `.ics` file is the first artefact that LEAVES the
  * app and is rendered by someone else's software, which has no notion of
- * "this institution's wall clock" — it only understands real instants. This
+ * "this institution's wall clock"; it only understands real instants. This
  * function is the boundary where that translation happens; it must never be
  * used inside grid or constraint logic, which have no instant to convert.
  */
@@ -25,7 +25,7 @@ export interface ZonedDateParts {
 /**
  * The instant that DISPLAYS as `parts` when read in `timeZone`.
  *
- * NO DATE LIBRARY — the same reasoning `localNow` in `solverCalendar.ts`
+ * NO DATE LIBRARY: the same reasoning `localNow` in `solverCalendar.ts`
  * already gives for the reverse direction: `Intl` is the only correct way to
  * ask what a zone's clock says without reimplementing tzdata, and adding one
  * for a single conversion this narrow is not worth a new dependency.
@@ -34,7 +34,7 @@ export interface ZonedDateParts {
  * `localNow`'s (instant → local parts is a straight lookup; local parts →
  * instant needs the zone's OFFSET at a moment that is not yet known):
  *
- *   1. Read `parts` as if they were already UTC — a wrong first guess, but a
+ *   1. Read `parts` as if they were already UTC: a wrong first guess, but a
  *      concrete instant to measure from.
  *   2. Ask `Intl` what wall-clock time THAT instant displays as in `timeZone`.
  *      The difference between that answer and the original guess IS the
@@ -44,7 +44,7 @@ export interface ZonedDateParts {
  * ONE ITERATION, not a fixed point loop: the offset can only change again
  * within the same conversion if `parts` names a moment inside a DST
  * transition, where the local time is genuinely ambiguous (occurs twice) or
- * nonexistent (skipped) — a case with no single correct answer for ANY
+ * nonexistent (skipped), a case with no single correct answer for ANY
  * implementation, calendar libraries included. A Session starting in that
  * hour is a real-world rarity this export accepts rather than solves.
  */
@@ -72,7 +72,7 @@ export function zonedTimeToUtc(parts: ZonedDateParts, timeZone: string): Date {
 }
 
 /**
- * Whether `value` is an IANA zone name `Intl` recognises — the same
+ * Whether `value` is an IANA zone name `Intl` recognises: the same
  * try/construct check `isUsableLocale` (`shared/locale.ts`) does for a BCP-47
  * tag, so a saved-but-unusable timezone fails the same way a saved-but-
  * unusable locale does: at the write boundary, not silently at read time.

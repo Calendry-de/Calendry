@@ -10,7 +10,7 @@
 
         <p class="items_help">
             Applied to a Group, each one below becomes a real Offering for the Term
-            you choose — read fresh from its template at that moment, so editing a
+            you choose, read fresh from its template at that moment, so editing a
             template here changes what the NEXT apply creates, never one already made.
         </p>
 
@@ -50,7 +50,7 @@
             v-else
             class="items_empty"
         >
-            Nothing in this plan yet — add a template below.
+            Nothing in this plan yet. Add a template below.
         </p>
 
         <label
@@ -76,7 +76,7 @@
 
 <script setup lang="ts">
 /**
- * A plan's ordered item list — see `OfferingPlanItem`'s own schema comment
+ * A plan's ordered item list: see `OfferingPlanItem`'s own schema comment
  * for why order is stored rather than computed, and `items.put.ts` for why
  * this is a bespoke endpoint rather than the generic `[relation]` mechanism
  * (that one replaces a SET; a plan's items are a SEQUENCE).

@@ -43,7 +43,7 @@
 
             <!--
                 Rendered only past CAPTCHA_ATTEMPT_THRESHOLD failed attempts
-                (issue #106, mirroring issue #79's login.vue) — see
+                (issue #106, mirroring issue #79's login.vue); see
                 renderTurnstile(). Cloudflare's script fills this element with
                 its own iframe; it is never used for anything else, so there
                 is nothing to keep in sync besides the element existing when
@@ -74,7 +74,7 @@ import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
 
 /**
  * Cloudflare's widget script attaches itself to `window.turnstile`. Declared
- * narrowly rather than reached for through `any` (CLAUDE.md: no `any`) —
+ * narrowly rather than reached for through `any` (CLAUDE.md: no `any`);
  * `render`/`reset` are the only two calls this page makes. Mirrors
  * `app/pages/login.vue`'s own declaration exactly.
  */
@@ -95,11 +95,11 @@ declare global {
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
 
 /**
- * Calendry-staff sign-in — issue #76. Deliberately separate from
+ * Calendry-staff sign-in (issue #76). Deliberately separate from
  * `app/pages/login.vue`: this authenticates a `StaffAccount` against
  * `POST /api/staff-auth/login`, which sets its own cookie
  * (`STAFF_SESSION_COOKIE`) and has nothing to do with the tenant `useSession`
- * composable. No tenant-selection step exists here — a staff principal is
+ * composable. No tenant-selection step exists here: a staff principal is
  * never IN a tenant, see `StaffIdentity` in `server/utils/tenantResolver.ts`.
  *
  * CAPTCHA widget behavior (issue #106) mirrors `login.vue`'s exactly: reusing
@@ -121,7 +121,7 @@ const busy = ref(false);
 const justChanged = computed(() => route.query.changed === '1');
 
 /*
- * CAPTCHA (issue #106) — a local counter, not server state, same reasoning as
+ * CAPTCHA (issue #106): a local counter, not server state, same reasoning as
  * login.vue: the server is the real gate (it counts by email across
  * devices/tabs); this counter only decides when to render the widget so a
  * legitimate staffer is not shown it on their very first attempt. Never reset
@@ -166,7 +166,7 @@ async function renderTurnstile() {
     try {
         await loadTurnstileScript();
     } catch {
-        // No widget, no token — the next submit will 400 with "CAPTCHA
+        // No widget, no token, so the next submit will 400 with "CAPTCHA
         // verification required.", which is an honest description of what
         // happened (Cloudflare's script did not load) rather than a fake
         // "sign in" attempt.
@@ -208,7 +208,7 @@ async function submit() {
             body: {
                 email: email.value,
                 password: password.value,
-                // Absent below the threshold — the server treats a missing
+                // Absent below the threshold: the server treats a missing
                 // token as "not required yet" and only checks it once its own
                 // count (per email, not this tab's local counter) agrees.
                 ...(turnstileToken.value ? { turnstileToken: turnstileToken.value } : {}),
@@ -218,7 +218,7 @@ async function submit() {
         // Credentials were correct, but the password is forced-reset or
         // expired (issue #106): no session was issued, so navigating to
         // STAFF_ROUTE would only bounce right back here. Sent to
-        // STAFF_CHANGE_PASSWORD_ROUTE to clear it instead — mirrors
+        // STAFF_CHANGE_PASSWORD_ROUTE to clear it instead, mirroring
         // login.vue's own requiresPasswordChange branch exactly.
         if (result.requiresPasswordChange) {
             await navigateTo(`${STAFF_CHANGE_PASSWORD_ROUTE}?forced=1&email=${encodeURIComponent(email.value)}`);
@@ -229,13 +229,13 @@ async function submit() {
         await navigateTo(destination());
     } catch {
         // ONE message for wrong password, unknown staff account, and a
-        // deactivated one — the API returns an identical 401 for all three so
+        // deactivated one: the API returns an identical 401 for all three so
         // this page does not become a staff-account-existence oracle.
         error.value = 'Invalid credentials.';
         password.value = '';
         failedAttempts.value += 1;
 
-        // A used or expired token must not be resubmitted silently — reset
+        // A used or expired token must not be resubmitted silently, so reset
         // the widget so the next submit carries a fresh one, matching
         // Turnstile's own single-use-token contract.
         turnstileToken.value = '';

@@ -7,7 +7,7 @@ import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
 import { MAX_ROOMS_PER_SESSION } from '../shared/rooms';
 
 /**
- * `Offering.requiredRoomCount` — a Session that needs two Rooms AT ONCE.
+ * `Offering.requiredRoomCount`: a Session that needs two Rooms AT ONCE.
  *
  * The solver has been able to do this for a while: `convert.rs` builds Room
  * COMBINATIONS above one, sums their capacity, and checks the Offering's
@@ -18,14 +18,14 @@ import { MAX_ROOMS_PER_SESSION } from '../shared/rooms';
  *
  *   1. THE CEILING IS ENFORCED THREE TIMES, and it has to be. Above
  *      `MAX_ROOMS_PER_SESSION` the solver REFUSES the entire input rather than
- *      truncating, so a 5 stored here is not a big number — it is every run
+ *      truncating, so a 5 stored here is not a big number: it is every run
  *      failing for the whole tenant, reported later against an Offering
  *      somebody edited weeks ago. The write schema refuses it politely, the
  *      database CHECK refuses it absolutely, and the form states the limit
  *      instead of letting it be discovered.
  *
- *   2. CAPACITY IS SUMMED, AND THE UI SAYS SO. The opposite reading — each Room
- *      must independently hold the whole Group — is a coherent thing for a
+ *   2. CAPACITY IS SUMMED, AND THE UI SAYS SO. The opposite reading, that each Room
+ *      must independently hold the whole Group, is a coherent thing for a
  *      tenant to want and gives the opposite answer on identical input. The
  *      proto decides it (summed), so the only thing this app can get wrong is
  *      failing to say which. Copy is normally nobody's tripwire; here it is the
@@ -58,7 +58,7 @@ const sentCount = async () => (await assemble()).input.offerings
 
 describe('what reaches the wire', () => {
     it('defaults to one, not the proto’s zero', async () => {
-        // 0 and 1 are identical to the solver, so this is not about behaviour —
+        // 0 and 1 are identical to the solver, so this is not about behaviour:
         // it is that the app now has an opinion where it previously had a
         // placeholder, and 1 is the true statement about an unedited Offering.
         expect(await sentCount()).toBe(1);
@@ -79,7 +79,7 @@ describe('the ceiling', () => {
     /**
      * BOTH SCHEMAS, not just the one a test happened to reach for. `offerings`
      * declares `create` and `update` separately, so a bound present on one and
-     * absent on the other is a hole nothing else would report — and a mutation
+     * absent on the other is a hole nothing else would report, and a mutation
      * that loosened only `create` left an `update`-only version of this suite
      * entirely green.
      */
@@ -103,8 +103,8 @@ describe('the ceiling', () => {
     });
 
     it('refuses more than the solver can place', () => {
-        // Not a preference. Past this the run FAILS — `TooManyRoomsRequired`,
-        // refused rather than truncated — so accepting it would trade one
+        // Not a preference. Past this the run FAILS with `TooManyRoomsRequired`,
+        // refused rather than truncated, so accepting it would trade one
         // person's typo for the tenant's whole timetable.
         for (const [name, schema] of schemas) {
             expect(() => schema.parse(body(name, MAX_ROOMS_PER_SESSION + 1)), name).toThrow();
@@ -123,8 +123,8 @@ describe('the ceiling', () => {
 
     it('is enforced by the database too, not only by the write schema', async () => {
         // The zod schema is the friendly refusal; this is the guarantee. Any
-        // future writer that does not go through `/api/offerings` — a script, a
-        // migration, an import — meets the same limit.
+        // future writer that does not go through `/api/offerings` (a script, a
+        // migration, an import) meets the same limit.
         await expect(setCount(MAX_ROOMS_PER_SESSION + 1)).rejects.toThrow();
         await expect(setCount(0)).rejects.toThrow();
 

@@ -33,7 +33,7 @@
             Advisory, and visually distinct from `picker_error` on purpose. An
             error means the write did NOT land; these mean it did, and here is
             what it implies. Rendered alongside rather than instead of the error,
-            because they are answers to different questions — though in practice
+            because they are answers to different questions, though in practice
             a failed write produces no warnings, since the hook runs after a
             successful replacement.
 
@@ -127,13 +127,13 @@
             NOTHING ASSIGNED. Two renderings, because an empty set is not always
             the same fact: for most relations it is unremarkable, and for
             `access-roles` it means this person can sign in and be shown nothing.
-            A relation says which by declaring `emptyWarning` — and when it does,
+            A relation says which by declaring `emptyWarning`, and when it does,
             the advisory REPLACES "None assigned." rather than joining it, since
             the warning already states the emptiness and two lines saying it is
             empty reads like two separate problems.
 
             `role="status"`, matching the warnings above: politely announced,
-            nothing is broken. Deliberately shown in read-only mode too — a
+            nothing is broken. Deliberately shown in read-only mode too: a
             viewer who cannot fix it is still better off knowing.
         -->
         <p
@@ -150,7 +150,7 @@
         <!--
             SEARCH, for a resource that can hold thousands of rows. The list is
             never fetched whole here, so there is nothing to scroll and nothing
-            to filter client-side — every keystroke asks the server.
+            to filter client-side: every keystroke asks the server.
         -->
         <div
             v-if="!readonly && def.searchable"
@@ -277,8 +277,8 @@
         </label>
 
         <!--
-            An empty option list has two very different causes — the referenced
-            entity has no rows at all, or everything is already assigned — and a
+            An empty option list has two very different causes (the referenced
+            entity has no rows at all, or everything is already assigned), and a
             select that is merely empty cannot tell them apart.
 
             NOT shown in search mode, where `options` carries only the assigned
@@ -302,7 +302,7 @@ import { indentedOptions } from '~/utils/groupTree';
  * One relation, edited as a set.
  *
  * Every change is persisted immediately by the parent composable rather than
- * being staged for a Save button — see `useEntityRelations` for why. The
+ * being staged for a Save button. See `useEntityRelations` for why. The
  * Saving/Saved state next to the heading is what makes that visible instead of
  * magical.
  */
@@ -317,8 +317,8 @@ const props = defineProps<{
      *   searchable      →  ONLY the rows already assigned, to label them.
      *                      Candidates come from the server, per keystroke.
      *
-     * One prop, because both cases answer the same question — "which rows can
-     * this component name?" — and a searchable picker that also received a full
+     * One prop, because both cases answer the same question ("which rows can
+     * this component name?"), and a searchable picker that also received a full
      * candidate list would be fetching the very list search exists to avoid.
      */
     options: EntityRow[];
@@ -330,7 +330,7 @@ const props = defineProps<{
     warnings?: string[];
     readonly?: boolean;
     /**
-     * Extra query parameters for the search request — the searchable
+     * Extra query parameters for the search request: the searchable
      * equivalent of `def.scopeBy`, which the parent resolves against the row
      * being edited and this component has no way to evaluate itself.
      *
@@ -363,8 +363,8 @@ const available = computed(() => {
  *
  * WHY A CACHE IS NOT OPTIONAL HERE. In search mode `options` holds the rows
  * assigned when the page loaded, and the parent does not refetch it on every
- * add. So a person just picked out of a search is in `rows` — rendered
- * immediately, optimistically — while being absent from `options`. Without this
+ * add. So a person just picked out of a search is in `rows` (rendered
+ * immediately, optimistically) while being absent from `options`. Without this
  * they would appear as a raw cuid the instant they were added, which reads as
  * data loss rather than as a missing label.
  *
@@ -419,7 +419,7 @@ const request = useRequestFetch();
 
 /**
  * A page, not the answer. The point of searching is that the full list is too
- * large to hold, so the result set has to be bounded too — and being bounded is
+ * large to hold, so the result set has to be bounded too, and being bounded is
  * stated in the UI rather than hidden, because "20 matches" and "the first 20
  * of 143" call for different next actions from the user.
  */
@@ -442,7 +442,7 @@ const results = computed(() => {
      * Matches are shown even when already assigned, flagged rather than
      * filtered out. Silently dropping them makes a search for someone who IS
      * assigned answer "no matches", which reads as "this person does not
-     * exist" — the opposite of the truth, and the single most confusing thing a
+     * exist": the opposite of the truth, and the single most confusing thing a
      * picker can say.
      */
     return matches.value.map((row) => ({
@@ -457,7 +457,7 @@ const showResults = computed(() => results.value.length > 0);
 /**
  * Guards against a slow earlier response landing after a faster later one.
  * Typing "ma" then "mar" issues two requests, and without this the "ma" results
- * can arrive second and be shown under the word "mar" — stale data that looks
+ * can arrive second and be shown under the word "mar": stale data that looks
  * exactly like correct data.
  */
 let sequence = 0;
@@ -477,8 +477,8 @@ async function runSearch(query: string) {
         });
 
         /**
-         * `limit` is what makes this `{ rows, total }` rather than a bare array
-         * — `/api/[resource]` switches shape on it. Typed explicitly and read
+         * `limit` is what makes this `{ rows, total }` rather than a bare array:
+         * `/api/[resource]` switches shape on it. Typed explicitly and read
          * structurally so a change to that contract fails here rather than
          * rendering an empty list, which is indistinguishable from no matches.
          */

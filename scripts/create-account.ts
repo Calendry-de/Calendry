@@ -5,15 +5,15 @@
  * ---------------
  * `provision:tenant` creates a tenant and its first admin. There was nothing to
  * add a *second* account to a tenant that already exists, so it kept being done
- * by hand-written SQL — which is exactly how `vic@demo.local` came to be a
+ * by hand-written SQL, which is exactly how `vic@demo.local` came to be a
  * tracked cleanup item in CLAUDE.md, and why verification work kept borrowing
  * (and resetting) the real admin's credential.
  *
  * WHY A CLI AS WELL AS THE MANAGE AREA
  * ------------------------------------
  * `/manage/accounts` now issues logins over HTTP, gated on `account.manage`
- * inside one tenant. This stays because it answers to a different authority —
- * whoever holds the database credential — and is the only path that works before
+ * inside one tenant. This stays because it answers to a different authority
+ * (whoever holds the database credential) and is the only path that works before
  * a tenant has anybody who can sign in, which is every tenant's first minute and
  * every locked-out tenant's worst one. It is also the only path that can create
  * the Person and the login together.
@@ -26,20 +26,20 @@
  * bypasses both concerns in one transaction.
  *
  * AN EXISTING ACCOUNT IS REUSED, NOT DUPLICATED. `account.email` is globally
- * unique and one Account can act in several tenants through `account_person` —
+ * unique and one Account can act in several tenants through `account_person`:
  * that is the whole point of a tenant-independent credential. Passing an email
  * that already exists therefore ADDS a tenant to that person rather than
  * creating a second login, and the password is left untouched.
  *
  * AN EXISTING *PERSON* NEEDS `--attach`, AND THAT IS THE POINT OF THE FLAG.
- * Creating a Person in the management area does NOT create a login — they are
- * different things (TAXONOMY.md §2 vs §4) — so the ordinary way to give somebody
+ * Creating a Person in the management area does NOT create a login: they are
+ * different things (TAXONOMY.md §2 vs §4), so the ordinary way to give somebody
  * access is: the roster already has them, and only the credential is missing.
  * Without `--attach` this script used to answer that with "a Person with email X
  * already exists. This script creates; it does not update." and stop, which left
  * no command that could finish the job. With it, every part that already exists
- * is REUSED and every part that is missing is created — the Person, the Account,
- * the `account_person` link, the access-role assignment — and the report says
+ * is REUSED and every part that is missing is created (the Person, the Account,
+ * the `account_person` link, the access-role assignment), and the report says
  * which was which.
  *
  * Still never an UPSERT: nothing existing is modified. A password is not reset, a
@@ -52,7 +52,7 @@
  */
 import { createInterface } from 'node:readline/promises';
 import { hostname, userInfo } from 'node:os';
-// The real hashing path, never a re-implementation — a second copy of the KDF
+// The real hashing path, never a re-implementation: a second copy of the KDF
 // drifts silently the moment the original changes.
 import { hashPassword } from '../server/utils/auth';
 import { createAccountRow, linkAccountToPerson } from '../server/utils/accountAdmin';
@@ -73,7 +73,7 @@ async function main() {
      * `--name` is required only when a Person may have to be CREATED. With
      * `--attach` against somebody already on the roster it would be ignored, and
      * demanding it would make the common case ask for information the database
-     * already holds — the sort of prompt people satisfy by typing anything.
+     * already holds: the sort of prompt people satisfy by typing anything.
      */
     if (!tenantSlug || !email || (!name && !attach)) {
         console.error(
@@ -132,7 +132,7 @@ async function main() {
             // message that did not was the whole complaint: the roster had the
             // person, the login was missing, and the tool said no.
             if (existingPerson.accountLink) {
-                console.error('They already have a login too. Nothing here is missing — use '
+                console.error('They already have a login too. Nothing here is missing. Use '
                     + '`bun run reset:password` to issue a new password.\n');
             } else {
                 console.error('They have no login yet. Re-run with --attach to create one for '
@@ -146,8 +146,8 @@ async function main() {
         /*
          * A Person answering to a DIFFERENT Account is refused outright, with or
          * without `--attach`. `account_person` is `@@unique([personId])` on
-         * purpose — two credentials controlling one tenant identity would make
-         * every audit entry ambiguous — so this is not a rule to work around, and
+         * purpose: two credentials controlling one tenant identity would make
+         * every audit entry ambiguous, so this is not a rule to work around, and
          * the raw unique violation would say nothing about whose login it is.
          */
         if (
@@ -166,7 +166,7 @@ async function main() {
 
         /*
          * Nothing to do is reported and NOT treated as failure. It is the honest
-         * answer to a re-run — the requested state already holds — and exiting
+         * answer to a re-run (the requested state already holds), and exiting
          * non-zero would make an idempotent provisioning script look broken.
          */
         if (existingPerson && linkExists && roleExists) {
@@ -195,7 +195,7 @@ async function main() {
          */
         if (!existingPerson && !name) {
             console.error(`\nNobody in '${tenantSlug}' has the email '${email}', so a Person has to `
-                + 'be created — and that needs --name "Given Family".\n');
+                + 'be created, and that needs --name "Given Family".\n');
             process.exit(1);
         }
 
@@ -206,12 +206,12 @@ async function main() {
 
         console.log(`\nTenant      ${tenant.slug} (${tenant.name})`);
         console.log(`Person      ${existingPerson
-            ? `EXISTS — ${existingPerson.givenName} ${existingPerson.familyName} <${email}>, reused`
-            : `${givenName} ${familyName} <${email}> — new`}`);
-        console.log(`Access role ${accessRole.key} — ${accessRole._count.permissions} permission(s)`
+            ? `EXISTS: ${existingPerson.givenName} ${existingPerson.familyName} <${email}>, reused`
+            : `${givenName} ${familyName} <${email}>, new`}`);
+        console.log(`Access role ${accessRole.key}: ${accessRole._count.permissions} permission(s)`
             + `${roleExists ? ', already held' : ''}`);
         console.log(`Account     ${existingAccount
-            ? 'EXISTS — this tenant is added to it; the password is NOT changed'
+            ? 'EXISTS: this tenant is added to it; the password is NOT changed'
             : 'new'}`);
         console.log(`Link        ${linkExists ? 'already linked' : 'new account_person row'}`);
         console.log('');
@@ -233,7 +233,7 @@ async function main() {
         /*
          * One transaction, and every write is conditional on the row being
          * absent. A Person with no Account, or an Account with no access role, is
-         * a half-created login that fails confusingly later — and a partial
+         * a half-created login that fails confusingly later, and a partial
          * `--attach` would leave exactly that.
          */
         const created = await prisma.$transaction(async (tx) => {

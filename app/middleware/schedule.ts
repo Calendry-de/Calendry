@@ -7,7 +7,7 @@ import { useSession } from '~/composables/session';
  * WHAT THIS USED TO DO
  *
  * Demand all six permissions the page's reference wave touched, and name the
- * missing ones — because without that a role holding only `session.read` reached
+ * missing ones, because without that a role holding only `session.read` reached
  * the page, one fetch 403'd, the whole `Promise.all` rejected, and the page
  * rendered NOTHING, indistinguishable from an unconfigured tenant.
  *
@@ -15,7 +15,7 @@ import { useSession } from '~/composables/session';
  * `GET /api/schedule/context`, which is behind this same gate, and every
  * directory fetch it makes on top is individually tolerant and only feeds
  * controls that are absent without it. So this middleware is back to asserting
- * exactly what the page's own data requires — which is the state it should
+ * exactly what the page's own data requires, which is the state it should
  * always have been in, and is now true by construction rather than by a list
  * being kept in sync.
  *

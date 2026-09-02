@@ -9,7 +9,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  *
  * ALLOWED EVEN FOR A SHARED LOGIN, unlike every other write here, and the
  * distinction is recoverability. `auth_session` hangs off `account_id`, so this
- * does reach the other institutions a shared credential serves — but its holder
+ * does reach the other institutions a shared credential serves, but its holder
  * knows their own password and signs straight back in, whereas a reset, a
  * rename or a deactivation leaves them locked out of a tenant that never agreed
  * to it. Refusing this for a shared login would also remove the one immediate

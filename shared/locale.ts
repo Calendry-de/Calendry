@@ -4,13 +4,13 @@
  * `parseAcceptLanguage` is the ORIGINAL implementation from
  * `app/composables/locale.ts` (`useViewerLocale`'s header-only, hydration-safe
  * mechanism), relocated here unchanged so `server/api/auth/session.get.ts` can
- * use the identical parser — `server/` cannot import from `app/`. This is the
+ * use the identical parser: `server/` cannot import from `app/`. This is the
  * "in shared/ because two consumers must not drift" reasoning
  * `shared/constraintTypes.ts` already states for the same structural reason.
  *
  * `resolveLocale` is the new layer issue #17 asks for: a Person's own
  * `locale` wins if set, then the tenant's `defaultLocale`, then this same
- * header parse, then the existing fallback — extending `useViewerLocale`'s
+ * header parse, then the existing fallback, extending `useViewerLocale`'s
  * header-only resolution rather than replacing it. See that composable's own
  * doc comment for why the whole thing has to be resolved once, server-side,
  * and carried to the client rather than re-resolved there.
@@ -23,7 +23,7 @@ export const FALLBACK_LOCALE = 'en-GB';
  * Quality values are deliberately ignored: browsers send their preferred tag
  * first, and honouring `q=` would mean ranking languages this app does not
  * translate into. The tag is used for NUMBER AND DATE SHAPE, not for
- * translation — "5 Oct" versus "Oct 5" versus "10月5日".
+ * translation: "5 Oct" versus "Oct 5" versus "10月5日".
  */
 export function parseAcceptLanguage(header: string | undefined | null): string | null {
     const first = header?.split(',')[0]?.split(';')[0]?.trim();
@@ -44,7 +44,7 @@ export function parseAcceptLanguage(header: string | undefined | null): string |
 /**
  * Same validate-via-round-trip technique as `parseAcceptLanguage`, applied to
  * a STORED value (`Person.locale` / `TenantDisplaySettings.defaultLocale`)
- * rather than a header — a stale or hand-edited row must degrade to the next
+ * rather than a header: a stale or hand-edited row must degrade to the next
  * source, not throw. Exported so the write boundary (both settings routes)
  * can refuse a value that would only ever degrade, rather than storing one
  * silently ignored at read time.

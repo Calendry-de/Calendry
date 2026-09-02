@@ -7,15 +7,15 @@ import { parseAcceptLanguage } from '../app/composables/locale';
  * The calendar date behind a `(termWeek, dayOfWeek)` slot, and how it is written.
  *
  * WHY THE DATE ITSELF IS NOT A DISPLAY CONCERN. The same arithmetic already
- * exists in SQL — `calendry_internal.federation_room_occupancy()` computes
- * `date_trunc('week', start_date) + ((week-1)*7 + (day-1))` — and its comment
+ * exists in SQL: `calendry_internal.federation_room_occupancy()` computes
+ * `date_trunc('week', start_date) + ((week-1)*7 + (day-1))`, and its comment
  * says it anchors that way deliberately so both sides agree. A fourth
  * definition drifting from the other three is the failure this module keeps
  * being written to prevent, so the expectations below are the SQL's answers for
  * the demo term, checked against a live database.
  */
 describe('slotDate agrees with the SQL already in production', () => {
-    // Wintersemester starts 2027-10-02, a SATURDAY — so week 1 begins on the
+    // Wintersemester starts 2027-10-02, a SATURDAY, so week 1 begins on the
     // Monday BEFORE the term's own start date. Anything anchoring on the start
     // date itself rather than its ISO Monday gets this wrong by five days.
     const termStart = new Date('2027-10-02T00:00:00Z');

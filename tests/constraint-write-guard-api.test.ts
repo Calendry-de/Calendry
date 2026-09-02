@@ -7,7 +7,7 @@ import { api, login } from './helpers/client';
  *
  * `constraint-write-guard.test.ts` pins the rules; this pins that both write
  * PATHS actually apply them, which is a separate question and was the whole
- * defect — the rule builder enforced these and the generic CRUD API did not, so
+ * defect: the rule builder enforced these and the generic CRUD API did not, so
  * anything not going through the form wrote whatever it liked.
  *
  * The two paths differ in what they can see and therefore in mechanism:
@@ -44,7 +44,7 @@ const create = (body: unknown) => api('/api/constraints', {
  * `readValidatedBody`, which hands back a ZodError whose `message` is the JSON
  * issue array; `beforeUpdate` throws `data.issues` directly. `entityForm`'s
  * `extractIssues` already reads both, and the point of this suite is that the
- * two paths blame the same FIELD — so the helper normalises the shapes rather
+ * two paths blame the same FIELD, so the helper normalises the shapes rather
  * than pinning one and quietly passing the other.
  */
 function blamedFields(body: unknown): string[] {
@@ -57,7 +57,7 @@ function blamedFields(body: unknown): string[] {
         try {
             candidates.push(JSON.parse(data.message));
         } catch {
-            // Not JSON — leave it; the assertion will report the empty list.
+            // Not JSON: leave it; the assertion will report the empty list.
         }
     }
 
@@ -80,7 +80,7 @@ afterAll(async () => {
     await ownerDb.$disconnect();
 });
 
-describe('POST — the create refinement', () => {
+describe('POST: the create refinement', () => {
     it('refuses a negative weight and blames the weight field', async () => {
         const res = await create({
             type: 'minimize_online_sessions', name: 'Negative', severity: 'SOFT', weight: -5,
@@ -92,7 +92,7 @@ describe('POST — the create refinement', () => {
 
     it('accepts weight zero', async () => {
         // The counter-example. Without it, a guard that rejected every weight
-        // would pass the test above — and zero is a real configuration the
+        // would pass the test above, and zero is a real configuration the
         // solver honours ("report the count, do not steer").
         const res = await create({
             type: 'minimize_online_sessions', name: 'Zero', severity: 'SOFT', weight: 0,
@@ -119,9 +119,9 @@ describe('POST — the create refinement', () => {
     });
 });
 
-describe('PATCH — beforeUpdate, and the row it must not trap', () => {
+describe('PATCH: beforeUpdate, and the row it must not trap', () => {
     it('lets a legacy bad row be DISABLED', async () => {
-        // The trap. Validating the merged row would refuse this — the guard
+        // The trap. Validating the merged row would refuse this: the guard
         // would block the one action that neutralises the row it objects to.
         await insertLegacyRow();
 
@@ -202,7 +202,7 @@ describe('parameters, on both write paths', () => {
         });
 
         expect(res.status).toBe(400);
-        // `days`, NOT `params` — see this block's note.
+        // `days`, NOT `params`: see this block's note.
         expect(blamedFields(res.body)).toEqual(['days']);
     });
 
@@ -238,7 +238,7 @@ describe('parameters, on both write paths', () => {
 
     it('refuses bad parameters on PATCH too, reading the STORED type', async () => {
         // The update path has no `type` in the payload at all, so this only
-        // works if `beforeUpdate` reads the row — the same asymmetry the
+        // works if `beforeUpdate` reads the row: the same asymmetry the
         // severity and weight cases exist to pin.
         const created = await create({
             type: 'minimize_specifc_day',

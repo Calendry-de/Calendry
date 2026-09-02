@@ -4,8 +4,8 @@ import { sessionLabel } from '../app/composables/schedule';
 /**
  * What a Session is called on screen.
  *
- * Pinned because this rule now has FIVE consumers — the grid chip, the
- * inspector, the off-grid tray, the placement banner and the violations panel —
+ * Pinned because this rule now has FIVE consumers (the grid chip, the
+ * inspector, the off-grid tray, the placement banner and the violations panel)
  * and it previously had five copies. Two said "Untitled session", one said
  * "Session", and the banner had no fallback at all, so it rendered
  * "Pick a slot for ." for every Event. One definition is the fix; this is what
@@ -25,7 +25,7 @@ describe('sessionLabel', () => {
     it('lets the Offering win even if a title somehow exists', () => {
         // The write guard refuses this combination, so it should be
         // unreachable. Asserted anyway: if a row ever acquires one, the two
-        // names must not start competing silently — the Offering is the answer.
+        // names must not start competing silently: the Offering is the answer.
         expect(sessionLabel({ title: 'stray', offering: { id: 'o', title: 'Accounting', code: null } } as never))
             .toBe('Accounting');
     });

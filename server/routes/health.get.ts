@@ -4,14 +4,14 @@ import { solverAddress } from '../utils/solverClient';
 import { logger } from '../utils/logger';
 
 /**
- * Real liveness/readiness check — issue #92. Verifies the two external
+ * Real liveness/readiness check (issue #92). Verifies the two external
  * dependencies a request can actually fail on, each under its own timeout, so
  * a hung dependency degrades this endpoint's ANSWER rather than hanging the
  * endpoint itself.
  *
  * Per-dependency status, not one boolean: "the database is down" and "the
  * solver is down" call for different responses from whoever is paged, and a
- * single `ok: false` would erase that distinction — the same "guards must
+ * single `ok: false` would erase that distinction, the same "guards must
  * report, not merely fail" reasoning CLAUDE.md states for write-path guards
  * applies here to a read-only one.
  */
@@ -32,7 +32,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 
 /**
  * `SELECT 1` on the RUNTIME role's own client (`getPrisma()`), the same one
- * `authDb.ts` uses for the pre-tenant plane — a health check has no tenant
+ * `authDb.ts` uses for the pre-tenant plane: a health check has no tenant
  * context either, and this query touches no tenant-scoped table so it needs
  * none.
  */
@@ -63,11 +63,11 @@ function parseAddress(address: string): { host: string; port: number } {
 
 /**
  * `@calendry-de/calendry-proto`'s `SolverService` exposes no application-level
- * health/ping RPC — only `StartRun`/`GetStatus`/`CancelRun` (confirmed against
+ * health/ping RPC, only `StartRun`/`GetStatus`/`CancelRun` (confirmed against
  * the generated `service.d.ts`), none of which is safe or free to call from a
  * health check. Falls back to a raw TCP connect against the same address the
  * app itself uses (`solverAddress()`), which at least proves the process is
- * listening — the documented fallback for exactly this gap.
+ * listening, the documented fallback for exactly this gap.
  */
 function probeSolverSocket(): Promise<CheckStatus> {
     return new Promise((resolve, reject) => {

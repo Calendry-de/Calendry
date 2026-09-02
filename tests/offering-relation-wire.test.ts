@@ -3,7 +3,7 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { assembleSolverInput } from '../server/utils/solverInput';
 
 /**
- * `SolverInput.offeringRelations` — the wire half of `different_time` (#53),
+ * `SolverInput.offeringRelations`: the wire half of `different_time` (#53),
  * built from `ConstraintRelationMember` rather than `toWireConstraint` (see
  * that function's relation carve-out and `wireRelationVariant`).
  */
@@ -52,7 +52,7 @@ describe('an enabled different_time relation', () => {
         const relation = input.offeringRelations.find((r) => r.id === constraint.id);
 
         expect(relation).toBeDefined();
-        // Position order, not creation order — offeringB was added at
+        // Position order, not creation order: offeringB was added at
         // position 0 despite being created second.
         expect(relation!.offeringIds).toEqual([offeringB, 'test-offering-a']);
         expect(relation!.differentTime).toEqual({});
@@ -61,7 +61,7 @@ describe('an enabled different_time relation', () => {
         await ownerDb.constraint.delete({ where: { id: constraint.id } });
     });
 
-    it('never reaches ConstraintConfig — no skip is reported for it', async () => {
+    it('never reaches ConstraintConfig, so no skip is reported for it', async () => {
         const constraint = await ownerDb.constraint.create({
             data: {
                 tenantId: f.tenantA, type: 'different_time', name: 'No overlap',
@@ -110,11 +110,11 @@ describe('a disabled different_time relation', () => {
 
 describe('a relation naming an offering outside this Term\'s snapshot', () => {
     /*
-     * NOT A DELETED OFFERING — `ConstraintRelationMember.offeringId` cascades
+     * NOT A DELETED OFFERING: `ConstraintRelationMember.offeringId` cascades
      * on the Offering's own deletion, so a truly FK-dangling row can never
      * persist. The real case `realOfferingIds` (built from `offeringRows`,
      * which filters to `termId` + `isActive`) guards against is an Offering
-     * that still exists but fell out of THIS solve's snapshot — deactivated
+     * that still exists but fell out of THIS solve's snapshot: deactivated
      * after being added to the relation, same as any other Offering a solve
      * silently stops sending.
      */

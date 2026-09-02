@@ -4,10 +4,10 @@ import { api, login } from './helpers/client';
 
 /**
  * `POST /api/sessions/:id/bank` and its restore path (issue #22,
- * cancel-to-spare-bank — the state half; auto-reschedule is a separate,
+ * cancel-to-spare-bank, the state half; auto-reschedule is a separate,
  * blocked card).
  *
- * `test-session-a` is the fixture's Offering-linked, placed Session — exactly
+ * `test-session-a` is the fixture's Offering-linked, placed Session, exactly
  * the shape banking exists for. It carries a Group, a Person and a Room, all
  * of which must survive banking untouched: the row is cancelled, not erased.
  */
@@ -49,7 +49,7 @@ describe('banking a Session', () => {
         expect(row.termWeek).toBeNull();
         expect(row.dayOfWeek).toBeNull();
         expect(row.blockIndex).toBeNull();
-        // The demand survives — still the same Offering, still counted.
+        // The demand survives: still the same Offering, still counted.
         expect(row.offeringId).toBe(OFFERING);
 
         expect(await ownerDb.sessionGroup.count({ where: { sessionId: SESSION } })).toBe(1);
@@ -67,7 +67,7 @@ describe('banking a Session', () => {
         const payload = events[0]!.payload as Record<string, unknown>;
         const from = payload.from as Record<string, unknown>;
 
-        // The placement it HELD before banking, not the one it has now — the
+        // The placement it HELD before banking, not the one it has now: the
         // whole point of the payload is that it outlives the row's own state.
         expect(from.termWeek).toBe(before.termWeek);
         expect(from.dayOfWeek).toBe(before.dayOfWeek);
@@ -118,7 +118,7 @@ describe('placing a banked Session', () => {
 
         const payload = events[0]!.payload as { from: { termWeek: number | null }; to: { termWeek: number } };
 
-        // Recorded FROM nothing — the same shape banking recorded TO, so a
+        // Recorded FROM nothing, the same shape banking recorded TO, so a
         // read of the log sees one continuous story rather than a gap.
         expect(payload.from.termWeek).toBeNull();
         expect(payload.to.termWeek).toBe(3);
@@ -132,7 +132,7 @@ describe('the spare bank in GET /api/sessions', () => {
         const week = await api<{ id: string }[]>('/api/sessions', { cookie });
 
         // No termId/week filter at all still must not surface a banked row by
-        // accident — the `banked` param is what asks for it, nothing else.
+        // accident: the `banked` param is what asks for it, nothing else.
         expect(week.body.some((s) => s.id === SESSION)).toBe(false);
 
         const banked = await api<{ id: string }[]>(
@@ -200,7 +200,7 @@ describe('only Offering-linked Sessions can be banked', () => {
 
 describe('locked Sessions must be unlocked first', () => {
     it('refuses to bank a locked Session', async () => {
-        // Re-seed puts test-session-a back to its ordinary placed state —
+        // Re-seed puts test-session-a back to its ordinary placed state,
         // and invalidates the account row `cookie` was issued for, so a
         // fresh login is not optional here.
         await seed();

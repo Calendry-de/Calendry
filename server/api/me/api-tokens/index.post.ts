@@ -62,18 +62,18 @@ const BODY = z.object({
 });
 
 /**
- * Mint an API token — a bearer credential for scripts (imports, integrations).
+ * Mint an API token: a bearer credential for scripts (imports, integrations).
  *
  * SELF-SERVICE, NO PERMISSION KEY OF ITS OWN, like `/api/me/settings`: the
  * route only ever narrows what the caller can already do, so the authority to
  * delegate a subset of your own permissions is the permissions themselves.
  * What it must therefore enforce is exactly two things:
  *
- * 1. SUBSET AT CREATION — every requested key is checked against the caller's
+ * 1. SUBSET AT CREATION: every requested key is checked against the caller's
  *    live permissions, and 403 names the ones they lack. Without this, a
  *    viewer could mint themselves an admin token.
  *
- * 2. SESSION ONLY — a token must not mint tokens. Otherwise a leaked
+ * 2. SESSION ONLY: a token must not mint tokens. Otherwise a leaked
  *    short-lived token launders itself into a permanent one, and revoking the
  *    original revokes nothing. `kind === 'account'` is that check.
  *

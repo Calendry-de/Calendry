@@ -8,15 +8,15 @@ import { weekCountOf } from '#shared/academicCalendar';
  *
  * WHY THIS SUITE EXISTS. This project has now been bitten four times by the same
  * shape: state seeded by a watcher is `undefined` at first render on the server,
- * because Vue does not flush watchers during SSR. Each time the symptom differed
- * — empty management forms, a `<select>` showing the wrong option, a hidden
- * solver control — and each time it survived review because the check asked
+ * because Vue does not flush watchers during SSR. Each time the symptom differed:
+ * empty management forms, a `<select>` showing the wrong option, a hidden
+ * solver control, and each time it survived review because the check asked
  * whether something EXISTED rather than what it SAID.
  *
  * The fourth was the worst: `totalWeeks` fell back to 1 on the server, so the
  * week stepper rendered `disabled="true"`. Vue patches mismatched TEXT on
- * hydration but explicitly refuses to patch mismatched ATTRIBUTES — "this
- * mismatch is check-only. The DOM will not be rectified" — so the buttons stayed
+ * hydration but explicitly refuses to patch mismatched ATTRIBUTES ("this
+ * mismatch is check-only. The DOM will not be rectified"), so the buttons stayed
  * disabled in the live DOM and week navigation was dead on every load, while the
  * label beside them correctly read "Week 1 / 19".
  *
@@ -102,11 +102,11 @@ describe('/schedule first render', () => {
         const html = await renderSchedule();
 
         /*
-         * The fixture term spans October to February — many weeks, never one.
+         * The fixture term spans October to February: many weeks, never one.
          *
          * Anchored on `weeknav_total`, the class that exists only to carry this
          * number. It was `Week 1</span> / N`, which broke when the stepper moved
-         * out of the toolbar and became `ScheduleWeekNav` — a positional match
+         * out of the toolbar and became `ScheduleWeekNav`: a positional match
          * on adjacent markup, which is exactly the kind that goes red on a
          * layout change and says nothing about the invariant. The invariant is
          * unchanged: the total is the real week count, never the fallback of 1.
@@ -128,8 +128,8 @@ describe('/schedule first render', () => {
      *
      * The week, term and filters moved out of plain `ref`s and into the query
      * string so a view is shareable and survives a round trip to the proposals
-     * list. That puts them in the same category as `totalWeeks` above — read
-     * before first paint, on the server — so the same trap applies: whatever the
+     * list. That puts them in the same category as `totalWeeks` above (read
+     * before first paint, on the server), so the same trap applies: whatever the
      * server writes is what the reader gets, and a week the term does not contain
      * renders an empty grid indistinguishable from a term with nothing in it.
      *
@@ -184,8 +184,8 @@ describe('/schedule first render', () => {
      *
      * `app/composables/schedule.ts` used to export `weeksInTerm`, computing the
      * raw span `ceil((end - start) / 7)`. That disagrees with the Monday-anchored
-     * `weekCountOf` — which the week classifier, the solver calendar assembly and
-     * `POST /api/sessions` all use — on roughly half of all terms, always by one.
+     * `weekCountOf` (which the week classifier, the solver calendar assembly and
+     * `POST /api/sessions` all use) on roughly half of all terms, always by one.
      *
      * The toolbar was the only reader of the local version, so the schedule
      * capped a term one week SHORT of what the server accepts: measured on this

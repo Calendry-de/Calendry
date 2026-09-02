@@ -2,10 +2,10 @@
  * #73/#74's coordination rule, in one place so the store and the URL cannot
  * independently decide it differently: an explicit URL value always wins (and
  * the store is updated to match, by the caller); absent, the store's
- * remembered Term applies; absent that too, '' — the server's own default.
+ * remembered Term applies; absent that too, '' (the server's own default).
  *
  * `useScheduleFilters()` below owns reading AND writing the URL itself
- * (`termId` there is a computed backed by `?term=`) — this function is only
+ * (`termId` there is a computed backed by `?term=`); this function is only
  * the precedence rule between that value and the Pinia store, not a second
  * reader of the query string.
  */
@@ -16,7 +16,7 @@ export function resolveTermId(queryTermId: string | undefined, storedTermId: str
 /**
  * The #75 fix: a link back to the schedule that carries the Term being
  * reviewed, so it lands on that Term instead of whichever one sorts first.
- * `term`, not `termId` — the short name is `useScheduleFilters()`'s own
+ * `term`, not `termId`: the short name is `useScheduleFilters()`'s own
  * `?term=` param, and a link built with any other key would silently fail to
  * be read.
  */
@@ -29,15 +29,15 @@ export function scheduleLinkForTerm(termId: string | null): string {
  *
  * OWNERSHIP BOUNDARY: this composable owns exactly the values that change the
  * API query, and nothing else. Density and the violations-panel toggle are
- * *view* state — they alter what the page looks like, never what it asks the
- * server for — so they stay page-local rather than drifting in here because it
+ * *view* state: they alter what the page looks like, never what it asks the
+ * server for, so they stay page-local rather than drifting in here because it
  * would be convenient. (They are persisted per-viewer in a cookie there; that is
  * a different question from being addressable.)
  *
  * WHY THE URL RATHER THAN PLAIN REFS. These were six `ref`s, which made the
  * whole state of the view unaddressable and unrecoverable. Three concrete
- * consequences, all of them daily: browser Back from `/schedule/proposals` — a
- * round trip this surface actively invites — returned to week 1 with every
+ * consequences, all of them daily: browser Back from `/schedule/proposals`
+ * (a round trip this surface actively invites) returned to week 1 with every
  * filter cleared; a reload during a 30-second solver run lost the reader's
  * place; and nobody could be sent "the Friday clash in week 7", though the page
  * already knows it serves several audiences.
@@ -53,8 +53,8 @@ export function useScheduleFilters() {
 
     /**
      * Writes coalesce through here because `router.replace()` resolves
-     * ASYNCHRONOUSLY: two sets in one tick — the week stepper firing twice on a
-     * fast wheel, or a term change that clears a group — would each read a
+     * ASYNCHRONOUSLY: two sets in one tick (the week stepper firing twice on a
+     * fast wheel, or a term change that clears a group) would each read a
      * `route.query` that does not yet contain the other's change, and the first
      * write would be silently lost. Cleared once the router has caught up.
      */
@@ -85,7 +85,7 @@ export function useScheduleFilters() {
         /*
          * SERVER-SIDE THIS IS A NO-OP, deliberately. The only writer during SSR
          * is `useScheduleData`'s watchEffect seeding the resolved term, and Vue
-         * does not flush watchers on the server anyway — but a `router.replace()`
+         * does not flush watchers on the server anyway, but a `router.replace()`
          * reached during render is a navigation mid-render, so the guard is
          * explicit rather than dependent on that.
          */
@@ -124,7 +124,7 @@ export function useScheduleFilters() {
     /**
      * Clamped at the FLOOR only. A week past the end of the term needs
      * `totalWeeks`, which belongs to the fetched term rather than to the URL, so
-     * the page clamps the ceiling once it knows it — this keeps `?week=0` and
+     * the page clamps the ceiling once it knows it; this keeps `?week=0` and
      * `?week=-3` and `?week=abc` from ever reaching the query.
      */
     const week = computed<number>({
@@ -138,7 +138,7 @@ export function useScheduleFilters() {
     });
 
     /**
-     * DEFAULTS TRUE, so it is the *disabled* case that needs writing down —
+     * DEFAULTS TRUE, so it is the *disabled* case that needs writing down:
      * `?nested=0`. Encoding the default would put a param in every schedule URL
      * that says only "nothing unusual here".
      */

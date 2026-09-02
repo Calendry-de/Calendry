@@ -1,7 +1,7 @@
 <template>
     <!--
         `role="group"`, NOT `role="grid"`: the grid role promises row/column
-        navigation this DOM cannot deliver — there are no `role="row"` wrappers
+        navigation this DOM cannot deliver: there are no `role="row"` wrappers
         because a multi-block chip SPANS rows and cannot belong to one. Naming is
         solved instead by every chip and target assembling its own full label.
     -->
@@ -67,7 +67,7 @@
                 >{{ row.minutes }}′</div>
 
                 <!--
-                    Inert by construction — no handler, no tabindex — so
+                    Inert by construction (no handler, no tabindex), so
                     placement mode cannot target it. A Session may not START in a
                     gap: there is no block index for it. One band across every
                     day, because these are the UNIVERSAL gaps.
@@ -155,7 +155,7 @@ import ScheduleNowIndicator from './ScheduleNowIndicator.vue';
  * Rows are shared across days and content-sized (`useGridGeometry`): a block row
  * is at least the chosen density and grows when its fullest day needs more, with
  * a block's label in the same row as its cells. The cost is that per-day drift
- * cannot be drawn — a day whose own breaks move its blocks is NAMED in its
+ * cannot be drawn: a day whose own breaks move its blocks is NAMED in its
  * header, and its cells' labels carry that day's real clock times.
  *
  * NO GEOMETRY IS COMPUTED HERE. Rows, spans and slot placement come from
@@ -164,7 +164,7 @@ import ScheduleNowIndicator from './ScheduleNowIndicator.vue';
  */
 const props = defineProps<{
     grid: TimeGrid;
-    /** Placed only (issue #22) — a banked Session has nowhere on this grid to draw. */
+    /** Placed only (issue #22): a banked Session has nowhere on this grid to draw. */
     sessions: PlacedScheduleSession[];
     violations: Map<string, Violation[]>;
     selectedId: string | null;
@@ -177,7 +177,7 @@ const props = defineProps<{
     /** Resolves a slot to a calendar date; null before a term is chosen. */
     slotDateOf: (termWeek: number, dayOfWeek: number) => Date | null;
     /**
-     * The resolved Term's start date and the tenant's zone — issue #109's
+     * The resolved Term's start date and the tenant's zone: issue #109's
      * live now-indicator needs both to know whether TODAY falls in the week
      * on screen and where "now" sits in tenant-local time. `termStart` is
      * null before a Term resolves, same as `slotDateOf`.
@@ -231,7 +231,7 @@ const blockRows = computed(() => rows.value.filter(
 
 /**
  * The target layer: one button per day per block. The accessible name resolves
- * THIS DAY's clock time, not the gutter's — announcing the shared timeline would
+ * THIS DAY's clock time, not the gutter's: announcing the shared timeline would
  * promise a slot the move would not make.
  */
 const cells = computed(() => props.grid.activeDays.flatMap((day, index) => (
@@ -267,12 +267,12 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 .grid {
     /*
      * Rows come from `gridTemplateRows` inline, because the row COUNT is data.
-     * Nothing auto-places — every child names its own row and column, which is
+     * Nothing auto-places: every child names its own row and column, which is
      * what keeps the time column in column 1 whatever is scheduled.
      */
     display: grid;
     grid-template-columns: auto repeat(var(--day-count), minmax(0, 1fr));
-    gap: 1px; // Grid-line gutter, drawn via the background colour — a physical constant, not a scale step.
+    gap: 1px; // Grid-line gutter, drawn via the background colour: a physical constant, not a scale step.
 
     padding: 1px; // Same grid-line gutter on the outer edge.
     border-radius: var(--radius-xl);
@@ -321,7 +321,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         &-note {
             padding: 1px 6px; // 1px is the same grid-gutter constant above; kept together with 6px rather than half-tokenized.
-            border-radius: 999px; // Idiomatic "fully round" — always a pill/circle regardless of size.
+            border-radius: 999px; // Idiomatic "fully round": always a pill/circle regardless of size.
 
             font-size: var(--font-size-xs);
             font-weight: 600;
@@ -489,7 +489,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
          * `position: absolute` it contributed nothing to its row's height and a
          * crowded block silently overflowed.
          *
-         * `align-self` here is only the fallback — `bandWithin` sets it per slot,
+         * `align-self` here is only the fallback: `bandWithin` sets it per slot,
          * because a slot spanning several rows whole must `stretch` to bridge the
          * 1px gaps interior to it.
          */
@@ -504,11 +504,11 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
            grows to fit. See `clusterSlots`. */
         &--compact {
             flex-direction: column;
-            gap: 1px; // Tightest possible fit for the crowded-cluster fallback — a physical minimum, not a scale step.
+            gap: 1px; // Tightest possible fit for the crowded-cluster fallback: a physical minimum, not a scale step.
 
             /*
              * The same chip, one line high. `:deep` because this is a layout
-             * decision the CONTAINER makes. Nothing is removed — title, kind,
+             * decision the CONTAINER makes. Nothing is removed: title, kind,
              * lock and violation icons survive, inline and ellipsised.
              */
             :deep(.chip) {
@@ -546,7 +546,7 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
 
         /*
          * While PLACING, chips stop intercepting clicks so the cell beneath is
-         * reachable — without this a chip covered its own cell and 26 of 40
+         * reachable: without this a chip covered its own cell and 26 of 40
          * targets were unreachable. The mirror of the mode rule: in `place` the
          * CELLS are targets so chips are inert; in `swap` the chips are.
          */

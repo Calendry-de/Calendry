@@ -49,7 +49,7 @@
 /**
  * The hero's figure: a week of sessions, and the product's one authored moment.
  *
- * WHY THIS EXISTS. The page had no image of a timetable — 1,500 words of copy
+ * WHY THIS EXISTS. The page had no image of a timetable: 1,500 words of copy
  * about a schedule, and twelve stock icons where the product should have been.
  * A screenshot would go stale on the next UI change and would need a real
  * tenant's data to look honest; a stock illustration would say nothing. So this
@@ -70,8 +70,8 @@
  * placement mode actually does: the grid arrives, sessions settle, the other
  * sessions dim to 0.35 while two candidate slots reveal their dashed target,
  * one session travels into the slot it was offered, and the field returns to
- * full contrast with the second candidate still standing. Every value — the
- * 0.35 dim, the dashed violet target, the 140ms-family ease-out — is the one
+ * full contrast with the second candidate still standing. Every value (the
+ * 0.35 dim, the dashed violet target, the 140ms-family ease-out) is the one
  * already shipped in `ScheduleGrid`.
  *
  * The rest state is the FINAL state, so the figure is complete with no
@@ -109,7 +109,7 @@ const CHIPS: Placement[] = [
 ];
 
 /**
- * The session that moves, placed in the slot it ENDS in — so its rest position
+ * The session that moves, placed in the slot it ENDS in, so its rest position
  * is the truth and the animation only offsets it backwards to where it came
  * from. Offsetting the destination instead would leave the reduced-motion
  * reader looking at a chip parked in the wrong cell.
@@ -118,7 +118,7 @@ const MOVER: Placement = { col: 4, row: 5, span: 1 };
 
 /**
  * Two candidates, because placement mode offers a set rather than a single
- * answer — and because the mover lands on the first, the second is what keeps a
+ * answer, and because the mover lands on the first, the second is what keeps a
  * visible target in the composition once the sequence has finished.
  */
 const TARGETS = [
@@ -226,7 +226,7 @@ const TARGETS = [
     &_chipTitle,
     &_chipMeta {
         height: 3px;
-        border-radius: 2px; // Half the 3px height — a pill end, not a scale step.
+        border-radius: 2px; // Half the 3px height: a pill end, not a scale step.
     }
 
     &_chipTitle {
@@ -244,7 +244,7 @@ const TARGETS = [
 }
 
 /*
- * THE SEQUENCE — added only when motion is welcome. Everything above is already
+ * THE SEQUENCE, added only when motion is welcome. Everything above is already
  * the finished state, so this layer can be removed entirely without leaving a
  * gap in the composition.
  */

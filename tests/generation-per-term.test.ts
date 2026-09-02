@@ -6,7 +6,7 @@ import { api, login } from './helpers/client';
  * A Generation belongs to a TERM, and its bookkeeping is scoped to it.
  *
  * WHY THIS SUITE EXISTS. Three things about a Generation were scoped to the
- * TENANT that should have been scoped to the term — its version series, the
+ * TENANT that should have been scoped to the term: its version series, the
  * "exactly one current" unique index, and the supersede in
  * `POST /generations/:id/apply`. The third one corrupted data: applying
  * Semester 3's proposal marked Semester 1's live applied schedule as
@@ -15,7 +15,7 @@ import { api, login } from './helpers/client';
  *
  * It survived review for the same reason its sibling did. The SESSION rebase in
  * the same handler had already been caught and fixed ("this used to be
- * `{ tenantId, isLocked: false }` — every unlocked Session in the tenant,
+ * `{ tenantId, isLocked: false }`, every unlocked Session in the tenant,
  * regardless of term"), and the fix stopped at the sessions: the status and the
  * current flag beside it kept the tenant-wide shape, and the partial unique
  * index agreed with them, so the database and the handler were consistent with
@@ -72,7 +72,7 @@ afterAll(async () => {
 describe('generation scoping', () => {
     it('lets two terms each hold a current schedule', async () => {
         // The old partial unique index was on (tenant_id) WHERE is_current, so
-        // the second of these was rejected by the DATABASE — a tenant could not
+        // the second of these was rejected by the DATABASE: a tenant could not
         // hold an applied schedule for two terms at once.
         await makeGeneration({ id: 'g-term-a-live', termId: f.termA, version: 1, status: 'APPLIED', isCurrent: true });
         await makeGeneration({ id: 'g-term-b-live', termId: f.termB, version: 1, status: 'APPLIED', isCurrent: true });
@@ -97,7 +97,7 @@ describe('generation scoping', () => {
         await makeGeneration({ id: 'g-term-b-next', termId: f.termB, version: 2, status: 'READY', isCurrent: false });
 
         // `api()`, not a raw `fetch`: a state-changing call needs the CSRF
-        // pairing `api()` attaches (issue #113) — a raw `fetch` here has no
+        // pairing `api()` attaches (issue #113); a raw `fetch` here has no
         // way to learn or send it and always 403s.
         const res = await api('/api/generations/g-term-b-next/apply', {
             method: 'POST',
@@ -114,7 +114,7 @@ describe('generation scoping', () => {
         expect(termA.status).toBe('APPLIED');
         expect(termA.isCurrent).toBe(true);
 
-        // Term B's own previous schedule IS superseded — that is a correct
+        // Term B's own previous schedule IS superseded: that is a correct
         // supersede, and the one the tenant-wide version was drowning out.
         const supersededInB = await statusOf('g-term-b-live');
 

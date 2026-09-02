@@ -3,17 +3,17 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { refreshViolations } from '../server/utils/violations';
 
 /**
- * `different_time` — the first RELATION-BASED violation check (issue #53,
+ * `different_time`: the first RELATION-BASED violation check (issue #53,
  * ADR-0028 in calendry-solver).
  *
- * A THIRD PASS, not a `describeCollision` case — the same reason
+ * A THIRD PASS, not a `describeCollision` case, for the same reason
  * `no_session_spanning_break` got its own pass rather than a switch branch:
  * this constraint's data (explicit `ConstraintRelationMember` membership) is
  * not in `describeCollision`'s shared-entity context (`byRoom`/`byPerson`/
  * `byGroup`/`conflictSets`/`attendeeSets`) and cannot be added to it without
  * changing what every other branch receives.
  *
- * TWO NAMED OFFERINGS SHARING NOTHING — the whole point of the feature. Both
+ * TWO NAMED OFFERINGS SHARING NOTHING: the whole point of the feature. Both
  * Sessions below share no Room, no Lecturer, no Group; only the relation says
  * they must never overlap.
  */
@@ -69,7 +69,7 @@ describe('two related offerings scheduled at overlapping times', () => {
             data: {
                 tenantId: f.tenantA, offeringId: offeringB, termId: 'test-term-a',
                 kindId: 'test-kind-a', timeGridId: 'test-grid-a',
-                // Same week/day/block as the seed — overlapping, no shared
+                // Same week/day/block as the seed: overlapping, no shared
                 // Room/Lecturer/Group at all.
                 termWeek: 3, dayOfWeek: 1, blockIndex: 0, durationBlocks: 1,
                 generationId: 'test-generation-a',
@@ -109,7 +109,7 @@ describe('two related offerings NOT overlapping', () => {
             data: {
                 tenantId: f.tenantA, offeringId: offeringB, termId: 'test-term-a',
                 kindId: 'test-kind-a', timeGridId: 'test-grid-a',
-                // Same day, later block — does not overlap.
+                // Same day, later block, does not overlap.
                 termWeek: 4, dayOfWeek: 1, blockIndex: 3, durationBlocks: 1,
                 generationId: 'test-generation-a',
             },
@@ -124,7 +124,7 @@ describe('two related offerings NOT overlapping', () => {
 });
 
 describe('an unrelated offering overlapping the same slot', () => {
-    it('is not reported — only relation members are checked against each other', async () => {
+    it('is not reported, since only relation members are checked against each other', async () => {
         const unrelated = await ownerDb.offering.create({
             data: {
                 tenantId: f.tenantA, termId: 'test-term-a', kindId: 'test-kind-a',

@@ -14,7 +14,7 @@ import { useSession } from '~/composables/session';
  *
  * WHERE THE NUMBERS COME FROM
  *
- * `GET /api/{resource}?limit=1` — the generic list route's `{ rows, total }`
+ * `GET /api/{resource}?limit=1`: the generic list route's `{ rows, total }`
  * envelope, which `limit` switches on. CLAUDE.md names that shape switch as a
  * repeat source of bugs, so it was read from the route rather than assumed:
  * `total` counts the whole filtered set, not the one row `limit` returns. So
@@ -50,7 +50,7 @@ export function useInstitutionCounts() {
         /*
          * `allSettled`, NOT `all`. One 403 or one slow resource inside a
          * `Promise.all` rejects the whole wave, and this page is gated on
-         * `dashboard.view` alone — so a caller holding five of these six keys
+         * `dashboard.view` alone, so a caller holding five of these six keys
          * would lose the entire strip rather than one tile. That is exactly the
          * "one missing permission blanks the page" failure CLAUDE.md warns
          * about, and settling per request is what makes each tile independent.

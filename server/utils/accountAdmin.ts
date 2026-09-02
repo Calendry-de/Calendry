@@ -11,7 +11,7 @@ import { PASSWORD_MIN_LENGTH, randomPassword } from '../../shared/password';
  * `account` and `account_person` are the pre-tenant auth plane: no `tenant_id`,
  * no RLS (CLAUDE.md, exception 2). The generic CRUD routes put
  * `where: { tenantId }` on every statement, which against these tables matches
- * nothing — not "everything", but nothing, so the failure would look like an
+ * nothing: not "everything", but nothing, so the failure would look like an
  * empty institution rather than a broken query. Accounts therefore get their own
  * handlers, and this module holds the part all of them must agree on.
  *
@@ -25,14 +25,14 @@ import { PASSWORD_MIN_LENGTH, randomPassword } from '../../shared/password';
  * One Account can act in several tenants (that is the point of a
  * tenant-independent login). Letting tenant A reset the password of an Account
  * that also acts in tenant B would be cross-tenant account takeover dressed up
- * as ordinary administration — A's admin sets a password, signs in, and picks
+ * as ordinary administration: A's admin sets a password, signs in, and picks
  * B's identity. So credential operations (password, email, activation, deletion)
  * are permitted only while THIS tenant is the account's only tenant, which
  * `scope.isSoleTenant` reports and every such route asserts. A shared account is
  * still fully manageable in the one way that cannot leak: attaching and
  * detaching this tenant's own Person.
  *
- * The mirror image of that rule keeps orphans unrepresentable — see
+ * The mirror image of that rule keeps orphans unrepresentable: see
  * `assertDetachable`.
  */
 
@@ -52,13 +52,13 @@ export interface CreateAccountRowInput {
     email: string;
     passwordHash: string;
     mustChangePassword: boolean;
-    /** Omitted keeps the column's own default — stated because callers vary on this. */
+    /** Omitted keeps the column's own default, stated because callers vary on this. */
     isActive?: boolean;
 }
 
 /**
  * Creates a new `account` row. The caller decides whether to reuse an
- * existing one by email first — this always creates, never upserts, matching
+ * existing one by email first: this always creates, never upserts, matching
  * how both callers already treat "an existing Account for this email" as a
  * question they answer themselves before reaching here.
  *
@@ -78,7 +78,7 @@ export async function createAccountRow(tx: Tx, input: CreateAccountRowInput): Pr
 }
 
 /**
- * Links an Account to a Person — the `account_person` row every
+ * Links an Account to a Person: the `account_person` row every
  * account-creation or account-attach path ends with, whether the Account was
  * just created or an existing one is being reused. Shared for the same
  * reason `createAccountRow` is.
@@ -107,7 +107,7 @@ export interface AccountScope {
     identities: Identity[];
     /** The identity inside the calling tenant. Never null for a visible account. */
     own: Identity;
-    /** Distinct OTHER tenants this account acts in. Count only — see below. */
+    /** Distinct OTHER tenants this account acts in. Count only; see below. */
     otherTenantCount: number;
     /**
      * Whether the calling tenant is the only one this account serves, and
@@ -126,7 +126,7 @@ export interface AccountScope {
  *
  * Reads the FULL identity set, including other tenants', because two of this
  * module's rules are about exactly that set. Only its SIZE ever leaves the
- * server — never the names or slugs of the other institutions.
+ * server, never the names or slugs of the other institutions.
  */
 export async function accountScope(tx: Tx, tenantId: string, accountId: string): Promise<AccountScope> {
     /*
@@ -147,7 +147,7 @@ export async function accountScope(tx: Tx, tenantId: string, accountId: string):
     });
 
     /*
-     * NOT `account.persons.person` — `person` is behind RLS and this runs inside
+     * NOT `account.persons.person`: `person` is behind RLS and this runs inside
      * the tenant transaction, so a nested select returns only THIS tenant's rows.
      * `otherTenantCount` would then be permanently 0 and both guards below would
      * silently pass for every shared account. The identity set is read through
@@ -246,7 +246,7 @@ export async function accountView(tx: Tx, scope: AccountScope): Promise<AccountV
  * Refuses a credential operation on an Account this tenant shares.
  *
  * 409, not 403: the caller holds `account.manage` and the permission is not the
- * problem — the ACCOUNT is, and a 403 would send them off to be granted
+ * problem; the ACCOUNT is, and a 403 would send them off to be granted
  * something that would not help. The message names the operator command that
  * can do it, because somebody legitimately needs this occasionally and a refusal
  * with no next step is how people start editing the database by hand.
@@ -269,9 +269,9 @@ export function assertSoleTenant(scope: AccountScope, action: string): void {
 /**
  * Refuses detaching the LAST identity an Account has.
  *
- * An Account with no `account_person` row is invisible to every tenant — it
+ * An Account with no `account_person` row is invisible to every tenant: it
  * cannot be listed, reset or deleted through any route, while its password
- * still works — so it is not a state to warn about, it is one to make
+ * still works, so it is not a state to warn about, it is one to make
  * unrepresentable. Together with `assertSoleTenant` the two rules are exact
  * complements, which is why neither needs an escape hatch:
  *
@@ -297,7 +297,7 @@ export function assertDetachable(scope: AccountScope): void {
  *
  * Three separate refusals rather than one, because they send the caller to three
  * different places: no such person here, that person already has a login, or the
- * person is deactivated (a login they cannot use — `listAccountIdentities`
+ * person is deactivated (a login they cannot use: `listAccountIdentities`
  * filters inactive persons out at sign-in, so the account would authenticate and
  * then be told it belongs to no tenant).
  */
@@ -358,7 +358,7 @@ export async function resolveAttachablePerson(
  * owns, so a local audit row would not be tamper-evident against the actor it
  * audits. `AuditLog` does not reopen that hole: it carries no RLS and is not
  * a `CRUD_RESOURCES` entry, so it is unreachable through the generic
- * `/api/[resource]` routes a tenant admin's permissions actually reach — the
+ * `/api/[resource]` routes a tenant admin's permissions actually reach; the
  * only write path is `writeAuditLog()` itself, called from server code, never
  * from a request body. `email` becomes the row's `target` (the human-readable
  * identifier of the account being acted on); everything else in `record`

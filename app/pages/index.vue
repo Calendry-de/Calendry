@@ -97,7 +97,7 @@ import {
 import { useFirstVisit } from '~/composables/pageOpener';
 
 /**
- * The public marketing page for calendry.de — the domain ROOT.
+ * The public marketing page for calendry.de: the domain ROOT.
  *
  * ROUTE. `/` is this page, and the authenticated home that used to live here is
  * now `/dashboard`. Whoever arrives at calendry.de has, by definition, not
@@ -105,14 +105,14 @@ import { useFirstVisit } from '~/composables/pageOpener';
  * Calendry; a visitor who does hold a session lands here too and clicks through.
  *
  * PUBLIC. `auth.global.ts` is deny-by-default, so a new page is protected the
- * moment it exists; `/` is listed in that middleware's ANONYMOUS_ROUTES — which
+ * moment it exists; `/` is listed in that middleware's ANONYMOUS_ROUTES, which
  * is deliberately NOT the same list as the auth pages, because those bounce a
  * signed-in visitor away and this page must not. It calls no API and reads no
  * session: a marketing page that 401s half its content would render its own
  * empty state and look like a broken product, which is this repository's
  * most-repeated failure shape.
  *
- * LAYOUT. `empty`, so the app header — menu, session control, tenant switcher —
+ * LAYOUT. `empty`, so the app header (menu, session control, tenant switcher)
  * stays out of a page whose reader has no session.
  *
  * READING ORDER IS THE ARGUMENT, and it changed. It used to run
@@ -151,7 +151,7 @@ import { useFirstVisit } from '~/composables/pageOpener';
  * the sentence.
  *
  * THE OPENER runs here and NOWHERE ELSE, on a visitor's first arrival only.
- * `/` is the one route where a brand moment is the job — every other page in
+ * `/` is the one route where a brand moment is the job: every other page in
  * this app is somebody's Tuesday, and a two-and-a-half second animation between
  * a timetabler and their week is a cost with no return. It is also the only
  * route a stranger reaches first.
@@ -180,7 +180,7 @@ useHead({
         { name: 'description', content: description },
         /*
          * Open Graph and Twitter, because the way this page actually reaches a
-         * decision-maker is somebody pasting it into Slack or Teams — and with
+         * decision-maker is somebody pasting it into Slack or Teams, and with
          * no tags at all it arrives there as a bare URL. `og:image` is
          * deliberately absent rather than pointed at a file that does not
          * exist: it needs a real asset, and a broken image card is worse than
@@ -213,8 +213,8 @@ onMounted(markSeen);
 .landing {
     /*
      * Full width, with every section constraining its own content. The page used
-     * to be a centred 1040px column, which meant a full-bleed band — the
-     * inverse-toned technical section — could only be drawn with a `100vw`
+     * to be a centred 1040px column, which meant a full-bleed band (the
+     * inverse-toned technical section) could only be drawn with a `100vw`
      * breakout, and that overflows horizontally as soon as a scrollbar takes up
      * space. Sections own their ground; `_measure` owns the reading width.
      */

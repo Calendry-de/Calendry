@@ -7,8 +7,8 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * Own handler rather than the generic CRUD scaffold, for the same reason
  * `accounts` has one: a Screen carries a SECRET, and the generic routes return
- * the row they wrote. Here the row must never carry its key — not even its hash
- * — so what a client sees is assembled deliberately rather than by projection.
+ * the row they wrote. Here the row must never carry its key, not even its hash,
+ * so what a client sees is assembled deliberately rather than by projection.
  *
  * Response shape follows the generic list route exactly (bare array without
  * `limit`, `{ rows, total }` with it), because `useEntityList` is shared.

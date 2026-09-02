@@ -1,16 +1,16 @@
 // The single emission point for the sizing tokens.
 
 // Registered in nuxt.config's `css` array so it is bundled exactly once.
-// It previously lived in layout.scss, which both layouts @use — that put an
+// It previously lived in layout.scss, which both layouts @use, and that put an
 // identical :root block in two CSS chunks. Harmless, but avoidable.
 
 // The SCSS aliases in tokens.scss point at these properties; the px values
 // exist only here.
 :root {
-    // Font size — 6 steps, collapsed from 14 values. ONE ROLE PER STEP, which is
+    // Font size: 6 steps, collapsed from 14 values. ONE ROLE PER STEP, which is
     // what the middle of this scale had stopped being: `sm` was 12.5 and `md`
     // was 13, half a pixel apart, both meaning "text", with no rule for choosing
-    // between them. The usage counts show how that resolved itself — 210 call
+    // between them. The usage counts show how that resolved itself: 210 call
     // sites reached for `sm` and 103 for `md`, so `sm` had quietly become the
     // body size while `md`'s own comment still called itself "the most-used
     // value". Two tokens competing for one job, separated by nothing anyone
@@ -18,16 +18,16 @@
     // in the product and two near-identical greys were left doing the work.
 
     // Respaced so each step is a role somebody can pick on purpose. Still
-    // COMPRESSED — 11 through 17 for the whole app — because density is a
+    // COMPRESSED (11 through 17 for the whole app) because density is a
     // committed decision (DESIGN.md), not an oversight to be corrected upward.
     // That commitment is also why the web's ordinary 16px body floor does not
     // apply here: this is the dense-role exemption, taken deliberately.
     --font-size-xs: 11px;    // labels (uppercase, 0.05em) and fine metadata
-    --font-size-sm: 12px;    // secondary text, chips, table meta — the workhorse
+    --font-size-sm: 12px;    // secondary text, chips, table meta, the workhorse
     --font-size-md: 14px;    // body prose and values: forms, panels, review copy
     --font-size-lg: 17px;    // panel and section titles
     --font-size-xl: 24px;    // page titles
-    --font-size-2xl: 32px;   // was 32, 38 — display
+    --font-size-2xl: 32px;   // was 32, 38; display
 
     // xs and sm sit 1px apart, which would be the very fault above if size were
     // the only thing separating them. It is not: xs carries either uppercase
@@ -36,10 +36,10 @@
     // must be told apart by size alone are 12 / 14 / 17, and those are 2px and
     // 3px.
 
-    // Line height — 3 steps, collapsed from 14 values. The same consolidation
+    // Line height: 3 steps, collapsed from 14 values. The same consolidation
     // the font sizes above already had, on the axis nobody did it for. Leading
     // was never missing: it was declared 91 times across components in FOURTEEN
-    // distinct values — 1.5 (45×), 1.6 (16×), 1.75 (7×), 1.45 (5×), 1.55 (3×),
+    // distinct values: 1.5 (45×), 1.6 (16×), 1.75 (7×), 1.45 (5×), 1.55 (3×),
     // 1.4 (3×), 1.35 (3×), 1.25 (2×), and six more used once or twice each.
     // Nothing was choosing between them, because there was nothing to choose
     // from.
@@ -57,7 +57,7 @@
     // Deliberately NOT a step: `line-height: 1` on an icon or a logo glyph means
     // "no leading at all" rather than a tighter text role, and folding it into
     // `--leading-tight` would start centring icons 25% off. Same treatment the
-    // 40px empty-state padding gets — a value with no scale match stays a
+    // 40px empty-state padding gets: a value with no scale match stays a
     // literal and says why.
 
     // Display step for the public landing surface only. Added deliberately
@@ -79,14 +79,14 @@
     // still breaks it cleanly in two.
     --font-size-4xl: 52px;
 
-    // Border radius — 4 steps. The stray 9px was an inner corner and stays a
+    // Border radius: 4 steps. The stray 9px was an inner corner and stays a
     // derivation: calc(var(--radius-xl) - 1px).
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 8px;
     --radius-xl: 10px;
 
-    // Spacing — 8 steps. Outliers (5, 7, 9, 10, 14, 20) snap to a neighbour;
+    // Spacing: 8 steps. Outliers (5, 7, 9, 10, 14, 20) snap to a neighbour;
     // reducing the choices is the point of a scale.
     --space-1: 2px;
     --space-2: 4px;

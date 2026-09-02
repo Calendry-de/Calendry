@@ -11,8 +11,8 @@ import {
 /**
  * The landing page's contact form, tested where its behaviour actually lives.
  *
- * The component owns two things — the draft refs and the one line that assigns
- * `location.href` — and everything that can be WRONG lives in the pure module:
+ * The component owns two things: the draft refs and the one line that assigns
+ * `location.href`. Everything that can be WRONG lives in the pure module:
  * which fields are required, what the mail draft contains, and how it is
  * encoded. This suite needs no DOM and no server, which is why it can assert
  * the encoding character by character rather than checking that a form
@@ -36,7 +36,7 @@ describe('validateEnquiry', () => {
         expect(result.errors).toEqual({});
     });
 
-    it('accepts an enquiry with no message — the message is optional', () => {
+    it('accepts an enquiry with no message, since the message is optional', () => {
         expect(validateEnquiry({ ...VALID, message: '' }).valid).toBe(true);
     });
 
@@ -82,7 +82,7 @@ const TO = 'timetable@example.edu';
 
 describe('the composed mail draft', () => {
     it('names the institution in the subject', () => {
-        expect(enquirySubject(VALID)).toBe('Calendry enquiry — Fachhochschule Nord');
+        expect(enquirySubject(VALID)).toBe('Calendry enquiry: Fachhochschule Nord');
     });
 
     it('repeats name and institution in the body, so a reply chain keeps them', () => {
@@ -133,7 +133,7 @@ describe('the composed mail draft', () => {
         expect(url).toContain('A%26B');
         expect(url).toContain('C%3FD');
         expect(url).toContain('%0Aline%20two%20%232');
-        // One '?' only — the parameter separator itself.
+        // One '?' only: the parameter separator itself.
         expect(url.split('?')).toHaveLength(2);
     });
 

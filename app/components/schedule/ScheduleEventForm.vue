@@ -24,15 +24,15 @@
 
         <!--
             An Event is a Session with no Offering. Said once, plainly, because
-            the distinction decides whether this is even the right tool — and
-            the alternative is a different entity entirely, not a different
+            the distinction decides whether this is even the right tool. The
+            alternative is a different entity entirely, not a different
             field on this form.
         -->
         <p class="evform_note">
-            An event stands on its own — no recurring demand behind it. It occupies this
+            An event stands on its own: no recurring demand behind it. It occupies this
             room and block, and no solve will move or remove it.
             <br>
-            Marking a range of DATES instead — a holiday, a break, an exam period — is
+            Marking a range of DATES instead (a holiday, a break, an exam period) is
             <NuxtLink to="/manage/calendar-periods">an academic-calendar period</NuxtLink>, not an event.
         </p>
 
@@ -71,7 +71,7 @@
                 <!--
                     An empty list is not an empty control. `kindId` is required by
                     the route, so with no kinds this form cannot be completed at
-                    all — and a select holding only "Choose…" says that as a dead
+                    all, and a select holding only "Choose…" says that as a dead
                     end rather than as a reason. The two causes are worth telling
                     apart, because only one of them is the reader's to fix.
                 -->
@@ -103,7 +103,7 @@
                     v-model="roomId"
                     :disabled="busy"
                 >
-                    <option value="">— none —</option>
+                    <option value="">(none)</option>
                     <option
                         v-for="room in rooms"
                         :key="room.id"
@@ -117,7 +117,7 @@
                 THE SAME control the Offering page uses, not a second one.
 
                 `ManageRelationPicker` is already standalone and already
-                decoupled from persistence — it renders `rows`/`options` and
+                decoupled from persistence: it renders `rows`/`options` and
                 emits add/remove, while its usual parent does the saving. So it
                 works unchanged against draft state here, and the Events form
                 gains the indented group tree: a flat <select multiple> gave no
@@ -148,7 +148,7 @@
             <span>
                 Locked
                 <em>
-                    An event is already exempt from solves because it has no offering —
+                    An event is already exempt from solves because it has no offering;
                     this additionally stops a manual re-place.
                 </em>
             </span>
@@ -182,8 +182,8 @@ import type { RelationDef } from '~/utils/manageRegistry';
  *
  * WHY THE TARGET SLOT IS A PROP AND NOT A FIELD. Day, block and week arrive from the
  * click, so the two inputs most likely to compose a placement the grid cannot
- * hold — `blockIndex` past the end of the day, a weekday the tenant does not
- * teach — cannot be typed at all. `fitsGrid()` still guards the route, because
+ * hold (`blockIndex` past the end of the day, a weekday the tenant does not
+ * teach) cannot be typed at all. `fitsGrid()` still guards the route, because
  * the API is reachable without this form; it is simply not the first line of
  * defence here.
  */
@@ -197,7 +197,7 @@ const props = defineProps<{
     /**
      * From the page's own reference wave, not fetched again here. This form used
      * to fetch `/api/session-kinds` on mount, with a comment arguing the page
-     * should not pay for a panel most visits never open — true when it was
+     * should not pay for a panel most visits never open; true when it was
      * written, false since the inspector's kind picker made the page fetch them
      * anyway. So it was one extra request per open AND a second failure path:
      * the page degrades to an empty list, the form said "Could not load session
@@ -211,7 +211,7 @@ const props = defineProps<{
 const emit = defineEmits<{ cancel: []; created: [] }>();
 
 /**
- * Claiming the keyboard makes the page's own Escape handler stand down — which
+ * Claiming the keyboard makes the page's own Escape handler stand down, which
  * is correct (it would otherwise cancel create mode out from under this form)
  * but leaves Escape doing NOTHING unless the claimant handles it. The claim is
  * a transfer of the key, not a suppression of it.
@@ -227,20 +227,20 @@ function onKey(event: KeyboardEvent) {
 const titleInput = ref<HTMLInputElement | null>(null);
 
 /**
- * THE FORM IS SCROLLED TO, THEN FOCUSED — in that order, and both are needed.
+ * THE FORM IS SCROLLED TO, THEN FOCUSED, in that order, and both are needed.
  *
  * It renders BELOW the week grid, which is 600–810px tall depending on density,
  * so "press Add event, click a slot" put it off the bottom of the viewport with
  * nothing moving: measured 92px below the fold at Comfortable and 297px at
  * Spacious. Pressing a cell looked like nothing had happened.
  *
- * `focus()` alone does scroll, but only MINIMALLY — just enough to reveal the
+ * `focus()` alone does scroll, but only MINIMALLY: just enough to reveal the
  * input, which leaves the header above it (`New event · Monday, week 1 · 08:00`)
  * at or past the top edge. That header is the only thing naming the slot that was
  * clicked, so it is the part that must be on screen. Hence an explicit scroll to
  * the form, then `preventScroll` on the focus so the two do not fight.
  *
- * Handing focus BACK is the page's job, not this form's — the element that opened
+ * Handing focus BACK is the page's job, not this form's: the element that opened
  * it is a grid cell that becomes `disabled` the moment create mode ends, so a
  * captured reference here would be connected, unfocusable, and silently do
  * nothing. Only the page knows a control that still exists afterwards.
@@ -256,7 +256,7 @@ onMounted(() => {
 
     /*
      * `center` while the form FITS, `start` once it does not. Centring a form
-     * taller than the viewport puts its top edge above zero — at 390×667 that is
+     * taller than the viewport puts its top edge above zero; at 390×667 that is
      * the header 46px off-screen, which is the one part that must stay: it names
      * the slot the click chose. Aligning to the top guarantees it at any height,
      * and centring keeps the form connected to the grid it came from when there
@@ -284,7 +284,7 @@ const groupIds = ref<string[]>([]);
  * The picker's contract: a relation DEFINITION plus the current rows.
  *
  * Built inline rather than imported from the manage registry, because that
- * entry describes the Offering's relation — its `scopeBy` narrows options by
+ * entry describes the Offering's relation: its `scopeBy` narrows options by
  * the Offering's own `termId`, which this form does not have and does not need
  * (the page already hands it groups for the term in view). Sharing the
  * COMPONENT is the point; sharing a config written for a different parent would
@@ -322,7 +322,7 @@ const error = ref('');
 const maxDuration = computed(() => Math.max(1, props.grid.blocksPerDay - props.target.blockIndex));
 
 /**
- * `max` on a number input is advertised, not enforced — a typed 9 submits, and
+ * `max` on a number input is advertised, not enforced: a typed 9 submits, and
  * `fitsGrid` then refuses it with a 400 the reader has to read to discover a
  * limit the control already knew. Clamped on commit rather than on every
  * keystroke, so typing "12" on the way to "1" is not fought.
@@ -336,7 +336,7 @@ function clampDuration() {
 }
 
 async function submit() {
-    // Name is required — an Event has no Offering to borrow one from, and the
+    // Name is required: an Event has no Offering to borrow one from, and the
     // server refuses it too.
     if (!kindId.value || !title.value.trim() || busy.value) {
         return;
@@ -367,7 +367,7 @@ async function submit() {
         const data = (caught as { data?: { statusMessage?: string; message?: string } }).data;
 
         /*
-         * The server's message names the grid and its real shape — "…is not a
+         * The server's message names the grid and its real shape: "…is not a
          * slot in 'Standard week', which has 3 blocks on days 1, 2, 3, 4, 5, 6".
          * Shown inline beside the controls rather than as a toast, because it
          * is a correction to what is on screen, not a notification about

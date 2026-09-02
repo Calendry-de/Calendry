@@ -30,7 +30,7 @@
 import { CONTACT_EMAIL } from '~/utils/landingContent';
 
 /**
- * Deliberately thin. Every link here goes somewhere that exists — there is no
+ * Deliberately thin. Every link here goes somewhere that exists: there is no
  * privacy page, no terms page and no careers page in this repository, and
  * linking to one would be the same fabrication as an invented testimonial.
  *
@@ -94,7 +94,7 @@ import { CONTACT_EMAIL } from '~/utils/landingContent';
         /*
          * 27px is not a phone target. These sit in a `<nav>`, not inline in a
          * sentence, so WCAG 2.5.8's inline exemption does not cover them the
-         * way it covers the address in the contact aside — they are standalone
+         * way it covers the address in the contact aside: they are standalone
          * controls and get the full 44px this repo already gives thumb-reached
          * rows elsewhere. Centred rather than padded so "Sign in" does not
          * grow a 44px-tall underline on hover.

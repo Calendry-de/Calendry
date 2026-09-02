@@ -4,12 +4,12 @@ import { RESOURCES } from '../server/utils/resources';
 import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
 
 /**
- * `Group.curriculumPlanId` — the plan a Group INTENDS to follow, set before
+ * `Group.curriculumPlanId`: the plan a Group INTENDS to follow, set before
  * it has a single Offering to prove it.
  *
  * NOT the same question as `deriveGroupPlanApplications()` (which plan a
  * Group is CURRENTLY on, derived from `Offering.createdFromTemplateId` on
- * Offerings it already has) — this field exists so
+ * Offerings it already has): this field exists so
  * `ManageOfferingPlanBulkApply` can pre-select a Group before that history
  * exists at all. The two are independent: setting this field creates no
  * Offering and attaches nothing.
@@ -33,7 +33,7 @@ afterAll(async () => {
 });
 
 describe('what it is', () => {
-    it('is a plain intent — settable with no Offering ever created', async () => {
+    it('is a plain intent, settable with no Offering ever created', async () => {
         await ownerDb.group.update({
             where: { id: f.groupSeminarA },
             data: { curriculumPlanId: planId },
@@ -90,7 +90,7 @@ describe('the write schema', () => {
         }
     });
 
-    it('accepts null — no intended plan, the common case', () => {
+    it('accepts null (no intended plan, the common case)', () => {
         for (const [name, schema] of schemas) {
             expect(() => schema.parse(body(name, null)), name).not.toThrow();
         }

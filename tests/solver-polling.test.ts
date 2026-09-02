@@ -31,7 +31,7 @@ describe('pollIntervalMs', () => {
         expect(hour / pollIntervalMs(hour)).toBe(240);
     });
 
-    it('is monotonic — a longer run is never polled more often', () => {
+    it('is monotonic: a longer run is never polled more often', () => {
         const ages = [0, 1_000, 5_000, 20_000, 30_000, 100_000, 300_000, 1_000_000];
         const intervals = ages.map(pollIntervalMs);
 
@@ -82,7 +82,7 @@ describe('classifyPollFailure', () => {
 });
 
 /**
- * Stage 7 prep — the bounded recovery of a missing result.
+ * Stage 7 prep: the bounded recovery of a missing result.
  *
  * The claim predicate and the code that gives up must agree on the limit, or one
  * of two silent failures follows: a row the claim still offers but the recovery

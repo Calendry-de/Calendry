@@ -9,7 +9,7 @@
         <!--
             Swatch plus text, not a bare colour picker. The stored value is a CSS
             colour string the schedule reads directly, so it has to stay readable
-            and CLEARABLE — a native picker cannot express "no colour", and every
+            and CLEARABLE: a native picker cannot express "no colour", and every
             colour in this product is nullable because null means "inherit".
         -->
         <div class="colorfield_row">
@@ -56,8 +56,8 @@ import { colorsList } from '~/utils/styles';
  * how the two would end up disagreeing about what "clear" means.
  *
  * The picker's opening swatch is the BRAND colour, resolved from the palette.
- * It was the literal `#7c59bc` — the violet `colorsList` records as retired when
- * the brand went teal — so every colour a tenant had never set opened on a value
+ * It was the literal `#7c59bc`, the violet `colorsList` records as retired when
+ * the brand went teal, so every colour a tenant had never set opened on a value
  * the design system no longer contains.
  */
 const FALLBACK_SWATCH = colorsList.primary500;

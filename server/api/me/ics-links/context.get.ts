@@ -5,7 +5,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Calendar links'],
         summary: 'Reference data for the "calendar links" self-service form',
-        description: 'Every Term (to fill scope=TERM\'s picker) plus, only for a caller holding ics_link.generate, every Group (to fill the group-target picker) — everything /my/calendar-links needs, scoped to ics_link.generate_own/ics_link.generate alone. Same reasoning as GET /api/me/exam-requests/context (issue #108): the page must not need term.read or group.read just to mint a link over its own or an explicitly-permitted subject.',
+        description: 'Every Term (to fill scope=TERM\'s picker) plus, only for a caller holding ics_link.generate, every Group (to fill the group-target picker): everything /my/calendar-links needs, scoped to ics_link.generate_own/ics_link.generate alone. Same reasoning as GET /api/me/exam-requests/context (issue #108): the page must not need term.read or group.read just to mint a link over its own or an explicitly-permitted subject.',
         responses: {
             200: { description: 'The reference data described above, plus canTargetGroups.' },
             403: { description: 'Caller holds neither ics_link key.' },
@@ -15,7 +15,7 @@ defineRouteMeta({
 
 /**
  * Reference data `/my/calendar-links` needs, scoped to `ics_link.generate_own`
- * or `ics_link.generate` alone — never `term.read`/`group.read`.
+ * or `ics_link.generate` alone, never `term.read`/`group.read`.
  *
  * `canTargetGroups` names the capability explicitly rather than letting the
  * client infer it from `groups` being non-empty: a tenant with zero Groups
@@ -27,7 +27,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
 
     const canTargetGroups = await holdsPermission(event, tx, 'ics_link.generate');
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection; concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const terms = await tx.term.findMany({
         where: { tenantId: identity.tenantId },

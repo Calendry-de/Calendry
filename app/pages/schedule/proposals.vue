@@ -21,10 +21,10 @@
                     "one term's" is now a GUARANTEE rather than a hope. This copy
                     already said "a term's timetable" while the handler
                     superseded the tenant's current schedule whatever term it
-                    belonged to — the words were right and the code was wrong.
-                    Since it is true, it is worth stating plainly: the reassurance
-                    a department head needs before applying anything is that the
-                    rest of the institution is untouched.
+                    belonged to: the words were right and the code was wrong.
+                    That guarantee is the reassurance a department head needs
+                    before applying anything: the rest of the institution stays
+                    untouched.
 
                     "Mostly the solver's" rather than "the solver has produced",
                     because the list under All also carries the tenant's starting
@@ -40,8 +40,8 @@
             <div class="props_controls">
                 <!--
                     A FILTER EXISTS WHEN IT HAS MORE THAN ONE OPTION, never
-                    because of a permission — the rule `ScheduleToolbar`
-                    documents. The term list is tolerant (a caller without
+                    because of a permission (the rule `ScheduleToolbar`
+                    documents). The term list is tolerant (a caller without
                     `term.read` gets none), so with nothing to choose between
                     the control is absent rather than empty.
                 -->
@@ -84,7 +84,7 @@
                     ALWAYS PRESENT, not only after a failure. The only way to
                     advance this list used to be the error banner's Retry, which
                     is `v-if="loadFailed"` and therefore absent exactly while
-                    things are working — so a reader watching a running solve had
+                    things are working, so a reader watching a running solve had
                     no way to ask again. It is also the manual path when the
                     automatic poll is paused because the tab is in the
                     background.
@@ -108,7 +108,7 @@
         <!--
             A run finishing is a state change nobody asked for, so it has to be
             announced rather than merely rendered. Mounted for the life of the
-            page and never hidden — a live region only announces a change inside
+            page and never hidden, because a live region only announces a change inside
             a region already being observed. The visible half needs nothing: the
             row's own status text changes in place, in view.
         -->
@@ -127,7 +127,7 @@
                 name="material-symbols:error"
                 aria-hidden="true"
             />
-            Could not load proposals. Nothing has been changed — try again.
+            Could not load proposals. Nothing has been changed. Try again.
             <CommonButton
                 type="link"
                 @click="refresh"
@@ -156,7 +156,7 @@
             <h2>{{ emptyTitle }}</h2>
             <p v-if="activeTermName">
                 Nothing for <strong>{{ activeTermName }}</strong>{{ scope === 'READY' ? ' is awaiting a decision' : ' has been produced yet' }}.
-                Other terms may have proposals — clear the term filter to see them.
+                Other terms may have proposals; clear the term filter to see them.
             </p>
             <p v-else-if="scope === 'READY'">
                 Every proposal has been applied or discarded. Generate a schedule from
@@ -174,7 +174,7 @@
 
         <!--
             `role="list"` because `list-style: none` makes Safari + VoiceOver drop
-            list semantics and, with them, the item count — which on this page is
+            list semantics and, with them, the item count, which on this page is
             the only cue for how many decisions are waiting.
         -->
         <ul
@@ -204,7 +204,7 @@
                             March and replaced in April is still APPLIED, so the
                             status reads as history where this reads as
                             consequence. It matters more now that "current" is
-                            per TERM — several rows here can be live at once, one
+                            per TERM: several rows here can be live at once, one
                             per term, and before that only one ever could be.
                         -->
                         <span
@@ -232,14 +232,14 @@
                 <dl class="props_stats">
                     <div>
                         <dt>Sessions</dt>
-                        <dd>{{ row.placements ?? '—' }}</dd>
+                        <dd>{{ row.placements ?? '-' }}</dd>
                     </div>
                     <!--
                         "Hard violations", not "Unresolved". Two problems in one
                         word: it was a fourth name for a quantity the toolbar,
                         the inspector and the panel all call a violation, and
-                        "unresolved" implies a workflow state — something waiting
-                        to be dealt with — when the number is a property of the
+                        "unresolved" implies a workflow state (something waiting
+                        to be dealt with) when the number is a property of the
                         proposal itself. `solverMeta.hardViolations` counts HARD
                         only, so the severity belongs in the label: a proposal
                         with soft breaches and no hard ones reads 0 here, and
@@ -253,13 +253,13 @@
                                 name="material-symbols:error"
                                 aria-hidden="true"
                             />
-                            {{ row.hardViolations ?? '—' }}
+                            {{ row.hardViolations ?? '-' }}
                         </dd>
                     </div>
                     <!--
                         "Penalty", and it says which direction is better.
                         "Score" reads as an achievement, so a higher one reads as
-                        a better schedule — the exact inversion of what the
+                        a better schedule: the exact inversion of what the
                         number means. It is a weighted penalty sum the solver
                         MINIMIZES, and the code below already refuses to rank by
                         it across different inputs; the label now carries the
@@ -275,17 +275,17 @@
                                 `toLocaleString()` resolves the SERVER's locale
                                 during SSR and the BROWSER's on hydration, so
                                 33,955 and 33.955 swap places between the two
-                                renders — the exact hazard `formatDate`'s doc
+                                renders: the exact hazard `formatDate`'s doc
                                 comment was written about, committed here on
                                 numbers instead of dates.
                             -->
-                            {{ row.objective === null ? '—' : row.objective.toLocaleString(locale) }}
+                            {{ row.objective === null ? '-' : row.objective.toLocaleString(locale) }}
                             <!--
                                 The one comparison this data supports, and it is
                                 worth a lot: 17 READY proposals here share an
                                 input hash with objectives from 430 to 33,955,
                                 and nothing in the product let anyone see that.
-                                Scoped to identical inputs, and it says so — see
+                                Scoped to identical inputs, and it says so; see
                                 the note on `bestOf`.
                             -->
                             <span
@@ -366,7 +366,7 @@ interface GenerationRow {
 }
 
 /**
- * PENDING and RUNNING advance WITHOUT THIS PAGE ASKING — the solver poller moves
+ * PENDING and RUNNING advance WITHOUT THIS PAGE ASKING: the solver poller moves
  * them server-side. Every other status is terminal, reached only by an action.
  * That distinction is the whole reason this page needs a clock.
  */
@@ -381,7 +381,7 @@ const LIST_LIMIT = 100;
 const scope = ref<'READY' | 'ALL'>('READY');
 
 /**
- * IN THE URL, so a term's proposal list is a shareable place — the same
+ * IN THE URL, so a term's proposal list is a shareable place, the same
  * reasoning `useScheduleFilters` documents for the schedule itself. Empty means
  * every term.
  */
@@ -407,7 +407,7 @@ const request = useRequestFetch();
 
 /**
  * SSR-safe fetch: `useRequestFetch()` rather than bare `$fetch`, which drops the
- * browser cookie server-side — the page would 401 and render its empty state,
+ * browser cookie server-side, so the page would 401 and render its empty state,
  * indistinguishable from a tenant with no proposals.
  */
 const listing = useAsyncData(
@@ -476,8 +476,8 @@ const rows = computed(() => {
         /*
          * THE GENERATION'S OWN TERM, with the run as a fallback only for rows
          * that predate the `term_id` column and were never backfilled because
-         * their run row is gone. A null term is a real state — a tenant-wide
-         * baseline — and renders as such rather than as "unknown".
+         * their run row is gone. A null term is a real state (a tenant-wide
+         * baseline) and renders as such rather than as "unknown".
          */
         termId: generation.termId ?? generation.run?.termId ?? null,
         termName: (() => {
@@ -500,12 +500,12 @@ const rows = computed(() => {
      * means something between runs that solved the SAME problem. Ranking within a
      * term looked right and was not: measured against real data, it crowned a
      * 67-session proposal at score 40 over a 260-session one at 430 for the same
-     * term — the 67-session run scored lower because it had far less to place.
+     * term: the 67-session run scored lower because it had far less to place.
      * That badge would have recommended the worse schedule with a green label.
      *
      * `inputHash` is the exact identity of the input (SHA-256 of the encoded
      * SolverInput; it is half the idempotency key), so same hash means literally
-     * the same problem. A run without one earns no badge — fail closed, because
+     * the same problem. A run without one earns no badge: fail closed, because
      * the failure mode here is a confident recommendation.
      *
      * COMPARED AT DISPLAYED PRECISION. The solver returns accumulated floats:
@@ -574,7 +574,7 @@ const liveRowCount = computed(() => rows.value.filter((row) => LIVE_STATUSES.inc
  * nothing says so.
  *
  * Polls only while something can actually change, and stops the moment the last
- * live row reaches a terminal status — an idle list costs nothing. The
+ * live row reaches a terminal status: an idle list costs nothing. The
  * self-rescheduling timeout (rather than an interval) is the idiom
  * `useSolverRun` already uses, and it cannot overlap its own request.
  */
@@ -881,7 +881,7 @@ watch(rows, (current) => {
 
     /*
      * `min-width: 0` because a flex item defaults to `min-width: auto`, which
-     * refuses to shrink below its content — an institution that names a term
+     * refuses to shrink below its content: an institution that names a term
      * "Wintersemester 2027/28 (Fachbereich Elektrotechnik und
      * Informationstechnik)" pushed the stats and the action off the row.
      */
@@ -905,12 +905,12 @@ watch(rows, (current) => {
     /*
      * SEVEN STATUSES, THREE REGISTERS. Four were coloured and three fell through
      * to the same `$content6`, so "pending", "running" and "discarded or
-     * superseded" were typographically identical — a live run and a dead one
+     * superseded" were typographically identical: a live run and a dead one
      * reading the same is the worst of the three to get wrong.
      *
      * A verdict gets colour. A live state gets a FILLED PILL, reusing this
      * page's own `props_best` device, so "still happening" is legible as a shape
-     * rather than as a hue — it survives greyscale, and it needs no new colour
+     * rather than as a hue: it survives greyscale, and it needs no new colour
      * family. A superseded proposal recedes instead: `$content7` is a step
      * WEAKER than the default, which is the right direction for context nobody
      * has to act on.
@@ -996,7 +996,7 @@ watch(rows, (current) => {
 
     /*
      * The one green thing on a row, and it means "this is live" rather than
-     * "this is good" — `props_best` is the other green, and the two never
+     * "this is good"; `props_best` is the other green, and the two never
      * coexist: a READY proposal can win a comparison, an applied one cannot
      * still be in the running.
      */
@@ -1022,7 +1022,7 @@ watch(rows, (current) => {
         }
     }
 
-    // Sits inside a `dt`, so it must not inherit the uppercase label register —
+    // Sits inside a `dt`, so it must not inherit the uppercase label register:
     // it is a sentence fragment, not a label.
     &_hint {
         margin-left: var(--space-2);

@@ -4,15 +4,15 @@ import type { SolverMode } from '#shared/solverMode';
 /**
  * The solver run in flight, for one Term.
  *
- * OWNERSHIP BOUNDARY: everything about *a run happening right now* — its status,
+ * OWNERSHIP BOUNDARY: everything about *a run happening right now*: its status,
  * its live numbers, whether it is improving, and the two actions that change it.
  * It does not own the Generation the run produces; the moment a run goes
  * terminal this hands off to the review route and stops caring.
  *
  * WHY THE OBJECTIVE SERIES LIVES HERE AND NOT IN THE DATABASE
  *
- * `solver_run` deliberately stores only the latest snapshot — its schema says
- * "Overwritten per poll, not appended — the run's history is not something
+ * `solver_run` deliberately stores only the latest snapshot. Its schema says
+ * "Overwritten per poll, not appended: the run's history is not something
  * anything needs." That stays true. A trend is only meaningful while somebody is
  * watching, which is exactly when a client-side series exists; persisting a
  * sample per poll per run would add write volume to serve a sparkline nobody is
@@ -24,7 +24,7 @@ import type { SolverMode } from '#shared/solverMode';
  * captured. Nothing here is load-bearing for that, which is why it can back off
  * and pause freely.
  *
- * NOTE the Nuxt trap this must not fall into: no top-level `await`. An `await`
+ * The Nuxt trap this must not fall into: no top-level `await`. An `await`
  * before a `useState`/`useRequestFetch` call detaches everything after it from
  * the Nuxt instance and fails at runtime.
  */
@@ -48,7 +48,7 @@ export interface SolverRunRow {
     maxWallMillis: number | null;
     /**
      * The stored scope, opaque here except for `mode`. Optional because only the
-     * active-run list selects it — the control needs it to say what a 409
+     * active-run list selects it: the control needs it to say what a 409
      * adopted it into, and nothing else reads it.
      */
     scope?: unknown;
@@ -109,7 +109,7 @@ export function deriveState(input: {
     }
 
     // A SUCCEEDED run always produces a Generation (Stage 5), so its absence
-    // means the capture failed — a failure to report, not a proposal to review.
+    // means the capture failed: a failure to report, not a proposal to review.
     if (input.run.status === 'SUCCEEDED' && input.run.generationId) {
         return 'finished';
     }
@@ -239,7 +239,7 @@ export function useSolverRun(termId: Ref<string>) {
                 cancelling.value = false;
             }
         } catch {
-            // A failed poll is not a failed run — Stage 4's rule. Keep the last
+            // A failed poll is not a failed run: Stage 4's rule. Keep the last
             // known state and try again rather than inventing a failure.
             schedule(3_000);
         }
@@ -270,7 +270,7 @@ export function useSolverRun(termId: Ref<string>) {
             );
 
             /**
-             * `active` is an ARRAY, and an empty one is truthy — reading it as a
+             * `active` is an ARRAY, and an empty one is truthy: reading it as a
              * single row made adoption silently never fire, which looks exactly
              * like "there is no run in progress". Take its first element, and
              * only ever adopt from `active`: `runs[0]` is merely the newest run,
@@ -294,7 +294,7 @@ export function useSolverRun(termId: Ref<string>) {
     function modeOf(row: SolverRunRow | null): SolverMode {
         const scope = row?.scope as { mode?: SolverMode } | undefined;
 
-        // Anything unrecognised — including a run stored before `mode` existed —
+        // Anything unrecognised, including a run stored before `mode` existed,
         // reads as a rebuild, which is what those runs actually were.
         return scope?.mode === 'repair' ? 'repair' : 'rebuild';
     }
@@ -319,7 +319,7 @@ export function useSolverRun(termId: Ref<string>) {
             /**
              * 409 means the one-active-run index rejected this because a run
              * started between the click and the request. That is not an error
-             * state — the thing the user wanted is already happening — so adopt
+             * state (the thing the user wanted is already happening), so adopt
              * the winner and say so.
              */
             if (status === 409) {
@@ -367,7 +367,7 @@ export function useSolverRun(termId: Ref<string>) {
 
     /**
      * Client-only, deliberately. An `immediate: true` watcher would run during
-     * SSR, where a bare `$fetch` carries no cookie and 401s — and the catch in
+     * SSR, where a bare `$fetch` carries no cookie and 401s, and the catch in
      * `adopt()` would render "no run in progress", which is indistinguishable
      * from the truth. Live run state is not first-render state: idle is the
      * correct thing to show until the browser has actually asked.
@@ -404,9 +404,9 @@ export function useSolverRun(termId: Ref<string>) {
 
         return joined === 'rebuild'
             ? 'A full rebuild was already running for this term, so this is showing that '
-                + 'instead of a repair — it replaces the whole timetable, not just the clashes.'
+                + 'instead of a repair: it replaces the whole timetable, not just the clashes.'
             : 'A repair was already running for this term, so this is showing that instead of '
-                + 'a full rebuild — it only moves what it must.';
+                + 'a full rebuild: it only moves what it must.';
     });
 
     return {

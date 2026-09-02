@@ -9,8 +9,8 @@ import { ownerDb } from './helpers/seed';
  * `schema.prisma` was refused by a trigger on the same table, so the parent
  * DELETE aborted:
  *
- *   1. `session_event.session_id` SET NULL vs. `session_event_append_only`
- *      — fixed 20260816180000.
+ *   1. `session_event.session_id` SET NULL vs. `session_event_append_only`,
+ *      fixed 20260816180000.
  *   2. `generation` / `session_event` CASCADE from `tenant` vs.
  *      `generation_no_delete` and `session_event_append_only`.
  *   3. `generation.created_by_id` SET NULL vs.
@@ -18,7 +18,7 @@ import { ownerDb } from './helpers/seed';
  *
  * (2) and (3) were fixed together in 20260828140000. Note WHICH trigger raised
  * for (2): `generation_no_delete`, not the session_event one the tracked entry
- * named — the generation cascade is reached first, so exempting only
+ * named. The generation cascade is reached first, so exempting only
  * `session_event` would have moved the error rather than removed it.
  *
  * (3) is the one reachable from the UI: `/manage/persons` offers delete behind
@@ -26,7 +26,7 @@ import { ownerDb } from './helpers/seed';
  * triggered a solver run failed with a raw database error.
  *
  * WHY THIS FILE EXISTS AT ALL. Every one of these was invisible because
- * `tests/helpers/seed.ts` DISABLED all three triggers around its teardown — a
+ * `tests/helpers/seed.ts` DISABLED all three triggers around its teardown, a
  * workaround in the fixture, which is how a schema defect survives a thousand
  * passing tests. That workaround is gone; the suite now deletes its tenants
  * through the real triggers, so a regression here fails everywhere. This file
@@ -58,7 +58,7 @@ async function fixture(): Promise<void> {
     /*
      * A real Session, so the event's `session_id` is non-null. Without it the
      * detach test below is a NO-OP update, which the trigger refuses on purpose
-     * ("at least one of them must actually be a detach") — the first draft of
+     * ("at least one of them must actually be a detach"): the first draft of
      * this fixture failed for exactly that reason, which is itself a small
      * confirmation that the no-op branch works.
      */
@@ -85,7 +85,7 @@ async function fixture(): Promise<void> {
 }
 
 afterEach(async () => {
-    // Through the real triggers — which is itself the headline assertion.
+    // Through the real triggers, which is itself the headline assertion.
     await ownerDb.$executeRawUnsafe(`DELETE FROM tenant WHERE id = $1`, T);
 });
 
@@ -112,8 +112,8 @@ describe('what the cascade exemption permits', () => {
             `SELECT created_by_id, status::text FROM generation WHERE id = 'probe-gen'`,
         );
 
-        // The Generation SURVIVES — deleting a person must not delete a
-        // timetable — and its authorship degrades to unknown rather than to a
+        // The Generation SURVIVES: deleting a person must not delete a
+        // timetable. Its authorship degrades to unknown rather than to a
         // lie about who made it.
         expect(row).toHaveLength(1);
         expect(row[0]!.created_by_id).toBeNull();
@@ -121,7 +121,7 @@ describe('what the cascade exemption permits', () => {
     });
 });
 
-describe('what it still refuses — the boundaries', () => {
+describe('what it still refuses: the boundaries', () => {
     it('refuses a direct DELETE of a Generation', async () => {
         await fixture();
 

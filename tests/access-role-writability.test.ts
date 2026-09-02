@@ -14,7 +14,7 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
  *
  * The negative cases are the point. A suite asserting only "the app role can
  * write a role" would pass just as well against a build where `tenant_isolation`
- * had been dropped from these tables altogether — which is precisely the failure
+ * had been dropped from these tables altogether, which is precisely the failure
  * this project fails closed against everywhere else, and would mean an operator
  * CLI could quietly plant a role in somebody else's tenant.
  *
@@ -36,7 +36,7 @@ function asTenant<T>(tenantId: string, fn: (tx: typeof ownerDb) => Promise<T>): 
     });
 }
 
-/** Same, with no tenant context at all — a script that forgot to set it. */
+/** Same, with no tenant context at all: a script that forgot to set it. */
 function asAppRoleWithoutContext<T>(fn: (tx: typeof ownerDb) => Promise<T>): Promise<T> {
     return ownerDb.$transaction(async (tx) => {
         await tx.$executeRawUnsafe('SET LOCAL ROLE calendry_app');
@@ -114,19 +114,19 @@ describe('access_role writability under RLS', () => {
         expect(fromA.map((r) => r.key).sort()).toEqual(['tenant-admin', 'viewer', 'writability']);
     });
 
-    it('cannot resolve a tenant by slug — why the CLI needs the owner for that', async () => {
+    it('cannot resolve a tenant by slug: why the CLI needs the owner for that', async () => {
         // Not a limitation being worked around: it is the reason `create:role`
         // opens an owner connection at all. Documented as a test so that a future
         // widening of the `tenant` read policy shows up here rather than as a
         // quietly redundant connection in a script.
         // With a tenant set (and no federation context), the app role sees only
-        // its own row — so it can confirm a slug it already holds the id for, but
+        // its own row, so it can confirm a slug it already holds the id for, but
         // cannot go the other way.
         const found = await asTenant(f.tenantA, (tx) => tx.tenant.findMany({ select: { slug: true } }));
 
         expect(found.map((t) => t.slug)).toEqual(['test-a']);
 
-        // And before any context exists — a CLI's opening move — it sees nothing
+        // And before any context exists, a CLI's opening move, it sees nothing
         // at all, which is why `--tenant <slug>` cannot be resolved app-side.
         const blind = await asAppRoleWithoutContext((tx) => tx.tenant.findMany({ select: { slug: true } }));
 

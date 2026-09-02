@@ -7,13 +7,13 @@ import { SESSION_KIND_TYPES } from '../shared/sessionKindType';
 import type { SessionKindType } from '../shared/sessionKindType';
 
 /**
- * `SessionKind.type` — the FIXED classification behind a tenant-named kind, and
+ * `SessionKind.type`: the FIXED classification behind a tenant-named kind, and
  * the rules that derive their scope from it.
  *
  * WHAT THIS REPLACES. "Which sessions are exams" used to be said once per rule,
  * as `ConstraintScope` rows, and that had a specific bad failure: the wire reads
  * `applies_to_kinds` EMPTY as EVERY KIND. So forgetting to scope
- * `exam_spacing_same_day` did not switch it off — it silently promoted "no two
+ * `exam_spacing_same_day` did not switch it off: it silently promoted "no two
  * exams for a group in a day" to "no two SESSIONS of any kind in a day", live,
  * on the next solve.
  *
@@ -23,7 +23,7 @@ import type { SessionKindType } from '../shared/sessionKindType';
  *   AN EMPTY DERIVED SET IS A SKIP, NEVER AN EMPTY LIST.
  *
  * A tenant with nothing marked EXAM must have the rule WITHHELD and reported,
- * because the wire cannot say "no kinds" — sending `[]` would mean the exact
+ * because the wire cannot say "no kinds": sending `[]` would mean the exact
  * opposite of what the tenant configured. That inversion is the whole reason
  * this feature is not just a nicer scoping UI.
  */
@@ -100,7 +100,7 @@ describe('deriving the scope from the classification', () => {
 
     it('SKIPS when the caller supplies no classification map at all', () => {
         // Absent must read as "nothing is classified", not as "scope unknown, send
-        // it anyway" — the unsafe default is the one that widens the rule.
+        // it anyway": the unsafe default is the one that widens the rule.
         const mapped = toWireConstraint(row('exam_spacing_same_day'), new Map());
 
         expect('skip' in mapped).toBe(true);
@@ -181,7 +181,7 @@ describe('the migration backfill', () => {
     /**
      * The half that cannot be skipped. A tenant who had hand-scoped
      * `exam_spacing_*` to their exam kind, and is not migrated, gets an empty
-     * derived set — which this feature correctly refuses to send. The rule goes
+     * derived set, which this feature correctly refuses to send. The rule goes
      * quiet with nothing on screen having changed.
      *
      * It is avoidable because the answer was already written down: scoping an
@@ -191,7 +191,7 @@ describe('the migration backfill', () => {
     /**
      * COMMENTS STRIPPED, and that is not fussiness. This migration explains
      * itself at length and names both derived types, `is_enabled` and
-     * `constraint_scope` in its prose — so every assertion below passes against
+     * `constraint_scope` in its prose, so every assertion below passes against
      * the comments alone. Removing a type from the actual `IN (...)` list left
      * this whole block green until the strip was added, which is the failure it
      * exists to catch.
@@ -202,7 +202,7 @@ describe('the migration backfill', () => {
      * Two ways to get this wrong, and both were made. Searching the raw file
      * matches the migration's own PROSE, which names every table and flag the
      * assertions below care about. Searching all statements then matches the
-     * rest of the schema — `is_enabled` is an ordinary column on
+     * rest of the schema: `is_enabled` is an ordinary column on
      * `constraint_def`, so "does not filter on is_enabled" fails against DDL
      * that merely declares it.
      *
@@ -213,7 +213,7 @@ describe('the migration backfill', () => {
         .slice(statements.indexOf('UPDATE "session_kind"'))
         .split(';')[0] ?? '';
 
-    it('exists at all — the assertions below are worthless against an empty string', () => {
+    it('exists at all: the assertions below are worthless against an empty string', () => {
         expect(backfill).toContain('UPDATE "session_kind"');
     });
 
@@ -228,7 +228,7 @@ describe('the migration backfill', () => {
         }
     });
 
-    it('does not filter on is_enabled — a disabled rule still records the classification', () => {
+    it('does not filter on is_enabled: a disabled rule still records the classification', () => {
         expect(backfill).not.toContain('is_enabled');
     });
 });
@@ -244,8 +244,8 @@ describe('the catalogue', () => {
 
     it('leaves minimize_exam_week_sessions manually scoped, on purpose', () => {
         /*
-         * It is named for an AXIS, not a direction: with `invert` off — the
-         * default — it keeps exam weeks CLEAR, which a tenant wants applied to
+         * It is named for an AXIS, not a direction: with `invert` off (the
+         * default) it keeps exam weeks CLEAR, which a tenant wants applied to
          * teaching kinds. Deriving it to EXAM would invert its ordinary meaning
          * while looking like a tidy-up.
          */

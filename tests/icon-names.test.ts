@@ -9,7 +9,7 @@ import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
  * WHY THIS EXISTS. A wrong icon name is the project's favourite failure shape:
  * it renders nothing, logs nothing, throws nothing, and the only symptom is a
  * blank space somebody notices weeks later and reports as a missing feature.
- * That is exactly what happened — `material-symbols:rule-outline` does not
+ * That is exactly what happened: `material-symbols:rule-outline` does not
  * exist, so the Constraints entry in the sidebar rendered its label with no
  * glyph and was read as "the constraints section isn't there".
  *
@@ -53,8 +53,8 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
 /**
  * Icon references found in source.
  *
- * The pattern is deliberately narrow — a quoted `prefix:name` where both halves
- * are lowercase-kebab — so it does not sweep up URLs, times, or CSS values.
+ * The pattern is deliberately narrow: a quoted `prefix:name` where both halves
+ * are lowercase-kebab, so it does not sweep up URLs, times, or CSS values.
  */
 function usedIcons(): Map<string, string[]> {
     const found = new Map<string, string[]>();
@@ -81,7 +81,7 @@ function usedIcons(): Map<string, string[]> {
 describe('icon names', () => {
     it('finds icon references to check (the scan itself works)', () => {
         // Guard the guard: a regex that matched nothing would make every
-        // assertion below pass vacuously — the exact failure this suite exists
+        // assertion below pass vacuously, the exact failure this suite exists
         // to prevent.
         expect(usedIcons().size).toBeGreaterThan(20);
     });
@@ -100,13 +100,13 @@ describe('icon names', () => {
             const collection = collections.get(prefix);
 
             if (!collection) {
-                broken.push(`${icon} — @iconify-json/${prefix} is not installed (used in ${files[0]})`);
+                broken.push(`${icon}: @iconify-json/${prefix} is not installed (used in ${files[0]})`);
 
                 continue;
             }
 
             if (!collection.icons[name] && !collection.aliases?.[name]) {
-                broken.push(`${icon} — not in the collection (used in ${files[0]})`);
+                broken.push(`${icon}: not in the collection (used in ${files[0]})`);
             }
         }
 

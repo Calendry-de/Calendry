@@ -19,8 +19,8 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * Issue a login for a Person in this institution.
  *
  * A PERSON IS REQUIRED, and that is the load-bearing choice here. An Account
- * with no `account_person` row is invisible to every tenant — not listable, not
- * resettable, not deletable — while its password still works. Making the link
+ * with no `account_person` row is invisible to every tenant: not listable, not
+ * resettable, not deletable, while its password still works. Making the link
  * part of creation, rather than a later step, means that state never exists
  * rather than being cleaned up afterwards. The mirror rule lives in
  * `assertDetachable`.
@@ -28,14 +28,14 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * AN EXISTING EMAIL IS AN OFFER, NOT A WALL. `account.email` is globally unique
  * and one Account is meant to act in several institutions, so "someone already
  * has this address" is the ordinary case for a lecturer arriving from a partner
- * university — not an error. Answering it with a bare 409 was the actual
+ * university, not an error. Answering it with a bare 409 was the actual
  * complaint that produced this endpoint: the admin was told the address was
  * taken and had no way forward. So the first attempt reports it with
  * `accountExists: true`, and a second carrying `attachExisting: true` links that
  * credential to this person instead of minting a second one.
  *
  * WHY NOT JUST ATTACH SILENTLY: attaching is a different act with different
- * consequences — the person will sign in with a password this institution did
+ * consequences: the person will sign in with a password this institution did
  * not set and cannot see, and the account becomes shared, which permanently
  * removes this tenant's ability to reset it (see `assertSoleTenant`). That is
  * not something to do on the strength of a typo in an email field.
@@ -57,7 +57,7 @@ const bodySchema = z.object({
     /**
      * Accepted at creation, not only on the later PATCH, so a login can be
      * prepared before the person starts. The management form renders the toggle
-     * on both pages and zod would STRIP an undeclared key — a switch that saves
+     * on both pages and zod would STRIP an undeclared key: a switch that saves
      * nothing and reports success.
      */
     isActive: z.boolean().optional(),
@@ -88,7 +88,7 @@ export default defineEventHandler(async (event) => {
             throw createError({
                 statusCode: 409,
                 statusMessage: `A login for ${body.email} already exists. It can be attached to `
-                    + `${person.givenName} ${person.familyName} instead of creating a second one — `
+                    + `${person.givenName} ${person.familyName} instead of creating a second one: `
                     + 'they would keep their existing password, and this institution would no longer '
                     + 'be able to reset it, because the login would then be shared.',
                 data: { field: 'email', accountExists: true },
@@ -139,7 +139,7 @@ export default defineEventHandler(async (event) => {
         setResponseStatus(event, 201);
 
         /*
-         * THE PASSWORD IS IN THE RESPONSE AND NOWHERE ELSE — this is the one and
+         * THE PASSWORD IS IN THE RESPONSE AND NOWHERE ELSE: this is the one and
          * only moment it is legible, exactly as the operator CLIs print it once.
          * Null when an existing credential was attached, because none was set and
          * echoing a placeholder would read as "here is their password".

@@ -30,10 +30,10 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
      */
     const byTerm = new Map<string, { week: number; kind: string }[]>();
 
-    // ISSUE #101 — see the review queue's own comment (`exam-requests/index.get.ts`):
+    // ISSUE #101: see the review queue's own comment (`exam-requests/index.get.ts`),
     // same fix, same reason. A lecturer asking for an exam should be able to
     // see, for any of their own pending requests, whether the module's
-    // teaching plan is actually fully placed yet — not only learn it once, as
+    // teaching plan is actually fully placed yet, not only learn it once, as
     // a side effect of the request they already submitted.
     const byOffering = new Map<string, TeachingCompleteness>();
 

@@ -6,8 +6,8 @@ import { api, login } from './helpers/client';
  * API tokens: a Person's own authority, delegated and narrowed.
  *
  * THE ASSERTIONS THAT MATTER are the two narrowings. A token resolves to a real
- * identity WITH an acting Person — that is what lets an import script pass
- * permission checks at all — and the whole safety argument is that the
+ * identity WITH an acting Person, which is what lets an import script pass
+ * permission checks at all, and the whole safety argument is that the
  * effective set is an intersection: the ceiling selected at creation, AND the
  * Person's live permissions at use time. Both are probed here with LIVE tokens
  * over real endpoints, for the reason the screens suite states: a revoked
@@ -127,7 +127,7 @@ describe('the ceiling is enforced at use, per endpoint', () => {
             expect(Array.isArray(rooms.body)).toBe(true);
 
             // The creator (tenant-admin) holds these; the token's ceiling does
-            // not, so every one must refuse — reads and writes alike.
+            // not, so every one must refuse: reads and writes alike.
             for (const path of ['/api/persons', '/api/sessions', '/api/constraints']) {
                 const res = await api(path, { headers: bearer(created.token) });
 
@@ -233,7 +233,7 @@ describe('the LIVE intersection: a Person who loses authority loses it in every 
         /*
          * viewerA holds session.read through the seeded viewer role. Mint a
          * token at that ceiling, prove it works, strip the role, and the SAME
-         * token must refuse — without anybody touching the token row. This is
+         * token must refuse, without anybody touching the token row. This is
          * the property that makes "permissions they own, or less" true over
          * time rather than only at the moment of creation.
          *

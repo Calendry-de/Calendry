@@ -20,14 +20,14 @@ const bodySchema = z.object({
  * A lecturer asks for an exam on a module they lead.
  *
  * UNDER `/api/me/`, and the path is the enforcement rather than a convention.
- * The route takes no person id — not in the URL, not in the body — so another
+ * The route takes no person id, not in the URL, not in the body, so another
  * Person's request is UNNAMEABLE rather than merely rejected. That is the same
  * shape `/api/me/availability` uses, and it is why a self-scoped route needs no
  * "is this me" check to get wrong.
  *
  * CREATES NOTHING SCHEDULED. The row is a request; the exam exists only after
  * somebody with `exam.review` approves it. That is the entire difference
- * between this and `POST /api/sessions`, which needs `session.create` — a key
+ * between this and `POST /api/sessions`, which needs `session.create`, a key
  * that creates a Session anywhere, for anyone, immediately.
  */
 export default defineEventHandler(async (event) => {
@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
         }));
 
         // Warn, don't block: an exam can be requested before every Session of
-        // the module's own teaching plan is placed — this is a fact for the
+        // the module's own teaching plan is placed: this is a fact for the
         // reviewer to weigh, not a reason to refuse the request.
         const teachingComplete = await assertTeachingComplete(tx, identity.tenantId, body.offeringId);
 

@@ -6,7 +6,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
 /**
  * Everything the self-service availability page renders, under ONE permission.
  *
- * THE PERSON ID IS NOT A PARAMETER — not in the path, not in the query, not in
+ * THE PERSON ID IS NOT A PARAMETER: not in the path, not in the query, not in
  * the body. It comes from the resolved session identity, exactly as `tenant_id`
  * does on every write route. That is what "self-scoped" means here: another
  * Person's row is unnameable rather than merely rejected, so there is no check
@@ -14,7 +14,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * THE GRID TRAVELS WITH THE RESPONSE, and that is not padding. A `/my` page
  * that fetched `/api/time-grids` separately would 403 for a lecturer holding
- * only `availability.manage_own` — one refused fetch inside a `Promise.all`
+ * only `availability.manage_own`: one refused fetch inside a `Promise.all`
  * takes the whole wave down, and the page renders empty controls over real data.
  * Same fix as Stage 6c, where offering names started travelling with the
  * preview response: everything a page needs arrives under the gate the page is
@@ -29,7 +29,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         throw createError({ statusCode: 403, statusMessage: 'No acting Person on this session.' });
     }
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection, and concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const rows = await tx.personUnavailability.findMany({
         where: { personId },
@@ -59,7 +59,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     const limits = await tenantGridLimits(tx, identity.tenantId);
     const terms = await tenantTerms(tx, identity.tenantId);
     /*
-     * The room-type vocabulary this person can choose from — sent WITH the
+     * The room-type vocabulary this person can choose from, sent WITH the
      * page rather than fetched from `/api/equipment`, which requires
      * `equipment.read`. This page's own gate is `availability.manage_own`,
      * and a page must not depend on a permission its gate does not imply:
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
         /*
          * Terms travel with the response so the holiday form can preview which
          * weeks a date range resolves to WITHOUT calling /api/terms, which needs
-         * `term.read` — a permission the self-service role does not hold.
+         * `term.read`, a permission the self-service role does not hold.
          */
         terms,
         maxBlocksPerDay: limits.blocksPerDay,

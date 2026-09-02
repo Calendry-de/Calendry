@@ -13,7 +13,7 @@ const bodySchema = z.object({
 
     /**
      * The EVENT's name. Required when there is no Offering to borrow one from,
-     * and REFUSED when there is — see the guard below.
+     * and REFUSED when there is (see the guard below).
      */
     title: z.string().min(1).nullish(),
     termWeek: z.number().int().min(1),
@@ -23,7 +23,7 @@ const bodySchema = z.object({
 
     /**
      * Absent or null makes this an EVENT (TAXONOMY.md §2): a placement with no
-     * recurring demand behind it. Not merely "optional" — the null case is the
+     * recurring demand behind it. Not merely "optional": the null case is the
      * feature, and it is what keeps the Session out of every solve's scope.
      */
     offeringId: z.string().min(1).nullish(),
@@ -35,7 +35,7 @@ const bodySchema = z.object({
     personIds: z.array(z.string().min(1)).default([]),
 
     /**
-     * Defaults to LOCKED. See the block comment below — this is defence in
+     * Defaults to LOCKED (see the block comment below): this is defence in
      * depth, not the primary protection.
      */
     isLocked: z.boolean().default(true),
@@ -101,7 +101,7 @@ defineRouteMeta({
 /**
  * Create a Session directly, without a solver run.
  *
- * This is the FIRST create path in the app — until now every Session came from
+ * This is the FIRST create path in the app: until now every Session came from
  * `materializeGeneration()`. Two things follow from that, and both are the
  * reason this route is not a generic CRUD entry in `RESOURCES`.
  *
@@ -111,7 +111,7 @@ defineRouteMeta({
  *
  *     !keptIds.has(s.id) && !s.isLocked && inScope.has(s.offeringId)
  *
- * `inScope` is a Set of offering ids, so for an Event — `offeringId` NULL —
+ * `inScope` is a Set of offering ids, so for an Event (`offeringId` NULL),
  * `inScope.has(null)` is false and the Session is STRUCTURALLY unreachable by
  * that partition. It cannot be swept up by a solve that never knew about it.
  *
@@ -124,14 +124,14 @@ defineRouteMeta({
  * WITH an `offeringId`. That one is in scope by default (a run with no explicit
  * `offeringIds` takes every Offering in the term), so without the lock the next
  * apply would move it or delete it. Creating one unlocked is permitted and is a
- * deliberate choice by the caller — "let the solver own this from now on".
+ * deliberate choice by the caller: "let the solver own this from now on".
  *
  * WHY THE GRID GUARD IS THE SAME ONE `move` USES
  *
  * A created placement outside the grid's index space is exactly the defect
  * `fitsGrid()` exists to prevent, and the zod schema cannot catch it: blockIndex
  * has no upper bound it could know, and dayOfWeek is 1..7 regardless of which
- * days the tenant actually teaches. Refused rather than warned — this is not a
+ * days the tenant actually teaches. Refused rather than warned: this is not a
  * constraint violation on a placement, it is a placement resolving to no slot.
  *
  * WARN AND ALLOW still applies to everything else (TAXONOMY.md §3): a creation
@@ -166,7 +166,7 @@ export default defineEventHandler(async (event) => {
         /**
          * An Offering, when given, must belong to the SAME term. Without this
          * the FK would accept a cross-term Offering and the Session would sit
-         * in a term whose solve never considers it — an orphan that looks
+         * in a term whose solve never considers it: an orphan that looks
          * placed. `planMaterialization()` already counts this shape as
          * `placementsUnmapped` coming the other way.
          */
@@ -175,7 +175,7 @@ export default defineEventHandler(async (event) => {
          *
          * Refused rather than stored-and-ignored: `sessionLabel()` reads this
          * column only when `offeringId` is NULL, so a title on an
-         * Offering-linked Session would be a value no screen ever renders —
+         * Offering-linked Session would be a value no screen ever renders:
          * dead data that reads as a bug the first time someone finds it.
          */
         if (body.offeringId && body.title) {
@@ -196,7 +196,7 @@ export default defineEventHandler(async (event) => {
         if (!body.offeringId && !body.title) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'An event needs a name — there is no Offering to take one from.',
+                statusMessage: 'An event needs a name: there is no Offering to take one from.',
                 data: { field: 'title' },
             });
         }
@@ -216,7 +216,7 @@ export default defineEventHandler(async (event) => {
         }
 
         /**
-         * `Term` stores dates, not a week count — the count is DERIVED, and
+         * `Term` stores dates, not a week count: the count is DERIVED, and
          * `weekCountOf` is the same function the solver calendar and the
          * calendar-period editor use. Computing it locally here (end - start
          * over 7) would be a fourth definition of "which week is this", and
@@ -278,8 +278,8 @@ export default defineEventHandler(async (event) => {
                     isLocked: body.isLocked,
                     /**
                      * Deliberately NOT attributed to `generationId`. The
-                     * baseline above is what the EVENT hangs off — an event
-                     * with no baseline cannot be replayed — but the Session
+                     * baseline above is what the EVENT hangs off (an event
+                     * with no baseline cannot be replayed), but the Session
                      * itself did not come from that Generation, and saying it
                      * did would make provenance a lie. Null reads as "placed by
                      * a human", which is exactly what happened.
@@ -317,8 +317,8 @@ export default defineEventHandler(async (event) => {
 
         /**
          * The first CREATE event this system has ever emitted. `materializeGeneration()`
-         * writes no per-session events at all — the Generation snapshot is the
-         * record for solver-originated Sessions — so there was no existing shape
+         * writes no per-session events at all: the Generation snapshot is the
+         * record for solver-originated Sessions, so there was no existing shape
          * to match, and this one mirrors MOVE's `to` half so replay stays
          * uniform across event types.
          */

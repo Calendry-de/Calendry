@@ -4,8 +4,8 @@ import type { TenantScopedIdentity } from './tenantResolver';
 
 /**
  * "Leads/lectures an Offering", the authority `assertLeadsOffering`
- * (`server/utils/examRequests.ts`) already established for exam requests —
- * duplicated here rather than shared because that function is scoped to a
+ * (`server/utils/examRequests.ts`) already established for exam requests.
+ * Duplicated here rather than shared because that function is scoped to a
  * TERM (an exam request always names one) and reports exam-specific wording,
  * while this one is not: a lecturer may repoint their module's pattern in any
  * term they still lead it, and the message names the actual capability

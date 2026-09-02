@@ -3,7 +3,7 @@
         <p class="intro">
             Ask for an exam on a module you lead. What you submit here is
             <strong>reviewed by an administrator</strong> before it appears on any
-            timetable — an exam takes a room and an hour the schedule has to find, so
+            timetable, because an exam takes a room and an hour the schedule has to find, so
             it is not placed on your say-so alone.
         </p>
 
@@ -15,7 +15,7 @@
 
         <!--
             WARN, DON'T BLOCK: the request above already went through. This
-            says the module's own teaching plan is not fully placed yet — a
+            says the module's own teaching plan is not fully placed yet: a
             fact for the lecturer to know, never a reason the request was
             refused.
         -->
@@ -28,7 +28,7 @@
         <!--
             The two blocking states, named separately. "You lead no modules" and
             "this institution has no exam kind" both leave the form unusable and
-            call for completely different action — one is a staffing fact, the
+            call for completely different action: one is a staffing fact, the
             other is a five-second settings change an administrator has to make.
             Collapsing them into one empty form would be the "no data vs. not
             configured" ambiguity this codebase keeps finding.
@@ -69,7 +69,7 @@
                             :key="m.id"
                             :selected="m.id === offeringId"
                             :value="m.id"
-                        >{{ m.code ? `${m.code} — ${m.title}` : m.title }}</option>
+                        >{{ m.code ? `${m.code}: ${m.title}` : m.title }}</option>
                     </select>
                 </label>
 
@@ -145,8 +145,8 @@
 
                 <!--
                     ADVISORY, NEVER A GATE. A Nachklausur legitimately sits in an
-                    ordinary teaching week — the timetable this demo's data came
-                    from is full of them — so this says what the institution
+                    ordinary teaching week (the timetable this demo's data came
+                    from is full of them), so this says what the institution
                     declared and leaves the choice alone.
                 -->
                 <p
@@ -246,7 +246,7 @@ import { WEEK_KIND_NAME, classifyWeeks } from '#shared/academicCalendar';
  * GATED ON `exam.request_own` by the nav entry, but the page does not assume
  * it: every endpoint it calls carries the same key, and the two blocking
  * states above are rendered from what came back rather than from a permission
- * check — a page that decides its own emptiness from a gate tells a different
+ * check: a page that decides its own emptiness from a gate tells a different
  * story than the server does.
  */
 definePageMeta({ middleware: 'my' });
@@ -264,7 +264,7 @@ interface RequestRow {
     kind: { id: string; name: string };
     /** Resolved per Term by the server, so both exam pages agree. */
     weekKind: string;
-    /** Issue #101 — the module's own teaching plan, not this request's placement. */
+    /** Issue #101: the module's own teaching plan, not this request's placement. */
     teachingComplete: { complete: boolean; placedCount: number; requiredCount: number };
 }
 
@@ -291,11 +291,11 @@ interface ExamContext {
 
 const { data, refresh } = await useAsyncData('my:exams', async () => {
     /*
-     * ONE key, TWO endpoints — not five. `/api/me/exam-requests/context`
+     * ONE key, TWO endpoints, not five. `/api/me/exam-requests/context`
      * replaced four generic CRUD reads (`/api/offerings`, `/api/session-kinds`,
      * `/api/time-grids`, `/api/terms`, `/api/calendar-periods`), each gated on
      * its own institution-wide `<resource>.read`. A lecturer holding only
-     * `exam.request_own` — this page's actual gate — held none of those, so the
+     * `exam.request_own` (this page's actual gate) held none of those, so the
      * `Promise.all` 403'd on the first of them and the page rendered BLANK
      * (issue #108). See that route's own comment for the full story.
      */
@@ -318,8 +318,8 @@ const rows = computed(() => data.value?.mine ?? []);
 
 /*
  * Every Offering the API returns, which is already narrowed by what this person
- * may read. The SERVER decides whether they lead it — `assertLeadsOffering`
- * answers 404 either way — so this list is a convenience, never the boundary.
+ * may read. The SERVER decides whether they lead it: `assertLeadsOffering`
+ * answers 404 either way, so this list is a convenience, never the boundary.
  */
 const modules = computed(() => data.value?.offerings ?? []);
 
@@ -342,7 +342,7 @@ const blockOptions = computed(() => Array.from(
  * The chosen module's Term, and its weeks classified.
  *
  * `classifyWeeks` is the SAME function the server's `classifyTermWeeks` calls
- * and the same one the solver calendar is built from — imported from `#shared`
+ * and the same one the solver calendar is built from, imported from `#shared`
  * rather than reimplemented, because "which week is an exam week" having two
  * definitions is exactly the failure TimeGrid already demonstrated.
  */
@@ -374,7 +374,7 @@ const weeks = computed(() => {
             // same as every other week is a choice made blind.
             label: kind === 'TEACHING' || kind === 'UNSPECIFIED'
                 ? `Week ${w.index + 1}`
-                : `Week ${w.index + 1} — ${kind.toLowerCase()} week`,
+                : `Week ${w.index + 1}: ${kind.toLowerCase()} week`,
         };
     });
 });
@@ -414,7 +414,7 @@ offeringId.value = modules.value[0]?.id ?? '';
 kindId.value = examKinds.value[0]?.id ?? '';
 /*
  * THE FIRST EXAM WEEK, not week 1. An exam is a locked Event the solver never
- * places, so `MinimizeExamWeek` cannot pull it anywhere — the default IS the
+ * places, so `MinimizeExamWeek` cannot pull it anywhere: the default IS the
  * placement for anyone who does not change it, and defaulting to the first week
  * of term was actively wrong.
  */
@@ -443,7 +443,7 @@ async function submit() {
 
         if (!teachingComplete.complete) {
             teachingWarning.value = `This module has ${teachingComplete.placedCount} of its `
-                + `${teachingComplete.requiredCount} sessions placed so far — the teaching plan `
+                + `${teachingComplete.requiredCount} sessions placed so far. The teaching plan `
                 + 'is not fully scheduled yet, though that does not stop the exam request.';
         }
 

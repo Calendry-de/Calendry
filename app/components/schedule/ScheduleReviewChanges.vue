@@ -3,8 +3,8 @@
         <!--
             THE EMPTY CASE, which had no rendering at all and left the section as
             a heading, a view switch, and roughly six hundred pixels of nothing
-            above one grey sentence. A no-op proposal is not an edge case here —
-            it is what a re-run of an already-solved term produces — so this is
+            above one grey sentence. A no-op proposal is not an edge case here:
+            it is what a re-run of an already-solved term produces, so this is
             the state the page shows most often.
         -->
         <p
@@ -56,7 +56,7 @@
 
                     <!--
                         THE COLLATERAL MARK. The plan reports `movedCollateral`
-                        as one term-level integer — the sharpest warning on the
+                        as one term-level integer, the sharpest warning on the
                         old screen, and the only one with nothing to click.
                         Scope is per-Offering, so this is where it becomes a
                         fact about something nameable.
@@ -106,7 +106,7 @@
             The unchanged majority as ONE number.
 
             The old grid rendered every reproduced session as a chip whose most
-            prominent word was "UNCHANGED" — 142 of them on a proposal that
+            prominent word was "UNCHANGED": 142 of them on a proposal that
             changed nothing, a wall of type carrying no information. What a
             reviewer needs from that set is its size.
         -->
@@ -131,7 +131,7 @@ import type { OfferingChange } from '~/composables/generationReview';
  * WHY BY OFFERING AND NOT BY SLOT. The week grid answers "what is in week 4".
  * It cannot answer "what does this proposal do", because a proposal that moves
  * 187 of 260 Sessions spreads those moves across a nineteen-week term and the
- * grid shows one week — auditing it meant thirteen `<select>` interactions,
+ * grid shows one week, so auditing it meant thirteen `<select>` interactions,
  * which is a search, not a review. Grouping by Offering matches the unit a
  * department head actually owns and the unit `scopeOfferingIds` is defined in.
  *
@@ -168,7 +168,7 @@ function countsFor(row: OfferingChange) {
         parts.push({ kind: 'moved', value: row.moved, label: 'moved' });
     }
 
-    // Unchanged rides along only when the Offering ALSO changed — it is the
+    // Unchanged rides along only when the Offering ALSO changed; it is the
     // denominator that makes "3 moved" readable ("3 moved, 9 left alone").
     if (row.unchanged > 0) {
         parts.push({ kind: 'unchanged', value: row.unchanged, label: 'left alone' });
@@ -222,7 +222,7 @@ function weekLabel(weeks: number[]): string {
 
         /*
          * HAIRLINES, NOT CARDS. Panels on this page were `background: $surface1`
-         * against a `$surface1` body — the same value in both themes, so every
+         * against a `$surface1` body, the same value in both themes, so every
          * card rendered at zero contrast and the page read as loose text with
          * one stray rule. Rows separated by a single hairline need no fill to
          * be structure, which is the honest fix at page scope; retiring
@@ -232,8 +232,8 @@ function weekLabel(weeks: number[]): string {
         gap: 0;
 
         /*
-         * The UA's `padding-inline-start: 40px` survived, so the change list —
-         * the evidence this whole redesign is built around — was the one block on
+         * The UA's `padding-inline-start: 40px` survived, so the change list
+         * (the evidence this whole redesign is built around) was the one block on
          * the page not sharing its left edge. Its own sibling `<p>` sat at 32px
          * while the rows started at 72px.
          */
@@ -319,7 +319,7 @@ function weekLabel(weeks: number[]): string {
 
         /*
          * Colour is spent on the two states with consequences, exactly as the
-         * grid's chips do it — a proposal typically moves almost everything, so
+         * grid's chips do it, because a proposal typically moves almost everything, so
          * tinting moves would flood the list and leave removals nothing.
          */
         &--deleted strong { color: $error700; }

@@ -7,8 +7,8 @@
         <!--
             THE OPENER MARKS A CHANGE OF MODE. Arriving here is deliberate and
             infrequent, and what follows is the only screen that can replace a
-            whole term's timetable. Faster than the landing page's — a work
-            surface, not an entrance — and it collapses under
+            whole term's timetable. Faster than the landing page's: a work
+            surface, not an entrance. It collapses under
             `prefers-reduced-motion`.
 
             Inside the root rather than above it: a comment beside the single
@@ -20,14 +20,14 @@
             :class="{ 'review--committing': confirmApply || confirmDiscard }"
         >
         <!--
-            DIRECTION CONTRACT — surface redesign, seed key calendry-review-01.
+            DIRECTION CONTRACT: surface redesign, seed key calendry-review-01.
 
             THESIS: A proposal is reviewed by Offering, not by slot. Refuses the
             dashboard arrangement of counters over a week grid, which answers
             "what is in week 4" and never "what does this do".
 
-            OWN-WORLD: Inherited, not replaced — Noto Sans, the surface/content
-            ramps, the chip and grid vocabulary shared with /schedule. One
+            OWN-WORLD: Inherited, not replaced, using Noto Sans, the surface/content
+            ramps and the chip and grid vocabulary shared with /schedule. One
             correction: raised surfaces are $surface2, because $surface1 panels on
             a $surface1 body were invisible in both themes.
 
@@ -38,7 +38,7 @@
             FIRST VIEWPORT: Identity, then a full-width state band, then the risk
             line, then the change list. Apply sits top-right with the identity.
 
-            FORM: The Change List — candidate 5 of 7, chosen over the roll's lead.
+            FORM: The Change List, candidate 5 of 7, chosen over the roll's lead.
 
             FINISH: unreviewed and undocumented is unfinished; this build ends
             with the finish review, the verdict, and DESIGN.md.
@@ -68,7 +68,7 @@
                         decide. "Review proposal v2" at 24px above a band saying
                         "Nothing here is awaiting a decision" is the contradiction
                         the band was added to resolve, and adding the band did not
-                        resolve it — the largest type on the page still ordered a
+                        resolve it: the largest type on the page still ordered a
                         review of something already settled.
                     -->
                     <template v-if="preview">{{ isDecidable ? 'Review proposal' : 'Proposal' }}
@@ -125,7 +125,7 @@
                     <!--
                         THE COMMIT. Apply used to be an unconfirmed primary button
                         identical to the "Review" one that navigated here, while
-                        the only confirmation guarded Discard — which deletes
+                        the only confirmation guarded Discard, which deletes
                         nothing. The friction was on the reversible action.
                         `secondary-black` so the affirmative control in the confirm
                         strip is the only primary-weight button in the flow.
@@ -158,20 +158,20 @@
         </header>
 
         <!--
-            THE STATE BAND — the fix for the complaint that opened this redesign:
+            THE STATE BAND is the fix for the complaint that opened this redesign:
             "one doesn't know what to do on this page".
 
             A proposal that is not READY is not asking for anything, and the page
-            never said so with any weight. It said "Review proposal v2" at 24px —
-            an imperative to review something already decided — and put
-            "Applied — this is the current schedule." in 12px `$content6`,
+            never said so with any weight. It said "Review proposal v2" at 24px,
+            an imperative to review something already decided, and put
+            "Applied: this is the current schedule." in 12px `$content6`,
             floated to the far right by `justify-content: space-between`, roughly
             1500px from the heading at 1920. Two of the three most valuable facts
             on the screen ("this is already live", "this changes nothing") were
             the two stated least loudly or, in the second case, nowhere at all.
 
             Full width, at reading weight, directly under the identity, and it
-            carries the action that IS available — opening the schedule — so the
+            carries the action that IS available, opening the schedule, so the
             page has something to do even when there is nothing to decide.
 
             Suppressed while the outcome banner is up: that banner states the
@@ -202,8 +202,8 @@
             `apply()` used to end in a silent `navigateTo('/schedule')`: the
             highest-stakes action in the product finishing as a screen change
             with no confirmation that it had worked and no statement of what it
-            did. It now stays put and says so, and the proposal's own status —
-            already rendered by `terminalMessage` above — corroborates it.
+            did. It now stays put and says so, and the proposal's own status,
+            already rendered by `terminalMessage` above, corroborates it.
         -->
         <Transition name="review-outcome">
         <div
@@ -238,7 +238,7 @@
             role="status"
         >
             <CommonLoader class="review_spinner" />
-            Writing placements — a large proposal takes a few seconds.
+            Writing placements. A large proposal takes a few seconds.
         </p>
 
         <p
@@ -263,7 +263,7 @@
             THE CONFIRM STRIP.
 
             Inline rather than a modal: nothing here needs protected focus, and
-            the plan it restates is on the same screen — a modal would cover the
+            the plan it restates is on the same screen; a modal would cover the
             evidence the reviewer is deciding from. Focus moves into it on open
             (which is what announces it), Escape backs out.
         -->
@@ -277,7 +277,7 @@
             <p class="review_confirm-detail">{{ consequence }}</p>
             <p class="review_confirm-detail">
                 Every locked session is left alone, and v{{ preview.generation.version }} stays on
-                record — the schedule it replaces remains as an earlier version.
+                record; the schedule it replaces remains as an earlier version.
             </p>
             <div class="review_confirm-actions">
                 <CommonButton
@@ -329,7 +329,7 @@
 
             "Nothing to review" is a claim about the proposal, and may only be
             made once the proposal has been read. Below this branch the page used
-            to state it on any failure — a 403 rendered "This proposal is
+            to state it on any failure: a 403 rendered "This proposal is
             undefined and is not awaiting a decision.", with `undefined` in the
             user-facing copy.
         -->
@@ -365,7 +365,7 @@
             v-else-if="!preview?.run"
             class="review_empty"
         >
-            Nothing to review — this Generation was not produced by a solver run.
+            Nothing to review: this Generation was not produced by a solver run.
         </p>
 
         <template v-else>
@@ -393,7 +393,7 @@
                         week 4" and never "what does this proposal do": a run
                         moving 187 of 260 sessions spreads them over a nineteen-
                         week term, so auditing it through the week picker was
-                        thirteen `<select>` interactions — a search, not a review.
+                        thirteen `<select>` interactions: a search, not a review.
                         The grid is now where you go once you know which Offering
                         you are checking, which is what `Show in the grid` does.
                     -->
@@ -464,8 +464,8 @@
                 <!--
                     The filters belong to the GRID, not to the page, and now
                     render only with it. In list view they narrowed nothing a
-                    reviewer could see — six controls above a term-wide list that
-                    ignores five of them — which is most of the "wall of options"
+                    reviewer could see: six controls above a term-wide list that
+                    ignores five of them, which is most of the "wall of options"
                     the filter row had become.
                 -->
                 <div class="review_controls">
@@ -523,9 +523,9 @@
                     </label>
 
                     <!--
-                        The person filter was implemented in three places — a ref
+                        The person filter was implemented in three places: a ref
                         here, a watched query param, and a branch in the preview
-                        route's `filterPlacements()` — and rendered nowhere, so
+                        route's `filterPlacements()`. It rendered nowhere, so
                         "what does this do to Dr. X?" was unanswerable.
                     -->
                     <label class="review_field">
@@ -551,7 +551,7 @@
                         Density, the same three steps the schedule toolbar
                         offers. DESIGN.md makes row height a user-adjustable
                         property and this screen opted out of it with a
-                        hardcoded 60 — on a proposal that touches a crowded week
+                        hardcoded 60, because on a proposal that touches a crowded week
                         there is a lot to read in one block.
                     -->
                     <label class="review_field">
@@ -583,7 +583,7 @@
 
                     Arriving from "Show in the grid" narrows the grid to one
                     Offering. An active narrowing that says nothing is how a
-                    filtered grid and an empty week become the same picture — the
+                    filtered grid and an empty week become the same picture, the
                     exact failure this codebase already recorded once. It renders
                     whenever it is active and carries its own clear.
                 -->
@@ -622,7 +622,7 @@
                         869.75px of empty cells and hatched break bands, then the
                         sentence 762.75px below the grid's top edge. The reviewer
                         scrolled a full screen of nothing to be told there was
-                        nothing — and on a proposal that changes one week of
+                        nothing, and on a proposal that changes one week of
                         thirteen, that is the common case, not the edge.
 
                         Deciding it here rather than in either presentation also
@@ -641,7 +641,7 @@
                         `weekData.data` keeps its last value across a refetch, so
                         changing the week rendered "Loading week 5…" above week
                         4's placements, at full strength, for the length of the
-                        request — two contradictory truths on screen, and the
+                        request: two contradictory truths on screen, and the
                         more legible one was the wrong one. `aria-busy` on the
                         section already said so; nothing visual did.
                     -->
@@ -685,7 +685,7 @@ import { scheduleLinkForTerm } from '~/composables/scheduleFilters';
 import { useHasPermission } from '~/composables/session';
 
 /**
- * Gated on `generation.read` — the one permission everything this page reads
+ * Gated on `generation.read`, the one permission everything this page reads
  * sits behind. Deliberately NOT the six-permission `schedule` middleware: every
  * reference fetch here is tolerant, so a caller who may read proposals but not
  * rooms gets ids instead of names rather than a refusal. Without any guard, a
@@ -707,7 +707,7 @@ const {
 const canApply = useHasPermission('generation.apply');
 
 /**
- * #75: the run's own `termId`, not the resolved `term` above — that one is
+ * #75: the run's own `termId`, not the resolved `term` above: that one is
  * null whenever `/api/terms` came back empty or forbidden, even though the id
  * itself was in the preview all along. Both "Open the schedule" links use
  * this so the schedule opens on the Term just reviewed, not whichever Term
@@ -716,7 +716,7 @@ const canApply = useHasPermission('generation.apply');
 const scheduleUrl = computed(() => scheduleLinkForTerm(preview.value?.run?.termId ?? null));
 
 /**
- * Plays on arrival, every time — deliberately unlike the landing page, which
+ * Plays on arrival, every time, deliberately unlike the landing page, which
  * gates its opener on a first-visit cookie.
  *
  * The reasoning differs because the visit does: the landing page is entered
@@ -737,8 +737,8 @@ const confirmFocusEl = ref<{ $el?: HTMLElement } | null>(null);
  * Defaults to the ROOMIEST step rather than the middle one, which is the
  * opposite of the live schedule's default and deliberate: a timetabler scanning
  * their own week wants to see as much of it at once as possible, while a
- * reviewer is reading four lines per chip — action, offering, room, and where it
- * moved from — and deciding whether to accept them.
+ * reviewer is reading four lines per chip (action, offering, room, and where it
+ * moved from) and deciding whether to accept them.
  */
 const DENSITIES = [
     { value: 60, label: 'Compact' },
@@ -769,7 +769,7 @@ const isDecidable = computed(() => preview.value?.generation.status === 'READY')
  * `changesNothing` is the fact the old screen never stated ANYWHERE. The
  * consequence string in `applyConsequence()` can say "no placement changes",
  * but it renders only inside the confirm strip, which a non-READY proposal never
- * shows — so a proposal that reproduced 142 sessions exactly reported
+ * shows, so a proposal that reproduced 142 sessions exactly reported
  * "0 added · 0 moved · 142 unchanged · 0 removed" and left the reader to
  * subtract. It is said here instead, in words.
  *
@@ -893,7 +893,7 @@ const totals = computed(() => {
      * to the number it is a subset of. The rows that make it up carry the same
      * fact individually.
      *
-     * `?? 0` because the field is optional by design, not by accident — a
+     * `?? 0` because the field is optional by design, not by accident: a
      * Generation captured before the counter existed has no value, and those runs
      * were all hard locked, so "the same as none" is the honest reading. The
      * type's own comment prescribes exactly this.
@@ -914,7 +914,7 @@ const totals = computed(() => {
 /**
  * EVERY week of the term, annotated with what happens in it.
  *
- * Built from the term's own length, not from `weekSummary` — that only contains
+ * Built from the term's own length, not from `weekSummary`, which only contains
  * weeks which RECEIVE placements, so a proposal pulling 258 sessions into weeks
  * 1–5 of 13 made weeks 6–13 unselectable. Those are exactly the weeks being
  * emptied, and the reviewer could not look at one. Falls back to the summary's
@@ -938,20 +938,20 @@ const weekOptions = computed(() => {
         const changed = week ? week.created + week.moved + week.deleted : 0;
 
         if (!week) {
-            return { termWeek, label: ' — untouched' };
+            return { termWeek, label: ': untouched' };
         }
 
         return {
             termWeek,
             label: changed
-                ? ` — ${changed} change${changed === 1 ? '' : 's'}`
-                : ' — no changes',
+                ? `: ${changed} change${changed === 1 ? '' : 's'}`
+                : ': no changes',
         };
     });
 });
 
 /**
- * How stale the snapshot is — and it must be allowed to say.
+ * How stale the snapshot is, and it must be allowed to say so.
  *
  * Two bugs lived here. The value was a `computed` over `Date.now()`, whose only
  * reactive dependency was the fetch, so it read "just now" for as long as the
@@ -984,14 +984,14 @@ const computedAgo = computed(() => {
 
     return minutes < 60
         ? `${minutes} minute${minutes === 1 ? '' : 's'} ago`
-        : `over ${Math.floor(minutes / 60)}h ago — refresh before applying`;
+        : `over ${Math.floor(minutes / 60)}h ago, refresh before applying`;
 });
 
 /**
  * A confirm strip must not outlive the question it asks.
  *
- * If the proposal stops being READY while the strip is open — someone else
- * applied it, or a re-read landed — the strip would go on asking "replace this
+ * If the proposal stops being READY while the strip is open (someone else
+ * applied it, or a re-read landed), the strip would go on asking "replace this
  * term's timetable?" about something that can no longer be applied, and its
  * button would fail on a decision the reviewer had every reason to think was
  * live. Closing it puts the terminal state in its place, which is the answer.
@@ -1002,7 +1002,7 @@ watch(isDecidable, (decidable) => {
     }
 });
 
-/** One confirm at a time, and focus follows it — that is what announces it. */
+/** One confirm at a time, and focus follows it: that is what announces it. */
 async function openConfirm(action: 'apply' | 'discard') {
     confirmApply.value = action === 'apply';
     confirmDiscard.value = action === 'discard';
@@ -1036,7 +1036,7 @@ async function doDiscard() {
  * Land on the first week that actually changed, rather than week 1 by default.
  *
  * Created AFTER `await ready`, so the `immediate` callback sees a populated
- * preview — the SSR trap this codebase has hit three times is a watcher that
+ * preview. The SSR trap this codebase has hit three times is a watcher that
  * seeds first-render state before its data exists.
  */
 watch(preview, (value) => {
@@ -1062,7 +1062,7 @@ watch(preview, (value) => {
      * actually use.
      *
      * The cap is generous rather than prose-narrow because ONE child genuinely
-     * wants width — the six-column week grid — and it keeps its left edge shared
+     * wants width (the six-column week grid) and it keeps its left edge shared
      * with the controls above it, which a full-bleed breakout would break. The
      * argument sections carry their own tighter measures from this property.
      */
@@ -1136,7 +1136,7 @@ watch(preview, (value) => {
         background: none;
 
         /*
-         * `.iconify`, not `svg` — `Icon` renders an Iconify SPAN, so the
+         * `.iconify`, not `svg`: `Icon` renders an Iconify SPAN, so the
          * `svg` rule this replaces matched nothing and the glyph sat at its
          * inherited 1em in the surrounding text colour. Same trap already
          * recorded in ViewMenu.vue, my/preferences.vue and my/availability.vue;
@@ -1258,7 +1258,7 @@ watch(preview, (value) => {
         /*
          * THE TWO OUTCOMES ARE DELIBERATELY UNEQUAL, and only one of them said
          * so. Applying replaced a term's timetable; discarding changed nothing
-         * on the schedule at all — so applied carries state colour and
+         * on the schedule at all, so applied carries state colour and
          * discarded stays neutral. That asymmetry is right.
          *
          * What was wrong is that discarded reached it by FALLING THROUGH to the
@@ -1339,7 +1339,7 @@ watch(preview, (value) => {
     }
 
     /*
-     * THE AUTHORED MOMENT ON THIS SCREEN — DESIGN.md allows one per surface. The
+     * THE AUTHORED MOMENT ON THIS SCREEN: DESIGN.md allows one per surface. The
      * strip arrives with weight (240ms, rising out of a slight compression) because
      * it asks the one irreversible-feeling question the product has, and leaves in
      * 140ms so backing out feels like nothing happened.
@@ -1394,7 +1394,7 @@ watch(preview, (value) => {
     }
 
     /*
-     * THE STATE BAND. Full width deliberately — it is the one thing on the page
+     * THE STATE BAND. Full width deliberately: it is the one thing on the page
      * that reframes everything below it, so it is the one thing allowed to
      * ignore `--review-measure`.
      *
@@ -1449,7 +1449,7 @@ watch(preview, (value) => {
     }
 
     /*
-     * `flex: 0 1` — NOT `1 1`, and that one digit was the whole defect.
+     * `flex: 0 1`, NOT `1 1`: that one digit was the whole defect.
      *
      * A growing text block pushed "Open the schedule" to the far right edge of a
      * 1376px band, roughly 700px from the sentence it belongs to. That is the
@@ -1489,8 +1489,8 @@ watch(preview, (value) => {
     /*
      * The headline totals, which the change list alone cannot state.
      *
-     * Removing the old `Changes` facts row was right — "0 added · 0 moved · 142
-     * unchanged · 0 removed" makes a reader subtract to learn nothing happened —
+     * Removing the old `Changes` facts row was right ("0 added · 0 moved · 142
+     * unchanged · 0 removed" makes a reader subtract to learn nothing happened),
      * but it took the term-level total with it, and a per-Offering list has no
      * place to put one. It belongs to the section, not to a row.
      */
@@ -1643,8 +1643,8 @@ watch(preview, (value) => {
     /*
      * The week-level empty state, at the size of the claim it makes.
      *
-     * Not the full-height treatment `&_failure` gets — nothing has gone wrong
-     * and there is nothing to recover from — and not a bare line either, or it
+     * Not the full-height treatment `&_failure` gets, since nothing has gone wrong
+     * and there is nothing to recover from, and not a bare line either, or it
      * reads as a caption for a grid that is not there. One quiet band, aligned
      * with the controls above it, so the eye lands where the grid would have
      * been and reads the sentence instead of hunting for it.
@@ -1733,11 +1733,11 @@ watch(preview, (value) => {
      * by opacity is the right answer rather than the trap.
      *
      * `ScheduleReviewGrid` deliberately does NOT use opacity for its `unchanged`
-     * chips — it measured 4.19:1 there, because opacity flattens a chip's own
+     * chips: it measured 4.19:1 there, because opacity flattens a chip's own
      * background into its text and the result is a persistent reading state
      * nobody can predict from the token ramp. This is the opposite case: the
      * content is transient, it is being replaced within one request, and it is
-     * explicitly NOT for reading — `aria-busy` on the section says exactly that
+     * explicitly NOT for reading: `aria-busy` on the section says exactly that
      * to anyone not looking at it. Dimming here means "do not trust this yet",
      * which is the honest thing to say about a week that has already changed in
      * the picker.
@@ -1777,12 +1777,12 @@ watch(preview, (value) => {
 
         /*
          * The week picker's ANNOTATION is the reason it is the best control on
-         * this page — "Week 4 — 37 changes" is the only place the reviewer learns
+         * this page: "Week 4: 37 changes" is the only place the reviewer learns
          * which weeks are worth opening. At `flex: 1 1 140px` it shared a row and
-         * truncated to "Week 4 — 37 chan…", cutting exactly that.
+         * truncated to "Week 4: 37 chan…", cutting exactly that.
          *
          * So the week gets its own full-width row and the other four pair up.
-         * Ordering is presentational only — the DOM order is unchanged, so tab
+         * Ordering is presentational only: the DOM order is unchanged, so tab
          * order still follows the visual one.
          */
         &_controls { align-items: stretch; }
@@ -1799,13 +1799,13 @@ watch(preview, (value) => {
          * THE CONFIRM STRIP BECOMES A COMMIT BAR, and this is the structural
          * adaptation the page was missing rather than a cosmetic one.
          *
-         * The strip is DOM-above the summary, which is right on desktop — it
+         * The strip is DOM-above the summary, which is right on desktop: it
          * appears next to the Apply button that opened it. At 390×844 that same
          * position pushed 100% of the evidence below the fold: the reviewer was
          * asked "Replace this term's timetable?" with nothing on screen to
          * decide from. The comment above `&_confirm` rejects a modal precisely
          * because "a modal would cover the evidence the reviewer is deciding
-         * from" — and this layout was doing that by another mechanism.
+         * from", and this layout was doing that by another mechanism.
          *
          * Anchored to the bottom instead, the argument scrolls behind it and the
          * decision sits in the thumb zone, which is also the sticky commit bar
@@ -1825,7 +1825,7 @@ watch(preview, (value) => {
             border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 
             // The tint is 8% and the bar now floats over scrolling content, so
-            // it is layered over an OPAQUE surface rather than replacing it —
+            // it is layered over an OPAQUE surface rather than replacing it:
             // a translucent background here renders chips through the sentence.
             background: $surface2;
             box-shadow: 0 -6px 20px varToRgba('surface7', 0.16);
@@ -1876,7 +1876,7 @@ watch(preview, (value) => {
 /*
  * The outcome SETTLES rather than arrives: it is the end of the movement the
  * confirm strip started, and the one thing on the screen the reviewer waited
- * for. Slightly longer, and it comes up rather than down — the decision is
+ * for. Slightly longer, and it comes up rather than down, since the decision is
  * behind them now.
  */
 .review-outcome-enter-active {

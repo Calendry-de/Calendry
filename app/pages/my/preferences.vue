@@ -2,7 +2,7 @@
     <CommonPage title="My teaching preferences">
         <p class="intro">
             Days, times and kinds of room you would rather teach in. Unlike unavailability, a preference is a
-            <strong>soft</strong> wish — it never blocks a placement, so it needs no approval
+            <strong>soft</strong> wish: it never blocks a placement, so it needs no approval
             and takes effect as soon as you save it.
         </p>
 
@@ -10,14 +10,14 @@
             ISSUE #3, RESOLVED: the hedge this replaced said "This page cannot
             read the tenant's constraint rows" and left the actual state
             unstated. `/api/me/enforcement` answers the ONE question this page
-            needs — is `person_preference_fit` currently on — with a plain
+            needs (is `person_preference_fit` currently on) with a plain
             boolean and no new permission (see that route's own comment for
             why none was needed). Two sentences now, chosen by the same fact
             rather than always saying the same thing regardless of it.
 
             STILL NOT AN UNCONDITIONAL PROMISE even when true: a preference
             always loses to a hard requirement, so "weighed" is not "granted".
-            Verified end to end when this first shipped — `scripts/preference
+            Verified end to end when this first shipped: `scripts/preference
             -solve-check.ts` scores the same instance solved with and without
             the rule, 7 of 40 placements satisfied against 40 of 40.
         -->
@@ -33,20 +33,20 @@
                 <strong>Your institution weighs these.</strong>
                 Preferences are saved, visible to administrators, and read by the timetable
                 generator, which tries to place your sessions on the days, blocks and kinds of
-                room you choose. A preference always loses to a hard requirement — so treat it
+                room you choose. A preference always loses to a hard requirement, so treat it
                 as a wish that is heard, not a guarantee.
             </span>
             <span v-else>
                 <strong>Your institution does not currently weigh these.</strong>
                 Preferences are still saved and visible to administrators, but the timetable
-                generator is not asked to act on them yet — an administrator switches this on
+                generator is not asked to act on them yet: an administrator switches this on
                 for the whole institution. Saving now means it takes effect the moment they do.
             </span>
         </p>
 
         <!--
             THE GUARD ITS SIBLING ALREADY HAD. Without it this page rendered
-            "Preferred blocks", its help text, and then nothing — so a tenant
+            "Preferred blocks", its help text, and then nothing, so a tenant
             with no TimeGrid was indistinguishable from a failed fetch, which is
             the exact failure CLAUDE.md names as invisible. `availability.vue`
             carried this branch; this page did not.
@@ -149,7 +149,7 @@ const { data, refresh } = await useAsyncData(
         const [payload, enforcement] = await Promise.all([
             request<Payload>('/api/me/availability'),
             /*
-             * NEEDS NO PERMISSION — see the route's own comment — so it cannot
+             * NEEDS NO PERMISSION (see the route's own comment), so it cannot
              * fail this wave for anyone who reached `/api/me/availability`
              * (availability.manage_own) here. Not wrapped in a `.catch()`
              * fallback the way `ManageGroupAvailability`'s tolerant fetch is:
@@ -191,7 +191,7 @@ function seed() {
 /*
  * Seeded from the AWAITED data, not from a watcher. Vue does not flush watchers
  * during SSR, so a `watch(..., { immediate: true })` would run once on the
- * server with nothing fetched and render empty controls over real preferences —
+ * server with nothing fetched and render empty controls over real preferences,
  * the failure CLAUDE.md records from Step 13. The watcher below is for later
  * client-side refreshes only.
  */
@@ -203,7 +203,7 @@ const dirty = computed(() => snapshot() !== pristine.value);
 /*
  * "Saved." is about the last write, so it stops being true the moment there are
  * unsaved changes again. It used to persist beside a dirty form, which reads as
- * "your current state is saved" — the one thing it does not mean.
+ * "your current state is saved", the one thing it does not mean.
  */
 watch(dirty, (isDirty) => {
     if (isDirty) {
@@ -221,7 +221,7 @@ async function save() {
             method: 'PUT',
             /*
              * ALL THREE AXES, EVERY TIME. The PUT replaces the whole preference
-             * state, so a body omitting an axis clears it — which is why this
+             * state, so a body omitting an axis clears it, which is why this
              * sends the room types even when the list is empty rather than
              * conditionally.
              */
@@ -258,7 +258,7 @@ async function save() {
     gap: var(--space-3);
     align-items: flex-start;
 
-    // `.iconify`, not `svg` — `Icon` renders a span, so the old rule matched
+    // `.iconify`, not `svg`: `Icon` renders a span, so the old rule matched
     // nothing and the glyph stayed shrinkable inside this flex row.
     > .iconify {
         flex: none;
@@ -293,7 +293,7 @@ async function save() {
      * NO GROUND, and that is the resolution rather than a compromise.
      *
      * This carried `background: $surface1` on a page ground that is also
-     * `$surface1` — 1.00:1, measured, in both themes — so the fill and the
+     * `$surface1` (1.00:1, measured, in both themes), so the fill and the
      * radius drew literally nothing. No adjacent surface step can fix it
      * either: `surface0` is 1.04:1 from the ground and `surface2` is 1.05:1, so
      * a visible card is simply not available in this palette.
@@ -306,7 +306,7 @@ async function save() {
 
     /*
      * Vertical inset only. `$surface1` is the body's own ground, so this box
-     * draws nothing (measured 1.00:1) — and a horizontal padding on an
+     * draws nothing (measured 1.00:1), and a horizontal padding on an
      * invisible container is just an unexplained 16px indent: it put this
      * card's content at x=288 while the page's own prose sat at x=272. The
      * section is grouped by rhythm instead. Restore the horizontal inset in the

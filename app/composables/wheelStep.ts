@@ -1,5 +1,5 @@
 /**
- * One wheel gesture, one step — for the controls that opt into it.
+ * One wheel gesture, one step: for the controls that opt into it.
  *
  * SCOPED BY WHERE IT IS BOUND, never globally. It lives on the week grid, the
  * day agenda and the week stepper, so a wheel anywhere else on the page is an

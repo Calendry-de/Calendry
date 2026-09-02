@@ -222,7 +222,7 @@ const SECTIONS = [
             gap: $space4;
 
             /*
-             * The CTA is `size="S"` — 36px rendered, right for the desktop row
+             * The CTA is `size="S"` (36px rendered), right for the desktop row
              * it was chosen for and too short for a thumb. Raised here rather
              * than in `CommonButton`, because `S` exists precisely to be the
              * compact one and every other caller picked it on purpose; this is

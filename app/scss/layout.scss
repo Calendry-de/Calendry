@@ -16,7 +16,7 @@ html, body {
 
     /*
      * STATED, not inherited. Nothing in this app set a line height, so every
-     * element rendered at whatever the user agent picked (~1.2 for this face) —
+     * element rendered at whatever the user agent picked (~1.2 for this face):
      * a value nobody chose and no stylesheet recorded. Declaring the tight step
      * here changes almost nothing visually and makes the default a decision:
      * chrome is single-line and lives in px-exact rows, so it stays tight, and
@@ -47,11 +47,11 @@ html, body {
 /*
  * The focus ring is a non-text UI indicator and needs 3:1 against what it sits
  * on (WCAG 1.4.11). `$primary400` (#58B4A7) measured 2.31:1 against the page
- * ground and 1.99:1 against a raised chip — the ring a keyboard user depends on
+ * ground and 1.99:1 against a raised chip: the ring a keyboard user depends on
  * was the least visible thing on the screen.
  *
  * `$primary600` measures 4.51:1 on the light ground. The primary ramp is NOT
- * theme-swapped (only surface/content are — see `themesList`), so the dark
+ * theme-swapped (only surface/content are; see `themesList`), so the dark
  * ground gets the light end of the same ramp explicitly rather than inheriting a
  * value composed for the opposite background.
  */
@@ -71,8 +71,8 @@ html, body {
 }
 
 // Tell the browser which ground it is painting on. Without this, native
-// surfaces we do not draw — form controls, the default scrollbar rendering,
-// spellcheck underlines — keep the user agent's own light/dark assumption and
+// surfaces we do not draw (form controls, the default scrollbar rendering,
+// spellcheck underlines) keep the user agent's own light/dark assumption and
 // can end up dark-on-light or the reverse. It follows the theme class the
 // layout composable sets on <html>.
 :root {

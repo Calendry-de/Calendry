@@ -9,7 +9,7 @@ import { type Tx, withRequestTenant } from '../../utils/tenantDb';
  *
  * DRIVEN FROM `person`, NOT FROM `account`. `person` is behind RLS, so starting
  * there makes the tenant boundary a property of the query rather than a filter
- * this handler has to remember — the same reason every other read in this
+ * this handler has to remember, the same reason every other read in this
  * codebase goes through `withTenant`. Starting from `account` (no RLS, no
  * `tenant_id`) and joining down would put the whole isolation guarantee in one
  * hand-written WHERE clause.
@@ -19,9 +19,10 @@ import { type Tx, withRequestTenant } from '../../utils/tenantDb';
  * unrepresentable through the write routes (`assertDetachable`), so an empty
  * list means "no logins", never "logins we could not see".
  *
- * Response shape follows the generic list route exactly — a bare array without
- * `limit`, `{ rows, total }` with it — because `useEntityList` is shared and a
- * second shape would be a second code path in the client for one entity.
+ * Response shape follows the generic list route exactly: a bare array without
+ * `limit`, `{ rows, total }` with it. That is because `useEntityList` is
+ * shared, and a second shape would be a second code path in the client for
+ * one entity.
  */
 const LIST_QUERY = z.object({
     limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -38,7 +39,7 @@ async function tenantCounts(tx: Tx, accountIds: string[]): Promise<Map<string, n
     /*
      * Through the SECURITY DEFINER function, not a join to `person`: inside this
      * transaction a join would see only THIS tenant's rows and every account
-     * would report exactly one tenant — turning the shared-account badge into a
+     * would report exactly one tenant, turning the shared-account badge into a
      * decoration that is always absent. The ids come from the RLS-scoped query
      * above, so the function is never asked about an account this tenant cannot
      * already see.
@@ -96,8 +97,8 @@ export default defineEventHandler(async (event) => {
         };
 
         return mapDbErrors(async () => {
-            // Sequential — `tx` is one shared connection; concurrent queries on
-            // it trip pg's deprecated overlapping-query warning.
+            // Sequential, because `tx` is one shared connection; concurrent
+            // queries on it trip pg's deprecated overlapping-query warning.
             const people = await tx.person.findMany({
                 where,
                 select,

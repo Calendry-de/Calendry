@@ -9,12 +9,12 @@
  * 24-seat rooms all eligible.
  *
  * In `shared/` because the solver input (what is possible) and the Offering form
- * (what leaving the field blank will do) must not drift. Kept PURE — rows in,
+ * (what leaving the field blank will do) must not drift. Kept PURE: rows in,
  * number out.
  *
  * A UNION, NOT A SUM. Summing per-Group counts double-counts a person reachable
  * more than once, in two independent ways: membership at a leaf AND an ancestor
- * (legal data), and an Offering carrying both a Group and its own descendant — "IT
+ * (legal data), and an Offering carrying both a Group and its own descendant: "IT
  * Security" (48) plus "dIT22 S1" (24) sums to 72 where the truth is 48. So: union
  * of every attached Group's own-plus-descendants closure, then DISTINCT people.
  */
@@ -31,13 +31,13 @@ export interface CapacityMembership {
     personId: string;
 }
 
-/** Where the number came from — shown to humans, and used in the report. */
+/** Where the number came from, shown to humans, and used in the report. */
 export type CapacityBasis =
     /** Distinct people actually enrolled somewhere in the closure. */
     | 'membership'
     /** No real membership anywhere; manual estimates summed instead. */
     | 'expected_size'
-    /** Neither available — the caller must not treat this as "no requirement". */
+    /** Neither available; the caller must not treat this as "no requirement". */
     | 'none';
 
 export interface DerivedCapacity {
@@ -52,14 +52,14 @@ export interface DerivedCapacity {
      * in its closure.
      *
      * Kept so the two candidate answers can be COMPARED rather than one simply
-     * replacing the other — which is the whole point of `partialEnrolment`.
+     * replacing the other, which is the whole point of `partialEnrolment`.
      */
     estimate: number | null;
     /**
      * The real roll is materially smaller than the estimate, so enrolment looks
      * incomplete and this capacity is probably too low.
      *
-     * Advisory. The real count still wins — an enrolment list is a fact — but a
+     * Advisory. The real count still wins (an enrolment list is a fact), but a
      * tenant should learn that "4 against an expected 96" is the basis BEFORE a
      * room turns out to be catastrophically small, not after.
      */
@@ -71,7 +71,7 @@ export interface DerivedCapacity {
  * complete. A roll is always slightly short, so flagging any shortfall would train
  * people to skip the report; ten percent absorbs churn but not a data-entry gap.
  *
- * The threshold decides only WHETHER to mention it — both numbers travel, so a
+ * The threshold decides only WHETHER to mention it: both numbers travel, so a
  * slightly wrong threshold degrades into noise rather than silence.
  */
 export const ENROLMENT_COMPLETE_RATIO = 0.9;
@@ -117,13 +117,13 @@ function estimateOf(id: string, byId: Map<string, CapacityGroup>, childrenOf: Ma
 
 /**
  * Every Group's displayed size, all at once: its own `expectedSize` where set,
- * or — where it is not — the sum of its nested groups' estimates. The same
+ * or, where it is not, the sum of its nested groups' estimates. The same
  * "own value, else sum of children" rule `estimateOf` applies to a single
  * attached Group inside `deriveCapacity`, run here for every Group a tenant
  * has so a list view can show one without walking a closure per row.
  *
  * NULL, not 0, where neither the Group nor anything beneath it carries a
- * number — the same "absence is not zero" reasoning `DerivedCapacity.estimate`
+ * number, the same "absence is not zero" reasoning `DerivedCapacity.estimate`
  * follows.
  */
 export function estimatedGroupSizes(groups: CapacityGroup[]): Map<string, number | null> {
@@ -182,8 +182,8 @@ export function deriveCapacity(
      * count is still the answer, but "4 people where 96 were expected" is a fact
      * about that answer which was invisible until a room turned out too small.
      *
-     * Only MAXIMAL attached Groups contribute to the estimate — one with another
-     * attached Group above it is already represented by that ancestor — which is
+     * Only MAXIMAL attached Groups contribute to the estimate: one with another
+     * attached Group above it is already represented by that ancestor, which is
      * the same double-count the union avoids.
      */
     const attachedSet = new Set(attached);
@@ -219,7 +219,7 @@ export function deriveCapacity(
             closureSize: closure.size,
             estimate,
             /**
-             * Advisory only — the roll still wins. Requires an estimate to
+             * Advisory only: the roll still wins. Requires an estimate to
              * compare against: absence of one is not evidence of completeness,
              * and inventing a comparison would be the silent-narrowing failure
              * this whole derivation exists to end, one level up.
@@ -243,7 +243,7 @@ export function deriveCapacity(
      * Nothing derivable. Returned as NULL rather than 0 on purpose: 0 is a
      * meaningful capacity requirement ("any room will do") and this is the
      * absence of a requirement anyone stated. Callers that must emit a number
-     * have to decide what to send AND say so — see
+     * have to decide what to send AND say so; see
      * `report.offeringsWithNoDerivableCapacity`.
      */
     return { capacity: null, basis: 'none', closureSize: closure.size, estimate: null, partialEnrolment: false };

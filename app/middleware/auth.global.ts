@@ -9,7 +9,7 @@ import {
  * Route guard: every page needs a session except the ones listed here.
  *
  * Deny-by-default. A new page is protected the moment it is created, rather
- * than protected only once someone remembers to add middleware to it — the
+ * than protected only once someone remembers to add middleware to it, the
  * same reasoning as the server's fail-closed RLS.
  *
  * This is a convenience, not a security boundary. The API enforces
@@ -24,7 +24,7 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  * Distinct from PUBLIC_ROUTES, which are the AUTH pages: those bounce a
  * signed-in visitor into the app, because a sign-in form is meaningless once you
  * are signed in. The public landing page is not meaningless to a signed-in
- * visitor — bouncing someone off it because they happen to hold a cookie would
+ * visitor: bouncing someone off it because they happen to hold a cookie would
  * make the roadmap unreadable to the people most likely to want it.
  *
  * `/` is that page. The authenticated home is `/dashboard`, which is where
@@ -39,8 +39,8 @@ const PUBLIC_ROUTES = ['/login', '/change-password'];
  * `/staff`, `/staff/login` and `/staff/change-password` (issue #76, #106) are
  * the third reason: a Calendry STAFF session is a completely separate
  * credential (`STAFF_SESSION_COOKIE`/`StaffIdentity`, never a tenant Account
- * session), so this guard — which only ever fetches and checks the TENANT
- * session — must neither block a staff visitor for lacking one nor bounce a
+ * session), so this guard, which only ever fetches and checks the TENANT
+ * session, must neither block a staff visitor for lacking one nor bounce a
  * tenant-signed-in visitor away from staff pages. Each staff page checks for
  * its own staff session itself.
  */
@@ -67,7 +67,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     const store = useStore();
 
     if (isPublic) {
-        // Already signed in and situated — nothing to do on the login page.
+        // Already signed in and situated: nothing to do on the login page.
         // A session still awaiting tenant selection must stay, to finish.
         // `?select=1` is the exception: a signed-in user deliberately going back
         // to change institution, which is a session mutation rather than a
@@ -82,7 +82,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
             // Only internal paths: an open redirect would let a crafted link
             // bounce a freshly authenticated user to another origin. `/\` is
-            // rejected too — browsers treat a backslash in a Location header
+            // rejected too: browsers treat a backslash in a Location header
             // as `/`, so `/\evil.com` is `//evil.com` in disguise.
             return navigateTo(isInternalPath(redirect) ? redirect : resolveHomeRoute(session.value?.permissions ?? []));
         }
@@ -106,7 +106,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
         return navigateTo('/schedule');
     }
 
-    // Reached only by a signed-in visit to a protected route — remember it as
+    // Reached only by a signed-in visit to a protected route; remember it as
     // "where the user left off," matching the fallback above and the login
     // page's own destination resolver.
     store.lastVisitedPage = to.fullPath;

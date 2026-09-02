@@ -6,15 +6,15 @@ import { api, login } from './helpers/client';
  * Screens: a lobby display is a DEVICE credential.
  *
  * THE ASSERTION THAT MATTERS is `a screen key cannot read anything else`. A
- * screen resolves to a real identity — that is what lets it read a board without
- * an account — and the whole safety argument is that it holds no acting Person,
+ * screen resolves to a real identity, which is what lets it read a board without
+ * an account, and the whole safety argument is that it holds no acting Person,
  * so `heldPermissions()` refuses it everywhere. That property is emergent rather
  * than written down at each route: nothing in `/api/persons` mentions screens,
  * and it stays safe only because the identity carries no Person.
  *
  * So it is tested against a LIVE key, over several unrelated endpoints, and it
  * needs to stay that way. The first version of this probe ran after revoking the
- * key and got 401 everywhere — which looks like a pass and proves nothing, since
+ * key and got 401 everywhere, which looks like a pass and proves nothing, since
  * a revoked key is refused before any permission is consulted.
  */
 let cookie = '';
@@ -111,7 +111,7 @@ describe('a screen key is authority for the board and NOTHING else', () => {
             const body = await res.json() as { screenName: string; state: string };
 
             expect(body.screenName).toBe('Board reader');
-            // Either state is correct here — the fixture may or may not have a
+            // Either state is correct here: the fixture may or may not have a
             // term running today. What matters is that it answered at all.
             expect(['ok', 'no-term']).toContain(body.state);
         } finally {
@@ -136,7 +136,7 @@ describe('a display says WHY it is blank', () => {
     it('distinguishes DEACTIVATED from unrecognised', async () => {
         /*
          * The distinction is the point. Both are "no board", but only one is
-         * fixable by whoever walks past — and the resolver treats an inactive
+         * fixable by whoever walks past, and the resolver treats an inactive
          * screen as no identity, which would otherwise reach the wall as a bare
          * 401 indistinguishable from a typo.
          */
@@ -195,16 +195,16 @@ describe('the payload the shared form actually sends', () => {
      * is the common case because empty means every room.
      *
      * `useEntityForm` serialises EVERY declared field on every save and returns
-     * `value ?? null` for anything untouched — so the form sends `roomIds: null`
+     * `value ?? null` for anything untouched, so the form sends `roomIds: null`
      * and `key: null`, not absent fields. `optional()` accepts `undefined` and
      * rejects `null`, so the schema refused its own form. Nothing in the
      * handler was wrong; the contract was written against an imagined caller
      * rather than the real one.
      *
      * These tests therefore send the literal shapes the form produces, rather
-     * than tidy hand-written ones — a hand-written body is exactly what hid this.
+     * than tidy hand-written ones: a hand-written body is exactly what hid this.
      */
-    it('accepts a create with roomIds null — no rooms ticked', async () => {
+    it('accepts a create with roomIds null, no rooms ticked', async () => {
         const res = await api<Created>('/api/screens', {
             method: 'POST',
             cookie,
@@ -272,7 +272,7 @@ describe('liveness', () => {
          * This shipped broken once and the test exists because of it. The write
          * was a fire-and-forget through `getPrisma()` OUTSIDE `withTenant()`,
          * where the app role's `FORCE ROW LEVEL SECURITY` has no
-         * `current_tenant_id()` to compare against — so the UPDATE matched zero
+         * `current_tenant_id()` to compare against, so the UPDATE matched zero
          * rows, silently, forever. Nothing in the response changed, which is why
          * only reading the column afterwards caught it.
          */
@@ -300,8 +300,8 @@ describe('the management form', () => {
          * SHIPPED BROKEN ONCE, and invisibly: the `roomIds` field was declared
          * `type: 'text'`, and `referencedResources()` builds the form's fetch
          * wave only from fields carrying a `reference`. So no rooms were ever
-         * fetched and the picker rendered its empty state — "No rooms defined
-         * yet." — in a tenant with four. Nothing errored; the form simply told a
+         * fetched and the picker rendered its empty state, "No rooms defined
+         * yet.", in a tenant with four. Nothing errored; the form simply told a
          * confident lie, which is this codebase's recurring failure shape.
          *
          * Asserted against SSR output because the picker is server-rendered. The

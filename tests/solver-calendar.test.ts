@@ -15,7 +15,7 @@ import { fromWireWeek, toWireSession, toWireWeek } from '../server/utils/solverS
 /**
  * Stage 3a/3c arithmetic.
  *
- * Pure functions, no server and no database — unlike the four integration
+ * Pure functions, no server and no database, unlike the four integration
  * suites. These are the calculations whose failure mode is a plausible-looking
  * timetable that is silently a week or a block out, so they are asserted rather
  * than eyeballed.

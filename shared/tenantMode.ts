@@ -2,7 +2,7 @@
  * Tenant mode (issue #8): a default-behaviour bias between "school" and
  * "university" framing, never a fork of the taxonomy.
  *
- * TAXONOMY.md's entity model does not branch on this — an Offering is the
+ * TAXONOMY.md's entity model does not branch on this: an Offering is the
  * same row shape either way. What changes is presentation only: which
  * Offering-form fields lead and which constraint types the catalogue
  * suggests first. A school's "Maths, 4 lessons a week, Mr Schmidt" and a
@@ -30,8 +30,8 @@ export function isTenantMode(value: unknown): value is TenantMode {
 /**
  * Offering fields a school does not lead with.
  *
- * A school names a concrete shape — a subject, a weekly count, a named
- * teacher assigned directly on the `lecturers` relation — rather than the
+ * A school names a concrete shape (a subject, a weekly count, a named
+ * teacher assigned directly on the `lecturers` relation) rather than the
  * more abstract university vocabulary these fields carry: a course CODE
  * distinct from its title, a scheduling PATTERN chosen instead of assumed
  * weekly, a required ROLE used to filter a pool of possible lecturers rather
@@ -39,7 +39,7 @@ export function isTenantMode(value: unknown): value is TenantMode {
  * and ONLINE delivery, which a single-building school rarely has at all.
  *
  * `title`, `kindId`, `frequency` and `durationBlocks` stay primary in both
- * modes — they are exactly "Maths, 4 lessons a week" either way.
+ * modes: they are exactly "Maths, 4 lessons a week" either way.
  */
 const SCHOOL_DEEMPHASISED_OFFERING_FIELDS: ReadonlySet<string> = new Set([
     'code',
@@ -62,9 +62,9 @@ export function offeringFieldsToDeemphasize(mode: TenantMode): ReadonlySet<strin
  * tenant can still enable, but not ones worth suggesting first.
  *
  * Basis for the split, stated so it can be argued with: everything NOT
- * listed here — the double-booking guards, exact frequency, vetoes,
+ * listed here (the double-booking guards, exact frequency, vetoes,
  * block/day/compactness preferences, lecturer-preference fit, room-fits-
- * group-size — is exactly as relevant to a single-building school timetable
+ * group-size) is exactly as relevant to a single-building school timetable
  * as to a university one, so it is never de-suggested.
  */
 const UNIVERSITY_ORIENTED_CONSTRAINT_TYPES: ReadonlySet<string> = new Set([

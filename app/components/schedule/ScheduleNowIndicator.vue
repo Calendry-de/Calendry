@@ -1,15 +1,15 @@
 <!--
-    The live "now" line (issue #109) — Google Calendar/Outlook's horizontal
+    The live "now" line (issue #109): Google Calendar/Outlook's horizontal
     bar across today's column, at the current time.
 
     A SEPARATE COMPONENT, not inlined into `ScheduleGrid.vue`: it owns its own
     ticking clock (`useTenantNow`) and a positioning calculation that is
-    substantial enough on its own — splitting it is `ScheduleGrid.vue`'s own
+    substantial enough on its own, so splitting it is `ScheduleGrid.vue`'s own
     "past ~3 responsibilities" rule (CLAUDE.md), and it also means a grid
     render never re-runs just because a minute passed.
 
     NO NEW GEOMETRY. `perMinute` and the row list come straight from
-    `useGridGeometry` in the parent — the same arithmetic `ScheduleSessionChip`
+    `useGridGeometry` in the parent, the same arithmetic `ScheduleSessionChip`
     is positioned with (CLAUDE.md, "Grid geometry": "the single definition of
     block boundaries"). This draws no line a Session's own placement could not
     already draw.
@@ -40,7 +40,7 @@ const props = defineProps<{
     perMinute: number;
     /** Block index → the row's 1-based CSS grid line. */
     lineOf: (blockIndex: number) => number;
-    /** The week currently on screen — the line only draws when this IS the week containing today. */
+    /** The week currently on screen: the line only draws when this IS the week containing today. */
     termWeek: number;
     /** Null before a Term resolves; the line has no "today" to place without it. */
     termStart: string | null;
@@ -59,7 +59,7 @@ interface Position {
  * Null whenever the line has nothing honest to draw: no term, a different
  * week on screen, today is not one of the grid's active days, or "now" falls
  * outside the grid's rendered hours (before the first block or after the
- * last) — never floating above or below the drawn range.
+ * last), never floating above or below the drawn range.
  */
 const position = computed<Position | null>(() => {
     if (!props.termStart) {
@@ -84,13 +84,13 @@ const position = computed<Position | null>(() => {
     const minutes = nowLocal.value.minutes;
 
     /*
-     * UNIVERSAL boundaries (`dayOfWeek: null`), not today's own — matching
+     * UNIVERSAL boundaries (`dayOfWeek: null`), not today's own, matching
      * `useGridGeometry`'s `rows`, built the same way (gridGeometry.ts). A
      * day-specific `TimeGridBreak` can push TODAY's own blocks later than
      * the universal template's last row, and this component draws no row
      * of its own to place a line into past that point: checking "now"
      * against today's real (shifted) boundaries let `blockAtMinute` return
-     * an in-range index — and therefore a "line" CSS row — for a time the
+     * an in-range index, and therefore a "line" CSS row, for a time the
      * drawn grid has no row for at all, which is what let the line keep
      * rendering (clamped to the last row by the `Math.max(0, …)` below)
      * long after the grid's last drawn block had ended.
@@ -111,7 +111,7 @@ const position = computed<Position | null>(() => {
     const span = blockSpan(props.grid, blockIndex, null);
 
     if (minutes < span.end) {
-        // Inside the block's own teaching time — the exact case
+        // Inside the block's own teaching time: the exact case
         // `useGridGeometry`'s `bandWithin` positions a Session chip for, so
         // the offset is the same `(minute - blockStart) * perMinute`.
         const line = props.lineOf(blockIndex);
@@ -123,7 +123,7 @@ const position = computed<Position | null>(() => {
         };
     }
 
-    // Inside the (universal) gap after this block — the grid draws only the
+    // Inside the (universal) gap after this block: the grid draws only the
     // UNIVERSAL breaks as rows (see `ScheduleGrid.vue`'s "own breaks" note),
     // so the line follows that same simplification rather than inventing a
     // day-specific gap row nothing else on this grid draws either.

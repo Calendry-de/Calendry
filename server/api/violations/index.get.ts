@@ -12,7 +12,7 @@ const querySchema = z.object({
 /**
  * Current constraint violations.
  *
- * Reads persisted constraint_violation rows — these are refreshed synchronously
+ * Reads persisted constraint_violation rows: these are refreshed synchronously
  * by the editing routes, never computed here. That is what makes warn-and-allow
  * workable: a hard-constraint breach introduced by a manual edit stays visible
  * in a queryable list instead of living only in the response that created it.
@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
         /**
          * A violation reaches a Term through EITHER its Session or its
          * Offering. Filtering on `session` alone would silently drop every
-         * offering-scoped violation — which is precisely the ExactFrequency
+         * offering-scoped violation, which is precisely the ExactFrequency
          * case the whole nullable-session change exists for.
          */
         if (query.termId) {

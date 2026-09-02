@@ -11,7 +11,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Tenant'],
         summary: 'Export this institution\'s entire dataset',
-        description: 'The tenant-wide half of issue #84 — Persons, logins, Groups, Rooms, Equipment, Roles, Offerings, Sessions, exam requests, Constraints and this tenant\'s audit trail, one sheet per entity. Self-service for a departing institution taking its data with it: gated on `tenant.export`, alongside `tenant.read`/`tenant.update` (this institution\'s own settings), never staff-only — erasing a tenant is the operation that stays staff-only (`DELETE /api/staff/tenants/:id`), not reading a copy of its own data.',
+        description: 'The tenant-wide half of issue #84: Persons, logins, Groups, Rooms, Equipment, Roles, Offerings, Sessions, exam requests, Constraints and this tenant\'s audit trail, one sheet per entity. Self-service for a departing institution taking its data with it: gated on `tenant.export`, alongside `tenant.read`/`tenant.update` (this institution\'s own settings), never staff-only; erasing a tenant is the operation that stays staff-only (`DELETE /api/staff/tenants/:id`), not reading a copy of its own data.',
         parameters: [
             { name: 'format', in: 'query', schema: { type: 'string', enum: ['json', 'xlsx'] }, description: 'Defaults to json.' },
         ],

@@ -87,14 +87,14 @@ export default defineEventHandler(async (event) => {
         }
 
         /**
-         * A swap exchanges two PLACEMENTS (issue #22) — a banked Session has
+         * A swap exchanges two PLACEMENTS (issue #22): a banked Session has
          * none to offer, so "swap with it" has no meaning. `bank`/`move` are
          * the routes that give one back a placement or take it away.
          */
         if (a.termWeek === null || b.termWeek === null) {
             throw createError({
                 statusCode: 409,
-                statusMessage: 'A Session in the spare bank has no placement to swap — place it first.',
+                statusMessage: 'A Session in the spare bank has no placement to swap; place it first.',
             });
         }
 
@@ -127,7 +127,7 @@ export default defineEventHandler(async (event) => {
             generationId,
         });
 
-        // Sequential — see the earlier note: `tx` is one shared connection.
+        // Sequential; see the earlier note: `tx` is one shared connection.
         const sessionA = await tx.session.findFirst({ where: { id: a.id } });
         const sessionB = await tx.session.findFirst({ where: { id: b.id } });
         const violations = await tx.constraintViolation.findMany({

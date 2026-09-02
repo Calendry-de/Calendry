@@ -23,8 +23,8 @@ import type { SessionKindType } from '../../shared/sessionKindType';
 import { UNBOUNDED_ROOM_CAPACITY } from '../../shared/rooms';
 import { LECTURER_ROLE_KEY } from '../../shared/roles';
 import { isPlacedSession } from '../../shared/sessionPlacement';
-// Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too — by
-// scripts/ and by vitest — where Nuxt's aliases do not exist. App code under
+// Relative, not `#shared`: this module is loaded OUTSIDE Nuxt too, by
+// scripts/ and by vitest, where Nuxt's aliases do not exist. App code under
 // app/ can use `#shared` freely because it only ever runs inside Nuxt.
 import {
     findConstraintType,
@@ -40,7 +40,7 @@ import {
  * it will never use, a Session left out is a slot it thinks is free. Hence the
  * narrowings are counted and returned rather than being quiet.
  *
- * Federation-owned Offerings are EXCLUDED — including a shared resource while
+ * Federation-owned Offerings are EXCLUDED: including a shared resource while
  * sending empty occupancy is what silently double-books across a tenant boundary.
  */
 
@@ -55,8 +55,8 @@ export interface AssemblyReport {
      * Sessions carrying more Rooms than the wire can express.
      *
      * Replaced `multiRoomSessions`, which named every Session with more than
-     * one Room. That gap is closed — `Session.room_ids` now carries the full
-     * set and the solver honours it — so the reason to report has narrowed to
+     * one Room. That gap is closed: `Session.room_ids` now carries the full
+     * set and the solver honours it, so the reason to report has narrowed to
      * the cap: beyond four Rooms `convert.rs` truncates silently, which puts the
      * solver back to reasoning about a Session occupying less Room than it
      * really does.
@@ -67,7 +67,7 @@ export interface AssemblyReport {
      *
      * EXISTS TO EXPOSE AN INERT RULE. `distributed_pattern_adherence` and
      * `block_pattern_adherence` price only the Offerings tagged with their own
-     * pattern, and an Offering nobody has classified is untouched by both —
+     * pattern, and an Offering nobody has classified is untouched by both,
      * which is every Offering until somebody sets the field. So a tenant can
      * enable either rule, weight it, see it in the catalogue, and have it do
      * nothing at all.
@@ -87,7 +87,7 @@ export interface AssemblyReport {
      *
      * Reported rather than refused, matching `unsatisfiableEquipmentQuantities`:
      * the run is still worth making, and the answer comes back as hard
-     * violations. What is not acceptable is for the cause to be invisible —
+     * violations. What is not acceptable is for the cause to be invisible:
      * "why is this course unplaced" has an exact answer here, and it is one
      * nobody would guess from a violation naming a slot.
      */
@@ -96,13 +96,13 @@ export interface AssemblyReport {
      * Equipment quantity requirements NO sent Room can meet.
      *
      * This replaced `droppedEquipmentQuantities`, which counted requirements the
-     * wire could not carry — a gap that closed when `Offering
+     * wire could not carry, a gap that closed when `Offering
      * .room_feature_requirements` and `Room.feature_quantities` shipped in proto
      * v0.10.0. The reason to report anything here now is the opposite one: those
      * counts are ENFORCED, so a room that used to qualify on mere presence can
      * fail on count, and an Offering whose requirement nothing satisfies has no
-     * eligible room at all. The run does not fail — it comes back unable to
-     * place that Offering — so the cause is named here rather than left to be
+     * eligible room at all. The run does not fail: it comes back unable to
+     * place that Offering, so the cause is named here rather than left to be
      * inferred from a placement that never happened.
      *
      * `bestAvailable` is null when no Room states a count for the feature at
@@ -118,21 +118,21 @@ export interface AssemblyReport {
     }[];
     /**
      * Offerings with no establishable capacity requirement. Sent with
-     * `minCapacity: 0`, which the solver reads as "any room qualifies" — the
+     * `minCapacity: 0`, which the solver reads as "any room qualifies": the
      * silent state this derivation exists to fix, so it is REPORTED. There is no
      * other value to send: the wire field is a plain uint32 with no absent case.
      */
     offeringsWithNoDerivableCapacity: { id: string; title: string }[];
     /**
      * Offerings whose derived capacity rests on a roll that looks INCOMPLETE.
-     * Not a narrowing — the real count is still used, because an enrolment list is
+     * Not a narrowing: the real count is still used, because an enrolment list is
      * a fact and a stale estimate is not. Both numbers travel, so 4-of-96 and
      * 86-of-96 are visibly different problems.
      */
     offeringsWithPartialEnrolment: { id: string; title: string; members: number; expected: number }[];
     /**
      * Offerings whose explicit `requiredLecturerCount` exceeds the attached
-     * candidate pool — `offering.lecturers.length`. The wire is never sent the
+     * candidate pool (`offering.lecturers.length`). The wire is never sent the
      * impossible number: `required` is clamped down to `available` before it
      * ships, so this is the only place the mismatch is visible at all.
      */
@@ -155,7 +155,7 @@ export interface AssemblyReport {
      */
     offeringsSplitByGroup: { id: string; title: string; series: number }[];
     /**
-     * Sessions of a split Offering that belong to no single series — they carry
+     * Sessions of a split Offering that belong to no single series: they carry
      * none or several of its Groups, so they predate the semantic change.
      *
      * Deliberately NOT sent to the solver, and deliberately not silent: they
@@ -167,13 +167,13 @@ export interface AssemblyReport {
     skippedConstraints: { id: string; type: string; reason: string }[];
     /**
      * Rows whose stored severity contradicts the catalogue's fixed severity for
-     * that type. Sent using the CATALOGUE's severity — the wire has no severity
-     * field, the type determines it — with any weight on a HARD type ignored.
+     * that type. Sent using the CATALOGUE's severity (the wire has no severity
+     * field, the type determines it), with any weight on a HARD type ignored.
      */
     severityMismatches: { id: string; type: string; stored: string; expected: string }[];
     /**
      * A relation (e.g. `different_time`) naming an Offering that no longer
-     * exists in this Term's snapshot — deleted after being added, or never
+     * exists in this Term's snapshot: deleted after being added, or never
      * belonging to this Term. Filtered out here rather than sent and left for
      * the solver's `ConvertError::UnknownOffering` to refuse the WHOLE run:
      * a dangling member makes only ITS relation unenforceable, not every rule
@@ -183,7 +183,7 @@ export interface AssemblyReport {
     /**
      * Groups the tenant has that this Term's problem does not involve, and which
      * were therefore not sent. Reported rather than narrowed quietly, like every
-     * other omission in this report — it is the difference between "the tenant
+     * other omission in this report: it is the difference between "the tenant
      * has three cohorts" and "this Term uses three cohorts", and a run that
      * looks wrong is easier to explain with the number in hand.
      */
@@ -193,7 +193,7 @@ export interface AssemblyReport {
      *
      * Two numbers for the same reason the preference block below has four: a
      * tenant can set a window, see it saved, enable `group_veto`, and have it
-     * change nothing — because the range happens to cover the whole Term, or
+     * change nothing, because the range happens to cover the whole Term, or
      * because week granularity rounded it away. That reads identically to a
      * feature that does not work. `windowsCoveringWholeTerm == windowsSent`
      * means every window is inert.
@@ -213,12 +213,12 @@ export interface AssemblyReport {
      * a stored block can legitimately name a slot this Term's grid has not got,
      * and it is dropped rather than sent as a slot the solver would reject.
      *
-     * `placementsWithNoSignal` is not a narrowing at all — nothing was dropped,
+     * `placementsWithNoSignal` is not a narrowing at all: nothing was dropped,
      * there was simply nothing to say. It is here because a tenant can enable
      * `person_preference_fit`, give it a weight, see it active in the constraint
      * grid, and have it contribute exactly zero to every placement: no counted
      * lecturer, or none of them has stated anything. That is the `lecturer_veto`
-     * shape — a rule that looks configured and can never fire — and the reason it
+     * shape (a rule that looks configured and can never fire), and the reason it
      * went unnoticed there is precisely that nothing counted it. Equal to
      * `placementsCounted` means the rule is wholly inert.
      */
@@ -233,7 +233,7 @@ export interface AssemblyReport {
         placementsCounted: number;
     };
     /**
-     * WHAT WAS ASKED, PER WIRE OFFERING — the record the apply reconciles
+     * WHAT WAS ASKED, PER WIRE OFFERING: the record the apply reconciles
      * against.
      *
      * Every other field here reports something NARROWED on the way to the wire.
@@ -262,7 +262,7 @@ export interface AssemblyReport {
 export interface AssembledInput {
     input: SolverInput;
     referenceSlot: SlotRef;
-    /** SHA-256 over the serialized input — makes "same problem?" answerable. */
+    /** SHA-256 over the serialized input, which makes "same problem?" answerable. */
     inputHash: string;
     /**
      * Scope in both languages: `wire` is what the solver must be told (split
@@ -317,7 +317,7 @@ export function toWireConstraint(row: {
 
     /**
      * `ConstraintScope` can name an Offering, but the wire's ConstraintConfig
-     * has only `applies_to_kinds` — there is no offering-scoped equivalent.
+     * has only `applies_to_kinds`; there is no offering-scoped equivalent.
      * Skipped rather than degraded to unscoped, which would silently WIDEN the
      * rule to every offering: the opposite of what was configured.
      */
@@ -326,7 +326,7 @@ export function toWireConstraint(row: {
      *
      * `BlockedWindow` follows `Unavailability`'s convention: an empty axis means
      * EVERY value on that axis. So a window with no days and no blocks is not
-     * "nothing reserved" — it is the whole grid reserved, as a HARD rule, and
+     * "nothing reserved": it is the whole grid reserved, as a HARD rule, and
      * the solver accepts it without complaint. Every session of the applying
      * kinds becomes unplaceable, reported as nothing more specific than no
      * feasible placement.
@@ -341,7 +341,7 @@ export function toWireConstraint(row: {
         && parseBlockPositions(params.blocks).length === 0) {
         return {
             skip: 'No days and no blocks are set, which would reserve the ENTIRE timetable '
-                + 'rather than nothing — an empty axis means "every value". Name at least '
+                + 'rather than nothing: an empty axis means "every value". Name at least '
                 + 'one day or one block.',
         };
     }
@@ -350,8 +350,8 @@ export function toWireConstraint(row: {
      * A RULE SCOPED TO ANOTHER GRID IS NOT SENT, and this is the one skip here
      * that is not a defect.
      *
-     * `SolverInput.time_grid` is SINGULAR — a run is per-Term and a Term has
-     * exactly one grid — so the solver has nothing to disambiguate and no field
+     * `SolverInput.time_grid` is SINGULAR: a run is per-Term and a Term has
+     * exactly one grid, so the solver has nothing to disambiguate and no field
      * to carry this. The filter therefore has to be applied on the way out, and
      * a rule about the evening grid must simply not appear in a run over the
      * academic one.
@@ -380,7 +380,7 @@ export function toWireConstraint(row: {
      * A DECLARED type derives its kinds; it does not read `ConstraintScope`.
      *
      * `kindKeysByType` is optional so the many callers that only ever pass
-     * ordinary rows — tests, `violations.ts` — are unchanged. Absent is treated
+     * ordinary rows (tests, `violations.ts`) are unchanged. Absent is treated
      * as "no kind is classified", which is the SAFE reading: it produces the
      * skip below rather than an empty list.
      */
@@ -392,7 +392,7 @@ export function toWireConstraint(row: {
             .filter((key): key is string => Boolean(key));
 
     /**
-     * AN EMPTY DERIVED SET IS NOT AN EMPTY SCOPE — it is the whole institution.
+     * AN EMPTY DERIVED SET IS NOT AN EMPTY SCOPE: it is the whole institution.
      *
      * `ConstraintConfig.applies_to_kinds` says "Empty = all kinds", so sending
      * `[]` here would turn "no group may sit two EXAMS in a day" into "no group
@@ -401,7 +401,7 @@ export function toWireConstraint(row: {
      * honest answer is not to send the rule.
      *
      * Reported, never silent: a rule the tenant enabled and weighted is not
-     * being applied, and the fix — classify a kind as EXAM — is not something
+     * being applied, and the fix (classify a kind as EXAM) is not something
      * anyone would guess from a timetable.
      *
      * Note this cannot happen to a manually scoped rule, where an empty set
@@ -421,7 +421,7 @@ export function toWireConstraint(row: {
         enabled: true,
         appliesToKinds,
         // Meaningful for SOFT only; the solver ignores it for a HARD type. Read
-        // from the catalogue's severity, not the row's — see severityMismatch.
+        // from the catalogue's severity, not the row's; see severityMismatch.
         weight: type.severity === 'SOFT' ? (row.weight ?? 0) : 0,
         [type.wireField]: buildVariant(type.key, params),
     } as ConstraintConfig;
@@ -430,14 +430,14 @@ export function toWireConstraint(row: {
 }
 
 /**
- * The per-relation-type payload — `OfferingRelation`'s equivalent of
+ * The per-relation-type payload: `OfferingRelation`'s equivalent of
  * `buildVariant` above, kept separate because a relation's wire shape
  * (`offeringIds` plus one discriminated variant) is not a `ConstraintConfig`
  * at all (see `assembleSolverInput`'s relation carve-out).
  *
  * `null` for an unmapped key: a catalogue entry can carry `relation` before
  * its wire variant ships, the same "ahead of the schema" situation
- * `ConstraintTypeDef.wireField` documents — reported by the caller rather
+ * `ConstraintTypeDef.wireField` documents; reported by the caller rather
  * than guessed at here.
  */
 function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'differentTime'> | null {
@@ -450,8 +450,8 @@ function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'different
 }
 
 /**
- * The per-type payload. Most variants are empty messages — the type IS the
- * rule — and only four carry parameters.
+ * The per-type payload. Most variants are empty messages (the type IS the
+ * rule), and only four carry parameters.
  *
  * `percent` is converted here: tenants think in 0–100, the wire wants 0.0–1.0,
  * and doing it at this single boundary keeps the STORED value the one the user
@@ -461,7 +461,7 @@ function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'different
  * is not the same as a message this app sends no values for. ts-proto's encoder
  * iterates a repeated field without a presence check (`for (const v of
  * message.roles)`), so `{}` for a message that HAS a repeated field throws
- * `not iterable` — and it throws inside `hashInput`, before any request is made,
+ * `not iterable`, and it throws inside `hashInput`, before any request is made,
  * which surfaces as the whole assembly failing rather than as a bad constraint.
  * Probed across all sixteen variants: `MaxOnlineShare`, `MinimizeBlockUsage`,
  * `MinimizeDayUsage`, `MinimizeRoomRank` and `PersonPreferenceFit` all crash on
@@ -479,7 +479,7 @@ function parseWeekdayList(value: unknown): number[] {
 
 /**
  * A comma-separated list of 1-BASED block positions, as the wire's 0-based
- * indices — the same conversion `minimize_block_usage` does, and for the same
+ * indices: the same conversion `minimize_block_usage` does, and for the same
  * reason: a human counts blocks from one and the grid counts from zero.
  *
  * Unparseable and out-of-range entries are dropped rather than rejected. The
@@ -501,14 +501,14 @@ function parseBlockPositions(value: unknown): number[] {
  * The GROUP / PERSON / BOTH selector shared by every whole-day rule.
  *
  * EMPTY MEANS BOTH on the wire, so 'BOTH' sends an empty list rather than
- * naming both scopes. Not interchangeable in principle — the proto defines
+ * naming both scopes. Not interchangeable in principle: the proto defines
  * empty as "both axes counted independently", so a two-entry list is a second
  * spelling of one state, and two spellings is what `inputHash` cannot see past:
  * the same configured rule would hash two ways and a retry would launch a fresh
  * run instead of replaying.
  *
  * One function rather than one copy per type, because that identity is the
- * whole reason these rules are comparable to each other — four copies would
+ * whole reason these rules are comparable to each other; four copies would
  * agree until one of them was edited.
  */
 function compactnessScope(value: unknown): CompactnessScope[] {
@@ -539,7 +539,7 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 rankThreshold: Number(params.rankThreshold),
                 /*
                  * `Boolean()`, so a row stored before this parameter existed
-                 * sends false — which is the behaviour it already had. An
+                 * sends false, which is the behaviour it already had. An
                  * absent key must not become a direction the tenant never
                  * chose, and 0.5.0's own default for the field is the same
                  * false, so the two agree.
@@ -563,7 +563,7 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
             return {
                 maxPerWeek: Number(params.maxPerWeek),
                 // `Boolean()`, so a row stored before this parameter existed
-                // reads as false — the sessions-not-blocks reading it had.
+                // reads as false: the sessions-not-blocks reading it had.
                 countBlocks: Boolean(params.countBlocks),
             };
 
@@ -590,7 +590,7 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
 
         case 'protected_block':
             /*
-             * ONE WINDOW, and `weeks` deliberately empty — the proto reads that
+             * ONE WINDOW, and `weeks` deliberately empty: the proto reads that
              * as every week, which is the recurring reservation this form
              * offers. Blocks are 1-based for a human and 0-based on the wire,
              * converted here exactly as `minimize_block_usage` does.
@@ -622,8 +622,8 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
             /*
              * SENT EXPLICITLY, though `{}` happens to reach the solver as false
              * too. ts-proto writes this field whenever it is not literally
-             * `false`, so an absent key encodes as `0800` — an explicit zero
-             * rather than nothing — which decodes correctly but makes the bytes,
+             * `false`, so an absent key encodes as `0800`, an explicit zero
+             * rather than nothing, which decodes correctly but makes the bytes,
              * and therefore `inputHash`, depend on a coincidence rather than on
              * a value this mapper chose. `Boolean()` for the same reason it is
              * used on `minimize_high_ranking_rooms` below: a row stored before
@@ -653,12 +653,12 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
              * absent for two independent reasons, and only one of them is about
              * this app.
              *
-             * Encoding: see the note above — ts-proto iterates `roles`
+             * Encoding: see the note above: ts-proto iterates `roles`
              * unguarded, so omitting it throws during `hashInput`.
              *
              * Semantics: the solver REFUSES a non-empty `roles`
              * (`PreferenceRolesUnsupported`) rather than approximating it.
-             * Empty means "lecturers only", which is the decided scope — a
+             * Empty means "lecturers only", which is the decided scope: a
              * Session's attendee set includes every member of every attached
              * Group's descendant closure, so counting attendees would let a
              * 200-student cohort's aggregate preference outweigh the person
@@ -687,8 +687,8 @@ export async function assembleSolverInput(
         where: { id: options.termId, tenantId: options.tenantId },
         // `breaks` travels with the grid: computeReferenceSlot() resolves a
         // block from the wall clock, and a day-specific break changes which
-        // block that is. The breaks themselves are NOT forwarded to the solver
-        // — see toWireTimeGrid().
+        // block that is. The breaks themselves are NOT forwarded to the solver;
+        // see toWireTimeGrid().
         include: { timeGrid: { include: { breaks: true } }, calendarPeriods: true },
     });
 
@@ -721,7 +721,7 @@ export async function assembleSolverInput(
         grid,
     });
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection; concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const roomRows = await tx.room.findMany({
         /**
@@ -748,7 +748,7 @@ export async function assembleSolverInput(
          * The Term-scoped availability window, if the tenant set one.
          * Filtered to THIS Term here rather than at use: a window is a
          * range of dates inside one Term, and week indices on the wire
-         * are indices into THAT Term's calendar — the same ambiguity
+         * are indices into THAT Term's calendar, the same ambiguity
          * `person_unavailability.term_id` exists to remove.
          */
         include: { availability: { where: { termId: options.termId } } },
@@ -788,7 +788,7 @@ export async function assembleSolverInput(
      * Federation-owned ROOMS are included: they arrive through the widened RLS
      * read policy and are sent with other tenants' occupancy of them.
      *
-     * Federation-owned OFFERINGS remain excluded — placing one raises "which
+     * Federation-owned OFFERINGS remain excluded: placing one raises "which
      * tenant owns the resulting Session?", a placement-ownership question rather
      * than an occupancy one.
      */
@@ -813,7 +813,7 @@ export async function assembleSolverInput(
         federationId: room.federationId ?? '',
         name: `${room.code} · ${room.name}`,
         /*
-         * 0 MEANS UNLIMITED, translated here because the wire cannot say it —
+         * 0 MEANS UNLIMITED, translated here because the wire cannot say it;
          * see `UNBOUNDED_ROOM_CAPACITY`. Without this, the column's own default
          * makes an unmeasured room ineligible for everything.
          */
@@ -823,7 +823,7 @@ export async function assembleSolverInput(
         isVirtual: room.isVirtual,
         /*
          * BOTH LISTS, ALWAYS. A feature with a stated quantity appears here too,
-         * not only in `featureQuantities` — the solver's two checks are additive
+         * not only in `featureQuantities`: the solver's two checks are additive
          * and independent (`required_room_features` against this, and
          * `room_feature_requirements` against the quantities), so dropping a
          * counted feature from the presence list would make a room ineligible
@@ -834,14 +834,14 @@ export async function assembleSolverInput(
         /*
          * The app models no site; empty is the proto's documented "no site
          * set" (co-located with every other Room), read only by
-         * `TravelTimeBetweenRooms` — a constraint type not yet in this repo's
-         * catalogue. Wiring a real value is part of landing that type.
+         * `TravelTimeBetweenRooms` (a constraint type not yet in this repo's
+         * catalogue). Wiring a real value is part of landing that type.
          */
         site: '',
         /*
          * The SUPPLY side of equipment counts. Only links that state one: a NULL
          * `quantity` means the tenant never counted this feature for this room,
-         * which is not the same as counting it at zero — sending 0 would make
+         * which is not the same as counting it at zero: sending 0 would make
          * the room fail every quantity requirement instead of simply not
          * answering the question.
          */
@@ -849,7 +849,7 @@ export async function assembleSolverInput(
             .filter((link) => link.quantity !== null)
             .map((link) => ({ feature: link.equipment.key, quantity: link.quantity! })),
         /*
-         * The app models no specialized-room flag yet — same "not modeled"
+         * The app models no specialized-room flag yet, the same "not modeled"
          * treatment as `site` above. `false` is the proto's own documented
          * no-op: the field is "inert on its own", costing nothing until a
          * `MinimizeSpecializedRoomUse` constraint exists to read it.
@@ -858,7 +858,7 @@ export async function assembleSolverInput(
     }));
 
     /**
-     * The best count any sent Room supplies, per feature — used only to REPORT a
+     * The best count any sent Room supplies, per feature, used only to REPORT a
      * requirement nothing can satisfy (see `unsatisfiableEquipmentQuantities`).
      *
      * Built from the same `roomRows` the wire gets, so the report answers the
@@ -882,7 +882,7 @@ export async function assembleSolverInput(
     /**
      * Only the Groups this Term's problem can involve: what the Offerings and
      * Sessions actually REFERENCE, expanded to the conflict closure. NOT filtered
-     * by `group_term` — that is human-set configuration, so trusting it here would
+     * by `group_term`: that is human-set configuration, so trusting it here would
      * let a mis-scoped Group produce an input whose Offerings name a `group_id`
      * the solver was never sent. See solverGroups.ts.
      */
@@ -896,7 +896,7 @@ export async function assembleSolverInput(
     /**
      * APPROVED unavailability only, through the single read path in
      * `availability.ts`. Until this landed `blackouts` was `[]` unconditionally, so
-     * `lecturer_veto` — a HARD constraint enabled by default — ran against an empty
+     * `lecturer_veto` (a HARD constraint enabled by default) ran against an empty
      * set in every solve and could never fire, looking healthy throughout.
      *
      * PENDING and REJECTED are excluded, and that filter is the safety property of
@@ -914,7 +914,7 @@ export async function assembleSolverInput(
     /**
      * Stated preferences, narrowed to THIS Term's grid.
      *
-     * The write boundary validates against the tenant's widest grid on purpose —
+     * The write boundary validates against the tenant's widest grid on purpose:
      * a preference is not term-scoped, so it stays expressible for every grid the
      * tenant has. Here one grid is in force, and a value naming a day it does not
      * teach or a block it does not have is dropped and counted. Sending it would
@@ -944,7 +944,7 @@ export async function assembleSolverInput(
          *
          * A lecturer who states ONLY a room preference has no day and no block,
          * so a condition testing those two alone drops their row entirely and
-         * their preference never reaches the solver — silently, since an absent
+         * their preference never reaches the solver, silently, since an absent
          * `Person.preferred` is a legitimate state meaning "no opinion". The
          * solver guards the mirror image of this on its own side (`room_wanted`
          * is built off `persons[l].preferred` directly rather than off the
@@ -952,7 +952,7 @@ export async function assembleSolverInput(
          *
          * An empty result is still NOT stored: after narrowing it means the same
          * thing as no row at all, and `Person.preferred` has one representation
-         * for that — absent. Keeping `{days:[],blocks:[]}` would give it two.
+         * for that: absent. Keeping `{days:[],blocks:[]}` would give it two.
          */
         if (days.length > 0 || blocks.length > 0 || stated.roomFeatures.length > 0) {
             narrowedPreferences.set(personId, {
@@ -962,7 +962,7 @@ export async function assembleSolverInput(
                  * NULL becomes ABSENT, never 0. The column's NULL means "use the
                  * tenant default"; the wire field is `optional double` for
                  * exactly this reason, because proto3's zero default is itself a
-                 * meaningful multiplier — 0 would mean "ignore this person
+                 * meaningful multiplier: 0 would mean "ignore this person
                  * entirely". Passing `null` through would not compile, and
                  * coercing it to a number would be the silent wrong answer.
                  */
@@ -972,7 +972,7 @@ export async function assembleSolverInput(
                  * grid to narrow against: the vocabulary is the tenant's own
                  * Equipment keys, and a key is either in it or the FK would not
                  * have let the row exist. A preference for a feature no Room
-                 * happens to carry is inert rather than invalid — the solver
+                 * happens to carry is inert rather than invalid; the solver
                  * compares it against each candidate room's features and finds
                  * nothing, which costs the same as having no preference.
                  */
@@ -984,7 +984,7 @@ export async function assembleSolverInput(
     /**
      * Warn-and-allow: refusing heavy unavailability would be this layer overruling
      * an administrator who already approved it. Counted against the DEFAULT grid,
-     * blanket windows only — see `blockedSlotSummary`.
+     * blanket windows only; see `blockedSlotSummary`.
      */
     const personsWithHeavyVetoLoad: { id: string; name: string; blocked: number; total: number }[] = [];
 
@@ -1012,7 +1012,7 @@ export async function assembleSolverInput(
         roleTags: person.personRoles.map((link) => link.role.key),
         /**
          * Narrowed to the Groups being sent: a `group_id` the solver was never
-         * given is a dangling reference. Dropping the rest loses nothing — a
+         * given is a dangling reference. Dropping the rest loses nothing: a
          * membership only matters if its Group carries a placement in this Term,
          * and such a Group is referenced and therefore in the sent set.
          */
@@ -1025,7 +1025,7 @@ export async function assembleSolverInput(
             weeks: window.weeks,
             // The wire carries a reason field; the app deliberately does not
             // send one. A veto's reason is often personal (medical, caring),
-            // it changes no placement, and the solver never reads it — so it
+            // it changes no placement, and the solver never reads it, so it
             // stays in the database where the tenant's own access rules govern
             // it rather than travelling to a service that has no use for it.
             reason: '',
@@ -1033,11 +1033,11 @@ export async function assembleSolverInput(
         /*
          * ABSENT when the person has stated nothing, rather than an empty
          * `Preference`. The wire's own comment says empty means no preference, so
-         * the two are the same fact — and this codebase's rule is that such a
+         * the two are the same fact, and this codebase's rule is that such a
          * fact gets one representation.
          *
          * The rule this feeds is NOT yet sent: the catalogue entry still has no
-         * `wireField` — which it now DOES, since `calendry-solver` 41f6227 added
+         * `wireField`, which it now DOES, since `calendry-solver` 41f6227 added
          * the evaluator and the catalogue entry was flipped in the same change.
          * The ordering mattered and is worth keeping: before the evaluator
          * existed, naming the field would have turned a reported skip into
@@ -1054,7 +1054,7 @@ export async function assembleSolverInput(
         /*
          * POSITIVE IN, NEGATIVE OUT. The tenant stores when the Group IS
          * available; the wire has one convention for absence, shared with
-         * `Person.blackouts`. `blackedOutWeeks` owns the flip — see its comment
+         * `Person.blackouts`. `blackedOutWeeks` owns the flip; see its comment
          * for why a partially-covered week counts as available.
          */
         const window = group.availability[0];
@@ -1066,8 +1066,8 @@ export async function assembleSolverInput(
             groupsWithAvailabilityWindow += 1;
 
             if (weeks.length === 0) {
-                // A window that blacks out nothing. Legitimate — a tenant may
-                // set a range covering the Term — and worth counting, because
+                // A window that blacks out nothing. Legitimate, since a tenant may
+                // set a range covering the Term, and worth counting, because
                 // "configured" and "configured to no effect" are otherwise the
                 // same absence of violations. Same reasoning as
                 // `placementsWithNoSignal` for preferences.
@@ -1083,7 +1083,7 @@ export async function assembleSolverInput(
             /*
              * ALWAYS AN ARRAY, never omitted. ts-proto iterates a repeated field
              * without a presence check, so an absent `blackouts` throws
-             * `not iterable` inside `hashInput` — before any request is made,
+             * `not iterable` inside `hashInput`, before any request is made,
              * surfacing as the whole assembly failing rather than as one bad
              * Group. Cost the same hour on `PersonPreferenceFit.roles`.
              */
@@ -1135,8 +1135,8 @@ export async function assembleSolverInput(
 
     /**
      * BANKED SESSIONS, GROUPED BY OFFERING (issue #22). A banked Session
-     * cannot be SENT — it has no placement, so `wireSessionRows` below excludes
-     * it — but it must still `requiredSessionCount` toward, or the solver
+     * cannot be SENT: it has no placement, so `wireSessionRows` below excludes
+     * it, but it must still `requiredSessionCount` toward, or the solver
      * would see the demand as unmet and invent a brand-new Session to fill
      * exactly the gap banking exists to hold open, doubling the teaching the
      * moment anyone next solves. Subtracting it here is the one place that
@@ -1191,7 +1191,7 @@ export async function assembleSolverInput(
 
         /**
          * Each series carries ONE group, so capacity is derived per series from
-         * that group alone — the existing single-group path, not the union.
+         * that group alone: the existing single-group path, not the union.
          *
          * This is the point of the change as much as the scheduling is: four
          * 24-person cohorts previously produced one requirement of 96, which no
@@ -1217,7 +1217,7 @@ export async function assembleSolverInput(
             /**
              * THE DOCUMENTED BEHAVIOUR, NOW REAL.
              *
-             * `requiredCapacity` stays authoritative when a human set it — an
+             * `requiredCapacity` stays authoritative when a human set it: an
              * explicit number is a decision, and a derived one must never
              * overrule it. Only the NULL case derives, which is precisely what
              * the schema comment and the form's help text have promised all
@@ -1261,14 +1261,14 @@ export async function assembleSolverInput(
             id: wireId,
             tenantId: options.tenantId,
             kind: offering.kind.key,
-            // Reduced by whatever is already banked (issue #22) — see
+            // Reduced by whatever is already banked (issue #22); see
             // `bankedSessionsByOffering` above for why the solver must not be
             // asked to fill a gap a human is holding open on purpose.
             requiredSessionCount: Math.max(0, offering.frequency - bankedCount),
             durationBlocks: offering.durationBlocks,
             candidateLecturerIds: offering.lecturers.map((link) => link.personId),
             // NULL (every Offering nobody has touched) derives to one lecturer,
-            // chosen by the solver from the pool — see the column's schema
+            // chosen by the solver from the pool; see the column's schema
             // comment. Clamped to the pool size either way: an explicit count
             // above it is reported in `offeringsWithInsufficientLecturers`
             // above rather than sent as a demand nothing can satisfy.
@@ -1277,14 +1277,14 @@ export async function assembleSolverInput(
                 offering.lecturers.length,
             ),
             // The SERIES' own group, not the Offering's whole set. This is
-            // what makes each series independent — and it is what comes back in
+            // what makes each series independent, and it is what comes back in
             // `PlacedSession.group_ids`, so materialization gets the one right
             // group for `session_group` with no extra bookkeeping.
             groupIds: capacityGroupIds,
             // The app models no direct per-Offering participants beyond groups.
             participantPersonIds: [],
             requiredRoomFeatures: offering.equipment.map((link) => link.equipment.key),
-            // 0 only when genuinely underivable — and that case is reported
+            // 0 only when genuinely underivable, and that case is reported
             // above rather than passing as "no requirement".
             minCapacity: offering.requiredCapacity ?? derived?.capacity ?? 0,
             // Empty = any eligible Room. The app has no allow-list.
@@ -1293,8 +1293,8 @@ export async function assembleSolverInput(
             /*
              * The DEMAND side of equipment counts, and only the links that state
              * one. A link with a NULL quantity is already fully expressed by
-             * `requiredRoomFeatures` above — the proto says an absent
-             * `min_quantity` asks exactly the presence question — so sending it
+             * `requiredRoomFeatures` above: the proto says an absent
+             * `min_quantity` asks exactly the presence question, so sending it
              * here as well would be the same requirement twice, and a reader
              * comparing the two lists would have no way to tell which entries
              * carry information.
@@ -1305,7 +1305,7 @@ export async function assembleSolverInput(
             /*
              * Sent as stored, and 1 is the overwhelming majority. The proto
              * treats 0 and 1 identically, so this was pinned at 0 for as long
-             * as the app had no column — the capability was live in the solver
+             * as the app had no column; the capability was live in the solver
              * and unreachable from here.
              *
              * NOT clamped on the way out. `MAX_ROOMS_PER_SESSION` is enforced
@@ -1317,8 +1317,8 @@ export async function assembleSolverInput(
             requiredRoomCount: offering.requiredRoomCount,
             /*
              * NULL IS UNSPECIFIED, and that is a claim rather than a gap: the
-             * Offering has not been classified. Mapping it to DISTRIBUTED — what
-             * most timetables assume — would send an institution's assumption as
+             * Offering has not been classified. Mapping it to DISTRIBUTED (what
+             * most timetables assume) would send an institution's assumption as
              * though somebody had chosen it, and the solver would then be free
              * to act on it the moment a pattern rule is enabled.
              */
@@ -1329,8 +1329,8 @@ export async function assembleSolverInput(
                     : SchedulingPattern.SCHEDULING_PATTERN_UNSPECIFIED,
             /*
              * The app has no such column; false is the proto's "no preference"
-             * default, read only by `MinimizeOfferingDistinctDays` — a
-             * constraint type not yet in this repo's catalogue. A real
+             * default, read only by `MinimizeOfferingDistinctDays` (a
+             * constraint type not yet in this repo's catalogue). A real
              * per-Offering knob is part of landing that type.
              */
             preferFullerDays: false,
@@ -1345,8 +1345,8 @@ export async function assembleSolverInput(
      * becomes immovable out-of-scope occupancy, counts toward no series, and the
      * solver places the full frequency again on top of it.
      *
-     * A LEGACY COMBINED Session — carrying none or several of the Offering's
-     * Groups — belongs to no series and is OMITTED entirely: the apply will delete
+     * A LEGACY COMBINED Session (carrying none or several of the Offering's
+     * Groups) belongs to no series and is OMITTED entirely: the apply will delete
      * it, and freezing it as occupancy would block the slots its replacements need.
      */
     const splitOfferingGroupIds = new Map<string, Set<string>>();
@@ -1363,7 +1363,7 @@ export async function assembleSolverInput(
 
     const wireSessionRows = sessionRows.filter((session) => {
         // BANKED, NOT SENT (issue #22). A banked Session has no placement to
-        // put on the wire — `requiredSessionCount` above already accounted
+        // put on the wire: `requiredSessionCount` above already accounted
         // for it, so omitting it here is not a loss, it is the other half of
         // the same accounting.
         if (session.termWeek === null) {
@@ -1401,7 +1401,7 @@ export async function assembleSolverInput(
                 return session.offeringId;
             }
 
-            // Exactly one by construction — the filter above kept only those.
+            // Exactly one by construction; the filter above kept only those.
             const own = session.groups.map((link) => link.groupId).find((id) => seriesGroups.has(id))!;
 
             return wireOfferingId(session.offeringId!, own);
@@ -1426,7 +1426,7 @@ export async function assembleSolverInput(
      * Kind KEYS grouped by their fixed classification, for the rules that derive
      * their scope from it rather than from `ConstraintScope`.
      *
-     * Keys, not ids, because that is what crosses the wire — the solver has
+     * Keys, not ids, because that is what crosses the wire: the solver has
      * never seen a database id for a kind, and building this as ids would put
      * one translation step between the declaration and the rule.
      */
@@ -1452,12 +1452,12 @@ export async function assembleSolverInput(
         /*
          * RELATION TYPES NEVER REACH `toWireConstraint`. Their type carries no
          * `wireField` because there is no `ConstraintConfig` field for them to
-         * populate — the whole point of a relation is that its operands are an
+         * populate: the whole point of a relation is that its operands are an
          * ordered set of Offerings, sent instead as `SolverInput.offeringRelations`
          * (assembled below, from the same row). Falling through to
          * `toWireConstraint` would report every one of these as "wire has no
          * field for this type yet", which is the message for a catalogue entry
-         * shipped ahead of the proto — the wrong diagnosis for a type that is
+         * shipped ahead of the proto, the wrong diagnosis for a type that is
          * sent, just on a different message.
          */
         if (type?.relation) {
@@ -1469,7 +1469,7 @@ export async function assembleSolverInput(
              * A DANGLING MEMBER IS OMITTED WHOLE, not filtered down to its
              * remaining members. ADR-0028: "a relation with one side missing
              * is a rule that cannot be evaluated, and running it half-applied
-             * would satisfy it by construction" — a 3-member DifferentTime
+             * would satisfy it by construction": a 3-member DifferentTime
              * missing one Offering is not a valid 2-member DifferentTime, it
              * is a different, unconfigured rule.
              */
@@ -1539,7 +1539,7 @@ export async function assembleSolverInput(
      * Other tenants' use of Federation-shared Rooms.
      *
      * Read through the parameterless SECURITY DEFINER function, because those
-     * Sessions belong to sibling tenants and are invisible under normal RLS —
+     * Sessions belong to sibling tenants and are invisible under normal RLS,
      * which is the whole reason shared rooms were excluded until now. What comes
      * back is occupancy and nothing else: no session ids, no tenant ids, no
      * titles.
@@ -1571,7 +1571,7 @@ export async function assembleSolverInput(
 
             return { row, date, week };
         })
-        // Occupancy outside this term's span tells the solver nothing — it can
+        // Occupancy outside this term's span tells the solver nothing: it can
         // only place within the weeks the calendar declares.
         .filter(({ week }) => week >= 0 && week < (calendar.weeks?.length ?? 0))
         .map(({ row, date, week }) => ({
@@ -1580,7 +1580,7 @@ export async function assembleSolverInput(
             // is exactly what SlotRef.week means on the wire.
             startSlot: { week, day: isoWeekday(date), block: row.block_index },
             durationBlocks: row.duration_blocks,
-            // Documented as "opaque; diagnostics only" — deliberately carries no
+            // Documented as "opaque; diagnostics only": deliberately carries no
             // identifier, so nothing about the owning tenant leaks through it.
             sourceRef: 'federation-shared',
         }));
@@ -1593,13 +1593,13 @@ export async function assembleSolverInput(
      * independent lecturer sets and four times the placements. `frequency` gives
      * the placement count without inventing one.
      *
-     * The counted set is `candidateLecturerIds` (§4.1 — lecturers only). Today
+     * The counted set is `candidateLecturerIds` (§4.1, lecturers only). Today
      * the pool equals the requirement, so it IS the set that will lead the
      * session; if genuine pool selection ever lands this becomes a decision
      * variable and this count becomes an upper bound rather than the answer.
      */
     /**
-     * THE DEMAND LEDGER — one entry per wire Offering, built from the two lists
+     * THE DEMAND LEDGER: one entry per wire Offering, built from the two lists
      * that are about to be sent rather than from the rows they came from.
      *
      * Reading `offerings` and `sessionInputs` here (not `offeringRows` and
@@ -1624,7 +1624,7 @@ export async function assembleSolverInput(
 
     const demand: DemandEntry[] = offerings.map((offering) => ({
         wireOfferingId: offering.id,
-        // Present for every wire id by construction — `realOfferingIdOf` is
+        // Present for every wire id by construction: `realOfferingIdOf` is
         // written in the same loop that builds `offerings`. Falling back to the
         // wire id keeps an unsplit id correct rather than dropping the entry,
         // which would under-report demand: the one direction that silently
@@ -1664,8 +1664,8 @@ export async function assembleSolverInput(
         externalOccupancy,
         constraints,
         referenceSlot,
-        // Built above, alongside `constraints`, from the same `constraintRows`
-        // — every enabled `different_time` row with no dangling member.
+        // Built above, alongside `constraints`, from the same `constraintRows`,
+        // every enabled `different_time` row with no dangling member.
         offeringRelations,
     };
 
@@ -1680,7 +1680,7 @@ export async function assembleSolverInput(
          * They differ once anything is split, and both are needed: the solver
          * places nothing for an Offering absent from its scope, while
          * `planMaterialization` tests `inScope.has(session.offeringId)` against
-         * DB ids — so recording wire ids there would mean no existing Session
+         * DB ids, so recording wire ids there would mean no existing Session
          * was ever in scope and nothing would ever be deleted.
          */
         scopeOfferingIds: {
@@ -1699,7 +1699,7 @@ export async function assembleSolverInput(
                     id: o.id,
                     title: o.title,
                     needs: o.requiredRoomCount,
-                    // The Rooms actually SENT, not the tenant's whole estate —
+                    // The Rooms actually SENT, not the tenant's whole estate:
                     // the report has to answer the question the solver was
                     // asked, which federation sharing can widen.
                     available: roomRows.length,
@@ -1750,7 +1750,7 @@ export async function assembleSolverInput(
 }
 
 /**
- * The wire bytes of a `SolverInput` — what `hashInput` digests and what
+ * The wire bytes of a `SolverInput`: what `hashInput` digests and what
  * `SolverInputSnapshot.compressedInput` gzips (issue #24). One encode, not
  * one per caller, so a snapshot and its own run's `inputHash` can never
  * describe two different encodings of what was, in memory, the same object.

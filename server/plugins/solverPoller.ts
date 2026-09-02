@@ -3,13 +3,13 @@ import { pollSolverRun, recoverRunResult } from '../utils/solverPolling';
 import { logger } from '../utils/logger';
 
 /**
- * Stage 4 — the background solver poller.
+ * Stage 4: the background solver poller.
  *
  * WHY THIS EXISTS AND ON-DEMAND POLLING IS NOT ENOUGH
  *
  * The solver keeps runs in an in-memory registry with no persistence and no
  * eviction. If nobody opens a run's page, the run finishes, the app never
- * learns, and the result is never captured — and if the solver then restarts,
+ * learns, and the result is never captured. If the solver then restarts,
  * the answer is gone for good while the row still says RUNNING. The
  * one-active-run-per-term index would leave that term blocked indefinitely.
  *
@@ -28,7 +28,7 @@ import { logger } from '../utils/logger';
 /** Between sweeps. Individual runs have their own cadence via `next_poll_at`. */
 const TICK_MS = 500;
 
-/** After a sweep throws — usually the database being briefly unavailable. */
+/** After a sweep throws, usually because the database is briefly unavailable. */
 const ERROR_BACKOFF_MS = 5_000;
 
 function isEnabled(): boolean {
@@ -86,8 +86,8 @@ export default defineNitroPlugin(() => {
                         continue;
                     }
 
-                    // The gRPC call happens HERE, outside the claim transaction
-                    // — the advisory lock was released at its commit.
+                    // The gRPC call happens HERE, outside the claim transaction,
+                    // because the advisory lock was released at its commit.
                     const outcome = await inTenant(tenantId, (tx) => pollSolverRun(tx, run));
 
                     if (outcome.becameTerminal) {
@@ -120,7 +120,7 @@ export default defineNitroPlugin(() => {
         try {
             await sweep();
         } catch (error) {
-            // Reaching here means the sweep itself broke — most likely the
+            // Reaching here means the sweep itself broke, most likely the
             // database. Backing off rather than hammering it every 500ms.
             logger.error({ err: error }, '[solver-poller] sweep failed');
             delay = ERROR_BACKOFF_MS;

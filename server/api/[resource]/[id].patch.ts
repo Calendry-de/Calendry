@@ -89,7 +89,7 @@ defineRouteMeta({
                                     curriculumPlanId: {
                                         type: 'string',
                                         nullable: true,
-                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering — an administrative hint, never derived from or resolved against its actual offerings.',
+                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering: an administrative hint, never derived from or resolved against its actual offerings.',
                                     },
                                 },
                                 description: 'All fields optional.',
@@ -562,7 +562,7 @@ export default defineEventHandler(async (event) => {
         const { columns, children } = splitChildren(config, body as Record<string, unknown>);
 
         /*
-         * issue #78 — an AccessRole's permission set changing is audited.
+         * issue #78: an AccessRole's permission set changing is audited.
          * Read BEFORE the write, in the same transaction, so `before` names
          * the set this request actually replaced rather than whatever the
          * table happens to hold when the audit line is written.

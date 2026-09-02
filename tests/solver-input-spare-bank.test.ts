@@ -6,23 +6,23 @@ import { assembleSolverInput } from '../server/utils/solverInput';
  * How a BANKED Session (issue #22, cancel-to-spare-bank) reaches
  * `assembleSolverInput`.
  *
- * TWO PROPERTIES, and neither is "the row survives" — that half is covered at
+ * TWO PROPERTIES, and neither is "the row survives": that half is covered at
  * the HTTP layer (`tests/session-spare-bank.test.ts`). This is the half only a
  * direct call can see:
  *
  *   1. NOT SENT AS OCCUPANCY. A banked Session has no placement to put on the
- *      wire — sending one would crash `toWireSession` on a null `termWeek`
+ *      wire; sending one would crash `toWireSession` on a null `termWeek`
  *      the proto has no way to represent.
  *
  *   2. STILL COUNTS TOWARD `requiredSessionCount`. Omitting it from
  *      `existingSessions` without correcting the count would tell the solver
- *      the Offering is short by one MORE Session than it actually is — and
+ *      the Offering is short by one MORE Session than it actually is, and
  *      the solver would invent a brand-new one to fill a gap banking exists
  *      to hold open, doubling the teaching the moment anyone next solves.
  *
  * `test-offering-a` has `frequency: 2` and exactly one Session
  * (`test-session-a`) in the fixture, so banking it is expected to drop
- * `requiredSessionCount` from 2 to 1 — not to 2 (uncorrected) and not to 0.
+ * `requiredSessionCount` from 2 to 1, not to 2 (uncorrected) and not to 0.
  */
 let f: Fixtures;
 

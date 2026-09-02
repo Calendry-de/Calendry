@@ -12,18 +12,18 @@ import { preferencesAreEmpty } from '../shared/availability';
  *
  *  - A person stating ONLY a room preference must still reach the wire. The
  *    narrowing step drops a preference row whose axes are all empty, and
- *    "all empty" used to mean days and blocks alone — so this lecturer's
+ *    "all empty" used to mean days and blocks alone, so this lecturer's
  *    preference would vanish with no error, since an absent `Person.preferred`
  *    is a legitimate state meaning "no opinion". The solver guards the mirror
  *    image of this on its own side, which is what makes the app's half easy to
  *    forget.
  *  - The wire speaks KEYS; the database stores equipment IDS. A test asserting
  *    "some strings arrived" would pass against a build sending ids, and the
- *    solver would match them against `Room.feature_tags` and find nothing —
+ *    solver would match them against `Room.feature_tags` and find nothing:
  *    inert, not wrong, and therefore invisible.
  *
- * The write path's own guard — refusing an unknown equipment id by name rather
- * than filtering it out — is pinned where it is reachable, over HTTP, in
+ * The write path's own guard, refusing an unknown equipment id by name rather
+ * than filtering it out, is pinned where it is reachable, over HTTP, in
  * `person-availability-api.test.ts`.
  */
 let f: Fixtures;
@@ -132,7 +132,7 @@ describe('the room-only lecturer', () => {
         /*
          * THE REGRESSION THIS FILE EXISTS FOR. With the narrowing condition
          * testing days and blocks alone, this person's whole `Preference`
-         * message is dropped — silently, because an absent one is a real state.
+         * message is dropped silently, because an absent one is a real state.
          */
         await statePreference(f.personA, { days: [], blocks: [], equipmentIds: [EQUIP_LAB] });
 

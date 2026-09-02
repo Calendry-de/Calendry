@@ -8,7 +8,7 @@ import {
 } from '../server/utils/generationMaterialize';
 
 /**
- * Stage 5 — materializing a solver result into real Session rows.
+ * Stage 5: materializing a solver result into real Session rows.
  *
  * These need a database (they write Sessions, join rows and violations) but not
  * a server, so they run against the owner connection with their own fixtures
@@ -56,7 +56,7 @@ async function reset() {
      * had nothing to refuse. The same pattern already exists in
      * `scripts/seed-demo-schedule.ts`.
      *
-     * Note what this reveals and does not fix — see the project board: a tenant or a
+     * Note what this reveals and does not fix (see the project board): a tenant or a
      * generation carrying ANY session_event cannot be deleted through ordinary
      * SQL, because the FKs say CASCADE and the trigger says no. Test fixtures
      * can reach for DISABLE TRIGGER; a production purge cannot.
@@ -123,11 +123,11 @@ async function seed() {
     await db.session.create({
         data: { ...base, id: ids.moveSession, offeringId: ids.offeringA, termWeek: 1, dayOfWeek: 1, blockIndex: 1 },
     });
-    // In scope, NOT returned — must be deleted.
+    // In scope, NOT returned; must be deleted.
     await db.session.create({
         data: { ...base, id: ids.dropSession, offeringId: ids.offeringA, termWeek: 1, dayOfWeek: 1, blockIndex: 2 },
     });
-    // Locked — must survive untouched even though it is in scope.
+    // Locked; must survive untouched even though it is in scope.
     await db.session.create({
         data: {
             ...base, id: ids.lockedSession, offeringId: ids.offeringA,
@@ -136,7 +136,7 @@ async function seed() {
     });
 
     /**
-     * EVENTS — offeringId NULL. Two of them, differing only in `isLocked`,
+     * EVENTS: offeringId NULL. Two of them, differing only in `isLocked`,
      * because the whole claim being tested is that the LOCK is not what
      * protects them: an Event is exempt because it belongs to no Offering and
      * therefore to no solve's scope.
@@ -201,14 +201,14 @@ describe('materializeGeneration', () => {
 
         expect(counts.created).toBe(1);
         expect(counts.moved).toBe(1);
-        // Returned at the slot it already had — reported separately so an apply
+        // Returned at the slot it already had; reported separately so an apply
         // that changes nothing does not claim to have moved everything.
         expect(counts.unchanged).toBe(1);
         // The in-scope session the solver did not return.
         expect(counts.deleted).toBe(1);
         // TWO: the locked in-scope Session, plus the locked EVENT. An Event is
         // exempt from the partition on scope grounds, but a LOCKED one is still
-        // literally a locked Session and is counted as such — the count is not
+        // literally a locked Session and is counted as such. The count is not
         // special-cased, because a second exemption rule would be one more thing
         // to keep in step with the first.
         expect(counts.skippedLocked).toBe(2);
@@ -250,7 +250,7 @@ describe('materializeGeneration', () => {
      * The wire leaves `PlacedSession.room_ids` empty for a single-Room
      * placement, so the apply normalises both shapes into one list. Writing
      * `room_id` alone would silently drop the second hall of a two-hall
-     * lecture — the same under-booking the plural field exists to fix, moved
+     * lecture, the same under-booking the plural field exists to fix, moved
      * from the input side to the output side where no test was looking.
      */
     it('writes every Room of a multi-Room placement', async () => {
@@ -278,7 +278,7 @@ describe('materializeGeneration', () => {
     it('does not duplicate the primary Room when the wire echoes it', async () => {
         /*
          * `PlacedSession.room_ids` is the full set INCLUDING `room_id`, so the
-         * naive concatenation writes the primary twice — which `session_room`'s
+         * naive concatenation writes the primary twice, which `session_room`'s
          * composite primary key rejects, turning a correct placement into a
          * failed apply.
          */
@@ -307,8 +307,8 @@ describe('materializeGeneration', () => {
      * A REPAIR MOVES SESSIONS; IT DOES NOT RE-CAST THEM.
      *
      * Under `LOCK_POLICY_MINIMIZE_MOVEMENT` a Session outside the scope becomes
-     * a movable `PlacementVar`, which deliberately carries no attendee snapshot
-     * — the search reads lecturers and groups from the OFFERING's current
+     * a movable `PlacementVar`, which deliberately carries no attendee snapshot:
+     * the search reads lecturers and groups from the OFFERING's current
      * definition. So the lists that come back describe the Offering, not the
      * Session, and a Session whose attendees were overridden through
      * `sessions/[id]/details.post.ts` would have that override silently
@@ -328,7 +328,7 @@ describe('materializeGeneration', () => {
 
         await materializeGeneration(db as never, {
             tenantId: ids.tenant, termId: ids.term, generationId: ids.generation,
-            // EMPTY scope — a pure repair. Every Session is out of scope.
+            // EMPTY scope: a pure repair. Every Session is out of scope.
             scopeOfferingIds: [],
             actorPersonId: ids.person,
             output: output({
@@ -358,7 +358,7 @@ describe('materializeGeneration', () => {
          * The counter-example, so the assertion above cannot be satisfied by a
          * build that simply stopped writing attendees. An IN-SCOPE placement is
          * the solver answering the Offering's demand, and its attendee lists are
-         * authoritative — that is what a rebuild is.
+         * authoritative. That is what a rebuild is.
          */
         await seed();
 
@@ -528,7 +528,7 @@ describe('violation materialization', () => {
 });
 
 /**
- * Stage 6a — the plan/execute split.
+ * Stage 6a: the plan/execute split.
  *
  * The property under test is not that planning produces plausible numbers, but
  * that the plan a PREVIEW shows is the decision an APPLY carries out. Two
@@ -557,7 +557,7 @@ describe('planMaterialization', () => {
             // every move is one the caller asked for.
             movedCollateral: 0,
             // No demand ledger is passed here, so nothing can be reconciled and
-            // nothing is withheld — this fixture asserts the UNCHANGED
+            // nothing is withheld. This fixture asserts the UNCHANGED
             // behaviour, which is what the reconciliation must not disturb. The
             // withholding itself is asserted in its own suite below.
             deletesWithheld: 0,
@@ -709,7 +709,7 @@ describe('summarizePlanByWeek', () => {
         expect(weeks.map((w) => w.termWeek)).toEqual([...weeks.map((w) => w.termWeek)].sort((a, b) => a - b));
 
         // The dropped session sits in week 1, so that is where a reviewer looks
-        // for it — not in whatever week the solver's output happened to mention.
+        // for it, not in whatever week the solver's output happened to mention.
         const deleted = weeks.find((w) => w.deleted > 0);
 
         expect(deleted?.termWeek).toBe(1);
@@ -741,7 +741,7 @@ describe('summarizeProposedViolations', () => {
 
         expect(summary.hard).toBe(1);
         expect(summary.sessionReferences).toBe(2);
-        // Reported, never netted out — a review screen that shows 1 clash when
+        // Reported, never netted out: a review screen that shows 1 clash when
         // there are 2 is worse than one that admits it cannot locate one.
         expect(summary.unmappable).toBe(1);
         expect(summary.byType).toEqual({ GroupDoubleBooking: 1 });
@@ -770,7 +770,7 @@ afterAll(async () => {
  *
  * The property under test is the one the whole feature rests on: applying a
  * solver Generation must never remove a Session a human placed. The interesting
- * case is the UNLOCKED Event — if the exemption were really the lock, that one
+ * case is the UNLOCKED Event: if the exemption were really the lock, that one
  * would be deleted.
  */
 describe('Events survive an apply', () => {
@@ -793,7 +793,7 @@ describe('Events survive an apply', () => {
         });
         const byId = new Map(survivors.map((s) => [s.id, s]));
 
-        // The orphan still goes — this test must not pass by disabling deletes.
+        // The orphan still goes. This test must not pass by disabling deletes.
         expect(counts.deleted).toBe(1);
         expect(byId.has(ids.dropSession)).toBe(false);
 
@@ -801,12 +801,12 @@ describe('Events survive an apply', () => {
         expect(byId.has(ids.eventSession)).toBe(true);
         expect(byId.has(ids.eventUnlocked)).toBe(true);
 
-        // And UNMOVED — surviving at a different slot would be its own bug.
+        // And UNMOVED: surviving at a different slot would be its own bug.
         expect(byId.get(ids.eventSession)).toMatchObject({ dayOfWeek: 3, blockIndex: 0 });
         expect(byId.get(ids.eventUnlocked)).toMatchObject({ dayOfWeek: 3, blockIndex: 1 });
     });
 
-    it('does not count Events as skippedLocked — the exemption is scope, not the lock', async () => {
+    it('does not count Events as skippedLocked: the exemption is scope, not the lock', async () => {
         await seed();
 
         const plan = await db.$transaction((tx) => planMaterialization(tx as never, {
@@ -815,7 +815,7 @@ describe('Events survive an apply', () => {
         }));
 
         // The locked EVENT does appear in skippedLocked (it is locked), but the
-        // unlocked one appears nowhere at all — not in deletes, not in
+        // unlocked one appears nowhere at all: not in deletes, not in
         // placements, not in skippedLocked. It is simply not this solve's
         // business, which is the point.
         expect(plan.deletes.map((d) => d.sessionId)).toEqual([ids.dropSession]);
@@ -861,7 +861,7 @@ describe('DELETE events', () => {
 
         /**
          * `session_id` is NULL because the FK is ON DELETE SET NULL and the row
-         * it pointed at is gone — that is the designed behaviour (migration
+         * it pointed at is gone. That is the designed behaviour (migration
          * 20260816180000), and it is precisely why the payload has to carry the
          * placement rather than reference it.
          */
@@ -902,8 +902,8 @@ describe('DELETE events', () => {
  *
  * `planMaterialization` reads an in-scope Session's absence from the output as
  * a refusal to place it, and deletes on that. The inference only holds while
- * the output is COMPLETE. A live tenant's `converged` run — 45.8M moves, not
- * budget-bound — was handed 208 in-scope wire Offerings each asking for one
+ * the output is COMPLETE. A live tenant's `converged` run (45.8M moves, not
+ * budget-bound) was handed 208 in-scope wire Offerings each asking for one
  * Session, each already carrying one, and returned 197 placements. The eleven
  * Sessions it dropped from its answer were deleted as orphans, reason
  * `not_returned_by_solver`, and the next run recreated them and dropped a
@@ -911,11 +911,11 @@ describe('DELETE events', () => {
  *
  * The demand ledger is what makes a refusal distinguishable from a gap. These
  * two cases are the whole contract, and they differ ONLY in what the run
- * recorded asking for — the output and the fixture are identical, so a
+ * recorded asking for: the output and the fixture are identical, so a
  * regression cannot hide in a difference between them.
  */
 describe('demand reconciliation withholds deletes on a short answer', () => {
-    /** offeringA's third Session — in scope, unlocked, and absent from `output()`. */
+    /** offeringA's third Session: in scope, unlocked, and absent from `output()`. */
     const dropped = { sessionId: ids.dropSession, offeringId: ids.offeringA };
 
     beforeAll(async () => {
@@ -989,8 +989,8 @@ describe('demand reconciliation withholds deletes on a short answer', () => {
             termId: ids.term,
             output: output(),
             scopeOfferingIds: [ids.offeringA, ids.offeringB],
-            // A run started before the ledger existed. Its deletes still happen
-            // — nothing contradicts them — but the plan must not claim they
+            // A run started before the ledger existed. Its deletes still happen,
+            // and nothing contradicts them, but the plan must not claim they
             // were checked, which is the distinction `verified` carries.
         }));
 

@@ -70,8 +70,8 @@
                 <!--
                     Search reaches the drawer because the header's own search
                     button is `display: none` below 1366px and Ctrl+K needs a
-                    keyboard. Without this row the command palette — a real
-                    feature, and the fastest route to every section — is simply
+                    keyboard. Without this row the command palette (a real
+                    feature, and the fastest route to every section) is simply
                     unreachable on a phone.
                 -->
                 <button
@@ -111,7 +111,7 @@ import { useOverlay } from '~/composables/overlay';
  * OPEN STATE IS SHARED, not a prop: this is mounted once in the default layout
  * (beside the command palette, for the same reason) while the button that opens
  * it lives in `ViewMenu`. `useState` is how the two meet without a second
- * instance of the focus trap, the overlay claim and the scroll lock — and
+ * instance of the focus trap, the overlay claim and the scroll lock, and
  * `aria-controls="nav-drawer"` on that button still resolves to the dialog
  * below, because a Teleport moves the node but keeps its id.
  */
@@ -121,7 +121,7 @@ const entries = useHeaderNav();
 
 /*
  * Resolved rather than imported: `NuxtLink` is a globally-registered component,
- * and `<component :is>` needs the definition, not the name — passing the string
+ * and `<component :is>` needs the definition, not the name: passing the string
  * works only for real HTML tags.
  */
 const NuxtLink = resolveComponent('NuxtLink');
@@ -129,7 +129,7 @@ const NuxtLink = resolveComponent('NuxtLink');
 /*
  * Claims the keyboard for as long as it is open, so page-level Escape handlers
  * (`useScheduleEditing` binds one on `window`) stand down instead of unwinding a
- * placement the user never meant to cancel. Released on close AND on unmount —
+ * placement the user never meant to cancel. Released on close AND on unmount:
  * `useOverlay` does the second whether or not this component remembers to.
  */
 const { claim, release } = useOverlay('nav-drawer');
@@ -162,7 +162,7 @@ function openPalette() {
 }
 
 /**
- * Focus follows OPENING, not mounting — the panel is `v-if`'d, so nothing inside
+ * Focus follows OPENING, not mounting: the panel is `v-if`'d, so nothing inside
  * it exists until then. The same watcher owns the claim and the scroll lock so
  * the three cannot drift apart; each is keyed on the state, never on the
  * function that changed it.
@@ -190,7 +190,7 @@ onBeforeUnmount(() => {
 });
 
 /**
- * A real cycling trap, unlike the palette's — that dialog holds one focusable
+ * A real cycling trap, unlike the palette's: that dialog holds one focusable
  * element and can trap by refusing to move; this one holds a close button, every
  * nav link and a search row.
  */
@@ -220,7 +220,7 @@ function trapFocus(event: KeyboardEvent) {
 /*
  * Close when the viewport crosses back to the inline bar. Without this, opening
  * the drawer on a phone and rotating to landscape leaves a modal over a header
- * that is already showing the same links — and the menu button that would close
+ * that is already showing the same links, and the menu button that would close
  * it is `display: none` by then, so it is a trap with no visible exit.
  *
  * The query mirrors `$navCollapseAt` in `variables.scss`; one number, two
@@ -246,7 +246,7 @@ onMounted(() => {
     display: flex;
     justify-content: flex-end;
 
-    // `black`, not the theme-relative `content0` — see `ScheduleFilterPanel`'s
+    // `black`, not the theme-relative `content0`. See `ScheduleFilterPanel`'s
     // own comment on this exact backdrop rule for why: `content0` flips to
     // near-white in dark mode, turning a dimming scrim into a light wash.
     background: varToRgba('black', 0.45);

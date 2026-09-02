@@ -8,7 +8,7 @@ import type { Tx } from './tenantDb';
  * A Person's permissions are the union of the Permissions carried by every
  * AccessRole assigned to them in the current tenant. Both `person_access_role`
  * and `access_role_permission` are tenant-scoped and behind RLS, so this query
- * runs inside the caller's tenant transaction — a Person cannot pick up an
+ * runs inside the caller's tenant transaction, so a Person cannot pick up an
  * access role belonging to another institution even if the ids were guessed.
  *
  * Deliberately NOT derived from the domain `Role` entity (Lecturer, Student).
@@ -45,8 +45,8 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
     const identity = requireTenantScopedIdentity(event);
 
     /*
-     * `ics_link` DOES carry a real `actorPersonId` — `ownSessionClause()` needs
-     * it to build "this Person's own Sessions" — but it must never satisfy a
+     * `ics_link` DOES carry a real `actorPersonId`, which `ownSessionClause()`
+     * needs to build "this Person's own Sessions", but it must never satisfy a
      * permission check with it, or a stray `?token=` on an unrelated route
      * would silently borrow whatever that Person can do everywhere else. Same
      * discipline `screen`'s null `actorPersonId` enforces structurally; this
@@ -54,7 +54,7 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
      * grant access via is also the field the stream route legitimately reads.
      */
     if (!identity.actorPersonId || identity.kind === 'ics_link') {
-        // issue #78 — a principal with no acting Person (or one deliberately
+        // issue #78: a principal with no acting Person (or one deliberately
         // barred from permission checks) reaching a permission-gated route at
         // all is itself the denial; there is no permission key to name yet.
         await writeAuditLog({
@@ -77,7 +77,7 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
          * An API token is its Person's authority NARROWED: the effective set is
          * the intersection of what the Person holds LIVE and the ceiling chosen
          * at creation. Computed here, at the single point permissions are
-         * loaded, so no route can forget it — and cached only per request, so
+         * loaded, so no route can forget it, and cached only per request, so
          * revoking an AccessRole narrows every derived token immediately.
          */
         if (identity.kind === 'token') {
@@ -103,7 +103,7 @@ async function heldPermissions(event: H3Event, tx: Tx): Promise<Set<string>> {
  *
  * Deliberately NOT a way to soften a guard. A route that narrows on this must
  * still `requireAnyPermission` first, or "holds neither" silently becomes the
- * narrow branch — which would serve an unauthenticated shape of the data rather
+ * narrow branch, which would serve an unauthenticated shape of the data rather
  * than refusing.
  */
 export async function holdsPermission(event: H3Event, tx: Tx, permission: string): Promise<boolean> {
@@ -115,7 +115,7 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
     const held = await heldPermissions(event, tx);
 
     if (!held.has(permission)) {
-        // issue #78 — every denied permission check is audited, not only the
+        // issue #78: every denied permission check is audited, not only the
         // ones on generic CRUD routes.
         const identity = requireTenantScopedIdentity(event);
 
@@ -145,7 +145,7 @@ export async function requirePermission(event: H3Event, tx: Tx, permission: stri
  * acceptable permissions (`crudPermission`). For every resource driven by the
  * `<prefix>.<action>` rule that list holds exactly one element, so this is the
  * same check `requirePermission` performs; only `access-roles` currently names
- * two, and only for reading — see the note on RESOURCE_PERMISSIONS.
+ * two, and only for reading; see the note on RESOURCE_PERMISSIONS.
  *
  * An EMPTY list is a 500, not a pass. "Any of nothing" is vacuously false, but
  * the shape that produces it is a registry mistake, and a route that silently
@@ -170,7 +170,7 @@ export async function requireAnyPermission(
         return;
     }
 
-    // issue #78 — same as requirePermission()'s own denial.
+    // issue #78: same as requirePermission()'s own denial.
     const identity = requireTenantScopedIdentity(event);
 
     await writeAuditLog({

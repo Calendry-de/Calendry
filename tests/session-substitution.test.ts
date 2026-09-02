@@ -11,13 +11,13 @@ import { api, login } from './helpers/client';
  *
  *   1. THE PICKER FILTERS BEFORE CREATION, not after. `substitute-candidates`
  *      must never offer somebody already teaching (or already covering) an
- *      overlapping Session — the ticket's own words: "not let a clash be
+ *      overlapping Session, the ticket's own words: "not let a clash be
  *      created and warned about after."
  *   2. THE SAME CHECK IS RE-ENFORCED AT WRITE TIME. A picker's list can go
  *      stale; `substitute.post.ts` must refuse a now-busy person rather than
  *      trust the client.
  *   3. THE ORIGINAL ASSIGNMENT SURVIVES. `session_person` is never touched by
- *      a substitution — "Frau Müller's lesson, covered by Herr Schmidt" is a
+ *      a substitution: "Frau Müller's lesson, covered by Herr Schmidt" is a
  *      fact ON TOP of the original, not a replacement.
  *   4. IT REACHES THE EVENT LOG as its own event type, not as an edit.
  */
@@ -35,7 +35,7 @@ beforeAll(async () => {
     cookie = (await login(ACCOUNTS.adminA, TEST_PASSWORD)).cookie;
     viewerCookie = (await login(ACCOUNTS.viewerA, TEST_PASSWORD)).cookie;
 
-    // The fixture tenant provisions no domain Role at all — `provision:tenant`
+    // The fixture tenant provisions no domain Role at all; `provision:tenant`
     // creates `lecturer` for a real tenant, but this fixture hand-seeds, so the
     // precondition every route here depends on has to be built explicitly, same
     // as `session-lecturer-override.test.ts`.
@@ -163,7 +163,7 @@ describe('POST substitute', () => {
 
         expect(res.status).toBe(200);
 
-        // Still exactly ONE row — an upsert, not a second substitute.
+        // Still exactly ONE row: an upsert, not a second substitute.
         const rows = await ownerDb.sessionSubstitution.findMany({ where: { sessionId: 'test-session-a' } });
 
         expect(rows).toHaveLength(1);
@@ -184,7 +184,7 @@ describe('POST substitute', () => {
 
         expect(res.status).toBe(409);
 
-        // Refused means REFUSED — the existing substitute is untouched.
+        // Refused means REFUSED: the existing substitute is untouched.
         const row = await ownerDb.sessionSubstitution.findUniqueOrThrow({
             where: { sessionId: 'test-session-a' },
         });

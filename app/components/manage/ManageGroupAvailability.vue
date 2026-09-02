@@ -4,7 +4,7 @@
 
         <p class="avail_help">
             Leave a term blank to make this group available for all of it. Setting dates
-            restricts placement to that range — for a cohort that runs the first half of a
+            restricts placement to that range, for a cohort that runs the first half of a
             term, or joins late.
         </p>
 
@@ -19,7 +19,7 @@
 
             TWO STATES, not one, and the second is the worse one. This condition
             was `vetoRule && !vetoRule.isEnabled`, which treated a MISSING rule
-            as nothing to mention — and a missing rule is exactly what every
+            as nothing to mention, and a missing rule is exactly what every
             tenant provisioned before this type has, because a new catalogue type
             needs `backfill:constraints` before it exists as a row. So the
             silence fell precisely where the person could not fix it from here.
@@ -120,7 +120,7 @@
                 <!--
                     THE PREVIEW, and it is not decoration. `Unavailability.weeks`
                     is an index into the term's calendar weeks, so a window
-                    ending mid-week frees the WHOLE of that week — the same
+                    ending mid-week frees the WHOLE of that week, the same
                     non-obvious rounding the calendar-period editor earned a
                     preview for. Without it a tenant sets 15 May and has no way
                     to discover that the solver was told something slightly
@@ -150,7 +150,7 @@ const locale = useViewerLocale();
  * different boundary: a sub-resource with its own endpoint, its own save, and a
  * preview of a mapping the tenant cannot otherwise see.
  *
- * SAVES IMMEDIATELY, per change, like every other relation — it is not part of
+ * SAVES IMMEDIATELY, per change, like every other relation: it is not part of
  * the entity's Save transaction. Which also means it needs an id to hang off,
  * so the parent renders it in edit mode only.
  */
@@ -187,13 +187,13 @@ interface ConstraintRow {
 
 /*
  * `useRequestFetch()`, never bare `$fetch`: server-side the latter drops the
- * browser cookie, so the call 401s and this renders its empty state —
+ * browser cookie, so the call 401s and this renders its empty state:
  * indistinguishable from a tenant with no terms.
  *
  * A BARE ARRAY, not `{ rows }`. `/api/[resource]` switches shape on `limit`:
  * paginated callers get `{ rows, total }`, everyone else gets the array. Both
  * fetches here were first written as `{ rows }`, and the two halves failed
- * differently in a way worth remembering — `/api/constraints` threw
+ * differently in a way worth remembering: `/api/constraints` threw
  * `Cannot read properties of undefined (reading 'find')` during SSR, while
  * `/api/terms` hit a `?? []` fallback and rendered "No terms defined yet" for a
  * tenant with two. The crash was the lucky half.
@@ -219,7 +219,7 @@ const asyncData = useAsyncData(
                  * NULL, not an empty list. Returning `[]` on failure made
                  * "there is no such rule" and "I may not read the rules" the
                  * same value, and the note below then stated the first as
-                 * fact — telling somebody their dates are ignored and an
+                 * fact: telling somebody their dates are ignored and an
                  * administrator must add a rule, for a tenant where that rule
                  * exists and is switched on.
                  */
@@ -232,7 +232,7 @@ const asyncData = useAsyncData(
 
 const terms = computed<TermRow[]>(() => asyncData.data.value?.termList ?? []);
 
-/** False when the constraint list could not be read at all — see the fetch. */
+/** False when the constraint list could not be read at all; see the fetch. */
 const rulesReadable = computed(() => asyncData.data.value?.constraints.readable ?? false);
 
 const vetoRule = computed(() => asyncData.data.value?.constraints.rows
@@ -241,7 +241,7 @@ const vetoRule = computed(() => asyncData.data.value?.constraints.rows
 /*
  * Seeded from the AWAITED promise, not from a watcher. Vue does not flush
  * watchers during SSR, so `watch(data, seed, { immediate: true })` runs once
- * before the fetch resolves and never again — first render would show empty
+ * before the fetch resolves and never again: first render would show empty
  * inputs for a group that has windows saved.
  */
 await asyncData;
@@ -296,7 +296,7 @@ async function save(): Promise<void> {
 
     try {
         /*
-         * A BARE ARRAY as the body, not `{ rows }` — `[relation].put.ts` parses
+         * A BARE ARRAY as the body, not `{ rows }`: `[relation].put.ts` parses
          * `z.array(config.item)`. Sent as `{ rows }` first, which is a flat 400
          * with nothing saved; the same wrapper assumption also broke both GET
          * shapes above. The rule that would have avoided all three: read the
@@ -334,7 +334,7 @@ function describe(term: TermRow): string {
  * What the solver will actually be told, in weeks.
  *
  * Calls the SAME `blackedOutWeeks` the assembly calls, so this cannot drift from
- * the wire — the rule the calendar-period preview follows for the same reason.
+ * the wire, the rule the calendar-period preview follows for the same reason.
  */
 function preview(term: TermRow): string {
     const window = draft.value[term.id];
@@ -357,7 +357,7 @@ function preview(term: TermRow): string {
     }
 
     if (!free) {
-        return `Blocks every week of this term — no session could be placed.`;
+        return `Blocks every week of this term: no session could be placed.`;
     }
 
     // Week numbers are 1-based for a human, 0-based on the wire.

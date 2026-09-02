@@ -3,12 +3,12 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * Federation management from the staff panel — issue #64's UI half.
+ * Federation management from the staff panel: issue #64's UI half.
  *
  * `POST /api/staff/federations` and `PATCH /api/staff/tenants/:id` call
  * `calendry_internal.staff_create_federation()` /
- * `staff_set_tenant_federation()` — narrow SECURITY DEFINER functions, the
- * same technique issue #105 used for tenant creation — through the ORDINARY
+ * `staff_set_tenant_federation()`, narrow SECURITY DEFINER functions, the
+ * same technique issue #105 used for tenant creation, through the ORDINARY
  * `calendry_app` role. `federation`'s own RLS policy (`federation_member_read`)
  * would otherwise make it invisible to a staff request, which opens no
  * tenant/federation context at all.
@@ -71,7 +71,7 @@ interface CreateFederationResult {
 }
 
 describe('creating a Federation', () => {
-    it('refuses a tenant Account session — staff only', async () => {
+    it('refuses a tenant Account session: staff only', async () => {
         const res = await api('/api/staff/federations', {
             method: 'POST',
             cookie: tenantCookie,
@@ -93,7 +93,7 @@ describe('creating a Federation', () => {
         expect(res.body.federation.slug).toBe(NEW_FEDERATION_SLUG);
     });
 
-    it('is idempotent by slug — a second create reports alreadyExisted, never renames', async () => {
+    it('is idempotent by slug: a second create reports alreadyExisted, never renames', async () => {
         const res = await api<CreateFederationResult>('/api/staff/federations', {
             method: 'POST',
             cookie: staffCookie,
@@ -120,7 +120,7 @@ describe('creating a Federation', () => {
 });
 
 describe('attaching and detaching a Tenant', () => {
-    it('refuses a tenant Account session — staff only', async () => {
+    it('refuses a tenant Account session: staff only', async () => {
         const res = await api(`/api/staff/tenants/${f.tenantA}`, {
             method: 'PATCH',
             cookie: tenantCookie,
@@ -152,7 +152,7 @@ describe('attaching and detaching a Tenant', () => {
 
     it('moves a Tenant from one Federation to another, then detaches it', async () => {
         // The shared fixture (tests/helpers/seed.ts) starts tenantA attached
-        // to `test-fed` — moving it here and detaching it at the end is safe
+        // to `test-fed`; moving it here and detaching it at the end is safe
         // because every OTHER test file reseeds from scratch via its own
         // `beforeAll`/`teardown()` pair; nothing in THIS file depends on
         // tenantA staying on `test-fed` past this point.

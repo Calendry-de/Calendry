@@ -3,9 +3,9 @@ import { type Fixtures, ownerDb, seed, teardown } from './helpers/seed';
 import { refreshViolations } from '../server/utils/violations';
 
 /**
- * "Report a break-spanning Session as a violation" — issue #27.
+ * "Report a break-spanning Session as a violation": issue #27.
  *
- * A PER-SESSION CHECK, not a pairwise one — the first of its kind in this
+ * A PER-SESSION CHECK, not a pairwise one, the first of its kind in this
  * evaluator. `no_session_spanning_break` needs no counterpart Session, only
  * the TimeGrid its own placement sits in, which is why it lives in
  * `PER_SESSION_CONSTRAINT_TYPES` rather than the pairwise structural list
@@ -32,7 +32,7 @@ beforeAll(async () => {
     });
 
     // Enabled by default for a freshly-provisioned tenant, but this fixture
-    // hand-seeds rather than provisions — so the row is created explicitly,
+    // hand-seeds rather than provisions, so the row is created explicitly,
     // matching how other test files in this suite already do for constraints
     // the seed itself does not configure.
     await ownerDb.constraint.create({
@@ -74,7 +74,7 @@ describe('a session spanning a named break', () => {
 
         expect(violations).toHaveLength(1);
         expect(violations[0]?.severity).toBe('SOFT');
-        // Penalty IS the weight for a SOFT violation — the same mechanism a
+        // Penalty IS the weight for a SOFT violation, the same mechanism a
         // solver-priced soft rule uses, even though nothing here is solver-priced.
         expect(violations[0]?.penalty).toBe(5);
 
@@ -168,7 +168,7 @@ describe('the catalogue', () => {
         expect(defaultConstraintRow(type).isEnabled).toBe(true);
     });
 
-    it('has no wire field — this is the reporting half only, #26 is unbuilt', async () => {
+    it('has no wire field: this is the reporting half only, #26 is unbuilt', async () => {
         const { findConstraintType } = await import('../shared/constraintTypes');
 
         expect(findConstraintType('no_session_spanning_break')?.wireField).toBeUndefined();

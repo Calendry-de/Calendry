@@ -14,14 +14,14 @@ import type { SolverRunStatus } from '@prisma/client';
  * The gRPC boundary to calendry-solver.
  *
  * The solver is STATELESS and never touches Postgres: everything it knows, this
- * app put in the request. Nothing in this file assembles that request — see
+ * app put in the request. Nothing in this file assembles that request; see
  * `solverInput.ts` for the assembly, which builds it from tenant data.
  *
  * Unary calls only, by the contract's design: the solver owns run state while a
  * run is in flight and this app polls, rather than holding a stream open.
  */
 
-/** Reused across requests — a channel is expensive and safely shared. */
+/** Reused across requests: a channel is expensive and safely shared. */
 let client: SolverServiceClient | undefined;
 
 /**
@@ -29,8 +29,8 @@ let client: SolverServiceClient | undefined;
  *
  * Two addresses for one service, the same shape the database already uses
  * (`MIGRATION_DATABASE_URL` / `..._HOST`): `solver:50051` resolves only on the
- * compose network, while host-run tooling — `bun run test`, which starts a Nuxt
- * server outside compose, plus the CLI scripts — needs the published port.
+ * compose network, while host-run tooling (`bun run test`, which starts a Nuxt
+ * server outside compose, plus the CLI scripts) needs the published port.
  * Neither value works in both places, so the environment cannot simply prefer
  * whichever is set; it is selected by asking where we are.
  *
@@ -66,8 +66,8 @@ export function getSolverClient(): SolverServiceClient {
  * One extractor for both layers. `classifyPollFailure()` reads a WRAPPED error
  * (it runs in a `catch` around `getStatus`), `call()` reads a RAW one, and a
  * second copy of `?.cause?.code` in the other spelling is how the two drift
- * apart. `undefined` means the failure carried no code at all — a dead channel,
- * a DNS failure — which every caller must treat as transport.
+ * apart. `undefined` means the failure carried no code at all (a dead channel,
+ * a DNS failure), which every caller must treat as transport.
  */
 export function grpcCode(error: unknown): number | undefined {
     const e = error as { code?: number; cause?: { code?: number } } | null | undefined;
@@ -99,7 +99,7 @@ export function isTransportFailure(error: unknown): boolean {
 /**
  * The solver could not be reached. The call never got an answer.
  *
- * Only for genuine transport failures — see `isTransportFailure`. A solver that
+ * Only for genuine transport failures; see `isTransportFailure`. A solver that
  * ANSWERS, even to reject the request, is reachable, and saying otherwise sends
  * whoever reads it to inspect ports and containers instead of the thing the
  * solver actually told them.
@@ -116,9 +116,9 @@ export class SolverUnavailableError extends Error {
  *
  * WHY THIS EXISTS. Every gRPC error used to become `SolverUnavailableError`,
  * despite that class documenting the very distinction it was erasing. A real
- * INVALID_ARGUMENT — *"session '…-session-3-1' sits at week 0 day 1 block 4,
+ * INVALID_ARGUMENT, *"session '…-session-3-1' sits at week 0 day 1 block 4,
  * which is not a slot in this tenant's grid"*, precise enough to fix the data
- * from — reached the operator as "Could not reach the solver service", and cost
+ * from, reached the operator as "Could not reach the solver service", and cost
  * a troubleshooting session spent on container networking that was fine
  * throughout.
  *
@@ -183,7 +183,7 @@ export function cancelRun(runId: string): Promise<CancelRunResponse> {
  * A one-to-one mapping except for UNSPECIFIED, which is treated as QUEUED: the
  * proto's zero value means "not set", and the honest local reading of a run the
  * solver has acknowledged but not classified is that it is waiting. It is
- * deliberately not mapped to FAILED — an unset field is not evidence of failure.
+ * deliberately not mapped to FAILED: an unset field is not evidence of failure.
  */
 export function toRunStatus(status: RunStatus): SolverRunStatus {
     switch (status) {
@@ -213,14 +213,14 @@ export function isTerminal(status: SolverRunStatus): boolean {
 }
 
 /**
- * ts-proto emits every `uint64` as a STRING, not a bigint — seed, the budget
+ * ts-proto emits every `uint64` as a STRING, not a bigint: seed, the budget
  * fields, moves_evaluated and elapsed_millis are all `string` on the wire types.
  * Postgres stores them as BIGINT. These two helpers are the only place that
  * conversion happens, so nothing has to remember which side it is on.
  *
  * (The Stage 1 smoke test passed a bigint literal and worked anyway, because
  * protobufjs coerces it. It typechecked only because scripts/ is outside the
- * app's typecheck — a reminder that "it ran" is not "it is typed".)
+ * app's typecheck, a reminder that "it ran" is not "it is typed".)
  */
 export function toWireU64(value: bigint | number): string {
     return value.toString();
@@ -231,7 +231,7 @@ export function fromWireU64(value: string): bigint {
 }
 
 /**
- * BigInt does not survive JSON.stringify — the same trap `session_event.seq`
+ * BigInt does not survive JSON.stringify, the same trap `session_event.seq`
  * already hit. Converted at the route boundary, in one place.
  */
 export function serializeRun<T extends Record<string, unknown>>(run: T): Record<string, unknown> {

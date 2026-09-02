@@ -8,7 +8,7 @@ import type { Tx } from './tenantDb';
  * purpose: a live union would keep a timetable's attendee set moving between
  * solves with nothing in the event log saying why. The cost of that choice is
  * that the group goes stale, and the only thing that makes stale acceptable is
- * being able to SEE it — so this is the other half of the decision, not a
+ * being able to SEE it, so this is the other half of the decision, not a
  * convenience on top of it.
  *
  * PURE-ISH AND SEPARATE FROM THE ROUTE because two callers need the same
@@ -49,7 +49,7 @@ export async function sourceDrift(tx: Tx, tenantId: string, groupId: string): Pr
      *
      * A source is picked by hand and means exactly itself. Expanding to
      * descendants would make "draw from dit22 S1 Management" quietly also mean
-     * every group under it — usually the same set, and silently not when
+     * every group under it: usually the same set, and silently not when
      * somebody adds a child. The narrower reading is the one a person can
      * predict from the name they picked.
      */

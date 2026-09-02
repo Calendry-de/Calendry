@@ -2,14 +2,14 @@ import { existsSync } from 'node:fs';
 import Redis from 'ioredis';
 
 /**
- * Thin Redis wrapper for issue #66 — a read-through cache for calendar reads,
+ * Thin Redis wrapper for issue #66: a read-through cache for calendar reads,
  * invalidated on schedule changes. See `scheduleCache.ts` for the domain-level
  * key shapes and invalidation entry point; this file only knows about Redis.
  *
  * FAILS OPEN, always. A cache outage must never take the schedule view down
  * with it: every Redis call here is wrapped so a connection error falls
  * through to calling `fetcher()` directly, exactly as if there were no cache
- * at all. That is the one property this module exists to guarantee — get it
+ * at all. That is the one property this module exists to guarantee; get it
  * wrong and a Redis blip becomes a 500 on every page that reads a timetable.
  */
 
@@ -38,7 +38,7 @@ function logRedisFailure(context: string, error: unknown): void {
 
     if (now - lastErrorLoggedAt > 30_000) {
         lastErrorLoggedAt = now;
-        console.error(`[cache] Redis ${context} — falling through to Postgres directly:`, error);
+        console.error(`[cache] Redis ${context}, falling through to Postgres directly:`, error);
     }
 }
 
@@ -49,7 +49,7 @@ function getClient(): Redis {
             // that imports this module (scripts, tests) opening a socket.
             lazyConnect: true,
             // A disconnected client must fail FAST, not queue commands that
-            // resolve only once Redis comes back — that would turn a cache
+            // resolve only once Redis comes back; that would turn a cache
             // outage into every request hanging instead of degrading.
             enableOfflineQueue: false,
             maxRetriesPerRequest: 1,
@@ -66,7 +66,7 @@ function getClient(): Redis {
 
 /**
  * `true` once safe to issue a command this call. Never blocks waiting for a
- * reconnect already in progress — states other than the two handled here mean
+ * reconnect already in progress. States other than the two handled here mean
  * ioredis is already mid-attempt, so this reports "not available yet" and lets
  * the caller fall through, rather than piling up connect() calls.
  */
@@ -92,11 +92,11 @@ async function ensureConnected(redis: Redis): Promise<boolean> {
 
 /**
  * Read-through cache. A hit returns the cached value; a miss calls `fetcher`,
- * caches the result for `ttlSeconds`, and returns it — same shape either way,
+ * caches the result for `ttlSeconds`, and returns it: same shape either way,
  * cold cache or warm.
  *
  * Concurrent misses on the same key both call `fetcher` (a "thundering herd"
- * double-fetch) rather than coalescing — acceptable for this scope, see
+ * double-fetch) rather than coalescing; acceptable for this scope, see
  * issue #66.
  */
 export async function getCached<T>(key: string, fetcher: () => Promise<T>, ttlSeconds: number): Promise<T> {
@@ -129,11 +129,11 @@ export async function getCached<T>(key: string, fetcher: () => Promise<T>, ttlSe
 }
 
 /**
- * Deletes every key starting with `keyOrPrefix` — a safe no-op if none exist
+ * Deletes every key starting with `keyOrPrefix`, a safe no-op if none exist
  * (never cached, or already invalidated). Always prefix-matched via SCAN
  * rather than a single DEL: every key this module writes is built to be a
  * valid prefix for itself, and invalidation is deliberately generous (see
- * `scheduleCache.ts`) — callers pass a prefix covering everything that might
+ * `scheduleCache.ts`): callers pass a prefix covering everything that might
  * be stale, not one exact key.
  */
 export async function invalidate(keyOrPrefix: string): Promise<void> {

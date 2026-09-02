@@ -2,7 +2,7 @@
  * Week classification: the one definition of what kind of week a week is.
  *
  * In `shared/` because the solver's calendar and the calendar-period editor's
- * preview must not drift — a preview disagreeing with the wire would state the
+ * preview must not drift: a preview disagreeing with the wire would state the
  * opposite of the truth while looking authoritative.
  *
  * A preview is needed because the mapping is genuinely not obvious: an exam period
@@ -19,7 +19,7 @@
  * unattractive for teaching, while a two-day break does not stop the other three
  * days. Holidays not swallowing a whole week are emitted as individual dates.
  *
- * A VISIBILITY and PREFERENCE model, not a hard rule —
+ * A VISIBILITY and PREFERENCE model, not a hard rule:
  * `minimize_exam_week_sessions` is SOFT.
  */
 
@@ -111,7 +111,7 @@ export function weekCountOf(termStart: Date, termEnd: Date): number {
 }
 
 /**
- * Which week of a term a DATE falls in — 0-based, Monday-anchored. The inverse of
+ * Which week of a term a DATE falls in, 0-based, Monday-anchored. The inverse of
  * `slotDate`, anchored the same way `weekCountOf` counts, so a date's index and the
  * term's total agree by construction.
  *
@@ -151,7 +151,7 @@ export function classifyWeeks(
 
         let kind: number = WEEK_KIND.TEACHING;
 
-        // TOUCHES for exams, COVERS for the other two — see the precedence note
+        // TOUCHES for exams, COVERS for the other two; see the precedence note
         // at the top of this file.
         if (exams.some((p) => overlaps(p.startDate, p.endDate, weekStart, weekEnd))) {
             kind = WEEK_KIND.EXAM;
@@ -174,7 +174,7 @@ export interface AvailabilityWindow {
 }
 
 /**
- * The week indices a Group is NOT available — the complement of its window.
+ * The week indices a Group is NOT available: the complement of its window.
  *
  * THE ONE PLACE THE POLARITY FLIPS. A tenant states when a Group *is* around,
  * because that is the question an academic calendar answers ("this cohort runs
@@ -185,15 +185,15 @@ export interface AvailabilityWindow {
  *
  * Week-granular, not day-granular, and that is a real narrowing worth stating:
  * `Unavailability.weeks` is an index into the Term's calendar weeks, so a window
- * ending mid-week frees the WHOLE of that week. Rounding the other way — dropping
- * a week the Group is present for part of — would refuse placements that are
+ * ending mid-week frees the WHOLE of that week. Rounding the other way, dropping
+ * a week the Group is present for part of, would refuse placements that are
  * legitimately fine, and this rule is HARD. So a partially-covered week counts as
  * available, deliberately: the same "touches the week" reading `EXAM` periods
  * use, for the same reason.
  *
  * A window with both sides open returns nothing, matching an absent row. The
  * database forbids that state (`group_term_availability_needs_a_bound`) so it
- * cannot arrive from storage, but the function is total rather than throwing —
+ * cannot arrive from storage, but the function is total rather than throwing:
  * "no constraint" is the honest answer to "no bounds", and it is what an absent
  * row already means.
  */
@@ -235,15 +235,15 @@ export interface TenantLocalNow {
 /**
  * An instant, expressed as the TENANT's calendar day and time.
  *
- * In `shared/` — not `server/utils/solverCalendar.ts`, which re-exports it —
+ * In `shared/`, not `server/utils/solverCalendar.ts` (which re-exports it),
  * because it now has TWO callers that must not disagree: `computeReferenceSlot`
  * server-side, and the schedule page's Today button / live now-indicator
  * client-side (CLAUDE.md, "Timezone is per-Person and display-only... All of
- * that is tenant-local time" — the grid resolves "today" and "now" in
+ * that is tenant-local time": the grid resolves "today" and "now" in
  * `Tenant.timezone`, never the viewer's own zone, so both sides need the exact
  * same function rather than two implementations that could quietly drift).
  *
- * Uses Intl rather than a date library — no new dependency, and it is the only
+ * Uses Intl rather than a date library: no new dependency, and it is the only
  * correct way to ask "what day is it in Europe/Berlin right now" without
  * reimplementing tzdata.
  */

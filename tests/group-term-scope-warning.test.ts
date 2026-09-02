@@ -6,13 +6,13 @@ import { api, login } from './helpers/client';
  * Warn-and-allow on `group_term` scope.
  *
  * Scoping a Group OUT of a Term whose Offerings or Sessions still reference it
- * is legal and harmless — `group_term` is a VISIBILITY scope, and the solver
+ * is legal and harmless: `group_term` is a VISIBILITY scope, and the solver
  * never reads it (`assembleSolverInput` derives the Groups it needs from actual
  * references, precisely so tenant configuration cannot make an input
  * inconsistent). What changes is that the Group stops appearing in that Term's
  * pickers, so a link removed later cannot be re-added without restoring scope.
  *
- * Worth saying, not worth blocking — TAXONOMY.md §3's rule for manual edits,
+ * Worth saying, not worth blocking: TAXONOMY.md §3's rule for manual edits,
  * applied to configuration.
  *
  * THE FOURTH SUITE HERE IS THE IMPORTANT ONE. The PUT's response shape is now
@@ -73,7 +73,7 @@ describe('scoping a Group out of a Term that still uses it', () => {
         expect(res.body.warnings[0]).toContain('still use this group');
     });
 
-    it('SAVES anyway — the warning is advisory, not a refusal', async () => {
+    it('SAVES anyway: the warning is advisory, not a refusal', async () => {
         // The whole point. A guard that warned and then refused would be a
         // block wearing a warning's clothes.
         await setScope(GROUP_WITH_USAGE, [otherTerm]);
@@ -136,7 +136,7 @@ describe('the conditional response shape did not leak', () => {
         // THE regression this suite exists for. Only `groups/terms` declares the
         // hook; if the shape change reached the shared route unconditionally,
         // these callers would silently receive an object where they read an
-        // array — and `Array.isArray` on an object is false, so the picker would
+        // array, and `Array.isArray` on an object is false, so the picker would
         // render an empty set rather than erroring.
         const bare: [string, unknown[]][] = [
             [`/api/offerings/${OFFERING}/groups`, [{ groupId: GROUP_NO_USAGE }]],

@@ -1,7 +1,7 @@
 import { requireAnyPermission } from '../../utils/requirePermission';
 import { withRequestTenant } from '../../utils/tenantDb';
 
-/** One screen, without its secret — see `index.get.ts` for why that is explicit. */
+/** One screen, without its secret. See `index.get.ts` for why that is explicit. */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');
 

@@ -1,7 +1,7 @@
 /**
  * A fetch rejection's status, narrowed without trusting its shape: an `ofetch`
  * rejection is untyped and a network failure is not an object at all. Anything
- * that is not a number is null — "we do not know how far this got".
+ * that is not a number is null: "we do not know how far this got".
  */
 export function statusCodeOf(error: unknown): number | null {
     if (typeof error !== 'object' || error === null) {
@@ -45,7 +45,7 @@ export function describeScheduleFailure(error: unknown): LoadFailure {
         default:
             return {
                 title: 'Could not load the schedule',
-                detail: 'The request did not come back. Nothing has been changed — '
+                detail: 'The request did not come back. Nothing has been changed, and '
                     + 'your timetable is intact.',
                 retryable: true,
             };

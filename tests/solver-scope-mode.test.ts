@@ -9,8 +9,8 @@ import { REPAIR_MOVEMENT_WEIGHT } from '../shared/solverMode';
  * A rebuild and a repair are the same solver mechanism given opposite
  * instructions (solver ADR-0008), which means the difference between them lives
  * entirely in three values that are derived together and were previously
- * written out separately. These pin that derivation, and — the reason this file
- * exists at all — that the two modes cannot collide in the solver's idempotency
+ * written out separately. These pin that derivation, and, the reason this file
+ * exists at all, that the two modes cannot collide in the solver's idempotency
  * registry.
  */
 
@@ -84,7 +84,7 @@ describe('toWireScope', () => {
 describe('hashScope, as the idempotency key’s scope half', () => {
     /**
      * THE BUG THIS GUARDS. The key was `<inputHash>:<seed>`, and `SolverInput`
-     * carries no scope — `SolveScope` is a separate argument to StartRun. So a
+     * carries no scope: `SolveScope` is a separate argument to StartRun. So a
      * rebuild and a repair of one unchanged term at the same seed hashed
      * identically, and the solver's in-memory registry would replay the
      * rebuild's answer for the repair: the user asks to fix one clash and is

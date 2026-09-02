@@ -20,13 +20,13 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * hands back a one-time secret, and a request whose body merely happened to
  * contain a password would not read as that. `mustChangePassword` IS a field,
  * because forcing a rotation without issuing a new secret is a different, milder
- * act — the person signs in with the password they already know and is then
+ * act: the person signs in with the password they already know and is then
  * required to change it.
  *
  * WHICH FIELDS A SHARED LOGIN ACCEPTS is the one asymmetry worth knowing.
  * `email`, `isActive` and `mustChangePassword` all change how the credential
  * behaves in EVERY institution it serves, so they are refused unless this tenant
- * is the only one — see `assertSoleTenant`. `personId` is always accepted: it
+ * is the only one; see `assertSoleTenant`. `personId` is always accepted: it
  * only names which of this tenant's people the login acts as, which is precisely
  * the part no other tenant can observe.
  */
@@ -35,14 +35,14 @@ const bodySchema = z.object({
     isActive: z.boolean().optional(),
     mustChangePassword: z.boolean().optional(),
     /**
-     * Which Person in THIS tenant the login acts as — a REASSIGNMENT, never a
+     * Which Person in THIS tenant the login acts as: a REASSIGNMENT, never a
      * removal.
      *
      * `null` is accepted by the schema and then refused with an explanation,
      * rather than rejected as a type error: the management form's person select
      * has a placeholder option, so clearing it and pressing Save is a real thing
      * a user does, and "expected string, received null" is not an answer to it.
-     * Detaching is `POST /accounts/:id/detach` — an explicit verb, because it
+     * Detaching is `POST /accounts/:id/detach`, an explicit verb, because it
      * removes the login from this institution and only makes sense for one
      * another institution still holds.
      */
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
          * Only for keys the body ACTUALLY carries, and compared against the
          * stored value. The management form PATCHes every field it renders on
          * every save, so refusing on presence alone would make a shared login
-         * uneditable in the one way it is meant to be editable — the same reason
+         * uneditable in the one way it is meant to be editable, the same reason
          * `beforeUpdate` on constraints validates touched fields rather than the
          * merged row.
          */
@@ -81,7 +81,7 @@ export default defineEventHandler(async (event) => {
             throw createError({
                 statusCode: 422,
                 statusMessage: 'A login has to act as somebody. Choose a person, or use '
-                    + '“Remove from this institution” — that is a different act, and it is only '
+                    + '“Remove from this institution”: that is a different act, and it is only '
                     + 'possible for a login another institution still holds.',
                 data: { field: 'personId' },
             });
@@ -114,7 +114,7 @@ export default defineEventHandler(async (event) => {
 
             /*
              * Delete THIS tenant's link by its own composite key, never
-             * `deleteMany({ accountId })` — that would silently detach the login
+             * `deleteMany({ accountId })`, which would silently detach the login
              * from every other institution it serves, from a request that says
              * only "this person, not that one".
              */

@@ -14,8 +14,8 @@ export interface ExportSession {
 }
 
 /**
- * One Session's real start/end instant, resolved from tenant-local wall clock
- * — the ONE conversion this feature exists to do (see `shared/timezone.ts`).
+ * One Session's real start/end instant, resolved from tenant-local wall clock:
+ * the ONE conversion this feature exists to do (see `shared/timezone.ts`).
  */
 function resolveInstant(
     session: ExportSession,
@@ -41,7 +41,7 @@ function resolveInstant(
     };
 }
 
-/** `YYYYMMDDTHHMMSSZ` — the iCalendar UTC form, required so every consumer's clock agrees. */
+/** `YYYYMMDDTHHMMSSZ`: the iCalendar UTC form, required so every consumer's clock agrees. */
 function icsUtc(date: Date): string {
     return `${date.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`;
 }
@@ -50,8 +50,8 @@ function icsUtc(date: Date): string {
  * Escapes the characters RFC 5545 §3.3.11 requires escaped in TEXT values.
  * Order matters: backslash first, or escaping the others would re-escape the
  * backslashes just added. CR/CRLF is normalised to `\n` BEFORE the newline
- * escape — a raw CR surviving into the output would start a new content line
- * mid-value, letting a title inject arbitrary ICS properties.
+ * escape, because a raw CR surviving into the output would start a new content
+ * line mid-value, letting a title inject arbitrary ICS properties.
  */
 function icsText(value: string): string {
     return value
@@ -70,9 +70,9 @@ export interface ExportTermGroup {
 }
 
 /**
- * `.ics` text for one Person's Sessions, across one or several Terms — issue
- * #15's stream half (`server/api/ics/stream.ics.get.ts`), and the one-off
- * download it replaced. GROUPED BY TERM because `resolveInstant` needs each
+ * `.ics` text for one Person's Sessions, across one or several Terms (issue
+ * #15's stream half, `server/api/ics/stream.ics.get.ts`, and the one-off
+ * download it replaced). GROUPED BY TERM because `resolveInstant` needs each
  * Session's own Term start date and TimeGrid, and an "all Terms" stream can
  * legitimately span several.
  */
@@ -100,14 +100,14 @@ export function buildIcs(groups: ExportTermGroup[], timeZone: string): string {
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
         'PRODID:-//Calendry//Schedule Export//EN',
-        // CRLF line endings throughout — RFC 5545 §3.1, and several calendar
-        // clients silently drop LF-only files rather than erroring.
+        // CRLF line endings throughout: RFC 5545 §3.1 requires it, and several
+        // calendar clients silently drop LF-only files rather than erroring.
         ...events,
         'END:VCALENDAR',
     ].join('\r\n');
 }
 
-/** Which Term-week index a date range covers, per Term — for the query bound. */
+/** Which Term-week index a date range covers, per Term, used for the query bound. */
 export function weekRangeOf(termStartDate: Date, from: Date, to: Date): { first: number; last: number } {
     return {
         first: Math.max(0, weekIndexOf(termStartDate, from)) + 1,

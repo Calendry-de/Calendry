@@ -11,8 +11,8 @@ import { api, login } from './helpers/client';
  * Three things, none of which a CRUD-shaped test would touch:
  *
  *   1. THE DIRECTION OF THE GROUP WALK. A Session assigned to a Cohort is
- *      attended by everyone in its Seminars — attendance flows DOWN
- *      (TAXONOMY.md §6) — so "is this session mine" walks UP from the Groups I
+ *      attended by everyone in its Seminars: attendance flows DOWN
+ *      (TAXONOMY.md §6), so "is this session mine" walks UP from the Groups I
  *      am a member of. Using `descendantGroupIds` instead would show a Cohort
  *      member every seminar's private sessions, and would look perfectly correct
  *      on any fixture whose groups are flat. So the fixture is NOT flat, and a
@@ -22,7 +22,7 @@ import { api, login } from './helpers/client';
  *      publishes names for the rooms, people and groups in the visible sessions.
  *      If its idea of "visible" were even slightly wider than
  *      `/api/sessions`, it would leak a name for something the caller cannot
- *      read — silently, since nothing on screen would show it. Both call one
+ *      read, silently, since nothing on screen would show it. Both call one
  *      function; these assertions are what prove they still do.
  *
  *   3. THAT DRAWING NEEDS NO DIRECTORY PERMISSION. The point of the change: a
@@ -37,7 +37,7 @@ const OWN_VIEWER = 'own-viewer@test.local';
 const cookies: Record<string, string> = {};
 
 const ids = {
-    /** A second seminar under the same cohort — the sibling that must stay hidden. */
+    /** A second seminar under the same cohort: the sibling that must stay hidden. */
     siblingSeminar: 'scope-group-sibling',
     /** Somebody else's room and person, to prove the context does not name them. */
     otherRoom: 'scope-room-other',
@@ -48,7 +48,7 @@ const ids = {
     sessionSeminar: 'scope-session-seminar',
     sessionSibling: 'scope-session-sibling',
     sessionUnrelated: 'scope-session-unrelated',
-    /** Owen COVERS this one (issue #30) — no membership, no attachment at all. */
+    /** Owen COVERS this one (issue #30): no membership, no attachment at all. */
     sessionCovered: 'scope-session-covered',
 };
 
@@ -65,7 +65,7 @@ interface Context {
 
 /**
  * One Session in the shared fixture's term/grid/kind, placed somewhere nothing
- * else occupies. Placement is irrelevant to this file — visibility is — so the
+ * else occupies. Placement is irrelevant to this file (visibility is), so the
  * only thing that matters is that two sessions never collide into a constraint
  * the fixture does not expect.
  */
@@ -108,7 +108,7 @@ beforeAll(async () => {
     });
 
     /*
-     * The acting person. A member of the SEMINAR, not the cohort — so the
+     * The acting person. A member of the SEMINAR, not the cohort, so the
      * up-walk has something to walk, and the down-walk would give a different
      * (wrong) answer.
      */
@@ -143,13 +143,13 @@ beforeAll(async () => {
         data: { tenantId: TENANT_A, sessionId: ids.sessionDirect, personId: ids.ownPerson },
     });
 
-    // Assigned to the COHORT — mine, because I am in one of its seminars.
+    // Assigned to the COHORT: mine, because I am in one of its seminars.
     await makeSession(ids.sessionCohort, 2);
     await ownerDb.sessionGroup.create({
         data: { tenantId: TENANT_A, sessionId: ids.sessionCohort, groupId: 'test-group-cohort-a' },
     });
     // Ada leads it, in a room. This is the "who holds it, and where" the whole
-    // change is about — both must reach a caller with no directory permission.
+    // change is about; both must reach a caller with no directory permission.
     await ownerDb.sessionPerson.create({
         data: { tenantId: TENANT_A, sessionId: ids.sessionCohort, personId: 'test-person-a' },
     });
@@ -162,7 +162,7 @@ beforeAll(async () => {
         data: { tenantId: TENANT_A, sessionId: ids.sessionSeminar, groupId: 'test-group-seminar-a' },
     });
 
-    // The sibling seminar's own session. NOT mine — and the one a reversed
+    // The sibling seminar's own session. NOT mine, and the one a reversed
     // closure walk would hand over.
     await makeSession(ids.sessionSibling, 4);
     await ownerDb.sessionGroup.create({
@@ -182,7 +182,7 @@ beforeAll(async () => {
      * Issue #30's addition to "mine": COVERING it, via `session_substitution`
      * rather than `session_person`. Owen has no membership, no direct
      * attachment, nothing `ownSessionClause`'s first two branches would ever
-     * find — only the third one does, which is the entire point of asserting
+     * find; only the third one does, which is the entire point of asserting
      * it here rather than trusting the code review.
      */
     await makeSession(ids.sessionCovered, 6);
@@ -212,7 +212,7 @@ describe('GET /api/sessions under session.read_own', () => {
         /*
          * `test-session-a` is the shared fixture's own, and it belongs here: it
          * is assigned to `test-group-seminar-a`, which Owen is a member of. It
-         * being Ada's session is irrelevant — Owen attends it, so it is his
+         * being Ada's session is irrelevant: Owen attends it, so it is his
          * timetable too, which is precisely what a group-scoped lecture means.
          */
         expect(seen).toEqual(
@@ -223,7 +223,7 @@ describe('GET /api/sessions under session.read_own', () => {
     /**
      * Issue #30: a THIRD way to be "mine" that has nothing to do with
      * membership or attachment. Owen holds no `session_person` row here at
-     * all — if this passed for the wrong reason (a bug that widened `own` to
+     * all: if this passed for the wrong reason (a bug that widened `own` to
      * everything), the earlier "sibling"/"unrelated" assertions would already
      * have failed, so this specifically isolates the substitution branch.
      */
@@ -232,7 +232,7 @@ describe('GET /api/sessions under session.read_own', () => {
             where: { sessionId: ids.sessionCovered, personId: ids.ownPerson },
         });
 
-        expect(attachment, 'the fixture attached Owen directly — that would defeat the point').toBeNull();
+        expect(attachment, 'the fixture attached Owen directly, which would defeat the point').toBeNull();
 
         const res = await api<SessionRow[]>('/api/sessions?termId=test-term-a', { cookie: cookies.own });
 
@@ -281,7 +281,7 @@ describe('GET /api/sessions under session.read_own', () => {
 
         const seen = res.body.map((row) => row.id).sort();
 
-        // The seminar's own sessions — not the cohort-wide one, which is theirs
+        // The seminar's own sessions, not the cohort-wide one, which is theirs
         // but is not assigned to this group.
         expect(seen).toEqual([ids.sessionSeminar, 'test-session-a'].sort());
     });
@@ -304,7 +304,7 @@ describe('GET /api/schedule/context', () => {
         expect(res.status).toBe(200);
         expect(res.body.scope).toBe('own');
 
-        // The whole point: "which room am I in, and who is leading it" — answered
+        // The whole point: "which room am I in, and who is leading it", answered
         // without `room.read` or `person.read`.
         expect(res.body.rooms.map((r) => r.id)).toContain('test-room-private-a');
         expect(res.body.people.map((p) => p.id)).toContain('test-person-a');
@@ -330,8 +330,8 @@ describe('GET /api/schedule/context', () => {
     });
 
     /**
-     * The Group's PARENT travels too. Not a widening — the child being visible
-     * already implies it — and without it the inspector renders a seminar as an
+     * The Group's PARENT travels too. Not a widening (the child being visible
+     * already implies it), and without it the inspector renders a seminar as an
      * orphan, which is what disambiguates two identically-named ones.
      */
     it('includes the ancestors of a visible group', async () => {
@@ -398,7 +398,7 @@ describe('the page itself', () => {
         const html = await fetch(`${BASE}/schedule`, { headers: { cookie: cookies[role]! } })
             .then((res) => res.text());
 
-        // Rendered body only — the hydration payload carries every label as
+        // Rendered body only: the hydration payload carries every label as
         // JSON, so matching there would find the filters for every role.
         return html.split('<script type="application/json"')[0] ?? '';
     }
@@ -406,7 +406,7 @@ describe('the page itself', () => {
     /**
      * The headline: a role holding ONE permission draws a real timetable.
      *
-     * The marker is a grid cell, which exists only once the geometry resolved —
+     * The marker is a grid cell, which exists only once the geometry resolved.
      * "200 OK" is what a blanked page returns, and that is the failure this whole
      * area keeps re-learning.
      */
@@ -418,7 +418,7 @@ describe('the page itself', () => {
     });
 
     /**
-     * A FILTER APPEARS WHEN IT CAN NARROW SOMETHING — not when a permission says
+     * A FILTER APPEARS WHEN IT CAN NARROW SOMETHING, not when a permission says
      * so. Owen holds neither `group.read` nor `person.read` nor `room.read`, and
      * this one fixture exercises both sides of the rule at once:
      *

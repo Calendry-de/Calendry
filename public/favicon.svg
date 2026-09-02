@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" fill="none" role="img" aria-label="Calendry">
   <title>Calendry</title>
   <!--
-    The 11C mark alone — no wordmark. A tab strip shows this at 16px, where
+    The 11C mark alone, no wordmark. A tab strip shows this at 16px, where
     lettering is a smudge and the C's counter is the only thing that survives.
 
     Drawn at the SMALL stroke weights (20/6/6, not the 18/5/5.5 of the large
@@ -12,7 +12,7 @@
     Ink follows the viewer's browser theme. `#1A2230` is the design's ink and
     is all but invisible against a dark tab strip (Chrome's is #202124), so a
     dark-scheme override lifts it to the app's own dark-theme content colour.
-    The accent holds its value in both — it is the brand, and it carries on
+    The accent holds its value in both because it is the brand, and it carries on
     either ground. SVG favicons are the only icon format that can do this,
     which is why the raster fallbacks below get an opaque tile instead.
   -->

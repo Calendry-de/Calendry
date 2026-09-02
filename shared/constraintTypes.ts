@@ -23,13 +23,13 @@ export const STRUCTURAL_CONSTRAINT_TYPES = [
 export type StructuralConstraintType = (typeof STRUCTURAL_CONSTRAINT_TYPES)[number];
 
 /**
- * App-decided, but PER SESSION rather than pairwise — a fact about one
+ * App-decided, but PER SESSION rather than pairwise: a fact about one
  * placement and the TimeGrid it sits in, needing no counterpart Session to
  * compare against.
  *
  * A SEPARATE LIST FROM `STRUCTURAL_CONSTRAINT_TYPES`, not a fifth member of it,
  * because that list drives `describeCollision`'s dispatch, whose switch is
- * exhaustive over pairs — `(a, b)` — and has nowhere to put a check that only
+ * exhaustive over pairs (`(a, b)`) and has nowhere to put a check that only
  * ever looks at one Session. Folding this in would mean either a dead case
  * that never fires from the pairwise loop, or bending the pairwise loop to
  * also iterate seeds alone; `server/utils/violations.ts` runs this list as its
@@ -61,7 +61,7 @@ export const RELATION_CONSTRAINT_TYPES = [
 export type RelationConstraintType = (typeof RELATION_CONSTRAINT_TYPES)[number];
 
 /**
- * Types owned by the solver service (TAXONOMY.md §7) — evaluated at generation
+ * Types owned by the solver service (TAXONOMY.md §7), evaluated at generation
  * time rather than by this app on every manual edit.
  *
  * Listed so the boundary is explicit and a missing app-side check is visibly
@@ -113,10 +113,10 @@ export type ConstraintEvaluator =
     /** This application, synchronously, on every manual edit. */
     | 'app'
     /**
-     * The Rust solver service, at generation time — as opposed to `'app'`, which
+     * The Rust solver service, at generation time, as opposed to `'app'`, which
      * evaluates synchronously on every manual edit.
      *
-     * This said "Not implemented — configurable but inert", which had been stale
+     * This said "Not implemented, configurable but inert", which had been stale
      * for a long time and became flatly wrong on 2026-08-27, when
      * `person_preference_fit` (the last unevaluated type) gained its evaluator in
      * `calendry-solver` 41f6227. Every catalogue type now crosses the wire and is
@@ -204,7 +204,7 @@ export type WireConstraintField =
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
- * shelves — independent of `severity`, which is what a breach MEANS.
+ * shelves, independent of `severity`, which is what a breach MEANS.
  */
 export type ConstraintCategory =
     | 'structure'
@@ -219,7 +219,7 @@ export type ConstraintCategory =
 export const CONSTRAINT_CATEGORIES: Record<ConstraintCategory, { label: string; blurb: string }> = {
     structure: {
         label: 'Placement & structure',
-        blurb: 'What makes a timetable valid at all — no overlaps, nothing left unplaced.',
+        blurb: 'What makes a timetable valid at all: no overlaps, nothing left unplaced.',
     },
     availability: {
         label: 'Availability & preferences',
@@ -227,7 +227,7 @@ export const CONSTRAINT_CATEGORIES: Record<ConstraintCategory, { label: string; 
     },
     days: {
         label: 'Days & patterns',
-        blurb: 'How sessions distribute across a day or week — spread, compactness, repeating patterns.',
+        blurb: 'How sessions distribute across a day or week: spread, compactness, repeating patterns.',
     },
     rooms: {
         label: 'Rooms',
@@ -247,7 +247,7 @@ export const CONSTRAINT_CATEGORIES: Record<ConstraintCategory, { label: string; 
     },
 };
 
-/** Fixed display order — not alphabetical, structure-first-to-niche. */
+/** Fixed display order, not alphabetical: structure-first-to-niche. */
 export const CONSTRAINT_CATEGORY_ORDER: ConstraintCategory[] = [
     'structure', 'availability', 'days', 'rooms', 'online', 'exams', 'workload',
 ];
@@ -258,12 +258,12 @@ export interface ConstraintTypeDef {
      * Which `ConstraintConfig` field this becomes on the wire.
      *
      * OPTIONAL for one situation: a catalogue entry landing before the proto field
-     * that carries it. Naming a field that does not exist would not fail —
-     * `toWireConstraint` casts and ts-proto writes only fields it knows — so the
+     * that carries it. Naming a field that does not exist would not fail:
+     * `toWireConstraint` casts and ts-proto writes only fields it knows, so the
      * constraint would be dropped from the request with nothing reporting it.
      * A type with no `wireField` is SKIPPED and named in the assembly report.
      *
-     * NO TYPE USES THIS TODAY — `person_preference_fit` was the last one, and it
+     * NO TYPE USES THIS TODAY: `person_preference_fit` was the last one, and it
      * gained its field when the solver gained its evaluator. The optionality
      * stays because the situation recurs every time a catalogue entry ships
      * ahead of the schema, and skipping is the only safe answer; the test suite
@@ -281,12 +281,12 @@ export interface ConstraintTypeDef {
      * the meaning. The database CHECK enforces the HARD⇄no-weight pairing
      * regardless of what the UI offers.
      *
-     * A SOFT weight is RELATIVE and unbounded above — see the note on
+     * A SOFT weight is RELATIVE and unbounded above: see the note on
      * `RESOURCES.constraints.weight`.
      */
     severity: 'HARD' | 'SOFT' | null;
     /**
-     * Which shelf this type sits on in the manage UI — orthogonal to `severity`.
+     * Which shelf this type sits on in the manage UI, orthogonal to `severity`.
      * Severity says whether a breach is a defect or a preference; category says
      * what the rule is ABOUT (rooms, days, exams, …), so the grid can offer both
      * axes as independent filters instead of one flat list of thirteen-plus
@@ -301,7 +301,7 @@ export interface ConstraintTypeDef {
      * exams for a group in a day" is not a rule a tenant should be able to aim
      * at lectures by accident, and under manual scoping the accident had a
      * particularly bad shape: `applies_to_kinds` EMPTY MEANS EVERY KIND on the
-     * wire, so forgetting to scope such a rule did not disable it — it widened
+     * wire, so forgetting to scope such a rule did not disable it; it widened
      * it to every session in the institution, live, on the next solve.
      *
      * A DECLARATION, NOT A DEFAULT. `toWireConstraint` ignores `ConstraintScope`
@@ -309,7 +309,7 @@ export interface ConstraintTypeDef {
      * builder shows no kind picker. Two sources for one answer is what let two
      * exam rules disagree about which kind was the exam kind.
      *
-     * AN EMPTY DERIVED SET IS A SKIP, NEVER AN EMPTY LIST — see
+     * AN EMPTY DERIVED SET IS A SKIP, NEVER AN EMPTY LIST: see
      * `toWireConstraint`. That is the entire safety property: the wire cannot
      * express "no kinds", so a tenant with nothing classified must have the rule
      * withheld and reported, not sent meaning its exact opposite.
@@ -320,21 +320,21 @@ export interface ConstraintTypeDef {
      * more than one grid almost certainly does not mean it tenant-wide.
      *
      * A HINT, NOT A RULE. `constraint_def.time_grid_id` is available on every
-     * type and NULL means every grid, which is right for most of them — "no
+     * type and NULL means every grid, which is right for most of them: "no
      * double-booking" means the same thing on any grid. This marks the ones
      * where a gap, a block count or a span is being compared against numbers
      * only one grid produces: a 45-minute grid's "three consecutive blocks" is
      * 135 minutes and a 60-minute grid's is 180.
      *
      * The builder surfaces the grid selector for these when the tenant has more
-     * than one grid, and says nothing when it has one — a filter exists when it
+     * than one grid, and says nothing when it has one; a filter exists when it
      * has more than one option, never because a flag is set.
      */
     gridRelative?: boolean;
     /**
      * Weight a tenant's DEFAULT row is seeded with. Required for every SOFT
      * type and meaningless for HARD ones, because `constraint_weight_matches_severity`
-     * demands SOFT rows carry a weight even while disabled — so "seed it
+     * demands SOFT rows carry a weight even while disabled, so "seed it
      * disabled with no weight" is not a representable state.
      *
      * These are a coherent RELATIVE scale, not calibrated magnitudes: only
@@ -348,7 +348,7 @@ export interface ConstraintTypeDef {
      * per-session types only) for THIS type specifically.
      *
      * ABSENT, NOT `false`, is the safe default for a type not listed here: a
-     * brand-new catalogue entry — or one nobody has opted in yet — falls back
+     * brand-new catalogue entry (or one nobody has opted in yet) falls back
      * to the heuristic and is seeded disabled, so `backfill:constraints
      * --all-missing` can never silently switch on a new solver-steering rule
      * for every existing tenant. Setting `true` is a deliberate, per-type
@@ -358,15 +358,15 @@ export interface ConstraintTypeDef {
     params: ConstraintParamDef[];
     /**
      * Set for a RELATION type (ADR-0028 in calendry-solver): this type's
-     * operands are an ordered, tenant-chosen set of Offerings — `params` is
+     * operands are an ordered, tenant-chosen set of Offerings. `params` is
      * always `[]` for these, and the set itself (`ConstraintRelationMember`)
      * is what a form has to collect instead.
      *
-     * `minMembers` is the smallest set the type means anything for — 2 for
+     * `minMembers` is the smallest set the type means anything for: 2 for
      * every relation shipped so far, since a relation about one Offering
      * alone is not a relation. NO DEFAULT ROW: `defaultConstraintTypes()`
      * excludes every type carrying this, because there is no membership a
-     * seed could choose on a tenant's behalf — "the first constraint whose
+     * seed could choose on a tenant's behalf: "the first constraint whose
      * operands are chosen by the tenant in the constraint itself" (ADR-0028).
      */
     relation?: { minMembers: number };
@@ -375,7 +375,7 @@ export interface ConstraintTypeDef {
      *
      * The entry STAYS in the catalogue. Removing it would make every existing
      * row of that type unrenderable, and `type` is `createOnly`, so a tenant
-     * could not edit their way to the replacement either — they would be left
+     * could not edit their way to the replacement either, so they would be left
      * with a rule the UI cannot show and cannot fix. The builder hides these
      * from the "add a rule" picker while continuing to render the ones already
      * configured.
@@ -439,18 +439,18 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         label: 'Report sessions spanning a break',
         description:
             'A session that starts before a named break and ends after it is drawn '
-            + 'honestly on the grid and is entirely LEGAL — this only makes the fact '
+            + 'honestly on the grid and is entirely LEGAL: this only makes the fact '
             + 'queryable, so it can be listed, counted and reviewed rather than living '
             + 'only in the chip somebody happens to be looking at.',
         evaluator: 'app',
         severity: 'SOFT',
         /*
-         * UNCALIBRATED, like `REPAIR_MOVEMENT_WEIGHT` — chosen to be visible in
+         * UNCALIBRATED, like `REPAIR_MOVEMENT_WEIGHT`: chosen to be visible in
          * a SOFT summary next to this tenant's other soft rules, not measured
          * against them. Meaningful even with no solver objective behind this
          * type: `refreshViolations` sets `penalty: weight` for every SOFT
          * violation regardless of which evaluator found it, and the review
-         * screen sums penalties per type — the same mechanism a solver-priced
+         * screen sums penalties per type, the same mechanism a solver-priced
          * SOFT rule uses.
          *
          * NO WIRE FIELD, and that is not a gap to close casually: this is the
@@ -458,7 +458,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * different, unbuilt card (issue #26) that needs the grid's break
          * structure on the wire at all, which today it deliberately is not
          * (CLAUDE.md, "TimeGrid breaks"). Enabling this type has no effect on
-         * what the solver places — only on what a manual edit is reported as.
+         * what the solver places; only on what a manual edit is reported as.
          */
         defaultWeight: 5,
         params: [],
@@ -470,18 +470,18 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         description:
             'A Session an Offering still owes must sit somewhere on the grid. Flags one '
             + 'cancelled to the spare bank that has not been re-placed or '
-            + 'removed — a hole in the timetable, not a preference.',
+            + 'removed: a hole in the timetable, not a preference.',
         evaluator: 'app',
         /*
          * HARD, unlike its per-session sibling above: an unplaced Session is
          * teaching that is not happening, not a preference about where it
          * happens. Still enabled by default like every structural/per-session
-         * type (`defaultConstraintRow`) — it can never make a term infeasible,
+         * type (`defaultConstraintRow`); it can never make a term infeasible,
          * since it reports a state that already exists rather than creating one.
          *
          * PRODUCED ONLY BY `bank.post.ts`, the sole route that sets a Session's
          * placement fields to NULL: it writes this violation directly rather
-         * than through `refreshViolations()` — see that route's file comment
+         * than through `refreshViolations()`: see that route's file comment
          * for why `refreshViolations()` never runs against a banked Session.
          * `refreshViolations()`'s per-session pass still knows this type, so
          * `move.post.ts` re-placing the Session (the only restore path) clears
@@ -498,16 +498,16 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         label: 'Different time',
         description:
             'Named offerings must never be scheduled at overlapping times, even '
-            + 'though they share no room, lecturer or group — the case an elective '
+            + 'though they share no room, lecturer or group: the case an elective '
             + 'combination is, where the students taking both are not a modelled '
             + 'cohort.',
         evaluator: 'app',
         severity: 'HARD',
         /*
-         * NO `params` — its one configurable fact is WHICH Offerings relate,
+         * NO `params`: its one configurable fact is WHICH Offerings relate,
          * which is `ConstraintRelationMember`, not a scalar the params form can
          * render. NO `wireField` either: it is sent, just not through
-         * `ConstraintConfig` — see `assembleSolverInput`'s relation carve-out.
+         * `ConstraintConfig`: see `assembleSolverInput`'s relation carve-out.
          */
         params: [],
         relation: { minMembers: 2 },
@@ -520,7 +520,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultEnabled: true,
         wireField: 'exactFrequency',
         label: 'Exact session count per offering',
-        description: 'Each offering gets exactly the number of sessions it declares — no more, no fewer.',
+        description: 'Each offering gets exactly the number of sessions it declares: no more, no fewer.',
         evaluator: 'solver',
         severity: 'HARD',
         params: [],
@@ -543,7 +543,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         wireField: 'groupVeto',
         label: 'Honour group availability windows',
         description:
-            'A group is only scheduled inside the dates it is available in a term — '
+            'A group is only scheduled inside the dates it is available in a term: '
             + 'for a cohort that runs the first half of a term, or joins late. '
             + 'Groups with no window set are available all term.',
         evaluator: 'solver',
@@ -551,7 +551,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * Same architecture as `lecturer_veto`, which this is a twin of one
          * entity across: the WINDOWS live on the Group
          * (`group_term_availability`) and this row is the tenant-level switch.
-         * Hence `params: []` — there is nothing to configure that is not either
+         * Hence `params: []`: there is nothing to configure that is not either
          * enablement or somebody's own stated window.
          *
          * HARD, like its twin: an absent cohort cannot attend, so a Session
@@ -584,7 +584,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * it is not the thing a term is planned around.
          *
          * NOT OPTIONAL. `defaultConstraintRow` throws for a SOFT type with no
-         * `defaultWeight`, rather than seeding 0 — which the solver reads as
+         * `defaultWeight`, rather than seeding 0, which the solver reads as
          * "count it, do not steer" and would look like a deliberate choice.
          * Pinned by tests/constraint-catalogue.test.ts.
          */
@@ -636,7 +636,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultWeight: 5,
         params: [],
         // Superseded by `minimize_block_usage`. Kept so tenants who already
-        // configured it keep working — a catalogue entry that disappears turns
+        // configured it keep working: a catalogue entry that disappears turns
         // an existing row into an unrenderable one, and `type` is createOnly so
         // it could not be edited to the replacement either.
         deprecatedBy: 'minimize_block_usage',
@@ -716,7 +716,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             type: 'weekdays',
             required: true,
             // DELIBERATELY NO DEFAULT. Defaulting to [6,7] would reintroduce the
-            // hardcoded-Saturday assumption TAXONOMY.md §7 forbids — a tenant may
+            // hardcoded-Saturday assumption TAXONOMY.md §7 forbids: a tenant may
             // not teach Saturday at all, or may want a different day
             // deprioritized. Unset means the constraint is skipped, not guessed.
             help: 'No default: which days are undesirable is an institutional decision, not an assumption.',
@@ -731,7 +731,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * Named for the AXIS, not for one direction along it.
          *
          * This was "Spare the best rooms", which is only half of what the rule
-         * can now express — `invert` steers placement toward the premium rooms
+         * can now express: `invert` steers placement toward the premium rooms
          * instead. A label accurate for one setting of a control the same rule
          * offers is the mislabelled-constraint problem in miniature, and the key
          * is `createOnly`, so a row saved under a wrong name cannot be renamed
@@ -758,7 +758,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             required: false,
             /*
              * DEFAULTS TO TRUE, expressed ONCE here rather than as a catalogue
-             * default of false with a provisioning override — two defaults for one
+             * default of false with a provisioning override: two defaults for one
              * field agree until something distinguishes them, and then the form
              * prefills one thing while provisioning writes another.
              *
@@ -766,8 +766,8 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
              * `invert` key, which reads as false. This governs new rows only.
              */
             default: true,
-            help: 'Off — discourage rooms AT OR ABOVE the boundary, keeping premium rooms free. '
-                + 'On — discourage rooms AT OR BELOW it, so lessons fill the better rooms first.',
+            help: 'Off: discourage rooms AT OR ABOVE the boundary, keeping premium rooms free. '
+                + 'On: discourage rooms AT OR BELOW it, so lessons fill the better rooms first.',
         }],
     },
     {
@@ -776,7 +776,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultEnabled: true,
         wireField: 'minimizeExamWeek',
         /*
-         * Named for the AXIS, not for one direction along it — the same
+         * Named for the AXIS, not for one direction along it, the same
          * correction `minimize_high_ranking_rooms` already carries, and for the
          * same reason: `key` is `createOnly`, so a row saved under a label that
          * describes only one setting of its own control cannot be renamed by
@@ -803,12 +803,12 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
              * thinking about direction should keep exam weeks clear, which is
              * what this type has always done.
              *
-             * EXISTING rows are untouched either way — their stored params carry
+             * EXISTING rows are untouched either way: their stored params carry
              * no `invert` key, which `buildVariant` reads as false.
              */
             default: false,
-            help: 'Off — discourage scheduling during exam periods, keeping them clear. '
-                + 'On — discourage scheduling OUTSIDE them, so the sessions this rule '
+            help: 'Off: discourage scheduling during exam periods, keeping them clear. '
+                + 'On: discourage scheduling OUTSIDE them, so the sessions this rule '
                 + 'applies to are drawn in. Turning this on usually means scoping the '
                 + 'rule to your exam session kind; unscoped, it pulls everything in.',
         }],
@@ -844,7 +844,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
                 { value: 'GROUP', label: 'Groups only' },
                 { value: 'PERSON', label: 'People only' },
             ],
-            help: 'A group\'s day and a person\'s day are different sets — a lecturer teaching '
+            help: 'A group\'s day and a person\'s day are different sets: a lecturer teaching '
                 + 'three cohorts has gaps none of those cohorts can see.',
         }],
     },
@@ -866,14 +866,14 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         defaultEnabled: true,
         /*
          * CROSSES THE WIRE, and this line had to land in the same change as the
-         * solver's evaluator — never before it.
+         * solver's evaluator, never before it.
          *
          * The proto has carried the field since 0.7.0, but until
          * `calendry-solver` 41f6227 its `convert.rs` answered this variant with
          * `Status::unimplemented`. That is a StartRun FAILURE, not a skipped
          * rule, so naming the field early would have taken a tenant who enabled
          * this from "the rule quietly does nothing" to "every solve fails
-         * outright" — strictly worse than the state it replaced.
+         * outright", which is strictly worse than the state it replaced.
          * `per-person-preferences-design.md` § "Where `wireField` gets flipped"
          * has the three-row table.
          *
@@ -882,21 +882,21 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * rather than approximating it, because empty means "lecturers only"
          * and widening the counted set would let a 200-student cohort's
          * aggregate preference outweigh the person teaching. An empty variant is
-         * therefore not laziness — it is the only accepted value, and sending a
+         * therefore not laziness; it is the only accepted value, and sending a
          * role would fail the run. See solver ADR-0026.
          */
         wireField: 'personPreferenceFit',
         label: 'Honour personal preferences',
         description:
             'Prefer the days and blocks a lecturer has said they would rather teach. '
-            + 'Only lecturers\' preferences count, and a breach is never a defect — this '
+            + 'Only lecturers\' preferences count, and a breach is never a defect: this '
             + 'competes with the other soft rules on weight alone.',
         evaluator: 'solver',
         /*
          * Same architecture as `lecturer_veto`, one severity down: the VALUES
          * live on the Person (`person_preference`), and this row is the
          * tenant-level switch plus how much the tenant cares. Hence `params:
-         * []` — there is nothing to configure here that is not either the
+         * []`: there is nothing to configure here that is not either the
          * weight or somebody's own stated preference.
          */
         severity: 'SOFT',
@@ -916,8 +916,8 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         evaluator: 'solver',
         /*
          * HARD, and validation-shaped rather than a preference. It compares two
-         * facts the wire already carries — `Group.size` against
-         * `Room.capacity` — so a breach is a defect in the data or the
+         * facts the wire already carries, `Group.size` against
+         * `Room.capacity`, so a breach is a defect in the data or the
          * placement, never a trade-off worth weighing.
          *
          * It exists BECAUSE `Offering.min_capacity` is derived: `deriveCapacity`
@@ -946,7 +946,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          *
          * "Usual" is the MODAL room among the offering's currently placed
          * sessions, recomputed as placements change rather than fixed to
-         * whichever session landed first — so the rule cannot be satisfied by
+         * whichever session landed first, so the rule cannot be satisfied by
          * accident of ordering.
          */
         severity: 'SOFT',
@@ -994,7 +994,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * HARD, and genuinely enforceable as one unlike `max_online_ratio_per_group`.
          * The count at a single slot is fully known while placing, with no
          * moving denominator, so the solver filters on it in `is_free` rather
-         * than pricing it — which is what ADR-0025 records as the reason the
+         * than pricing it, which is what ADR-0025 records as the reason the
          * share cap could NOT be a filter.
          *
          * The cap lives on the rule, not on a Room: a virtual Room has no
@@ -1133,8 +1133,8 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * accumulate is the dead-end-construction problem `MaxOnlineShare` ran
          * into: the search can paint itself into a corner it cannot leave.
          *
-         * A contract limit is still expressible — set the weight high enough to
-         * dominate — and stays recoverable rather than making the term
+         * A contract limit is still expressible: set the weight high enough to
+         * dominate, and stays recoverable rather than making the term
          * infeasible.
          */
         severity: 'SOFT',
@@ -1321,7 +1321,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         /*
          * WHICH SESSIONS COUNT AS EXAMS IS `applies_to_kinds`, not a field here.
          * That is the same scoping mechanism every kind-scoped type already
-         * uses, and CLAUDE.md forbids hardcoding a kind called "exam" — the
+         * uses, and CLAUDE.md forbids hardcoding a kind called "exam": the
          * vocabulary is the tenant's.
          *
          * Narrower than `minimize_exam_week_sessions`, which is about the exam
@@ -1386,8 +1386,8 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * are not: their windows live on the Person or Group and the rule only
          * switches enforcement on. There is no entity to hang "lunch" on.
          *
-         * Monotone-safe like the four structural types — a protected slot is
-         * never freed by placing something elsewhere — so the solver enforces it
+         * Monotone-safe like the four structural types: a protected slot is
+         * never freed by placing something elsewhere, so the solver enforces it
          * in `is_free` rather than pricing it, and HARD is honest here in a way
          * it is not for `max_weekly_teaching_load`.
          *
@@ -1428,7 +1428,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         /*
          * WHICH OFFERINGS THIS PRICES IS NOT CONFIGURED HERE. It reads
          * `Offering.scheduling_pattern` per offering, so an offering nobody has
-         * classified is untouched — which is EVERY offering until somebody sets
+         * classified is untouched, which is EVERY offering until somebody sets
          * the field, and is why the assembly report counts them.
          *
          * That is the `lecturer_veto` shape this codebase already paid for: a
@@ -1462,7 +1462,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * left unclassified is untouched by either.
          *
          * Cost is the idle WEEKS between the offering's first and last placed
-         * session — the same gap-counting shape as `compactness`, at week
+         * session, the same gap-counting shape as `compactness`, at week
          * granularity and keyed by offering.
          */
         severity: 'SOFT',
@@ -1484,7 +1484,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * The Lecturer half of `room_consistency`, buildable now that pool
          * selection (issue #61) and the evaluator itself both exist. Aggregate
          * over an entire Offering's Sessions across the whole term, priced
-         * against `max(0, distinct_lecturers - required_lecturer_count)` — it
+         * against `max(0, distinct_lecturers - required_lecturer_count)`; it
          * only ever fires for an Offering with a genuine lecturer POOL
          * (candidates > required), so an Offering with one fixed lecturer is
          * never charged for having exactly that one.
@@ -1506,7 +1506,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         /*
          * NOT the same question `compactness` asks. A day packed solid with
          * OTHER offerings between two runs of this one has zero gaps and still
-         * splits it — this counts non-contiguous runs of the SAME offering,
+         * splits it: this counts non-contiguous runs of the SAME offering,
          * minus one, so a single run (including a lone session) costs nothing.
          */
         severity: 'SOFT',
@@ -1522,11 +1522,11 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         label: 'Cap an offering’s sessions per day',
         description:
             '“Maths, 4x a week” means four different days unless a tenant says '
-            + 'otherwise — caps how many of one offering’s sessions may land on the '
+            + 'otherwise: caps how many of one offering’s sessions may land on the '
             + 'same day.',
         evaluator: 'solver',
         /*
-         * A raw SESSION count, not blocks — not `gridRelative`, unlike its
+         * A raw SESSION count, not blocks; not `gridRelative`, unlike its
          * per-Offering sibling below. Distinct from `max_daily_session_count`,
          * which caps a Group's or Person's WHOLE day across every offering.
          */
@@ -1551,14 +1551,14 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         wireField: 'maxConsecutiveOfferingBlocks',
         label: 'Cap an offering’s blocks in a row',
         description:
-            'Caps how many blocks of ONE offering may run back to back in a day — a triple '
+            'Caps how many blocks of ONE offering may run back to back in a day: a triple '
             + 'lecture with no break, say.',
         evaluator: 'solver',
         /*
          * The Offering-scoped sibling of `max_consecutive_blocks`, which caps a
          * GROUP's or PERSON's unbroken run across every offering at once. This
          * one is about a single offering monopolising the day, so it carries no
-         * scope selector — there is only one axis, the offering itself.
+         * scope selector: there is only one axis, the offering itself.
          */
         severity: 'SOFT',
         defaultWeight: 5,
@@ -1569,7 +1569,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             min: 1,
             required: true,
             help: 'No default, for the same reason the sessions-per-day cap above has none. '
-                + 'In BLOCKS — how long a block is comes from your time grid.',
+                + 'In BLOCKS: how long a block is comes from your time grid.',
         }],
     },
 
@@ -1579,13 +1579,13 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         wireField: 'maxDailySessionCount',
         label: 'Cap sessions per day',
         description:
-            'Caps a raw session COUNT per day for a group and/or a person — the volume '
+            'Caps a raw session COUNT per day for a group and/or a person: the volume '
             + 'sibling of “Cap how long a day runs” (elapsed time) and “Cap teaching '
             + 'without a break” (continuity). A day can satisfy both of those and still be '
             + 'overloaded, e.g. six sessions split three plus a gap plus three.',
         evaluator: 'solver',
         /*
-         * A raw COUNT, not blocks — not `gridRelative`. Priced once the cap is
+         * A raw COUNT, not blocks; not `gridRelative`. Priced once the cap is
          * exceeded rather than refused, the same reasoning `max_weekly_teaching_load`
          * and ADR-0025 give: a hard cap on a count only fully known as
          * placements accumulate risks the same dead-end-construction problem.
@@ -1603,7 +1603,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
                 { value: 'GROUP', label: 'Groups only' },
                 { value: 'PERSON', label: 'People only' },
             ],
-            help: 'A group’s day and a person’s day are different sets — a lecturer '
+            help: 'A group’s day and a person’s day are different sets: a lecturer '
                 + 'teaching three cohorts has a day none of those cohorts can see.',
         }, {
             key: 'maxPerDay',
@@ -1649,7 +1649,7 @@ const CONSTRAINT_LABEL_INDEX: Record<string, string> = (() => {
     }
 
     /**
-     * The app evaluator's own `reason` strings, which are not catalogue keys —
+     * The app evaluator's own `reason` strings, which are not catalogue keys:
      * `violations.ts` writes them as the shape of the breach it found, one
      * reason covering two catalogue types (lecturer and attendee double-booking
      * both report `person_double_booked`). Mapped explicitly for that reason:
@@ -1706,7 +1706,7 @@ export function constraintCatalogueDrift(): { missingFromCatalogue: string[]; mi
  *
  * Drives skip-and-report: a constraint missing a required parameter is NOT sent
  * with an invented default. A default here would be a rule the tenant never
- * chose, enforced by a solver, reported to nobody — the exact shape of failure
+ * chose, enforced by a solver, reported to nobody: the exact shape of failure
  * this codebase keeps designing against.
  *
  * `0` and `false` are legitimate values, so emptiness is tested explicitly
@@ -1728,7 +1728,7 @@ export function missingConstraintParams(
                 return true;
             }
 
-            // An empty weekday list is "avoid no days" — indistinguishable from
+            // An empty weekday list is "avoid no days", indistinguishable from
             // not having answered, and meaningless as a constraint either way.
             return param.type === 'weekdays' && Array.isArray(value) && value.length === 0;
         })
@@ -1739,7 +1739,7 @@ export function missingConstraintParams(
  * Does this row's stored severity contradict the catalogue?
  *
  * The catalogue pins severity per type because the severity IS the meaning, but
- * the generic CRUD API accepts whatever it is given — so a row can exist saying
+ * the generic CRUD API accepts whatever it is given, so a row can exist saying
  * `no_double_booking_room` is SOFT. The wire has no severity field at all (the
  * TYPE determines hard/soft), so such a row is sent as its true severity and any
  * weight is ignored. Reported rather than silently normalised.
@@ -1760,7 +1760,7 @@ export interface ConstraintShapeProblem {
     /*
      * `scopes` is a real form control on the builder (the kind checkboxes) even
      * though it is a child collection rather than a column, so an issue about it
-     * lands on something the user can see — unlike `params`, which is why the
+     * lands on something the user can see, unlike `params`, which is why the
      * `paramKey` escape below exists.
      */
     field: 'type' | 'severity' | 'weight' | 'params' | 'scopes' | 'members';
@@ -1770,7 +1770,7 @@ export interface ConstraintShapeProblem {
      * Carried separately so a call site can put the issue on the offending
      * CONTROL. `params` is a single `custom` column that the rule builder renders
      * as many controls, so an issue reported against `'params'` itself sets
-     * `fieldErrors.params` on a field nothing displays — the save fails, the
+     * `fieldErrors.params` on a field nothing displays: the save fails, the
      * banner says "some fields need attention", and nothing is marked. That is
      * the least diagnosable outcome a form has, and it is the reason this exists
      * rather than the field name alone.
@@ -1784,7 +1784,7 @@ export interface ConstraintShapeProblem {
  *
  * `buildVariant` reads these with `Number(...)`, so a numeric STRING is a value
  * that works end to end today. Rejecting one here would be exactly the
- * builder-stricter-than-API divergence that produced the weight gap — the
+ * builder-stricter-than-API divergence that produced the weight gap: the
  * validator would refuse a configuration the solver accepts. What is rejected is
  * what `Number()` cannot turn into a usable figure: `NaN` and the infinities.
  *
@@ -1807,7 +1807,7 @@ function numericParamValue(value: unknown): number | null {
 /**
  * Is this value one the catalogue's declaration for `param` allows?
  *
- * DRIVEN ENTIRELY BY THE DECLARATION — `type`, `min`, `max`, `options` — so a
+ * DRIVEN ENTIRELY BY THE DECLARATION (`type`, `min`, `max`, `options`), so a
  * parameter added to the catalogue is validated the moment it is declared, with
  * no second list to keep in step. That is the same reason `wireField` is data
  * rather than a switch in the mapper.
@@ -1817,7 +1817,7 @@ function numericParamValue(value: unknown): number | null {
  *
  * - `weekdays` is cast `as number[]` and immediately `.map`ped. A non-array
  *   there does not disable the rule, it THROWS during assembly and fails the
- *   whole run — every other constraint included.
+ *   whole run, every other constraint included.
  * - `number`/`percent` go through `Number()`, so `"abc"` becomes `NaN`, encodes
  *   as a NaN double, and every comparison against it is false. The rule is
  *   silently inert, which looks identical to a rule that is being satisfied.
@@ -1825,7 +1825,7 @@ function numericParamValue(value: unknown): number | null {
  *   A stored `"false"` therefore means its own opposite.
  * - `select` is compared against one literal (`params.window ===
  *   'SHARE_WINDOW_PER_WEEK' ? 2 : 1`), so any typo silently selects the other
- *   branch — a guard that cannot distinguish "per term" from "matched nothing".
+ *   branch: a guard that cannot distinguish "per term" from "matched nothing".
  */
 function paramProblem(param: ConstraintParamDef, value: unknown): string | null {
     switch (param.type) {
@@ -1855,7 +1855,7 @@ function paramProblem(param: ConstraintParamDef, value: unknown): string | null 
                 : `'${param.label}' must be true or false.`;
 
         case 'text':
-            // A number is fine — the mapper stringifies — but an object becomes
+            // A number is fine (the mapper stringifies), but an object becomes
             // the literal '[object Object]' and is parsed as zero positions.
             return typeof value === 'string' || typeof value === 'number'
                 ? null
@@ -1894,7 +1894,7 @@ function paramProblem(param: ConstraintParamDef, value: unknown): string | null 
  *
  * One function for all of them, because severity-contradicts-the-catalogue,
  * weight-is-negative and a-parameter-is-not-what-it-claims are checked from two
- * places with different information — three rules times two call sites is six
+ * places with different information: three rules times two call sites is six
  * chances to drift.
  *
  * ABSENT MEANS UNCHECKED, deliberately: validating the MERGED row on update would
@@ -1902,19 +1902,19 @@ function paramProblem(param: ConstraintParamDef, value: unknown): string | null 
  * it. Checking only what is being changed means a legacy row can always be
  * repaired while no new bad value gets in.
  *
- * `null` weight is NOT absent — it is the explicit "this is HARD" value, and the
+ * `null` weight is NOT absent; it is the explicit "this is HARD" value, and the
  * HARD ⇄ NULL pairing is the database CHECK's job.
  */
 export function validateConstraintShape(input: {
-    /** The row's type. On update this is the STORED value — `type` is create-only. */
+    /** The row's type. On update this is the STORED value; `type` is create-only. */
     type: string | undefined;
     severity?: string | null;
     weight?: number | null;
     /**
      * The row's parameters, as the generic schema accepts them: arbitrary JSON.
      *
-     * Whole-object, never a patch — `params` is written wholesale by the rule
-     * builder — so validating what arrives IS validating the resulting row for
+     * Whole-object, never a patch: `params` is written wholesale by the rule
+     * builder, so validating what arrives IS validating the resulting row for
      * every key the catalogue declares.
      */
     params?: Record<string, unknown> | null;
@@ -1925,7 +1925,7 @@ export function validateConstraintShape(input: {
     scopeCount?: number;
     /**
      * How many `ConstraintRelationMember` rows the write carries. `undefined`
-     * means the write does not touch members at all — same absent-vs-zero
+     * means the write does not touch members at all, same absent-vs-zero
      * distinction as `scopeCount`, and for the same reason: a legacy row
      * missing this must stay editable for fields it is not touching.
      */
@@ -1949,7 +1949,7 @@ export function validateConstraintShape(input: {
      * `ConstraintScope` for these, so a stored scope would sit in the database
      * looking like configuration, show in any list that renders scopes, and
      * change nothing. That is the shape this file already refuses in three other
-     * places — a setting that cannot fail and cannot act.
+     * places: a setting that cannot fail and cannot act.
      *
      * Refused rather than dropped on save, because dropping is the same silence
      * one step earlier: the tenant would see their choice vanish with no reason
@@ -1958,7 +1958,7 @@ export function validateConstraintShape(input: {
     if (type?.appliesToKindType && (input.scopeCount ?? 0) > 0) {
         problems.push({
             field: 'scopes',
-            message: `'${type.key}' is not scoped by hand — it applies to every session kind `
+            message: `'${type.key}' is not scoped by hand: it applies to every session kind `
                 + `whose type is ${type.appliesToKindType}. Change a session kind's type `
                 + 'instead, and the rule follows it.',
         });
@@ -1974,13 +1974,13 @@ export function validateConstraintShape(input: {
     if (type?.relation && (input.scopeCount ?? 0) > 0) {
         problems.push({
             field: 'scopes',
-            message: `'${type.key}' is not scoped by session kind — it relates the specific `
+            message: `'${type.key}' is not scoped by session kind: it relates the specific `
                 + 'offerings named below, and applies to their sessions regardless of kind.',
         });
     }
 
     /**
-     * A RELATION TYPE'S OPERANDS ARE ITS WHOLE CONFIGURATION — there is no
+     * A RELATION TYPE'S OPERANDS ARE ITS WHOLE CONFIGURATION: there is no
      * default to fall back to (`defaultConstraintTypes()` excludes these), so
      * naming fewer than `minMembers` Offerings is not a smaller version of the
      * rule, it is a rule that names no relationship at all.
@@ -1992,14 +1992,14 @@ export function validateConstraintShape(input: {
     if (type?.relation && input.memberCount !== undefined && input.memberCount < type.relation.minMembers) {
         problems.push({
             field: 'members',
-            message: `'${type.key}' needs at least ${type.relation.minMembers} offerings named — `
+            message: `'${type.key}' needs at least ${type.relation.minMembers} offerings named: `
                 + `it relates them to each other, and ${input.memberCount} names no relationship.`,
         });
     }
 
     /**
      * The catalogue pins severity per type because the severity IS the meaning
-     * (TAXONOMY.md §7) — a double-booked room is not a preference. `null` means
+     * (TAXONOMY.md §7); a double-booked room is not a preference. `null` means
      * the tenant genuinely chooses, and then anything is fine.
      *
      * Shares `severityMismatch()` with `assembleSolverInput`'s reporting, so the
@@ -2013,7 +2013,7 @@ export function validateConstraintShape(input: {
             problems.push({
                 field: 'severity',
                 message: `'${type.key}' is always ${mismatch.expected}; it cannot be stored as ${mismatch.stored}. `
-                    + `${type.label} — ${type.description}`,
+                    + `${type.label}: ${type.description}`,
             });
         }
     }
@@ -2021,7 +2021,7 @@ export function validateConstraintShape(input: {
     /**
      * `>= 0`, matching calendry-solver's own check (convert.rs::soft_instance)
      * rather than the builder's input attribute. ZERO IS LEGAL and means
-     * "evaluate this and report the count, but do not steer the search" — a
+     * "evaluate this and report the count, but do not steer the search"; a
      * floor of 1 would reject a configuration the solver accepts, which is the
      * builder-stricter-than-API divergence that produced this gap.
      *
@@ -2048,7 +2048,7 @@ export function validateConstraintShape(input: {
      *
      * It does not check REQUIREDNESS. `missingConstraintParams()` asks that
      * question at SOLVE time, where the answer is a reported skip for one rule
-     * rather than a refused save — and a rule someone is still configuring, or
+     * rather than a refused save, and a rule someone is still configuring, or
      * has deliberately left disabled, must stay saveable. Duplicating it here
      * would mean a half-filled draft could not be written down, and the two
      * copies could disagree about what "set" means (an empty weekday list is
@@ -2056,19 +2056,19 @@ export function validateConstraintShape(input: {
      *
      * It does not reject UNKNOWN keys. The builder spreads the stored object on
      * every edit, so a key left behind by a parameter the catalogue no longer
-     * declares travels with the row — and refusing it would make exactly the
+     * declares travels with the row, and refusing it would make exactly the
      * legacy rows that need repairing unrepairable, which is the trap the note
      * above this function is about. A stale key is inert: `buildVariant` reads
      * by name. A MISTYPED key is not silent either, because the parameter it
      * should have been is then unset, and every parameter the mapper reads
-     * unsafely is `required` — so `missingConstraintParams` names it and the
+     * unsafely is `required`, so `missingConstraintParams` names it and the
      * rule is skipped with a reason rather than sent as nonsense.
      */
     if (type && input.params !== undefined && input.params !== null) {
         for (const param of type.params) {
             const value = input.params[param.key];
 
-            // UNSET, not invalid — see above. `''` counts as unset because that
+            // UNSET, not invalid: see above. `''` counts as unset because that
             // is what a cleared control sends, and it is what
             // `missingConstraintParams` already treats as unanswered.
             if (value === undefined || value === null || value === '') {
@@ -2101,7 +2101,7 @@ export function validateConstraintShape(input: {
  * membership a seed could choose on a tenant's behalf. Every other type here
  * means something with zero configuration beyond severity/weight; a
  * `different_time` row with no `ConstraintRelationMember` rows names no
- * relationship at all (ADR-0028 in calendry-solver — "the first constraint
+ * relationship at all (ADR-0028 in calendry-solver: "the first constraint
  * whose operands are chosen by the tenant in the constraint itself").
  */
 export function defaultConstraintTypes(): ConstraintTypeDef[] {
@@ -2114,14 +2114,14 @@ export function defaultConstraintTypes(): ConstraintTypeDef[] {
  * STRUCTURAL AND PER-SESSION RULES ARE ALWAYS ENABLED: those are evaluated by
  * THIS app and produce the double-booking warnings a user expects without
  * configuring anything. Every other type is enabled by default only when its
- * catalogue entry says `defaultEnabled: true` — a per-type opt-in, tuned to
+ * catalogue entry says `defaultEnabled: true`, a per-type opt-in, tuned to
  * match what a real tenant (`test`) actually runs, not a blanket flip. A type
  * with no opinion here stays OFF: `backfill:constraints --all-missing` seeds
  * missing rows for EXISTING tenants too, so a brand-new solver-steering type
  * with no explicit `defaultEnabled` must never come back on for everyone the
  * moment it is backfilled.
  *
- * A disabled row is not a dormant rule — it is a rule the tenant can see and
+ * A disabled row is not a dormant rule; it is a rule the tenant can see and
  * switch on.
  */
 export function defaultConstraintRow(type: ConstraintTypeDef): {

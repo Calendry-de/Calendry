@@ -3,7 +3,7 @@ import { clientPollMs, deriveState, deriveTrend } from '../app/composables/solve
 import type { SolverRunRow } from '../app/composables/solverRun';
 
 /**
- * Stage 6b — the toolbar control's state machine and trend derivation.
+ * Stage 6b: the toolbar control's state machine and trend derivation.
  *
  * These are the rules that decide what a person is told about a run in flight,
  * so they are pinned here rather than left to be rediscovered by clicking. Two
@@ -102,7 +102,7 @@ describe('deriveTrend', () => {
     });
 
     it('treats an objective that got worse as a change, not as a stall', () => {
-        // The signal is "is the search still moving", not "is it winning" —
+        // The signal is "is the search still moving", not "is it winning":
         // local search legitimately steps uphill.
         const trend = deriveTrend([at(0, 800), at(30, 900)]);
 

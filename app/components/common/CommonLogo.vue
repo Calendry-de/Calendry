@@ -52,7 +52,7 @@
 
 <script setup lang="ts">
 /**
- * The Calendry mark — concept 11C from the "Calendry logo concepts" design
+ * The Calendry mark: concept 11C from the "Calendry logo concepts" design
  * project: a heavy C whose counter holds three agenda rows of unequal length,
  * the last one accented and terminating in a node.
  *
@@ -64,7 +64,7 @@
  * The first version instead gave both the same px value and centred them on
  * each other. Both halves of that were wrong, and visibly so: a font's cap
  * height is ~0.71em, so a 26px mark next to 26px text stood a seventh taller
- * than the letters it was leading — the word read as the small half — and
+ * than the letters it was leading, so the word read as the small half, and
  * `align-items: center` centres the LINE BOX, whose descender space pushed the
  * lowercase band below the mark's middle. It sat low and small, which is
  * exactly how it looked.
@@ -89,7 +89,7 @@
  * Stroke weights are optically compensated, following the design rather than
  * scaling one drawing: 11C is drawn twice there, at 170px with 18/5/5.5 and at
  * 30px with 20/6/6. A single set scaled down goes spindly at small sizes, so
- * the heavier set is used below `HEAVY_BELOW` — measured against the mark's
+ * the heavier set is used below `HEAVY_BELOW`, measured against the mark's
  * own rendered size, which in a lockup is not `size`.
  */
 
@@ -170,7 +170,7 @@ $notoCap: 0.714;
     // break rather than a letter space.
     gap: 0;
     // Baseline, not centre. The mark is a capital, so it sits on the same line
-    // the letters do — and unlike `center`, this is unaffected by the
+    // the letters do, and unlike `center`, this is unaffected by the
     // descender space in the line box, which is what pushed it low before.
     align-items: baseline;
 

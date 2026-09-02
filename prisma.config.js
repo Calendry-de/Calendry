@@ -7,7 +7,7 @@ import { defineConfig } from "prisma/config";
 try {
   await import("dotenv/config");
 } catch {
-  // No dotenv, so no .env to load — the environment is already populated.
+  // No dotenv, so no .env to load: the environment is already populated.
 }
 
 export default defineConfig({
@@ -17,7 +17,7 @@ export default defineConfig({
     // Migrations are schema-only; reference data arrives via seed.
     //
     // DECLARED HERE, AND NOT RELIED ON. `migrate reset` is documented to run
-    // this automatically and, under the pinned Prisma, does not — a reset
+    // this automatically and, under the pinned Prisma, does not; a reset
     // leaves `permission` empty, and the next `provision:tenant` fails on the
     // `access_role_permission` FK with an error naming neither the seed nor the
     // reset. So `bun run db-reset` calls `db-seed` itself, and this stays as
@@ -29,7 +29,7 @@ export default defineConfig({
   datasource: {
     // Migrations run as the OWNER role, not the runtime role. The runtime role
     // (DATABASE_URL) is deliberately powerless to create or alter tables, and
-    // is subject to FORCE ROW LEVEL SECURITY — see the RLS migration.
+    // is subject to FORCE ROW LEVEL SECURITY; see the RLS migration.
     //
     // Same host-vs-container selection as scripts/lib/ownerDatabaseUrl.ts, which
     // carries the full explanation. Duplicated rather than imported because this

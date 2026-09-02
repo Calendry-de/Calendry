@@ -6,7 +6,7 @@ import { api, login } from './helpers/client';
  * Named break overrides, end to end.
  *
  * The walk itself is unit-tested in `time-grid-breaks.test.ts`; this is about
- * the plumbing around it — that breaks survive a save, come back on read,
+ * the plumbing around it: that breaks survive a save, come back on read,
  * cannot be duplicated at one position, and are cleaned up rather than left
  * dangling when the grid shrinks under them.
  *
@@ -70,7 +70,7 @@ describe('saving break overrides with the grid', () => {
         expect(rows[0]).toMatchObject({ afterBlockIndex: 3, durationMinutes: 45, label: 'Lunch', dayOfWeek: null });
         expect(rows[1]).toMatchObject({ afterBlockIndex: 6, durationMinutes: 30, dayOfWeek: 5 });
 
-        // The column write landed too — the two halves are one transaction.
+        // The column write landed too: the two halves are one transaction.
         expect((read.body as { breakMinutes: number }).breakMinutes).toBe(10);
     });
 
@@ -120,7 +120,7 @@ describe('the database refuses a duplicate override', () => {
     it('allows the same position on DIFFERENT days', async () => {
         // The counter-example: without it the test above passes against a unique
         // index that wrongly spans every day and makes per-day overrides
-        // impossible — the entire point of the feature.
+        // impossible, which is the entire point of the feature.
         await expect(ownerDb.timeGridBreak.createMany({
             data: [
                 { timeGridId: GRID, tenantId: 'test-tenant-a', afterBlockIndex: 3, durationMinutes: 45, label: 'Universal', dayOfWeek: null },
@@ -177,7 +177,7 @@ describe('shrinking a grid under its breaks', () => {
     it('deletes NOTHING when the shrink is refused for orphaning a Session', async () => {
         // The two rules meet here. A Session at block 6 refuses the shrink, and
         // because the cascade runs in the SAME transaction, the break at block 6
-        // must survive — a refusal that still destroyed configuration would be
+        // must survive: a refusal that still destroyed configuration would be
         // the worst of both behaviours.
         await withBreaks();
         await ownerDb.session.update({ where: { id: SESSION }, data: { blockIndex: 6 } });

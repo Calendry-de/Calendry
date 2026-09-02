@@ -4,19 +4,19 @@
  *
  * WHY A MAIL DRAFT AND NOT A POST ENDPOINT
  *
- * This app has no notification delivery — the project board ("Import / Export /
+ * This app has no notification delivery: the project board ("Import / Export /
  * Notifications" says so, and it is on the landing page's own roadmap. An
  * endpoint that accepted an enquiry today could only log it to stdout and
  * return 200, which is the exact failure this project keeps writing rules
  * against: a success message over a write nobody receives, indistinguishable
  * from a working contact form. Storing it instead would mean a public,
- * unauthenticated write into a tenant-scoped database — a fourth RLS-bypassing
+ * unauthenticated write into a tenant-scoped database: a fourth RLS-bypassing
  * path, which CLAUDE.md forbids without a far stronger reason than a contact
  * form.
  *
  * A `mailto:` draft is honest: the mail is composed by the visitor and sent
  * from their own account, so either it is genuinely delivered or they can see
- * that nothing opened. The one failure mode — no mail client configured — is
+ * that nothing opened. The one failure mode (no mail client configured) is
  * why the component also shows the address as selectable text.
  *
  * Pure functions on purpose. Nothing here touches `window`, so the rules can be
@@ -67,7 +67,7 @@ export function validateEnquiry(draft: EnquiryDraft): EnquiryValidation {
     }
 
     if (draft.message.length > MESSAGE_MAX_LENGTH) {
-        errors.message = `Keep this under ${MESSAGE_MAX_LENGTH} characters — the rest can go in the email itself.`;
+        errors.message = `Keep this under ${MESSAGE_MAX_LENGTH} characters. The rest can go in the email itself.`;
     }
 
     return { valid: Object.keys(errors).length === 0, errors };
@@ -77,7 +77,7 @@ export function validateEnquiry(draft: EnquiryDraft): EnquiryValidation {
 export function enquirySubject(draft: EnquiryDraft): string {
     const institution = draft.institution.trim();
 
-    return institution === '' ? 'Calendry enquiry' : `Calendry enquiry — ${institution}`;
+    return institution === '' ? 'Calendry enquiry' : `Calendry enquiry: ${institution}`;
 }
 
 /**

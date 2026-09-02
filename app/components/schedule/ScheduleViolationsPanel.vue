@@ -3,7 +3,7 @@
         <div class="panel_head">
             <!--
                 "Current" said nothing: every row here is current by
-                construction — `refreshViolations` rewrites them inside each
+                construction, since `refreshViolations` rewrites them inside each
                 mutation, and there is no historical view to distinguish them
                 from. The scope that DOES need saying is the term, and the empty
                 state says it once, where mistaking absence for a filtered view
@@ -14,7 +14,7 @@
             <!--
                 THE OFFER LIVES AT THE PROBLEM. `refreshViolations` runs inside
                 every session mutation, so a clash is known the moment it is
-                made — and this is where the person is already looking at it.
+                made, and this is where the person is already looking at it.
                 Not a peer of "Generate schedule" in the toolbar: the
                 one-active-run index means the two can never run together, so
                 presenting them as siblings would misdescribe what they are.
@@ -44,12 +44,12 @@
             v-if="canRepair && hardCount > 0"
             class="panel_muted"
         >
-            A repair moves as little as possible and produces a proposal to review —
+            A repair moves as little as possible and produces a proposal to review;
             it never changes the timetable on its own.
         </p>
 
         <!--
-            "in this term", not "in this view" — the old copy was a FACTUAL
+            "in this term", not "in this view": the old copy was a FACTUAL
             error, not a wording preference. This list is fetched per term
             (`/api/violations?termId=`) and is not narrowed by the Group, Room or
             Person filters above it, so a reader who had filtered to one cohort
@@ -69,8 +69,8 @@
                 <!--
                     A session-scoped violation is a link to the chip that caused
                     it. An OFFERING-scoped one (ExactFrequency: "needs 6, placed
-                    4") has no chip to select — the whole point is that the
-                    sessions were never placed — so it renders as a statement
+                    4") has no chip to select, because the whole point is that the
+                    sessions were never placed, so it renders as a statement
                     rather than a dead button.
                 -->
                 <button
@@ -120,7 +120,7 @@ const props = defineProps<{
     violations: Violation[];
     lookup: { room: (id: string) => string; person: (id: string) => string; group: (id: string) => string };
     sessionTitle: (id: string) => string;
-    /** `solver.trigger`. Absent, never disabled — a control nobody can use is noise. */
+    /** `solver.trigger`. Absent, never disabled: a control nobody can use is noise. */
     canRepair?: boolean;
 }>();
 
@@ -136,7 +136,7 @@ const hardCount = computed(() => props.violations.filter((v) => v.severity === '
 
 /**
  * What a row is ABOUT. A named function rather than the expression it replaces,
- * which ran `[code, title].filter(Boolean).join(' · ')` inside the `v-for` — so
+ * which ran `[code, title].filter(Boolean).join(' · ')` inside the `v-for`, so
  * once per violation on every render of the panel.
  *
  * Not a `computed`, because the value is per row rather than per component: a
@@ -173,7 +173,7 @@ function subjectOf(violation: Violation): string {
     // to navigate to, and a button that selects nothing is worse than text.
     &_unplaced {
         display: flex;
-        gap: 5px; // Between space-2 (4px) and space-3 (6px) — hand-tuned, not on the scale.
+        gap: 5px; // Between space-2 (4px) and space-3 (6px), hand-tuned, not on the scale.
         align-items: center;
 
         font-size: var(--font-size-sm);

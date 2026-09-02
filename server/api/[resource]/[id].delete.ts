@@ -26,7 +26,7 @@ defineRouteMeta({
  *
  * Deleting a Group that still has children is refused by the database
  * (parent_group_id is ON DELETE RESTRICT), which surfaces as 409. group_closure
- * rows are removed by FK cascade — this route never maintains the closure.
+ * rows are removed by FK cascade; this route never maintains the closure.
  */
 export default defineEventHandler(async (event) => {
     const resource = getRouterParam(event, 'resource');
@@ -40,8 +40,8 @@ export default defineEventHandler(async (event) => {
          * Rows provisioning created and the tenant must not delete.
          *
          * Read BEFORE the delete, because after it there is nothing left to ask.
-         * This was client-only until Step 14 — `ManageEntityForm` hid the button
-         * and the route honoured the request anyway — which for `access_role`
+         * This was client-only until Step 14: `ManageEntityForm` hid the button
+         * and the route honoured the request anyway, which for `access_role`
          * meant `tenant-admin` was one curl from gone.
          *
          * 409 rather than 403: the caller may well hold the delete permission.
@@ -75,7 +75,7 @@ export default defineEventHandler(async (event) => {
                 where: { id, tenantId: identity.tenantId },
             });
 
-            // Invariants about what the tenant is LEFT with — see `afterWrite`.
+            // Invariants about what the tenant is LEFT with: see `afterWrite`.
             // Only when something was removed: a cross-tenant id deletes nothing
             // and must report 404.
             if (deleted.count > 0) {

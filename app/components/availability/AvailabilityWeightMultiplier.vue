@@ -11,7 +11,7 @@
         >{{ help }}</p>
 
         <!--
-            Read-only renders as TEXT, never a disabled input — the same rule the
+            Read-only renders as TEXT, never a disabled input: the same rule the
             two pickers beside this one follow: a disabled control reads as
             "unavailable right now" rather than "not yours to change".
         -->
@@ -92,7 +92,7 @@ import {
  * How much one person's stated preference counts, relative to the tenant default.
  *
  * Shape deliberately mirrors `ManageWeekdayPicker` and
- * `AvailabilityBlockPicker` — `v-model`, `label`/`help`/`error`/`readonly` — so
+ * `AvailabilityBlockPicker` (`v-model`, `label`/`help`/`error`/`readonly`), so
  * the three read as one editor split across three axes rather than as two
  * pickers and a stray field.
  *
@@ -137,7 +137,7 @@ const localError = ref('');
 const NEUTRAL = 1;
 
 watch(model, (value) => {
-    // Keeps the field in step when the parent reseeds it — opening a different
+    // Keeps the field in step when the parent reseeds it: opening a different
     // person's row, or a refresh after save.
     const next = value === null ? '' : String(value);
 

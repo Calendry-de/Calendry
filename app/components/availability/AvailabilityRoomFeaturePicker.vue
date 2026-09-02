@@ -6,7 +6,7 @@
             EMPTY IS ITS OWN STATE, and it is not "no preference".
             A tenant that has defined no equipment cannot express a room-type
             preference at all, which renders identically to a person who simply
-            has none unless it is said out loud — the "no data and fetch failed
+            has none unless it is said out loud: the "no data and fetch failed
             look the same" failure, in its quietest form.
         -->
         <p
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 /**
- * Which room types a Person would rather teach in — the third axis of a
+ * Which room types a Person would rather teach in: the third axis of a
  * preference, beside days and blocks.
  *
  * THE VALUE IS EQUIPMENT IDS, not feature keys. Ids are how this app references
@@ -57,7 +57,7 @@
  *
  * The option list is PASSED IN rather than fetched here. Both pages that use
  * this are gated on an availability permission, which does not imply
- * `equipment.read` — so the options travel with each page's own payload, and a
+ * `equipment.read`, so the options travel with each page's own payload, and a
  * component fetching them itself would reintroduce exactly the cross-permission
  * dependency that blanks a page with no error.
  */

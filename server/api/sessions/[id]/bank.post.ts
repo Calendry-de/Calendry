@@ -9,14 +9,14 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
 /**
  * Cancel a Session to the spare bank (issue #22).
  *
- * WHY ONLY OFFERING-LINKED SESSIONS. An Event has no demand behind it —
+ * WHY ONLY OFFERING-LINKED SESSIONS. An Event has no demand behind it:
  * cancelling one and "keeping the teaching owed" is a contradiction, since
  * there is no teaching owed. `[id].delete.ts` is final removal for exactly
  * that case; this route is its counterpart for a Session an Offering still
  * requires.
  *
  * WHY THIS DOES NOT TOUCH `constraint_violation` VIA `refreshViolations()`.
- * That function's collision detection keys on `termWeek`/`dayOfWeek` — a
+ * That function's collision detection keys on `termWeek`/`dayOfWeek`; a
  * banked Session has neither, so it cannot violate a placement-based hard
  * constraint. Its existing session-scoped rows are simply cleared rather than
  * recomputed, which is the same end state `refreshViolations` would reach
@@ -25,7 +25,7 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
  * does not exist.
  *
  * ONE ROW SURVIVES THE CLEAR: `no_unplaced_session` (shared/constraintTypes.ts)
- * is the exact opposite shape — a fact about the ABSENCE of a placement — so
+ * is the exact opposite shape (a fact about the ABSENCE of a placement), so
  * it is written directly here rather than through `refreshViolations()`, which
  * never sees a banked Session at all. `move.post.ts` clears it again the
  * moment this Session is re-placed, the same way it clears any other
@@ -33,7 +33,7 @@ const bodySchema = z.object({ reason: z.string().nullish() }).optional();
  *
  * WHY LOCKED IS REFUSED RATHER THAN SILENTLY UNLOCKED. `Move…` and `Swap…`
  * both require an unlock first (TAXONOMY.md §3: a lock is the tenant's own
- * decision to protect a placement) — cancelling one out from under that
+ * decision to protect a placement); cancelling one out from under that
  * decision without asking would be the one path that bypasses it.
  */
 export default defineEventHandler(async (event) => {
@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
             reason: body.reason,
         });
 
-        // No placement, nothing to collide against — see the file comment.
+        // No placement, nothing to collide against; see the file comment.
         await tx.constraintViolation.deleteMany({
             where: { tenantId: identity.tenantId, sessionId: session.id },
         });

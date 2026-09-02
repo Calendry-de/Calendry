@@ -46,7 +46,7 @@ $typographySecondary: $surface2;
 }
 
 /*
- * WHERE THE HEADER STOPS FITTING ON ONE LINE — content-driven, not a device.
+ * WHERE THE HEADER STOPS FITTING ON ONE LINE: content-driven, not a device.
  *
  * Measured min-content of the header bar, at its widest permission set:
  *
@@ -57,7 +57,7 @@ $typographySecondary: $surface2;
  *
  * Below that the bar cannot hold its contents, and it did not previously try:
  * `.header__menu` had no `flex-wrap` and no collapse, so the document floored
- * at 781px and every viewport under it scrolled horizontally — on a 390px phone
+ * at 781px and every viewport under it scrolled horizontally: on a 390px phone
  * that is a 391px dead zone beside every page in the app.
  *
  * The other mixins here are DEVICE lines (699 / 1365) and are the wrong tool:
@@ -82,7 +82,7 @@ $navCollapseAt: 819px;
 }
 
 /*
- * WHERE THE LANDING BAR'S LOCKUP STOPS FITTING — its own measurement, for the
+ * WHERE THE LANDING BAR'S LOCKUP STOPS FITTING: its own measurement, for the
  * same reason `$navCollapseAt` above has one. The landing bar carries two
  * controls, not four, so the app header's 819px would collapse it ~380px early.
  *
@@ -96,16 +96,16 @@ $navCollapseAt: 819px;
  * Below that the bar could not hold its contents and did not try: `_measure`
  * does not wrap and neither child could shrink, so a 390px phone rendered a
  * 426px document. The whole page scrolled sideways and 83px of "Get in touch"
- * — the ONLY conversion control on a phone, by that component's own design —
+ * (the ONLY conversion control on a phone, by that component's own design)
  * sat past the right edge.
  *
- * 640 rather than 438, and the gap is not padding — it is the second language.
+ * 640 rather than 438, and the gap is not padding: it is the second language.
  * This repo has already measured German running ~30% longer (see
  * `ScheduleToolbar`), and the bar's own labels are the ones that grow:
  * "Kontakt aufnehmen" takes the button from 132px to ~180 and "Anmelden" the
  * link from 61 to ~72, so the same bar needs ~571px. A threshold at 560 would
  * have re-broken the bar the day i18n landed, in the one band where the lockup
- * is shown — which is exactly the failure this comment was written to prevent.
+ * is shown, which is exactly the failure this comment was written to prevent.
  * Re-measure it if either label changes.
  */
 $landingBarCollapseAt: 640px;

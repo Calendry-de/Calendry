@@ -9,7 +9,7 @@ import { parseWireOfferingId } from './offeringSplit';
  * `planMaterialization()` reads a Session's absence from the output as a
  * decision: the solver was asked about this Offering, said nothing about this
  * Session, therefore it refused to place it, therefore the apply deletes it.
- * That inference is only sound while the output is COMPLETE — while every
+ * That inference is only sound while the output is COMPLETE: while every
  * in-scope Offering comes back carrying its full `required_session_count`.
  *
  * On 2026-09-01 it was not. A `converged` run (45.8M moves, not budget-bound)
@@ -19,7 +19,7 @@ import { parseWireOfferingId } from './offeringSplit';
  * with the event reason `not_returned_by_solver`. Every applied Generation in
  * that tenant had done the same: the delete count equalled the run's shortfall
  * exactly, run after run, 127 DELETE events deep, and each run dropped a
- * DIFFERENT set — so the next run recreated them and the timetable churned
+ * DIFFERENT set, so the next run recreated them and the timetable churned
  * forever while the Session count stayed flat.
  *
  * The solver bug is filed separately and is not fixable here. What is fixable
@@ -31,7 +31,7 @@ import { parseWireOfferingId } from './offeringSplit';
  * Apply happens whenever a human decides, which can be days after the run and
  * across a restart. Re-deriving "what did we ask for" from `Offering.frequency`
  * at that point would answer a question about the Offering as it is NOW, not as
- * it was sent — and an Offering whose frequency changed in between would make
+ * it was sent, and an Offering whose frequency changed in between would make
  * the reconciliation silently wrong in the one direction that matters. The
  * ledger is written once by `assembleSolverInput()`, travels in
  * `solver_run.meta.report`, and is read back verbatim. Same reasoning as the
@@ -41,7 +41,7 @@ import { parseWireOfferingId } from './offeringSplit';
 /** One wire Offering, as it was put on the wire. */
 export interface DemandEntry {
     /**
-     * The id the SOLVER was given — a synthetic `offering::group` id for a
+     * The id the SOLVER was given: a synthetic `offering::group` id for a
      * split multi-group Offering, the real id otherwise.
      */
     wireOfferingId: string;
@@ -66,7 +66,7 @@ export interface DemandShortfall {
 export interface DemandReconciliation {
     /**
      * FALSE MEANS NOTHING WAS CHECKED, and it is a distinct state from "checked
-     * and found complete" — a run started before the ledger existed carries no
+     * and found complete": a run started before the ledger existed carries no
      * record of what it asked for, so its deletes can be neither justified nor
      * withheld on this evidence. `planMaterialization()` reports that count
      * separately rather than picking a side, which is the same rule
@@ -84,14 +84,14 @@ export interface DemandReconciliation {
      * Session belongs to means re-deriving the split from its Groups at apply
      * time, and the Groups may have changed since the run. An Offering whose
      * answer is short in any of its series therefore protects all of its
-     * Sessions — coarser, and the honest reading of "the solver returned fewer
+     * Sessions: coarser, and the honest reading of "the solver returned fewer
      * placements for this Offering than were asked of it, so which of its
      * Sessions it meant to drop is not knowable".
      */
     short: Map<string, DemandShortfall>;
 }
 
-/** The empty reconciliation — nothing recorded, nothing checkable. */
+/** The empty reconciliation: nothing recorded, nothing checkable. */
 function unknownDemand(): DemandReconciliation {
     return { known: false, totalRequired: 0, totalReturned: 0, short: new Map() };
 }
@@ -154,7 +154,7 @@ export function demandLedgerFrom(meta: unknown): DemandEntry[] | null {
  * What the run asked for, against what it answered.
  *
  * Counted over the placements the output actually carries, resolved to real
- * Offering ids the same way `planMaterialization()` resolves them — via
+ * Offering ids the same way `planMaterialization()` resolves them: via
  * `parseWireOfferingId`, with an ambiguous id counting for nobody. A placement
  * naming an Offering absent from the ledger is ignored rather than credited:
  * it cannot pay off demand nothing recorded asking for.

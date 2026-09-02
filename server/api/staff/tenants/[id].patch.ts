@@ -5,7 +5,7 @@ import { UnknownTenantIdError } from '../../../utils/staffCreateTenant';
 import { UnknownFederationIdError, setTenantFederationViaFunction } from '../../../utils/staffFederation';
 
 const bodySchema = z.object({
-    // `null` detaches; the key must be PRESENT to change anything — omitting
+    // `null` detaches; the key must be PRESENT to change anything: omitting
     // it is refused rather than silently treated as "detach", the same
     // "guards must fail loudly" reasoning CLAUDE.md names for an ambiguous
     // absent-vs-null body.

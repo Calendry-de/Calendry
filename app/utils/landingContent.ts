@@ -7,7 +7,7 @@
  * place that records what is actually true is the project board
  * (what is done, what is not) and `CLAUDE.md` (why it works the way it does).
  * Keeping the copy in one module means a claim can be checked against those two
- * files without reading nine component templates — and it means the page's
+ * files without reading nine component templates, and it means the page's
  * factual content is testable, which a template is not.
  *
  * THE RULE FOR EDITING THIS FILE: nothing here may describe a capability that
@@ -19,7 +19,7 @@
 /**
  * Where enquiries go. The ONE place this address is written.
  *
- * Read by the contact form, the footer, and the tests — so changing the mailbox
+ * Read by the contact form, the footer, and the tests, so changing the mailbox
  * is a one-line edit here and nothing else. It must be an address that actually
  * receives mail: the page composes a mail draft in the visitor's own client
  * rather than posting to an endpoint (see `~/utils/landingContact` for why), so
@@ -32,7 +32,7 @@ export const CONTACT_EMAIL = 'noah@calendry.de';
  * A titled explanation.
  *
  * NO ICON FIELD, deliberately. These were twelve `material-symbols` glyphs at
- * `$primary600` — a generic B2B icon set that said nothing this product does,
+ * `$primary600`, a generic B2B icon set that said nothing this product does,
  * spent the accent on decoration (which `DESIGN.md` reserves for "where a
  * session may land"), and included `auto-awesome`, the AI sparkle, directly
  * above copy promising numbers off a benchmark rather than a pitch deck. The
@@ -101,7 +101,7 @@ export const BUILT_CLUSTERS = [
 export type BuiltCluster = typeof BUILT_CLUSTERS[number];
 
 /**
- * WHAT IT DOES — deliberately non-technical.
+ * WHAT IT DOES: deliberately non-technical.
  *
  * Written for a registrar or timetabling officer, so no wire formats, no
  * "hybrid constructive + local search", no entity names that only mean
@@ -148,7 +148,7 @@ export const FEATURES: LandingFeature[] = [
 ];
 
 /**
- * BUILT SO FAR — every line traces to something actually shipped.
+ * BUILT SO FAR: every line traces to something actually shipped.
 
  * THIS ARRAY IS THE CLAIM, and since `BACKLOG.md` was retired nothing checks it
  * against reality: `tests/landing-page.test.ts` proves the page renders exactly
@@ -157,7 +157,7 @@ export const FEATURES: LandingFeature[] = [
  *
  * ORDER IS EDITORIAL. It was the old checklist's order, which
  * opened on "Multi-tenant data model and API" and buried "Schedule view and
- * editor" third — answering an architecture question first for a reader whose
+ * editor" third, answering an architecture question first for a reader whose
  * first question is "can it hold my week". The list now runs from what a
  * timetabling officer touches daily to what an evaluator asks about last.
  *
@@ -297,7 +297,7 @@ export const BUILT: LandingRoadmapItem[] = [
 ];
 
 /**
- * WHAT'S NEXT — what the project board has not finished, plus the
+ * WHAT'S NEXT: what the project board has not finished, plus the
  * items from § "Features not built" and § "Needs a decision" that a customer
  * would actually notice.
  *
@@ -351,7 +351,7 @@ export const NEXT: LandingRoadmapItem[] = [
 ];
 
 /**
- * WHY IT WORKS THIS WAY — architectural decisions from CLAUDE.md, not invented
+ * WHY IT WORKS THIS WAY: architectural decisions from CLAUDE.md, not invented
  * differentiators. Each one is a real rule this codebase is built on, and each
  * is stated with its consequence rather than as a virtue.
  */
@@ -399,7 +399,7 @@ export const PRINCIPLES: LandingFeature[] = [
 /**
  * The one measurement set large enough to read as the argument it is.
  *
- * ONE number, in running text — not a three-up stat row with an accent, which
+ * ONE number, in running text, not a three-up stat row with an accent, which
  * is the stock template and would put "27,000", "350ms" and "4s" at equal
  * weight when only the first pair is the claim. `figure` carries tabular
  * numerals for the same reason every clock time in the schedule does.

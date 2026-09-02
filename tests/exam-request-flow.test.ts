@@ -12,11 +12,11 @@ import { api, login } from './helpers/client';
  *   1. A request creates NOTHING until a decision. That is the whole reason the
  *      flow exists rather than granting `session.create` to every lecturer.
  *   2. "My own" means an Offering the acting Person LEADS, and the route takes
- *      no person id — another lecturer's module answers 404, not 403, so the
+ *      no person id: another lecturer's module answers 404, not 403, so the
  *      route cannot be used to enumerate who teaches what.
  *   3. The kind must be EXAM-typed. `exam_spacing_*` derive their scope from
  *      that classification, so an exam under a TEACHING kind is a Session no
- *      exam rule can see — it looks right on the timetable and is governed by
+ *      exam rule can see; it looks right on the timetable and is governed by
  *      nothing.
  *   4. Approval creates an EVENT, never a Session on the module's Offering.
  *      `ExactFrequency` is HARD, so an extra Session on an Offering is deleted
@@ -31,7 +31,7 @@ let offeringA = '';
 let examKindA = '';
 let teachingKindA = '';
 let personA = '';
-/** In tenant A, with no lecturer attached — the ownership check's real subject. */
+/** In tenant A, with no lecturer attached: the ownership check's real subject. */
 let unleadOfferingA = '';
 
 /** A fresh PENDING request, so each test starts from a known row. */
@@ -61,7 +61,7 @@ beforeAll(async () => {
     adminA = (await login(ACCOUNTS.adminA, TEST_PASSWORD)).cookie;
     adminB = (await login(ACCOUNTS.adminB, TEST_PASSWORD)).cookie;
 
-    // An EXAM-typed kind, and the acting Person as the module's lecturer —
+    // An EXAM-typed kind, and the acting Person as the module's lecturer:
     // both are preconditions of the feature rather than part of it.
     const kind = await ownerDb.sessionKind.create({
         data: { tenantId: ids.tenantA, key: 'klausur', name: 'Klausur', type: 'EXAM' },
@@ -103,14 +103,14 @@ describe('asking', () => {
 
         expect(row.status).toBe('PENDING');
         expect(row.sessionId).toBeNull();
-        // Never from the body — the acting Person IS the requester.
+        // Never from the body: the acting Person IS the requester.
         expect(row.requestedByPersonId).toBe(personA);
     });
 
     it('refuses a module the caller does not lead, as a 404', async () => {
         /*
          * IN THE CALLER'S OWN TENANT. Using another tenant's module would make
-         * this test pass on tenant isolation alone — verified by deleting the
+         * this test pass on tenant isolation alone, verified by deleting the
          * `lecturers: { some: ... }` clause and watching a cross-tenant version
          * of this stay green.
          */
@@ -145,7 +145,7 @@ describe('deciding', () => {
     it('needs the review key, which asking does not imply', async () => {
         const created = await request();
         // adminB holds every permission in ITS OWN tenant, so this is a tenant
-        // boundary rather than a permission one — and it must still be a 404.
+        // boundary rather than a permission one, and it must still be a 404.
         const res = await api(`/api/exam-requests/${created.body.request.id}/approve`, {
             method: 'POST', cookie: adminB, body: '{}',
         });
@@ -254,8 +254,8 @@ describe('the database backs the route up', () => {
     it('cannot mark a request APPROVED with no Session behind it', async () => {
         const created = await request({ dayOfWeek: 1, blockIndex: 3 });
 
-        // The half-landed approval — decided, but with nothing created and
-        // nothing saying so — is unrepresentable rather than merely unlikely.
+        // The half-landed approval (decided, but with nothing created and
+        // nothing saying so) is unrepresentable rather than merely unlikely.
         await expect(ownerDb.$executeRawUnsafe(
             `UPDATE exam_request SET status = 'APPROVED', decided_at = now() WHERE id = '${created.body.request.id}'`,
         )).rejects.toThrow();
@@ -295,7 +295,7 @@ describe('the exam week', () => {
      * It is not one: an institution says where its term-end assessment window is
      * by declaring an EXAM calendar period, and the flow reads that.
      *
-     * It has to, because the solver cannot help here — an approved exam is a
+     * It has to, because the solver cannot help here: an approved exam is a
      * locked Event and `MinimizeExamWeek` only steers what the solver PLACES.
      * The lecturer's chosen week is the final answer.
      */
@@ -333,7 +333,7 @@ describe('the exam week', () => {
         const byId = new Map(mine.body.rows.map((r) => [r.id, r.weekKind]));
 
         expect(byId.get(inExam.body.request.id)).toBe('EXAM');
-        // TEACHING, not EXAM — and allowed, because a Nachklausur legitimately
+        // TEACHING, not EXAM, and allowed, because a Nachklausur legitimately
         // sits in an ordinary teaching week.
         expect(byId.get(outside.body.request.id)).not.toBe('EXAM');
     });
@@ -356,7 +356,7 @@ describe('the exam week', () => {
 describe('the module’s own teaching-plan completeness', () => {
     /**
      * `assertTeachingComplete` used to run ONLY inside `POST .../approve`'s
-     * response — a fact shown once, as a side effect of the very decision it
+     * response: a fact shown once, as a side effect of the very decision it
      * should have informed, then gone. Neither list route carried it at all,
      * so a reviewer scanning pending requests, or a lecturer checking their
      * own, saw nothing distinguishing a module whose teaching plan is fully
@@ -364,7 +364,7 @@ describe('the module’s own teaching-plan completeness', () => {
      *
      * `offeringA` (`test-offering-a`, from the shared fixture) has
      * `frequency: 2` and exactly one placed Session throughout this whole
-     * file — every request against it approves to an EVENT (`offeringId:
+     * file: every request against it approves to an EVENT (`offeringId:
      * null`), never a Session ON the module itself, so this stays 1 of 2
      * for every test above and below this one.
      */
@@ -394,7 +394,7 @@ describe('the module’s own teaching-plan completeness', () => {
         const row = queue.body.rows.find((r) => r.id === created.body.request.id);
 
         expect(row?.teachingComplete).toEqual({ complete: false, placedCount: 1, requiredCount: 2 });
-        // Every OTHER request against the same Offering agrees — this is a
+        // Every OTHER request against the same Offering agrees: this is a
         // fact about the module, not about the one request that happened to
         // trigger the lookup.
         const sameOffering = queue.body.rows.filter((r) => r.id !== row?.id);

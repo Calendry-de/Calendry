@@ -7,7 +7,7 @@ import type { PartialRecord } from '../../types';
  * not by lightness:
  *
  *   surface0…surface7  the ground and the things stacked on it
- *   content0…content7  what sits on those surfaces — text, icons, hairlines
+ *   content0…content7  what sits on those surfaces: text, icons, hairlines
  *
  * That naming is what makes theming legible. The ramps were previously called
  * `darkgray*` and `lightgray*`, which described their values in one theme and
@@ -22,7 +22,7 @@ import type { PartialRecord } from '../../types';
  * that made the original bug invisible.
  */
 /**
- * The brand teal — the logo's accent and the interface's primary, one value.
+ * The brand teal: the logo's accent and the interface's primary, one value.
  * Declared above the palette so the two entries that carry it are visibly the
  * same constant rather than two hex strings that happen to match today.
  */
@@ -67,13 +67,13 @@ export const colorsList = {
     content6: '#3c3c3f',
     content7: '#525255',
 
-    // Primary is the brand teal, and `primary500` IS the logo's accent — the
+    // Primary is the brand teal, and `primary500` IS the logo's accent: the
     // same value, written once as `BRAND` above, so the mark and the interface
     // cannot drift apart. Purple retired here: the mark said one thing and
     // every button said another.
     //
     // NO STEPS BELOW 300: an earlier `primary200`/`primary100` pair (used as
-    // flat GROUND tints for a "selected" state) was removed — they had no
+    // flat GROUND tints for a "selected" state) was removed: they had no
     // dark-theme override, while the foreground text sitting on them
     // (`primary700`) DOES flip per theme, so the pairing silently went
     // low-contrast the moment dark mode turned that text light against a
@@ -92,7 +92,7 @@ export const colorsList = {
     primary300: '#8ACDC3',
 
     /**
-     * CONTRAST, MEASURED — the reason the ramp has a direction of use.
+     * CONTRAST, MEASURED: the reason the ramp has a direction of use.
      *
      *   primary700 on surface0        5.6:1   body text, links      ✓ AA
      *   white      on primary700      6.1:1   filled buttons        ✓ AA
@@ -100,12 +100,12 @@ export const colorsList = {
      *   primary500 on surface0        2.9:1   fills and icons ONLY  ✗ AA
      *
      * So: `primary500` is a FILL, `primary700` is the text and the pressed
-     * state. Teal text on a teal fill is never legible — the old purple ramp
+     * state. Teal text on a teal fill is never legible; the old purple ramp
      * tolerated white on `primary500` at 5.01:1 and this one does not (3.1:1),
      * which is why `CommonButton`'s primary label is ink rather than white.
      */
 
-    // Clay — the one warm counterweight, for illustrations and empty states.
+    // Clay: the one warm counterweight, for illustrations and empty states.
     secondary700: '#94502F',
     secondary600: '#A85E38',
     secondary500: '#BE6E45',
@@ -123,7 +123,7 @@ export const colorsList = {
      * ONE STEP DARKER THAN THE RAMP, FOR WARNING TEXT ON A LIGHT SURFACE.
      *
      * `warning700` is the ramp's darkest and still measures 3.73:1 on
-     * `surface1` and 3.89:1 on `surface0` — below AA for normal text at every
+     * `surface1` and 3.89:1 on `surface0`, below AA for normal text at every
      * size it renders, while `error700` (6.60) and `success700` (5.18) pass
      * comfortably on the same grounds. So this is one ramp step, not a systemic
      * problem, and it was carrying the most important sentences on the
@@ -157,7 +157,7 @@ export const colorsList = {
 
     /**
      * The logo's accent. Kept as its own name because the logo component asks
-     * for "the brand colour", not for "step 500 of the primary ramp" — but it
+     * for "the brand colour", not for "step 500 of the primary ramp", but it
      * is the same constant, so renumbering the ramp cannot silently repaint
      * the mark, and retuning the mark cannot leave the UI behind.
      */
@@ -171,16 +171,16 @@ export type ColorsList = keyof typeof colorsList;
  * light ones.
  *
  * THE SEMANTIC RAMPS ARE PARTLY THEME-DEPENDENT TOO, and this comment used to
- * claim otherwise — "the semantic colours read acceptably on both grounds" was
+ * claim otherwise: "the semantic colours read acceptably on both grounds" was
  * measured and is false at the dark end of each ramp. Used as FOREGROUND on the
  * dark ground (`$surface1` = #18181B), `$error700` measures 2.21:1 and
- * `$success700` 2.71:1 — both under the 3:1 a non-text indicator needs, and far
+ * `$success700` 2.71:1, both under the 3:1 a non-text indicator needs, and far
  * under text's 4.5:1. `schedule-panel.scss` had already worked around this
  * locally by reaching for `$error300`/`$warning400` instead, which is the same
  * finding discovered one component at a time.
  *
- * So the 600 and 700 steps — the two used as borders, icons, counts and link
- * text — take the light end of their own ramp under `dark`. The 300–500 steps
+ * So the 600 and 700 steps (the two used as borders, icons, counts and link
+ * text) take the light end of their own ramp under `dark`. The 300–500 steps
  * are NOT remapped: they are used as fills and tints, where the light theme's
  * values are already correct against a dark surface.
  *

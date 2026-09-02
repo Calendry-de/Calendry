@@ -6,13 +6,13 @@ import { CSRF_COOKIE, CSRF_HEADER } from './shared/csrf';
  * `CSRF_HEADER` on every state-changing same-origin request, so no existing
  * `$fetch`/`useRequestFetch()` call site across `app/` has to change.
  *
- * This is a classic inline `<script>`, not a Nuxt plugin — see the long
+ * This is a classic inline `<script>`, not a Nuxt plugin; see the long
  * comment in `shared/csrf.ts` for why a plugin's `setup()` runs too late to
  * intercept `fetch`: Nuxt's own `$fetch` singleton captures `globalThis.fetch`
  * once, at MODULE EVALUATION time (`#build/fetch.mjs`), which always finishes
  * before any plugin callback runs. A non-module script tag, by contrast,
- * executes during HTML parsing — strictly before any deferred `type="module"`
- * script, regardless of position in the document — so patching `window.fetch`
+ * executes during HTML parsing, strictly before any deferred `type="module"`
+ * script regardless of position in the document, so patching `window.fetch`
  * here is the only place guaranteed to win the race. Safe under this app's CSP
  * (`script-src ... 'unsafe-inline'`, `security-headers.ts`), so it needs no
  * nonce.
@@ -56,16 +56,16 @@ const csrfFetchPatchScript = `(function () {
 
 export default defineNuxtConfig({
     runtimeConfig: {
-        // Cloudflare Turnstile secret key (issue #79) — server-only, read
+        // Cloudflare Turnstile secret key (issue #79), server-only, read
         // directly from process.env by server/utils/turnstile.ts, declared
         // here too so it is documented and typed like every other server
         // secret. PRODUCTION MUST SET A REAL SECRET; left unset, login skips
         // the CAPTCHA requirement entirely and relies on the rate limit
-        // alone — see turnstile.ts's own comment.
+        // alone; see turnstile.ts's own comment.
         turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY ?? '',
         public: {
             version: pkg.version,
-            // Public Turnstile site key — safe to ship to the client.
+            // Public Turnstile site key, safe to ship to the client.
             // Defaults to Cloudflare's published always-pass TEST key so
             // local dev renders a working widget with zero configuration.
             turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA',
@@ -79,7 +79,7 @@ export default defineNuxtConfig({
                     content: 'width=device-width, initial-scale=1.0',
                 },
             ],
-            // The 11C mark, mark only — a wordmark is unreadable in a tab strip.
+            // The 11C mark, mark only: a wordmark is unreadable in a tab strip.
             // Declared rather than left to the implicit /favicon.ico lookup, so
             // the SVG is offered first: it is the one format that can follow the
             // viewer's colour scheme, and browsers that understand it prefer it.
@@ -110,7 +110,7 @@ export default defineNuxtConfig({
             }
         },
         alias: {
-            // See server/utils/pgNativeStub.ts — pg's optional native addon,
+            // See server/utils/pgNativeStub.ts: pg's optional native addon,
             // never installed, needs somewhere to resolve at build time.
             'pg-native': './server/utils/pgNativeStub.ts',
         },

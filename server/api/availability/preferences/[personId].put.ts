@@ -7,14 +7,14 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 /**
  * Set anyone's preferences directly.
  *
- * `manage_any` only — `read_any` reaches the overview and stops there, which is
+ * `manage_any` only: `read_any` reaches the overview and stops there, which is
  * the whole reason the two keys are separate.
  *
  * No approval on this path either, and none on the self-service one: a
  * preference is soft and tenant-weighted, so it cannot make a term infeasible
  * the way a veto can. In this slice it additionally has no solver effect at all.
  *
- * STORED, NOT YET HONOURED — see the `PersonPreference` model comment.
+ * STORED, NOT YET HONOURED. See the `PersonPreference` model comment.
  */
 export default defineEventHandler(async (event) => {
     const personId = getRouterParam(event, 'personId');
@@ -38,7 +38,7 @@ export default defineEventHandler(async (event) => {
         if (outOfRange.length) {
             throw createError({
                 statusCode: 400,
-                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1} — the largest time grid `
+                statusMessage: `Blocks must be between 0 and ${limits.blocksPerDay - 1}. The largest time grid `
                     + `in this tenant has ${limits.blocksPerDay} blocks per day.`,
                 data: { field: 'preferredBlocks' },
             });
@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
              * representation: no row.
              *
              * DELIBERATE CONSEQUENCE: the weight override goes with it. A
-             * multiplier modifies a preference, so it cannot outlive one — a row
+             * multiplier modifies a preference, so it cannot outlive one: a row
              * holding only a weight would be a factor applied to nothing. The
              * axes are therefore what decides existence, and `weightMultiplier`
              * is only ever read on a row that already has something to weight.
@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
                 select: { preferredDays: true, preferredBlocks: true, weightMultiplier: true },
             });
 
-            // AFTER the upsert — the join rows reference `person_preference`.
+            // AFTER the upsert: the join rows reference `person_preference`.
             await replaceRoomFeaturePreferences(tx, {
                 tenantId: identity.tenantId,
                 personId: person.id,

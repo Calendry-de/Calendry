@@ -62,7 +62,7 @@ defineRouteMeta({
 });
 
 /**
- * Edit what an EVENT is — its title, kind, groups and people.
+ * Edit what an EVENT is: its title, kind, groups and people.
  *
  * WHY A NAMED VERB AND NOT `PATCH /api/sessions/:id`
  *
@@ -74,7 +74,7 @@ defineRouteMeta({
  *
  * WHY ROOM IS NOT HERE
  *
- * Room is already editable — `setRooms()` sends `roomIds` to `/move`, under
+ * Room is already editable: `setRooms()` sends `roomIds` to `/move`, under
  * `session.move`, recorded as a MOVE. Accepting it here too would mean two
  * routes writing `session_room` under two permissions emitting two event types,
  * and a reader of the log would have to know both to reconstruct the room's
@@ -85,13 +85,13 @@ defineRouteMeta({
  * Same reason `DELETE` is Events-only. An Offering-linked Session's `kind_id`
  * is copied from its Offering and its groups and people come from solver
  * output, so a manual edit here would be silently overwritten by the next
- * apply — an edit that appears to work and then undoes itself, which is worse
+ * apply: an edit that appears to work and then undoes itself, which is worse
  * than being refused. 409 rather than 404 so "this is solver-derived" stays
  * distinguishable from "no such Session".
  *
  * PLACEMENT IS NOT TOUCHED, so `fitsGrid()` has nothing to check: week, day,
  * block and duration all stay on `move`, which already guards them. A grid
- * check here would be a guard that can never fail — the kind this codebase
+ * check here would be a guard that can never fail: the kind this codebase
  * treats as worse than none.
  */
 export default defineEventHandler(async (event) => {
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
         if (body.title !== undefined && !body.title.trim()) {
             throw createError({
                 statusCode: 400,
-                statusMessage: 'An event needs a name — there is no Offering to take one from.',
+                statusMessage: 'An event needs a name. There is no Offering to take one from.',
                 data: { field: 'title' },
             });
         }
@@ -197,7 +197,7 @@ export default defineEventHandler(async (event) => {
          * BEFORE AND AFTER, for the fields the request actually touched.
          *
          * Both halves, because a Generation snapshot describes what exists now
-         * and cannot answer "what was this called last week" — the same reason
+         * and cannot answer "what was this called last week": the same reason
          * a DELETE event carries the placement it removed.
          */
         const changed = (Object.keys(after) as (keyof typeof after)[])
@@ -216,7 +216,7 @@ export default defineEventHandler(async (event) => {
         });
 
         // Groups and people change WHO is in the room, so collisions can appear
-        // or clear — recomputed in the same transaction, as every editing route
+        // or clear. Recomputed in the same transaction, as every editing route
         // does, so persisted violations are never stale relative to the edit.
         await refreshViolations(tx, {
             tenantId: identity.tenantId,

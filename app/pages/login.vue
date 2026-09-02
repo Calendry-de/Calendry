@@ -2,7 +2,7 @@
     <CommonBox>
         <h1 class="login_title">Calendry</h1>
 
-        <!-- STEP 1 — credentials -->
+        <!-- STEP 1: credentials -->
         <form
             v-if="step === 'credentials'"
             class="login_form"
@@ -42,7 +42,7 @@
 
             <!--
                 Rendered only past CAPTCHA_ATTEMPT_THRESHOLD failed attempts
-                (issue #79) — see renderTurnstile(). Cloudflare's script fills
+                (issue #79); see renderTurnstile(). Cloudflare's script fills
                 this element with its own iframe; it is never used for
                 anything else, so there is nothing to keep in sync besides the
                 element existing when the widget wants to mount into it.
@@ -56,7 +56,7 @@
             <!--
                 native-type="submit" makes this a real submit button inside the
                 <form>, so Enter in either field works and the @submit.prevent
-                handler is the single entry point. No @click here — that would
+                handler is the single entry point. No @click here: that would
                 fire the handler twice. CommonButton defaults to type="button",
                 so this opt-in is what keeps Enter-to-submit working.
             -->
@@ -79,7 +79,7 @@
             </p>
         </form>
 
-        <!-- STEP 2 — tenant selection, only when the account has several identities -->
+        <!-- STEP 2: tenant selection, only when the account has several identities -->
         <div
             v-else
             class="login_form"
@@ -120,7 +120,7 @@ import { CAPTCHA_ATTEMPT_THRESHOLD } from '#shared/turnstile';
 
 /**
  * Cloudflare's widget script attaches itself to `window.turnstile`. Declared
- * narrowly rather than reached for through `any` (CLAUDE.md: no `any`) —
+ * narrowly rather than reached for through `any` (CLAUDE.md: no `any`);
  * `render`/`reset` are the only two calls this page makes.
  */
 interface TurnstileApi {
@@ -165,7 +165,7 @@ const availableTenants = ref<SessionTenant[]>([]);
 const justChanged = computed(() => route.query.changed === '1');
 
 /*
- * CAPTCHA (issue #79) — a local counter, not server state. The server is the
+ * CAPTCHA (issue #79): a local counter, not server state. The server is the
  * real gate (it counts by email across devices/tabs); this counter only
  * decides when to render the widget so a legitimate user is not shown it on
  * their very first attempt. Never reset except by navigating away: a widget
@@ -214,7 +214,7 @@ async function renderTurnstile() {
     try {
         await loadTurnstileScript();
     } catch {
-        // No widget, no token — the next submit will 400 with "CAPTCHA
+        // No widget, no token: the next submit will 400 with "CAPTCHA
         // verification required.", which is an honest description of what
         // happened (Cloudflare's script did not load) rather than a fake
         // "sign in" attempt.
@@ -238,7 +238,7 @@ watch(showCaptcha, (shown) => {
 
 // Arriving with ?select=1 means an already-signed-in user came back to change
 // institution. Skip straight to the selection step using the identities the
-// session already knows about — no re-authentication required.
+// session already knows about, so no re-authentication is required.
 if (route.query.select === '1' && session.value?.availableTenants.length) {
     availableTenants.value = session.value.availableTenants;
     step.value = 'tenant';
@@ -252,9 +252,9 @@ function destination(): string {
     }
 
     // #73: an ordinary sign-in with no `?redirect=` returns a visitor to where
-    // they left off rather than always HOME_ROUTE — empty on a session's first
+    // they left off rather than always HOME_ROUTE, which is empty on a session's first
     // sign-in, since nothing has been visited yet. Issue #107: the fallback
-    // itself is no longer the bare constant — `resolveHomeRoute()` sends a
+    // itself is no longer the bare constant: `resolveHomeRoute()` sends a
     // caller who lacks `dashboard.view` to `/schedule` instead. `finish()`
     // calls `fetchSession(true)` before this runs, so `session.value` already
     // carries this sign-in's permissions.
@@ -279,7 +279,7 @@ async function submitCredentials() {
             body: {
                 email: email.value,
                 password: password.value,
-                // Absent below the threshold — the server treats a missing
+                // Absent below the threshold: the server treats a missing
                 // token as "not required yet" and only checks it once its own
                 // count (per email, not this tab's local counter) agrees.
                 ...(turnstileToken.value ? { turnstileToken: turnstileToken.value } : {}),
@@ -303,7 +303,7 @@ async function submitCredentials() {
 
         await finish();
     } catch {
-        // ONE message for every failure mode — wrong password, unknown account,
+        // ONE message for every failure mode: wrong password, unknown account,
         // and an account with no active Person all land here. The API already
         // returns identical 401s for the first two; distinguishing them in the
         // UI would reintroduce the account-existence oracle that the server
@@ -312,7 +312,7 @@ async function submitCredentials() {
         password.value = '';
         failedAttempts.value += 1;
 
-        // A used or expired token must not be resubmitted silently — reset
+        // A used or expired token must not be resubmitted silently, so reset
         // the widget so the next submit carries a fresh one, matching
         // Turnstile's own single-use-token contract.
         turnstileToken.value = '';

@@ -21,7 +21,7 @@ useCalendryLayout();
  * The build stamp is for people working on the product, not for the public page.
  *
  * `ViewVersion` is `position: fixed` at `z-index: 10000`, so on the landing page
- * it pinned "v0.0.1" over the marketing copy — in the corner, permanently,
+ * it pinned "v0.0.1" over the marketing copy, in the corner, permanently,
  * duplicating the version the hero badge already states deliberately. A visitor
  * who has never heard of Calendry reads a bare `0.0.1` as "this does not exist
  * yet"; the badge says "in active development" in words, which is the same fact

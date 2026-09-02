@@ -17,7 +17,7 @@
         >I can't teach this week</CommonButton>
 
         <!--
-            ANCHORED, not in flow — the toolbar's height is invariant
+            ANCHORED, not in flow: the toolbar's height is invariant
             (CLAUDE.md, "The schedule toolbar"), matching how the solver
             control's own tall states are positioned.
         -->
@@ -30,7 +30,7 @@
             <p class="blockday_help">
                 Pick a day in the week you're viewing.
                 <strong>This is submitted for approval</strong>, not applied
-                immediately — a declared day is a hard rule for the scheduler,
+                immediately, because a declared day is a hard rule for the scheduler,
                 so it is reviewed first.
             </p>
 
@@ -69,7 +69,7 @@
                 v-if="submitted"
                 class="blockday_submitted"
                 role="status"
-            >Submitted — waiting for a decision.</p>
+            >Submitted, waiting for a decision.</p>
 
             <div class="blockday_actions">
                 <CommonButton
@@ -92,13 +92,13 @@ import { weekdayName } from '~/composables/schedule';
 import { useHasPermission } from '~/composables/session';
 
 /**
- * "I cannot teach this day" — issue #2. A lecturer declares a single date's
+ * "I cannot teach this day": issue #2. A lecturer declares a single date's
  * unavailability from the schedule they are already looking at, instead of
  * navigating to `/my/availability` and re-finding it there.
  *
  * REUSES THE EXISTING WRITE PATH, unchanged in shape: this sends
  * `{ date, reason }` to `POST /api/me/availability/vetoes`, the same route
- * `/my/availability`'s recurring-pattern form uses — an affordance in a
+ * `/my/availability`'s recurring-pattern form uses: an affordance in a
  * different place, not a second way to write availability.
  */
 const props = defineProps<{

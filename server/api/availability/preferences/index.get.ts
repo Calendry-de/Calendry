@@ -3,7 +3,7 @@ import { requireAnyPermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
- * Everyone in the tenant, with their preferences — the administrator overview.
+ * Everyone in the tenant, with their preferences: the administrator overview.
  *
  * DRIVEN BY THE PEOPLE, NOT BY THE PREFERENCE ROWS. A list of the rows that
  * exist answers "who has set preferences"; the question an administrator
@@ -19,7 +19,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 export default defineEventHandler(async (event) => withRequestTenant(event, async (tx, identity) => {
     await requireAnyPermission(event, tx, ['availability.manage_any', 'availability.read_any']);
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection; concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const people = await tx.person.findMany({
         where: { tenantId: identity.tenantId, isActive: true },
@@ -44,7 +44,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
     /*
      * Travels with the page, not fetched from `/api/equipment`. This route's
      * gate is `availability.manage_any`/`read_any`, which does not imply
-     * `equipment.read` — and one 403 inside a reference fetch blanks the
+     * `equipment.read`, and one 403 inside a reference fetch blanks the
      * whole screen with no error, the least diagnosable failure a UI has.
      */
     const roomFeatureOptions = await tx.equipment.findMany({
@@ -61,7 +61,7 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
             givenName: person.givenName,
             familyName: person.familyName,
             roles: person.personRoles.map((link) => link.role.key),
-            // `null` when no row exists, which IS the "no preference" state —
+            // `null` when no row exists, which IS the "no preference" state:
             // see the model comment. Synthesising empty arrays here would erase
             // the distinction the write path works to keep single-valued.
             // Flattened to ids, so the client never sees the join shape. Still

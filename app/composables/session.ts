@@ -4,7 +4,7 @@ import { DEFAULT_TENANT_MODE } from '#shared/tenantMode';
 /**
  * Client-side view of the authenticated session.
  *
- * Mirrors GET /api/auth/session. This is UI state only — it decides what to
+ * Mirrors GET /api/auth/session. This is UI state only: it decides what to
  * render, never what is allowed. Every route re-checks permissions server-side,
  * so tampering with anything here changes what the page looks like and nothing
  * else.
@@ -25,10 +25,10 @@ export interface SessionState {
     activePerson?: { id: string; givenName: string; familyName: string } | null;
     permissions: string[];
     availableTenants: SessionTenant[];
-    /** Resolved server-side (issue #17) — see `shared/locale.ts`'s `resolveLocale`. */
+    /** Resolved server-side (issue #17); see `shared/locale.ts`'s `resolveLocale`. */
     locale: string;
     /**
-     * UI/UX bias only (issue #8) — see `shared/tenantMode.ts`. Never gates
+     * UI/UX bias only (issue #8); see `shared/tenantMode.ts`. Never gates
      * what data may be stored; only which form fields and constraint types
      * a page leads with.
      */
@@ -46,9 +46,9 @@ const useSessionLoaded = () => useState<boolean>('calendry.session.loaded', () =
 /**
  * Loads the session from the server.
  *
- * On SSR the browser's cookie has to be forwarded explicitly — $fetch does not
- * inherit it — otherwise the first render always looks logged out and the page
- * flashes the login screen before hydrating.
+ * On SSR the browser's cookie has to be forwarded explicitly, since $fetch does
+ * not inherit it, otherwise the first render always looks logged out and the
+ * page flashes the login screen before hydrating.
  */
 export async function fetchSession(force = false): Promise<SessionState | null> {
     const session = useSession();
@@ -92,7 +92,7 @@ export function useHasPermission(permission: string) {
 
 /**
  * The active tenant's mode bias (issue #8), or the default for a signed-out
- * visitor or a tenant that never set one — same "absent means default" rule
+ * visitor or a tenant that never set one, the same "absent means default" rule
  * every other reader of this setting follows.
  */
 export function useTenantMode() {

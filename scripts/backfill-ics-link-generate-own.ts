@@ -7,25 +7,25 @@
  * -------------------------------------------
  * `grant-permissions.ts --role <key>` matches by ROLE KEY, one at a time
  * across tenants. This permission needs to reach whatever a tenant happened
- * to NAME the role that can already see a schedule — `tenant-admin`,
- * `lecturer`, `member`, a hand-composed `department-head` — which is a
+ * to NAME the role that can already see a schedule (`tenant-admin`,
+ * `lecturer`, `member`, a hand-composed `department-head`), which is a
  * PERMISSION-SHAPE question, the same reason `backfill-dashboard-view.ts`
  * exists instead of using `--role`.
  *
  * WHY `session.read` OR `session.read_own`, SPECIFICALLY
  * ---------------------------------------------------------
  * Before issue #115, `POST /api/me/ics-links` had NO permission check at
- * all — literally any signed-in Person could mint a link, and it streamed
+ * all: literally any signed-in Person could mint a link, and it streamed
  * their own Sessions (possibly an empty feed, if they held neither read
  * key). Granting `generate_own` to every role that already holds
  * `session.read`/`session.read_own` reaches every role for which the
- * capability was ever MEANINGFUL — a role holding neither could never have
- * produced a non-empty feed anyway — so this is a non-regression backfill,
+ * capability was ever MEANINGFUL: a role holding neither could never have
+ * produced a non-empty feed anyway, so this is a non-regression backfill,
  * not a widening one, despite the direction looking the same as
  * `dashboard.view`'s. `ics_link.generate` (the wider key, letting a link
  * target Groups) is a brand-new capability with no prior equivalent and
  * follows the ordinary `grant:permissions --role tenant-admin --all-missing`
- * path instead — see that permission's own comment in shared/permissions.ts.
+ * path instead; see that permission's own comment in shared/permissions.ts.
  *
  * WHY THE OWNER CONNECTION, WHY A CLI
  * -------------------------------------
@@ -66,13 +66,13 @@ async function main() {
     const prisma = createOwnerPrisma();
 
     try {
-        // The catalogue must already carry the key, or the FK below fails —
+        // The catalogue must already carry the key, or the FK below fails:
         // same guard `grant-permissions.ts` runs, for the same reason.
         const seeded = await prisma.permission.findUnique({ where: { key: GENERATE_OWN } });
 
         if (!seeded) {
             console.error(`\n'${GENERATE_OWN}' is in the code (shared/permissions.ts) but not in the database.`);
-            console.error('Run `bun run db-seed` first — the catalogue is seeded, not migrated.\n');
+            console.error('Run `bun run db-seed` first: the catalogue is seeded, not migrated.\n');
             process.exit(1);
         }
 
@@ -125,9 +125,9 @@ async function main() {
             const label = `${plan.tenantSlug} / ${plan.accessRoleKey} (${plan.accessRoleName})`;
 
             if (!plan.eligible) {
-                console.log(`  SKIP    ${label} — no schedule visibility`);
+                console.log(`  SKIP    ${label}: no schedule visibility`);
             } else if (plan.alreadyHeld) {
-                console.log(`  OK      ${label} — already holds it`);
+                console.log(`  OK      ${label}: already holds it`);
             } else {
                 console.log(`  +GRANT  ${label}`);
             }
@@ -153,7 +153,7 @@ async function main() {
             );
         }
 
-        // One transaction across every tenant — a partial backfill leaves
+        // One transaction across every tenant: a partial backfill leaves
         // some tenants able to self-serve a calendar link and others locked
         // out of a capability they had unconditionally a moment ago, which
         // is harder to diagnose than a clean failure. Same reasoning as

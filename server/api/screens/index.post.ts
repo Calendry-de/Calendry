@@ -12,7 +12,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * a leaked database backup must not hand over working credentials. So the key
  * exists in exactly one moment and the UI has to say so.
  *
- * THE BROWSER MAY SUPPLY IT, and the management form does — for precisely the
+ * THE BROWSER MAY SUPPLY IT, and the management form does, for precisely the
  * reason an account's initial password is generated client-side: the create page
  * navigates to the saved row on success, so a key generated here would be gone
  * before anybody could read it. When a caller sends none (a script, a future
@@ -34,7 +34,7 @@ const BODY = z.object({
      *
      * `nullish`, NOT `optional`, and the difference is the whole bug this once
      * had. `useEntityForm` serialises every declared field on every save and
-     * returns `value ?? null` for anything untouched — so a form where nobody
+     * returns `value ?? null` for anything untouched, so a form where nobody
      * ticked a room sends `roomIds: null`, which `optional()` rejects. The most
      * ordinary way to create a screen answered "Validation Error". Null and
      * absent both mean "no scope stated", which is what the empty case is.

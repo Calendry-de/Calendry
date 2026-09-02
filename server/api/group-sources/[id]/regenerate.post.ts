@@ -3,7 +3,7 @@
  * cosmetic. Nitro matches a concrete directory ahead of a parameterised one, so
  * creating `server/api/groups/[id]/anything.ts` SHADOWS
  * `server/api/[resource]/[id]/[relation].ts` for the whole `/api/groups/*`
- * prefix — and every Group relation the generic route serves
+ * prefix, and every Group relation the generic route serves
  * (`groups/terms`, `groups/availability`, `groups/sources`) starts answering
  * 404 from the PAGE router, which reads as a missing page rather than a broken
  * API. Measured: putting these two files there broke group availability, a
@@ -29,7 +29,7 @@ import { sourceDrift } from '../../../utils/groupSources';
  * upward forever, which is the same staleness one level less visible.
  *
  * REFUSED WITH NO SOURCES. An empty source list would otherwise EMPTY the
- * group, which is a destructive answer to a request that reads as harmless —
+ * group, which is a destructive answer to a request that reads as harmless,
  * and it is indistinguishable from "the sources are all empty", which is a
  * legitimate state this route should carry out.
  */

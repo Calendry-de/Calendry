@@ -11,7 +11,7 @@ import {
  * browser.
  *
  * WHAT THIS FILE DELIBERATELY DOES NOT DO, and why. This repo has no
- * component-mounting harness — no `@vue/test-utils`, no `happy-dom` — so a true
+ * component-mounting harness (no `@vue/test-utils`, no `happy-dom`), so a true
  * mount-and-click test of `AvailabilityWeightMultiplier` is not possible without
  * adding a second test stack. Rather than skip the coverage, the control's
  * behaviour is split so the deciding logic is testable where it lives:
@@ -20,8 +20,8 @@ import {
  *     predicate the control calls and the same bounds the server's zod schema
  *     uses (`tests/person-availability-api.test.ts` covers the server side, and
  *     the database CHECK is covered there too);
- *   - the three STATES a reader has to distinguish — default, overridden, and
- *     an out-of-range attempt — are decided by `describeWeightMultiplier` and
+ *   - the three STATES a reader has to distinguish (default, overridden, and
+ *     an out-of-range attempt) are decided by `describeWeightMultiplier` and
  *     `isWeightMultiplierInRange`, both asserted here, and the overridden state
  *     is asserted again over real HTTP against the rendered staff page in
  *     `person-availability-api.test.ts`. They live in `shared/` because
@@ -44,7 +44,7 @@ describe('the clamp, shared by the control and the write path', () => {
     });
 
     it('treats null as legal, because null IS a setting', () => {
-        // "Use the tenant default" is a state, not a missing value — the whole
+        // "Use the tenant default" is a state, not a missing value: the whole
         // reason the control renders a sentence there rather than an empty box.
         expect(isWeightMultiplierInRange(null)).toBe(true);
     });

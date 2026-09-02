@@ -53,7 +53,7 @@ withDefaults(defineProps<{
      * `inverse` paints the section on the opposite end of the ramp. Because the
      * dark theme swaps the surface and content ramps wholesale, expressing it
      * with `content*` tokens means the band is always the inverse of whatever
-     * ground the page currently has — no per-theme override, and it cannot end
+     * ground the page currently has, with no per-theme override, and it cannot end
      * up the same colour as the page.
      */
     tone?: 'default' | 'inverse';
@@ -172,7 +172,7 @@ withDefaults(defineProps<{
     }
 
     // The inverse band. `content1` as a ground and `surface*` as ink is the same
-    // pair the rest of the page uses, read the other way round — 15.9:1 in the
+    // pair the rest of the page uses, read the other way round: 15.9:1 in the
     // light theme and 15.9:1 in the dark one, because both tokens move together.
     &--inverse {
         background: $content1;

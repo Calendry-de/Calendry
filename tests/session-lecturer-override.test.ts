@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, type Fixtures, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * A manual override of who leads a Session — #7 item 4.
+ * A manual override of who leads a Session, #7 item 4.
  *
  * WHY THIS ROUTE EXISTS RATHER THAN REUSING `details.post.ts`. That route
  * refuses ANY edit to an Offering-linked Session's people, because they are
@@ -26,7 +26,7 @@ beforeAll(async () => {
     f = await seed();
     cookie = (await login(ACCOUNTS.adminA, TEST_PASSWORD)).cookie;
 
-    // The fixture tenant provisions no domain Role at all — `provision:tenant`
+    // The fixture tenant provisions no domain Role at all: `provision:tenant`
     // creates `lecturer` for a real tenant, but this fixture hand-seeds, so the
     // precondition this route depends on has to be built here explicitly.
     lecturerRoleId = (await ownerDb.role.create({
@@ -61,7 +61,7 @@ describe('an unlocked Offering-linked Session', () => {
         expect(res.status).toBe(409);
         expect(JSON.stringify(res.body)).toContain('Lock');
 
-        // Refused means REFUSED — nothing written.
+        // Refused means REFUSED: nothing written.
         const rows = await ownerDb.sessionPerson.findMany({
             where: { sessionId: 'test-session-a', roleId: lecturerRoleId },
         });
@@ -87,7 +87,7 @@ describe('a locked Offering-linked Session', () => {
 
     it('replaces wholesale: dropping a lecturer DELETES their row', async () => {
         // personB was the sole lecturer a moment ago. Naming only a third
-        // person here drops them, and dropping is a delete — not a demotion to
+        // person here drops them, and dropping is a delete, not a demotion to
         // plain attendee, which would invent an attendance fact nobody asked
         // for. See the route's own comment for why.
         const personC = (await ownerDb.person.create({
@@ -107,7 +107,7 @@ describe('a locked Offering-linked Session', () => {
 
     it('PROMOTES an existing plain attendee rather than erroring on the shared key', async () => {
         /*
-         * `session_person`'s key is (sessionId, personId) — one row per person
+         * `session_person`'s key is (sessionId, personId): one row per person
          * per Session. The fixture attaches personA to this Session already,
          * with `roleId: null` (an ordinary attendee). Naming them here must
          * turn that SAME row into a lecturer row, not attempt a second row for

@@ -67,13 +67,13 @@ import CommonInputText from '~/components/common/CommonInputText.vue';
 import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
 
 /**
- * Clears a StaffAccount's forced or expired password — issue #106's missing
+ * Clears a StaffAccount's forced or expired password: issue #106's missing
  * other half. `staff/login.vue` authenticates correctly against
  * `POST /api/staff-auth/login` but, on `requiresPasswordChange`, had nowhere
  * to send the staffer: no session is issued for a forced/expired password,
  * so there was no way to actually clear the flag short of an administrator
  * doing it by hand. Mirrors `app/pages/change-password.vue` exactly, one
- * plane over — same shape, `/api/staff-auth/change-password` instead of
+ * plane over: same shape, `/api/staff-auth/change-password` instead of
  * `/api/auth/change-password`, and back to `STAFF_LOGIN_ROUTE` rather than
  * the tenant `/login`. Deliberately its own page rather than a shared one:
  * the staff plane has no `useSession`/tenant state to reuse, same reasoning
@@ -117,7 +117,7 @@ async function submit() {
     } catch (e) {
         const status = (e as { statusCode?: number }).statusCode;
 
-        // 422 is the only case worth naming — it is about the new password,
+        // 422 is the only case worth naming: it is about the new password,
         // not about whether the account exists. Everything else (401: wrong
         // current password, unknown or deactivated account) reads as one
         // generic message, matching staff login's own existence-oracle care.

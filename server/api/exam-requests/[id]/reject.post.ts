@@ -6,7 +6,7 @@ const bodySchema = z.object({ note: z.string().max(2000).nullish() });
 
 /**
  * Reject a request. Creates nothing, which is the whole difference from
- * approving one — `session_id` stays NULL and the database's
+ * approving one: `session_id` stays NULL and the database's
  * `exam_request_session_matches_status` CHECK enforces that it must.
  *
  * The row is kept rather than deleted: "we asked and were told no" is the

@@ -14,7 +14,7 @@ interface ListResponse {
  * what came back.
  *
  * OWNERSHIP BOUNDARY: exactly what changes the API query. Column choice,
- * selection and form drafts are not here — they do not change what is fetched.
+ * selection and form drafts are not here: they do not change what is fetched.
  *
  * SYNCHRONOUS BY DESIGN. `useRequestFetch()` is taken at setup so SSR forwards
  * the browser's cookie; an `await` in this function would detach everything
@@ -64,14 +64,14 @@ export function useEntityList(entity: ManageEntity) {
 
     /**
      * Whether this page holds the ENTIRE set. A tree view is only correct when
-     * it does — assembled from a partial page it silently shows roots that are
+     * it does: assembled from a partial page it silently shows roots that are
      * really children whose parent did not come back.
      */
     const isComplete = computed(() => rows.value.length >= total.value);
 
     /**
      * "No rows at all" and "no rows matching your search" are different facts
-     * and must not render the same way — an empty list that could equally mean
+     * and must not render the same way: an empty list that could equally mean
      * a broken fetch is the failure this codebase keeps re-learning.
      */
     const isFiltered = computed(() => debouncedSearch.value.length > 0);
@@ -88,7 +88,7 @@ export function useEntityList(entity: ManageEntity) {
         pending: computed(() => asyncData.pending.value),
         error: computed(() => asyncData.error.value),
         refresh: () => asyncData.refresh(),
-        /** The page awaits this — the one await, at setup top level. */
+        /** The page awaits this: the one await, at setup top level. */
         ready: asyncData,
     };
 }

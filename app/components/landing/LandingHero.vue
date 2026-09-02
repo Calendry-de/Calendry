@@ -140,7 +140,7 @@ const version = computed(() => config.public.version);
             font-size: $fontSize3Xl;
         }
 
-        // Was 24px here — the size of a desktop section title, which left the
+        // Was 24px here, the size of a desktop section title, which left the
         // page with no display step at all on a phone.
         @include mobileOnly {
             font-size: $fontSize2Xl;

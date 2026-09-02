@@ -3,7 +3,7 @@
         <div
             class="painter_grid"
             role="grid"
-            :aria-label="`Teaching week — ${gridLabel}`"
+            :aria-label="`Teaching week: ${gridLabel}`"
             aria-multiselectable="true"
             :style="geometry.cssVars.value"
             @pointerleave="onPointerLeave"
@@ -125,7 +125,7 @@ import { useGridGeometry } from '~/composables/gridGeometry';
  * Paint one unavailability window onto the tenant's own teaching week.
  *
  * WHY A RECTANGLE AND NOT FREE CELLS. `UnavailabilityWindow` is
- * `{ days[], blocks[], weeks[] }` — the proto message verbatim — and that is a
+ * `{ days[], blocks[], weeks[] }` (the proto message verbatim), and that is a
  * CROSS PRODUCT, not a set of cells. "Monday block 1 and Friday block 8" is not
  * one window; as `days:[1,5] × blocks:[1,8]` it is four cells. So the gesture is
  * a rectangle, because the model is a rectangle: what you drag is exactly what
@@ -133,14 +133,14 @@ import { useGridGeometry } from '~/composables/gridGeometry';
  * visible rows in the approval queue rather than a silent decomposition.
  *
  * WHY NOT `ScheduleGrid`. That component takes sessions, violations, placement
- * and swap modes, room/person resolvers and display settings — none of which
+ * and swap modes, room/person resolvers and display settings, none of which
  * exist here. What the two share is `useGridGeometry`, and sharing it is the
  * point: it is what stops this grid and the schedule disagreeing about where
  * 09:45 is, breaks included.
  *
  * The status line carries a FIXED id so the page's submit button can name it as
- * its own description. Safe because the painter is single-instance per page —
- * one week, one selection — and it means the precondition for submitting is
+ * its own description. Safe because the painter is single-instance per page
+ * (one week, one selection), and it means the precondition for submitting is
  * stated once, beside the grid, rather than repeated under the form.
  *
  * THE ACCENT IS DELIBERATELY ABSENT. DESIGN.md spends `$primary` on one idea,
@@ -169,13 +169,13 @@ interface Rect { days: number[]; blocks: number[] }
 /**
  * EVERY rectangle drawn so far, not one.
  *
- * A window is a cross product, so one rectangle is one window — but a person's
+ * A window is a cross product, so one rectangle is one window, but a person's
  * real week is rarely one rectangle. "Friday afternoons and Monday first thing"
  * is two, and the first version of this held a single draft, so a second drag
  * silently replaced the first and only one could ever be submitted.
  *
- * Accumulating them keeps the rectangle-to-window identity intact — each entry
- * still maps to exactly one stored window and one row in the approval queue —
+ * Accumulating them keeps the rectangle-to-window identity intact: each entry
+ * still maps to exactly one stored window and one row in the approval queue,
  * while letting the gesture be repeated as often as the week needs.
  */
 const draft = defineModel<Rect[]>({ required: true });
@@ -208,7 +208,7 @@ const dragging = ref(false);
  * The rectangle currently under the pointer, before it is let go.
  *
  * Held apart from `draft` so a drag in progress can be redrawn on every
- * pointermove without churning the committed list — and so abandoning it leaves
+ * pointermove without churning the committed list, and so abandoning it leaves
  * the earlier rectangles untouched.
  */
 const live = ref<Rect | null>(null);
@@ -298,7 +298,7 @@ defineExpose({ clear });
 
 /*
  * ONE model for mouse, trackpad and touch: press anchors, movement extends,
- * release settles — and a press-and-release WITHOUT movement leaves the anchor
+ * release settles, and a press-and-release WITHOUT movement leaves the anchor
  * standing so a second tap picks the far corner. Drag alone would be unusable on
  * a phone, where a drag across cells is the scroll gesture.
  */
@@ -331,7 +331,7 @@ function onPointerDown(day: number, block: number) {
      * A press on a cell an existing window already governs OFFERS THAT WINDOW
      * rather than starting a new one. Windows are immutable, so there is no
      * partial edit to imply: the page reveals the window's status and its
-     * Remove. Emitted on a deliberate press only — hanging this off the cursor
+     * Remove. Emitted on a deliberate press only, since hanging this off the cursor
      * would fire it on every arrow keypress.
      */
     const held = coverage.value.get(key(day, block));
@@ -377,8 +377,8 @@ function onPointerLeave() {
 /* ----------------------------------------------------------------- keyboard */
 
 /*
- * A drag-only painter would be unusable by keyboard — the failure this section
- * just had fixed. Arrows move, Space anchors and then settles, Enter settles,
+ * A drag-only painter would be unusable by keyboard, which is the failure this
+ * section just fixed. Arrows move, Space anchors and then settles, Enter settles,
  * Escape abandons. `role="grid"` is what makes one tab stop plus arrows the
  * expected contract rather than a surprise.
  */
@@ -441,7 +441,7 @@ function onKey(event: KeyboardEvent, day: number, block: number) {
 
             return;
         case 'Escape':
-            // The rectangle in progress first, the whole selection second — so
+            // The rectangle in progress first, the whole selection second, so
             // abandoning one drag never discards the ones already drawn.
             if (anchor.value || live.value) {
                 event.preventDefault();
@@ -475,7 +475,7 @@ function onKey(event: KeyboardEvent, day: number, block: number) {
  *
  * Precedence is stated rather than emergent: APPROVED reads strongest because it
  * is the only status actually in force, PENDING sits under it, and REJECTED is
- * not painted at all — it is not in effect, and drawing it would claim the
+ * not painted at all: it is not in effect, and drawing it would claim the
  * scheduler is honouring something it ignores.
  */
 const RANK: Record<PaintedWindow['status'], number> = { APPROVED: 2, PENDING: 1, REJECTED: 0 };
@@ -507,7 +507,7 @@ const coverage = computed(() => {
 });
 
 /**
- * Which region a cell belongs to — the draft outranks a stored window.
+ * Which region a cell belongs to; the draft outranks a stored window.
  *
  * Each committed rectangle gets its OWN region id. Without that, two selections
  * that happen to touch would fuse into a single shape and read as one window,
@@ -529,7 +529,7 @@ function regionOf(day: number, block: number): string | null {
  *
  * A break gets its own grid row, so blocks either side of one are adjacent in
  * INDEX space but separated on screen. Treating the break as an edge closes each
- * contiguous run into its own shape — a border running through a band would
+ * contiguous run into its own shape: a border running through a band would
  * claim the break is blocked, and it is not: it has no block index, so it cannot
  * be.
  */
@@ -539,7 +539,7 @@ function touching(block: number): boolean {
 
 /*
  * WHY EDGES AT ALL. Without this a painted rectangle rendered as six separate
- * rounded cells with gaps between them — six things, when the whole point of the
+ * rounded cells with gaps between them: six things, when the whole point of the
  * reshape is that one window is one shape. The border is drawn only where the
  * region actually ends, so the interior fuses.
  */
@@ -578,7 +578,7 @@ function cellLabel(day: number, block: number): string {
                 ? 'already declared, awaiting review'
                 : 'free';
 
-    return `${weekdayName(day)} block ${block + 1}, ${time.start} to ${time.end} — ${state}`;
+    return `${weekdayName(day)} block ${block + 1}, ${time.start} to ${time.end}, ${state}`;
 }
 
 /** One rectangle as "Mon–Wed, 09:45–11:15". */
@@ -611,8 +611,8 @@ const says = computed(() => {
 
     /*
      * `blockedSlotSummary` counts DISTINCT (day, block) pairs, so overlapping
-     * rectangles are counted once — the same helper, and therefore the same
-     * number, as the page's own "blocked N of M" meter.
+     * rectangles are counted once; it is the same helper, and therefore
+     * produces the same number, as the page's own "blocked N of M" meter.
      */
     const summary = blockedSlotSummary(
         all.map((rect) => ({ ...rect, weeks: [] })),
@@ -628,7 +628,7 @@ const says = computed(() => {
 
     // Named, not just counted: each rectangle becomes its own window and its own
     // row in the approval queue, so the person should see what they are sending.
-    return `${slots} · ${all.length} separate entries — ${all.map(describeRect).join('; ')}`;
+    return `${slots} · ${all.length} separate entries: ${all.map(describeRect).join('; ')}`;
 });
 </script>
 
@@ -753,7 +753,7 @@ const says = computed(() => {
 
     background: $surface0;
     // 3.14:1 light, 4.04:1 dark. The surface ramp cannot reach 1.4.11's 3:1
-    // at all, and a painting surface wants its cells visible anyway — the faint
+    // at all, and a painting surface wants its cells visible anyway; the faint
     // first version made the targets hard to aim at.
     box-shadow: inset 0 0 0 1px varToRgba('content7', 0.65);
 
@@ -772,7 +772,7 @@ const says = computed(() => {
      * DESIGN.md spends `$primary` on "where a session may land"; this grid is
      * about where one may NOT, so borrowing that colour would spend the one
      * signal the schedule reserves. Each state also carries a PATTERN, so the
-     * three survive greyscale and a colourblind reader — the same rule
+     * three survive greyscale and a colourblind reader; the same rule
      * violations follow, and the reason the block chips gained a real tick.
      */
     // A region drops the lattice: the hairline is what separated cells, and
@@ -804,7 +804,7 @@ const says = computed(() => {
     }
 
     // The live rectangle. Solid, because it is the only state that is not yet a
-    // claim about the timetable — it is what you are about to say.
+    // claim about the timetable; it is what you are about to say.
     &--draft {
         --edge: #{$content4};
 

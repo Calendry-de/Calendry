@@ -7,7 +7,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
 const bodySchema = z.object({
     termId: z.string().min(1),
     groupId: z.string().min(1).optional(),
-    /** The bulk form — see the handler's own comment for why it is a separate field rather than `groupId` accepting an array. */
+    /** The bulk form; see the handler's own comment for why it is a separate field rather than `groupId` accepting an array. */
     groupIds: z.array(z.string().min(1)).min(1).max(100).optional(),
 }).refine((body) => Boolean(body.groupId) !== Boolean(body.groupIds), {
     message: 'Provide exactly one of groupId or groupIds.',
@@ -17,7 +17,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Curriculum plans'],
         summary: 'Apply a curriculum plan to one or more Groups, for one Term',
-        description: 'Gives the Group(s) every Offering in the plan for the given Term — creating whichever ones do not exist yet and attaching each Group to whichever already do (reuse is keyed on term + createdFromTemplateId, not on the plan, so two Groups taking the same subject in the same Term share one Offering). Idempotent: re-applying the same plan to a Group that already has it changes nothing. Provide exactly one of groupId (single-Group shape, responds { offerings }) or groupIds (bulk shape, responds { results: [...] }). All-or-nothing across every check, for every Group named, before writing anything.',
+        description: 'Gives the Group(s) every Offering in the plan for the given Term: creating whichever ones do not exist yet and attaching each Group to whichever already do (reuse is keyed on term + createdFromTemplateId, not on the plan, so two Groups taking the same subject in the same Term share one Offering). Idempotent: re-applying the same plan to a Group that already has it changes nothing. Provide exactly one of groupId (single-Group shape, responds { offerings }) or groupIds (bulk shape, responds { results: [...] }). All-or-nothing across every check, for every Group named, before writing anything.',
         parameters: [
             { name: 'id', in: 'path', required: true, schema: { type: 'string' }, description: 'Curriculum plan id.' },
         ],
@@ -47,14 +47,14 @@ defineRouteMeta({
 });
 
 /**
- * Gives one or more Groups every Offering in a curriculum plan, for one Term
- * — creating whichever ones do not exist yet and ATTACHING each Group to
+ * Gives one or more Groups every Offering in a curriculum plan, for one Term:
+ * creating whichever ones do not exist yet and ATTACHING each Group to
  * whichever already do, rather than ever making a second "Math" for a Term
  * that already has one.
  *
  * TWO SEPARATE FIELDS, NOT ONE ARRAY-OR-SCALAR. `groupId` is the original,
  * single-Group shape (still what a Group's own "Apply a plan" panel sends,
- * and still the shape that responds with a bare `{ offerings }` — no
+ * and still the shape that responds with a bare `{ offerings }`, so no
  * existing caller had to change); `groupIds` is the "roll this out" bulk
  * shape a Plan's own page uses, which responds `{ results: [...] }` because
  * a bulk caller needs to know WHICH Group each batch of offerings belongs
@@ -64,24 +64,24 @@ defineRouteMeta({
  *
  * REUSE IS KEYED ON (term, `createdFromTemplateId`), NOT ON THE PLAN. Two
  * Jahrgänge taking the same subject in the same Term is exactly the shape
- * TAXONOMY.md already gives multiple Groups on one Offering — N independent
- * parallel Session series, one per Group — so the second Jahrgang's apply
+ * TAXONOMY.md already gives multiple Groups on one Offering: N independent
+ * parallel Session series, one per Group, so the second Jahrgang's apply
  * finds the first's Offering and joins it instead of duplicating it. This
  * also makes applying IDEMPOTENT: re-running the same plan against the same
  * Group in the same Term finds every Offering already has that Group and
  * changes nothing, so there is no "confirm before duplicating" step to ask
- * for — repeating the action, or rolling it out to a Group that already has
+ * for; repeating the action, or rolling it out to a Group that already has
  * it alongside ones that don't, is always safe.
  *
  * READS TEMPLATES FRESH, AT APPLY TIME, for whichever items still need
- * CREATING — see `applyOfferingPlanItems`, the actual mechanics, shared with
+ * CREATING. See `applyOfferingPlanItems`, the actual mechanics, shared with
  * `scripts/seed-demo-schedule.ts` so the demo curriculum is built through the
  * same path a tenant would use.
  *
  * ALL-OR-NOTHING ON BOTH CHECKS, ACROSS EVERY GROUP, before writing anything:
  * a template missing `kindId` or `title` cannot become a valid Offering, and
  * an unknown Group id is refused the same way an unknown Term id already
- * is. A bulk apply that partly failed — three Groups placed, a fourth 404s —
+ * is. A bulk apply that partly failed, three Groups placed, a fourth 404s,
  * would leave the tenant guessing which ones actually happened.
  */
 export default defineEventHandler(async (event) => {
@@ -155,7 +155,7 @@ export default defineEventHandler(async (event) => {
             // Sequential, not `Promise.all`: `applyOfferingPlanItems` reads
             // "what already exists" then writes, so the second Group in a
             // bulk apply must see the first Group's freshly-created
-            // Offerings — running them concurrently would race that read and
+            // Offerings; running them concurrently would race that read and
             // recreate the same Offering twice.
             for (const groupId of groupIds) {
                 const offerings = await applyOfferingPlanItems(tx, {

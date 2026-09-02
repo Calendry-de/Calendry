@@ -7,7 +7,7 @@ import { login } from './helpers/client';
  *
  * The Group availability panel explains whether the dates it saves actually
  * bind, which depends on the tenant's `group_veto` constraint row. It fetches
- * `/api/constraints` TOLERANTLY — deliberately, because a caller who may edit
+ * `/api/constraints` TOLERANTLY, deliberately, because a caller who may edit
  * Groups need not hold `constraint.read`, and failing the whole panel would hide
  * the editor from the person sent there to use it.
  *
@@ -22,7 +22,7 @@ import { login } from './helpers/client';
  * on a tenant where that rule existed and was switched ON. Their dates were
  * binding; the screen said they were ignored.
  *
- * Four states now, and the tests below are one per state — the only way to show
+ * Four states now, and the tests below are one per state: the only way to show
  * that a message is attached to the right one.
  */
 const TENANT_A = 'test-tenant-a';
@@ -83,7 +83,7 @@ async function panel(cookie: string): Promise<string> {
 
     expect(res.status, 'the group page did not render').toBe(200);
 
-    // Rendered body only — the hydration payload would match for a page that
+    // Rendered body only: the hydration payload would match for a page that
     // rendered nothing at all.
     return (await res.text()).split('<script type="application/json"')[0] ?? '';
 }
@@ -115,7 +115,7 @@ describe('the four states, one test each', () => {
 
     it('says it CANNOT TELL when the rules are unreadable, even with the rule ON', async () => {
         /*
-         * THE BUG. Rule present and enabled, so the dates really do bind — and
+         * THE BUG. Rule present and enabled, so the dates really do bind, and
          * the reader is the one account that cannot see that. The old copy
          * asserted the opposite.
          */
@@ -150,7 +150,7 @@ describe('the four states, one test each', () => {
     it('says NONE CONFIGURED to an admin when there is genuinely no rule', async () => {
         /*
          * The counter-example that keeps the headline test honest. This message
-         * must still exist and still be reachable — the fix distinguishes it
+         * must still exist and still be reachable: the fix distinguishes it
          * from "unreadable", it does not remove it.
          */
         await setRule('absent');

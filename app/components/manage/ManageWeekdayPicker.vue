@@ -46,7 +46,7 @@ import { weekdayName } from '~/composables/schedule';
  * solver avoid?).
  *
  * Extracted rather than duplicated: the two had identical semantics and the
- * second copy would have been the one to drift — most likely by quietly
+ * second copy would have been the one to drift, most likely by quietly
  * defaulting to Mon–Fri or to [6,7], which is exactly the hardcoded assumption
  * TAXONOMY.md §7 calls out by name.
  */
@@ -68,7 +68,7 @@ function toggle(iso: number) {
     if (next.has(iso)) next.delete(iso);
     else next.add(iso);
 
-    // Sorted so the stored value is stable regardless of click order — an
+    // Sorted so the stored value is stable regardless of click order. An
     // unsorted array makes dirty-tracking and the input hash jitter.
     selected.value = [...next].sort((a, b) => a - b);
 }

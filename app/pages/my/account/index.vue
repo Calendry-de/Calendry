@@ -25,7 +25,7 @@
                     <span>Your locale</span>
                     <input
                         v-model="localeInput"
-                        placeholder="e.g. de-DE — leave empty to inherit"
+                        placeholder="e.g. de-DE, leave empty to inherit"
                         type="text"
                     >
                 </label>
@@ -40,7 +40,7 @@
             <section class="panel_group">
                 <h2>Timezone</h2>
                 <p class="panel_hint">
-                    Display and export only — an IANA zone name (e.g. <code>Europe/Berlin</code>,
+                    Display and export only: an IANA zone name (e.g. <code>Europe/Berlin</code>,
                     <code>America/New_York</code>). It never changes where a session is drawn on the
                     grid or how "today" is decided; the institution's own timezone governs all of
                     that. Leave empty to leave it unset.
@@ -50,7 +50,7 @@
                     <span>Your timezone</span>
                     <input
                         v-model="timezoneInput"
-                        placeholder="e.g. Europe/Berlin — leave empty to leave unset"
+                        placeholder="e.g. Europe/Berlin, leave empty to leave unset"
                         type="text"
                     >
                 </label>
@@ -141,14 +141,14 @@ async function save() {
     const trimmedTimezone = timezoneInput.value.trim();
 
     if (trimmedLocale && !isUsableLocale(trimmedLocale)) {
-        localeError.value = 'Not a recognised locale — try a tag like "de-DE" or "en-GB".';
+        localeError.value = 'Not a recognised locale. Try a tag like "de-DE" or "en-GB".';
         saving.value = false;
 
         return;
     }
 
     if (trimmedTimezone && !isUsableTimeZone(trimmedTimezone)) {
-        timezoneError.value = 'Not a recognised timezone — try a zone name like "Europe/Berlin".';
+        timezoneError.value = 'Not a recognised timezone. Try a zone name like "Europe/Berlin".';
         saving.value = false;
 
         return;

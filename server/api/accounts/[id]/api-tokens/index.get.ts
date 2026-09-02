@@ -7,7 +7,7 @@ import { withRequestTenant } from '../../../../utils/tenantDb';
  * The API tokens a login's Person has minted, as this institution's admin sees
  * them.
  *
- * Same shape as `GET /api/me/api-tokens` — `tokenHash` is not selected, the
+ * Same shape as `GET /api/me/api-tokens`; `tokenHash` is not selected, the
  * secret exists in exactly one response, ever, and this route cannot change
  * that: it only ever LISTS what already exists.
  */

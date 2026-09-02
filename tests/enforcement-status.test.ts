@@ -3,11 +3,11 @@ import { ACCOUNTS, TEST_PASSWORD, type Fixtures, ownerDb, seed, teardown } from 
 import { api, login } from './helpers/client';
 
 /**
- * "Can a lecturer see whether the rule governing their data is on?" — #3.
+ * "Can a lecturer see whether the rule governing their data is on?" (#3).
  *
  * THE DECISION THE CARD POSED: a `/my`-scoped booleans-only endpoint needing
  * NO new permission, rather than a new `constraint.read_enabled`-style key.
- * The tests here are mostly about proving that choice holds up — a lecturer
+ * The tests here are mostly about proving that choice holds up: a lecturer
  * who holds NOTHING but an acting Person can read this, and the answer never
  * carries a weight, a name, or any other rule's state.
  */
@@ -73,7 +73,7 @@ describe('reading the enforcement status', () => {
         expect(res.body.groupAvailabilityHonoured).toBe(false);
     });
 
-    it('leaks no weight, name, or other rule — booleans only', async () => {
+    it('leaks no weight, name, or other rule: booleans only', async () => {
         await setEnabled('person_preference_fit', true);
 
         const res = await api('/api/me/enforcement', { cookie: lecturerCookie });
@@ -87,7 +87,7 @@ describe('reading the enforcement status', () => {
 });
 
 describe('who may read it', () => {
-    it('needs no permission at all — only an acting Person', async () => {
+    it('needs no permission at all, only an acting Person', async () => {
         // adminA already holds every permission in the fixture tenant; this
         // is not a test that ONE particular key is enough, since the whole
         // point is that no key is required. See the "unreachable by

@@ -9,8 +9,8 @@ import { UNBOUNDED_ROOM_CAPACITY } from '../shared/rooms';
  * Two narrowings that both happen on the way to the wire, because the wire
  * cannot express either of them.
  *
- * A CONSTRAINT'S TIMEGRID. `SolverInput.time_grid` is SINGULAR — a run is
- * per-Term and a Term has exactly one grid — so the solver never sees two grids
+ * A CONSTRAINT'S TIMEGRID. `SolverInput.time_grid` is SINGULAR: a run is
+ * per-Term and a Term has exactly one grid, so the solver never sees two grids
  * and a `time_grid_id` on `ConstraintConfig` would have nothing to
  * disambiguate. An institution with a 45-minute academic grid and a 60-minute
  * evening one still means different numbers by "three consecutive blocks", so
@@ -18,7 +18,7 @@ import { UNBOUNDED_ROOM_CAPACITY } from '../shared/rooms';
  *
  * A ROOM'S UNLIMITED CAPACITY. `Room.capacity` is a `uint32` compared with
  * `room.capacity >= min_capacity`, and there is no value meaning "no limit". 0
- * fails that comparison against any real demand — so the column's own DEFAULT
+ * fails that comparison against any real demand, so the column's own DEFAULT
  * made every unmeasured room ineligible for everything.
  */
 let f: Fixtures;
@@ -133,15 +133,15 @@ describe('a constraint scoped to a TimeGrid', () => {
          * DELETED IN SQL, NOT THROUGH PRISMA, and that is the whole point of
          * this test. `prisma.timeGrid.delete()` performs its OWN cascade from
          * `schema.prisma` whatever the database says, so it passes against a
-         * `SET NULL` foreign key — verified by mutating the migration to
+         * `SET NULL` foreign key, verified by mutating the migration to
          * `SET NULL` and watching this test stay green. What protects a writer
-         * that is not Prisma — a script, psql, a later migration — is the
+         * that is not Prisma (a script, psql, a later migration) is the
          * constraint itself, so the constraint is what gets exercised.
          */
         await ownerDb.$executeRawUnsafe(`DELETE FROM time_grid WHERE id = '${doomed.id}'`);
 
         // CASCADE, not SET NULL. Nulling would promote a rule about one grid to
-        // a rule about every grid — the opposite of what its author asked for,
+        // a rule about every grid, the opposite of what its author asked for,
         // and invisible until a timetable came back wrong.
         expect(await ownerDb.constraint.findUnique({ where: { id: scoped.id } })).toBeNull();
     });
@@ -182,7 +182,7 @@ describe('a room with no capacity', () => {
         await ownerDb.room.update({ where: { id: f.roomPrivateA }, data: { capacity: 0 } });
 
         // The column DEFAULTS to 0, so this is the state of every room saved
-        // without a capacity — and `room.capacity >= min_capacity` would make
+        // without a capacity, and `room.capacity >= min_capacity` would make
         // all of them ineligible for every offering that asked for any.
         expect(await capacityOf('Private A')).toBe(UNBOUNDED_ROOM_CAPACITY);
     });

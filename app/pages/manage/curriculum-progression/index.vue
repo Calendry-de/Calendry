@@ -4,7 +4,7 @@
         title="Curriculum progression"
     >
         <p class="intro">
-            Nothing here is stored on the group — this is worked out fresh each time
+            Nothing here is stored on the group: this is worked out fresh each time
             from the offerings a plan already created. A group with a plan that names a
             successor, and a later term to move into, is eligible to advance.
         </p>
@@ -76,13 +76,13 @@
                             :key="`${row.groupId}:${application.planId}:${application.termId}`"
                         >
                             <td>{{ row.groupName }}</td>
-                            <td>{{ application.planName }} — {{ application.termName }}</td>
+                            <td>{{ application.planName }} · {{ application.termName }}</td>
                             <td>
                                 <span v-if="application.advance">{{ application.advance.planName }} ({{ application.advance.termName }})</span>
                                 <span
                                     v-else
                                     class="table_muted"
-                                >—</span>
+                                >(none)</span>
                             </td>
                         </tr>
                     </template>
@@ -103,7 +103,7 @@ import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import { useSession } from '~/composables/session';
 
 /**
- * The bulk half of curriculum-plan progression (issue #100) — the single-
+ * The bulk half of curriculum-plan progression (issue #100): the single-
  * Group version already lives on each Group's own page
  * (`ManageGroupApplyPlan.vue`, reading `GET /api/group-plan-applications/:id`).
  * This is a bespoke settings page rather than a registry entity for the same
@@ -112,11 +112,11 @@ import { useSession } from '~/composables/session';
  *
  * NOTHING IS STORED. "Which phase is a group in" is derived fresh, every
  * load, from the offerings a plan already created
- * (`deriveGroupPlanApplications`, `server/utils/offeringPlans.ts`) — a Group
+ * (`deriveGroupPlanApplications`, `server/utils/offeringPlans.ts`): a Group
  * absent from the table has simply never had a plan applied.
  */
 definePageMeta({
-    // Gated inline, not through the `manage` entity middleware — same reason
+    // Gated inline, not through the `manage` entity middleware, same reason
     // `/manage/access-defaults` is: this is not a registry entity.
     middleware: [
         () => {

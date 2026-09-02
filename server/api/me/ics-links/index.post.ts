@@ -8,7 +8,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Calendar links'],
         summary: 'Create a calendar-subscription link',
-        description: 'Needs ics_link.generate_own (streams exactly the caller\'s own Sessions — the same "mine" ownSessionClause already defines for session.read_own) or ics_link.generate (also lets groupIds name one or more Groups, streaming THEIR Sessions instead — issue #115). ALL streams every Term the subject has a Session in, bounded to the next weeksAhead weeks; TERM streams one Term in full. The secret is returned in the url field and stays retrievable afterwards from GET /api/me/ics-links — unlike an API token, this is a link meant to be re-copied, not a one-time bearer credential.',
+        description: 'Needs ics_link.generate_own (streams exactly the caller\'s own Sessions, the same "mine" ownSessionClause already defines for session.read_own) or ics_link.generate (also lets groupIds name one or more Groups, streaming THEIR Sessions instead, issue #115). ALL streams every Term the subject has a Session in, bounded to the next weeksAhead weeks; TERM streams one Term in full. The secret is returned in the url field and stays retrievable afterwards from GET /api/me/ics-links: unlike an API token, this is a link meant to be re-copied, not a one-time bearer credential.',
         requestBody: {
             required: true,
             content: {
@@ -52,16 +52,16 @@ const BODY = z.discriminatedUnion('scope', [
 ]);
 
 /**
- * Mint a calendar link — a capability URL an external calendar app streams.
+ * Mint a calendar link: a capability URL an external calendar app streams.
  *
  * TWO PERMISSIONS, ONE ROUTE, same shape `sessionReadScope` gives
  * `session.read`/`session.read_own`: `ics_link.generate_own` may only ever
  * narrow to the caller's own Sessions (authority a Person always has over
- * themselves, needing no permission in principle — the key exists only
+ * themselves, needing no permission in principle: the key exists only
  * because a link is a standing credential handed to a third-party app, not a
  * one-off read); `ics_link.generate` may ALSO name explicit `groupIds`,
  * which is institution data, not self-service. SESSION ONLY, so a leaked link
- * cannot mint further links — the same reasoning that keeps a token from
+ * cannot mint further links, the same reasoning that keeps a token from
  * minting tokens.
  */
 export default defineEventHandler(async (event) => {

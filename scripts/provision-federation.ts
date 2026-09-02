@@ -6,7 +6,7 @@
  * Same reasoning as `provision-tenant.ts`: this is infrastructure, not a
  * product feature. Beyond that, a self-service "attach my tenant to a
  * federation" HTTP route would let a tenant admin join any federation whose
- * id or slug they merely happen to know — and a Tenant's federation is what
+ * id or slug they merely happen to know, and a Tenant's federation is what
  * widens RLS read access to that federation's shared Room/Equipment/
  * Offering/Session rows (CLAUDE.md, "The three deliberate exceptions to
  * tenant isolation" #1). Joining is therefore a decision with real
@@ -23,8 +23,8 @@
  * IDEMPOTENT BY LOOKUP-THEN-CREATE, matching the rest of this family
  * (`create-account.ts`): creating a Federation that already exists (by slug)
  * reports that clearly and changes nothing, rather than throwing a raw unique
- * violation or silently creating a second row (impossible anyway — `slug` is
- * `@unique` — but a confusing error is still a worse experience than a report).
+ * violation or silently creating a second row (impossible anyway, since `slug`
+ * is `@unique`, but a confusing error is still a worse experience than a report).
  * Attach/detach are naturally idempotent: setting the same `federationId`
  * twice is a no-op UPDATE.
  *
@@ -71,7 +71,7 @@ async function main() {
     } catch (error) {
         console.error(
             `\n${error instanceof Error ? error.message : String(error)}\n\n`
-            + 'Provisioning requires the OWNER connection — the runtime role cannot\n'
+            + 'Provisioning requires the OWNER connection; the runtime role cannot\n'
             + 'create or reassign federations by design.\n',
         );
         process.exit(1);
@@ -129,7 +129,7 @@ async function main() {
         } else {
             console.log(
                 `\nFederation '${result.federation.slug}' (${result.federation.id}) already exists`
-                + ' — nothing created.',
+                + ', nothing created.',
             );
 
             if (name && name !== result.federation.name) {

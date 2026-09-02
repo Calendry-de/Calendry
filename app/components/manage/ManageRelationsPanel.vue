@@ -16,7 +16,7 @@
                 name="material-symbols:info-outline"
                 aria-hidden="true"
             />
-            Save this {{ entity.label.toLowerCase() }} first — then you can assign
+            Save this {{ entity.label.toLowerCase() }} first, then you can assign
             {{ assignableLabels }}.
         </p>
 
@@ -49,8 +49,8 @@ import ManageRelationPicker from '~/components/manage/ManageRelationPicker.vue';
 /**
  * Every relation an entity declares, rendered below its form.
  *
- * Registry-driven, which is why Offering — the hub that references a Term, a
- * Kind and a Role and holds three many-to-many sets — needs no bespoke detail
+ * Registry-driven, which is why Offering (the hub that references a Term, a
+ * Kind and a Role and holds three many-to-many sets) needs no bespoke detail
  * component at all. Its complexity is a longer `relations` array, not different
  * code.
  */

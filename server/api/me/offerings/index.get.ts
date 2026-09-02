@@ -2,7 +2,7 @@ import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
 
 /**
- * The modules the caller LEADS, across every term — a convenience for the
+ * The modules the caller LEADS, across every term: a convenience for the
  * scheduling-pattern picker, never a boundary.
  *
  * Filtered on `OfferingLecturer`, unlike `/api/offerings` (which needs

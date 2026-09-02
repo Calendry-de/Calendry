@@ -18,7 +18,7 @@ defineSlots<{
 
 <style scoped lang="scss">
 /*
- * ONE COLUMN, CENTRED AS A COLUMN — not `align-items: center`.
+ * ONE COLUMN, CENTRED AS A COLUMN: not `align-items: center`.
  *
  * This was `align-items: center` on a column flex container, which sizes every
  * child to `max-content` instead of centring a shared measure. Measured
@@ -51,12 +51,12 @@ defineSlots<{
 
     /*
      * Matches `CommonAppShell`, the app's other page shell, exactly:
-     * `--font-size-xl` at 680. This was `38px`/`bold` — a size the scale does
+     * `--font-size-xl` at 680. This was `38px`/`bold`, a size the scale does
      * not contain and which `tokens-root.scss` records as deliberately retired
-     * ("was 32, 38 — display"). Every other h1 in the app already uses
+     * ("was 32, 38; display"). Every other h1 in the app already uses
      * `--font-size-xl`, so this shell was the only page title disagreeing.
-     * No mobile step-down: 24px needs none, and the old one fired at 1365px —
-     * a desktop width — rather than at a phone.
+     * No mobile step-down: 24px needs none, and the old one fired at 1365px
+     * (a desktop width) rather than at a phone.
      */
     h1 {
         margin: 0;

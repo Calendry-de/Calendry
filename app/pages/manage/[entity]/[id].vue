@@ -8,8 +8,8 @@
             THE SAME ACTION THE LIST HEADER CARRIES, kept on the detail screen so
             entering a run of records does not round-trip through the list.
 
-            Creating lands you HERE — `new.vue` navigates to the row it just made
-            — so without this the loop is: back to the list, New, fill, create,
+            Creating lands you HERE (`new.vue` navigates to the row it just made),
+            so without this the loop is: back to the list, New, fill, create,
             back to the list. Two navigations per record whose only purpose is to
             reach a button that was already on screen a moment ago.
 
@@ -105,7 +105,7 @@ await Promise.all([form.ready, relations.ready]);
  *
  * `useAsyncData`'s handle resolves even when its handler throws, so without this
  * a mistyped or stale id rendered a form with every field blank and answered
- * 200 — the API said 404 and the page disagreed. Anyone typing into it was
+ * 200: the API said 404 and the page disagreed. Anyone typing into it was
  * filling in a record that does not exist.
  *
  * Thrown HERE and not in the composable, because only a page can answer with a
@@ -113,7 +113,7 @@ await Promise.all([form.ready, relations.ready]);
  * a 404 and a 403 are different facts for whoever is looking at it.
  *
  * Deliberately narrow: `loadError` is the ROW's failure alone. A reference list
- * that 403s is handled by locking that field, and must NOT reach this — see
+ * that 403s is handled by locking that field, and must NOT reach this: see
  * `isFieldLocked` and `tests/form-reference-wave.test.ts`.
  */
 if (form.loadError.value) {
@@ -149,7 +149,7 @@ async function confirmDelete() {
     }
 
     // The dialog stays open holding the reason. A 409 here is the database
-    // refusing to orphan real references — that is information the user needs,
+    // refusing to orphan real references, and that is information the user needs,
     // not a failure to swallow.
     deleteError.value = form.formError.value || 'Could not delete.';
     confirming.value = true;

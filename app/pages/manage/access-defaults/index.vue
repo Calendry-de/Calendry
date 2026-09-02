@@ -5,7 +5,7 @@
     >
         <p class="intro">
             Off by default. Granting a role to somebody is normally a deliberate
-            decision made on their own page — this setting reverses that for every
+            decision made on their own page; this setting reverses that for every
             new Person at once, so choose it deliberately too. Every grant it makes
             is marked as coming from this default, distinct from a role assigned by
             hand.
@@ -40,7 +40,7 @@
                     v-model="form.defaultAccessRoleId"
                     :disabled="!canEdit"
                 >
-                    <option :value="null">None — grant nothing automatically</option>
+                    <option :value="null">None: grant nothing automatically</option>
                     <option
                         v-for="role in roles"
                         :key="role.id"
@@ -53,7 +53,7 @@
                 v-if="form.defaultAccessRoleId"
                 class="panel_hint"
             >
-                Every Person created from now on will hold this role immediately —
+                Every Person created from now on will hold this role immediately,
                 including through bulk creation, once that exists. Deleting this
                 role while it is the default is refused; choose a different default
                 (or None) first.
@@ -90,12 +90,12 @@ import CommonAppShell from '~/components/common/CommonAppShell.vue';
 import { useHasPermission, useSession } from '~/composables/session';
 
 /**
- * The tenant's authorization defaults (issue #25) — a SINGLETON, not a list,
+ * The tenant's authorization defaults (issue #25): a SINGLETON, not a list,
  * same reasoning `/manage/display` gives for being bespoke rather than a row
  * on the generic scaffold.
  */
 definePageMeta({
-    // Gated inline, not through the `manage` entity middleware — same reason
+    // Gated inline, not through the `manage` entity middleware: same reason
     // `/manage/display` is: this is not a registry entity.
     middleware: [
         () => {
@@ -114,7 +114,7 @@ definePageMeta({
 useHead({ title: 'Access defaults' });
 
 const selectId = useId();
-// Both, not either — see index.put.ts's own note on why writing this needs
+// Both, not either: see index.put.ts's own note on why writing this needs
 // the union of "may change tenant config" and "may grant access at all".
 const canEdit = computed(() => useHasPermission('tenant.update').value
     && useHasPermission('person_access_role.assign').value);

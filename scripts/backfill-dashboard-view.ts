@@ -7,26 +7,26 @@
  * --------------------------------------------------
  * `grant-permissions.ts` matches by ROLE KEY: `--role tenant-admin` grants to
  * every AccessRole named `tenant-admin`, across every tenant. This backfill
- * cannot use that shape at all — it has no role key to match on. `dashboard.view`
+ * cannot use that shape at all, since it has no role key to match on. `dashboard.view`
  * must reach EVERY AccessRole that is not the schedule-only default, whatever a
  * tenant happened to name it: `tenant-admin`, `lecturer`, a tenant's own
  * hand-composed `department-head`, all of them. The one shape it must NOT reach
- * is an AccessRole holding EXACTLY `{session.read_own}` and nothing else — the
- * seeded `member` role, or any tenant's own copy of that same idea — because
+ * is an AccessRole holding EXACTLY `{session.read_own}` and nothing else: the
+ * seeded `member` role, or any tenant's own copy of that same idea, because
  * that shape is precisely what should keep routing to `/schedule` instead of
  * `/dashboard`. That is a PERMISSION-SHAPE rule, not a role-key rule, and
  * `grant-permissions.ts`'s `--role` flag has nowhere to express it.
  *
  * WHY THIS IS THE DANGEROUS DIRECTION
  * ------------------------------------
- * `/dashboard` had NO permission check before `dashboard.view` existed —
+ * `/dashboard` had NO permission check before `dashboard.view` existed:
  * every signed-in Person could reach it. The moment the app starts gating on
  * this key, every AccessRole that doesn't explicitly hold it loses dashboard
  * access, not just the new `student`/`parent`-flavoured ones this issue adds.
  * Skipping this backfill, or running it after the gate ships instead of in the
  * same deploy, means every existing lecturer and admin in every existing
  * tenant is locked out of a page they use today. See CLAUDE.md's "A new
- * permission" and "A permission that MOVES" rules — this is closer to the
+ * permission" and "A permission that MOVES" rules; this is closer to the
  * second, despite being a brand new key, because the risk is identical: a
  * capability everyone silently had is about to require a grant nobody has yet.
  *
@@ -71,13 +71,13 @@ async function main() {
     const prisma = createOwnerPrisma();
 
     try {
-        // The catalogue must already carry the key, or the FK below fails —
+        // The catalogue must already carry the key, or the FK below fails;
         // same guard `grant-permissions.ts` runs, for the same reason.
         const seeded = await prisma.permission.findUnique({ where: { key: DASHBOARD_VIEW } });
 
         if (!seeded) {
             console.error(`\n'${DASHBOARD_VIEW}' is in the code (shared/permissions.ts) but not in the database.`);
-            console.error('Run `bun run db-seed` first — the catalogue is seeded, not migrated.\n');
+            console.error('Run `bun run db-seed` first: the catalogue is seeded, not migrated.\n');
             process.exit(1);
         }
 
@@ -125,17 +125,17 @@ async function main() {
         console.log(`Roles seen ${planned.length}`);
         console.log(`To grant   ${toGrant.length}`);
         console.log(`Already OK ${alreadyHad.length}`);
-        console.log(`Skipped    ${skippedMemberShaped.length} (session.read_own-only — must stay schedule-only)\n`);
+        console.log(`Skipped    ${skippedMemberShaped.length} (session.read_own-only: must stay schedule-only)\n`);
 
         for (const plan of planned) {
             const label = `${plan.tenantSlug} / ${plan.accessRoleKey} (${plan.accessRoleName})`;
 
             if (plan.memberShaped) {
-                console.log(`  SKIP    ${label} — exactly {session.read_own}`);
+                console.log(`  SKIP    ${label}: exactly {session.read_own}`);
             } else if (plan.alreadyHeld) {
-                console.log(`  OK      ${label} — already holds it`);
+                console.log(`  OK      ${label}: already holds it`);
             } else {
-                console.log(`  +GRANT  ${label} — held ${plan.heldCount} other permission(s)`);
+                console.log(`  +GRANT  ${label}: held ${plan.heldCount} other permission(s)`);
             }
         }
 
@@ -159,7 +159,7 @@ async function main() {
             );
         }
 
-        // One transaction across every tenant — a partial backfill leaves
+        // One transaction across every tenant: a partial backfill leaves
         // some tenants able to reach /dashboard and others locked out of it,
         // which is harder to diagnose than a clean failure. Same reasoning as
         // `grant-permissions.ts`.

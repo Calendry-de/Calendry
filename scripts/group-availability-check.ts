@@ -4,7 +4,7 @@
  * The same discipline as `preference-solve-check.ts`, because the same failure is
  * available: the app can store a window, the UI can show it, the solver can
  * enforce group blackouts perfectly, and every Session can still be placed
- * wherever it likes — because the window was on a Group nothing references, or
+ * wherever it likes, because the window was on a Group nothing references, or
  * the rule was not enabled, or the inversion produced an empty week list.
  *
  * So this does not ask whether the solve "looks right". It picks a Group that
@@ -12,12 +12,12 @@
  * checks three things:
  *
  *   1. the window crosses the wire as `Group.blackouts` on the right Group,
- *      with the complementary weeks — the inversion, verified against an
+ *      with the complementary weeks (the inversion), verified against an
  *      independently computed expectation;
  *   2. with the rule off, placements land in the blocked weeks (so the instance
  *      genuinely had something to move);
  *   3. with the rule on, NO placement attached to that Group lands in a blocked
- *      week — and the ones not attached to it still do, so the rule is narrow
+ *      week, and the ones not attached to it still do, so the rule is narrow
  *      rather than globally restrictive.
  *
  * Writes a window and a constraint row, then RESTORES both. Run against a solver
@@ -34,7 +34,7 @@ import { blackedOutWeeks, weekCountOf } from '../shared/academicCalendar';
 
 const SEED = 42;
 const MAX_MOVES = 2_000_000;
-/** Generous, so the MOVE budget binds — a `time_budget` run is not comparable. */
+/** Generous, so the MOVE budget binds; a `time_budget` run is not comparable. */
 const MAX_WALL_MILLIS = 180_000;
 const TAG = `groupavail-${Date.now()}`;
 
@@ -101,10 +101,10 @@ try {
     ));
 
     if (term._count.offerings === 0) {
-        throw new Error('No Term has offerings — nothing to solve. A fixture problem, not a result.');
+        throw new Error('No Term has offerings: nothing to solve. A fixture problem, not a result.');
     }
 
-    rule(`FIXTURE — tenant '${tenant.slug}', term '${term.name}'`);
+    rule(`FIXTURE: tenant '${tenant.slug}', term '${term.name}'`);
 
     const totalWeeks = weekCountOf(term.startDate, term.endDate);
 
@@ -114,7 +114,7 @@ try {
     /*
      * A Group that actually appears on offerings in this Term. Picking any Group
      * would risk one nothing references, whose window would then be correctly
-     * sent and correctly ignored — passing every check below while proving
+     * sent and correctly ignored, passing every check below while proving
      * nothing.
      */
     const candidate = await prisma.offeringGroup.findFirst({
@@ -187,7 +187,7 @@ try {
         now: new Date(),
     }));
 
-    rule('THE WIRE — did the window cross, and did the polarity flip correctly?');
+    rule('THE WIRE: did the window cross, and did the polarity flip correctly?');
 
     const wireGroup = input.groups.find((g) => g.id === group.id);
     const sentWeeks = wireGroup?.blackouts.flatMap((b) => b.weeks) ?? [];
@@ -204,7 +204,7 @@ try {
         report.skippedConstraints.some((s) => s.type === 'group_veto') ? 'YES ✗' : 'no ✓'}`);
 
     // -- Runs ----------------------------------------------------------------
-    rule('RUNS — same instance, same seed, one constraint apart');
+    rule('RUNS: same instance, same seed, one constraint apart');
 
     const withoutRule: SolverInput = {
         ...input,
@@ -229,7 +229,7 @@ try {
     line(`  ... in a blocked week, rule OFF      ${offMine}`);
     line(`  ... in a blocked week, rule ON       ${onMine}`);
     line(`  the window is honoured               ${onMine === 0 ? 'YES ✓' : 'NO ✗'}`);
-    line(`  the instance had something to move   ${offMine > 0 ? 'YES ✓' : 'NO ✗ (vacuous — see below)'}`);
+    line(`  the instance had something to move   ${offMine > 0 ? 'YES ✓' : 'NO ✗ (vacuous, see below)'}`);
     line('');
     // A rule that blocked those weeks for EVERYBODY would also show onMine == 0,
     // and would be a much worse bug than the one being tested for.
@@ -237,7 +237,7 @@ try {
 
     if (!offMine) {
         line('');
-        line('  ⚠ With the rule off, nothing landed in the blocked weeks anyway — so "the window');
+        line('  ⚠ With the rule off, nothing landed in the blocked weeks anyway, so "the window');
         line('    is honoured" is not evidence. Widen the window or pick a busier term.');
     }
 

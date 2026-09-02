@@ -11,8 +11,8 @@ import { withRequestTenant } from '../../utils/tenantDb';
  *
  * WHY THIS EXISTS
  * ---------------
- * `/schedule` used to assemble its own reference data from five CRUD endpoints —
- * `/api/terms`, `/api/time-grids`, `/api/groups`, `/api/rooms`, `/api/persons` —
+ * `/schedule` used to assemble its own reference data from five CRUD endpoints:
+ * `/api/terms`, `/api/time-grids`, `/api/groups`, `/api/rooms`, `/api/persons`,
  * each behind its own read permission. So the smallest role that could see a
  * timetable at all needed `term.read`, `time_grid.read`, `group.read`,
  * `room.read` and `person.read`: the authority to query the entire institution's
@@ -20,7 +20,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * know which room they are teaching in was being handed the staff directory.
  *
  * It was also the page's most persistent bug: one 403 inside that `Promise.all`
- * rejected the whole wave and the page rendered NOTHING — twice, in two
+ * rejected the whole wave and the page rendered NOTHING, twice, in two
  * different disguises, which is why `SCHEDULE_PERMISSIONS` existed at all. One
  * endpoint behind the page's own gate removes the class rather than the
  * instances.
@@ -30,7 +30,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * The rooms, people and groups here are DERIVED FROM THE VISIBLE SESSIONS, not
  * listed. A `session.read_own` caller therefore learns the name of the room they
  * are booked into and the lecturer leading their lecture, and learns nothing
- * about the rest of the institution — the narrowing is a property of the query
+ * about the rest of the institution: the narrowing is a property of the query
  * rather than a filter someone has to maintain.
  *
  * That is also why `sessionReadScope()` is shared with `GET /api/sessions` and
@@ -41,7 +41,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
  * WHAT IS DELIBERATELY *NOT* HERE
  * -------------------------------
  * The full directory. Filter dropdowns and the inspector's pickers need every
- * room, every group and every person — that is querying, not drawing, and it
+ * room, every group and every person; that is querying, not drawing, and it
  * stays behind `room.read` / `group.read` / `person.read`. The page fetches
  * those separately and TOLERANTLY, and simply does not render the controls it
  * has no data for. See `useScheduleData`.
@@ -76,7 +76,7 @@ defineRouteMeta({
                                 rooms: { type: 'array', items: { type: 'object' } },
                                 people: { type: 'array', items: { type: 'object' } },
                                 groups: { type: 'array', items: { type: 'object' }, description: 'Referenced groups plus their ancestors, for disambiguation.' },
-                                tenantTimezone: { type: 'string', description: 'IANA zone name. "Today"/"now" for the schedule (the Today button, the live now-indicator) resolve against THIS, never the viewer\'s own zone — timezone is per-Person and display-only (CLAUDE.md).' },
+                                tenantTimezone: { type: 'string', description: 'IANA zone name. "Today"/"now" for the schedule (the Today button, the live now-indicator) resolve against THIS, never the viewer\'s own zone, because timezone is per-Person and display-only (CLAUDE.md).' },
                             },
                         },
                     },
@@ -98,7 +98,7 @@ export default defineEventHandler(async (event) => {
          * no sessions at all, and `termId` is resolved against them by the
          * client exactly as it was before.
          */
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential: `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const terms = await tx.term.findMany({
             where: { tenantId: identity.tenantId },
@@ -110,7 +110,7 @@ export default defineEventHandler(async (event) => {
             /*
              * WITH BREAKS. They change what every block is CALLED, so a grid
              * without them renders a timetable that is wrong rather than
-             * merely sparse — the same reason `RESOURCES['time-grids']`
+             * merely sparse, the same reason `RESOURCES['time-grids']`
              * includes them.
              */
             include: { breaks: true },
@@ -118,7 +118,7 @@ export default defineEventHandler(async (event) => {
         /*
          * THE ONE PLACE THE CLIENT LEARNS THE TENANT'S ZONE. "Today"/"now"
          * on the schedule (the Today button, the live now-indicator) must
-         * resolve in `Tenant.timezone`, never the viewer's own — the same
+         * resolve in `Tenant.timezone`, never the viewer's own, the same
          * rule `localNow` already enforces server-side for
          * `computeReferenceSlot`. Fetched alongside terms/timeGrids, not
          * inside the cached block below: a tenant's timezone changing
@@ -132,7 +132,7 @@ export default defineEventHandler(async (event) => {
         /*
          * RESOLVED HERE AND REPORTED BACK, rather than each side defaulting to
          * "the first term". The client fetches its sessions with whatever this
-         * says, so the two cannot end up describing different terms — which is
+         * says, so the two cannot end up describing different terms, which is
          * how the names below would come to belong to a week nobody is looking
          * at. `startDate: 'desc'` matches `RESOURCES['terms']`, so the default
          * is the same term the old five-fetch wave picked.
@@ -140,14 +140,14 @@ export default defineEventHandler(async (event) => {
         const termId = query.termId || terms[0]?.id || '';
 
         /**
-         * Cache freshness (issue #66): the query above (terms/timeGrids —
+         * Cache freshness (issue #66): the query above (terms/timeGrids,
          * needed just to resolve `termId`, which the cache key depends on) is
-         * deliberately NOT cached and always current. Everything below IS —
+         * deliberately NOT cached and always current. Everything below IS:
          * the whole response is the cached value, terms/timeGrids included,
          * so a cache hit still returns the exact wire shape this route always
          * returned. "Immediately visible after a manual edit" depends on
          * `invalidateScheduleCache()` firing from `appendEvent()`
-         * (server/utils/sessionEvents.ts) — the single choke point every
+         * (server/utils/sessionEvents.ts), the single choke point every
          * write that could change this response passes through. The TTL is a
          * backstop only, in case an invalidation path is ever missed.
          */
@@ -188,21 +188,21 @@ export default defineEventHandler(async (event) => {
             /*
              * ANCESTORS TOO, and this is not a widening. The inspector shows a
              * Group's parent to disambiguate two identically-named seminars, so a
-             * Group whose parent is missing renders as an orphan — and the parent is
+             * Group whose parent is missing renders as an orphan, and the parent is
              * already implied by the child being visible. `ancestorGroupIds` walks
              * UP; `descendantGroupIds` here would publish sibling cohorts the caller
              * has nothing to do with.
              */
             const groupIds = await ancestorGroupIds(tx, referencedGroupIds);
 
-            // Sequential — `tx` is one shared connection; concurrent queries on
+            // Sequential: `tx` is one shared connection; concurrent queries on
             // it trip pg's deprecated overlapping-query warning.
             const rooms = roomIds.length
                 ? await tx.room.findMany({
                     /*
                      * No tenant predicate: the ids came from Sessions this caller
                      * may read, and a federation-shared Session names a
-                     * federation-owned Room that `tenantId` would exclude — the
+                     * federation-owned Room that `tenantId` would exclude: the
                      * shared lecture hall would lose its name on the one
                      * timetable that most needs it. RLS still applies.
                      */
@@ -226,8 +226,8 @@ export default defineEventHandler(async (event) => {
             return {
                 /*
                  * REPORTED, not inferred. The client renders a different page for
-                 * each — no filters, no editor, a heading that says whose timetable
-                 * this is — and deriving that from "did the person list come back
+                 * each: no filters, no editor, a heading that says whose timetable
+                 * this is, and deriving that from "did the person list come back
                  * empty" would make a tenant with one room look like a restricted
                  * caller.
                  */
@@ -241,7 +241,7 @@ export default defineEventHandler(async (event) => {
             };
         }, SCHEDULE_CACHE_TTL_SECONDS);
 
-        // OUTSIDE the cached value, deliberately — see this function's own
+        // OUTSIDE the cached value, deliberately: see this function's own
         // comment above the cache key: a tenant's timezone changing must not
         // wait out a stale cache entry (up to SCHEDULE_CACHE_TTL_SECONDS).
         // `tenant` is fetched fresh on every request, alongside terms/timeGrids.

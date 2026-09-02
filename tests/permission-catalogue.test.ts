@@ -11,7 +11,7 @@ import {
  * The permission catalogue must hold each key exactly once.
  *
  * WHY THIS EXISTS. `CRUD_RESOURCES` maps two resource segments onto one prefix
- * on purpose — `calendar-periods` and `terms` both mean `term`, because editing
+ * on purpose: `calendar-periods` and `terms` both mean `term`, because editing
  * a term's exam period IS editing the term. `crudPermissions()` iterated the
  * ENTRIES, so it emitted `term.read/create/update/delete` twice and the array
  * held 57 items for 53 keys.
@@ -21,7 +21,7 @@ import {
  *   provision:tenant   inserts this array into `access_role_permission` with a
  *                      single `createMany` and no `skipDuplicates`. Postgres
  *                      rejects duplicate primary keys inside one INSERT, so
- *                      provisioning a NEW tenant failed outright — and nobody
+ *                      provisioning a NEW tenant failed outright, and nobody
  *                      noticed, because the existing tenant was repaired by
  *                      `grant:permissions --all-missing`, which computes what
  *                      is missing and skips duplicates.
@@ -54,7 +54,7 @@ describe('permission catalogue', () => {
     it('describes each key once', () => {
         // `PERMISSIONS` is what the seed and provisioning iterate; `PERMISSION_KEYS`
         // is derived from it. Asserting both means a future dedupe applied to the
-        // derived list only — which would leave provisioning broken — still fails.
+        // derived list only, which would leave provisioning broken, still fails.
         expect(PERMISSIONS.length).toBe(PERMISSION_KEYS.length);
     });
 
@@ -71,7 +71,7 @@ describe('permission catalogue', () => {
     it('carries the two administration permissions Step 14 gates on', () => {
         // These existed in the catalogue for a long time with no endpoint
         // checking either. If one is ever removed, the routes that now depend on
-        // them fail closed rather than open — but they fail at request time, in
+        // them fail closed rather than open, but they fail at request time, in
         // a tenant, which is a worse place to find out than here.
         expect(PERMISSION_KEYS).toContain('access_role.manage');
         expect(PERMISSION_KEYS).toContain('person_access_role.assign');
@@ -83,7 +83,7 @@ describe('permission catalogue', () => {
  *
  * Both levels exist for a reason found by getting it wrong. A management page's
  * relation picker fetches its options from one or more endpoints and may only
- * be offered when EVERY one is reachable — while a single endpoint can accept
+ * be offered when EVERY one is reachable, while a single endpoint can accept
  * several permissions. The any-of-only version of this gated `lecturers`, which
  * fetches persons AND roles, on "either", and would have offered a picker that
  * renders half empty.
@@ -109,7 +109,7 @@ describe('permission requirements', () => {
 
     it('mixes the two levels', () => {
         // "must read persons, and must be able to read access roles by either
-        // route" — the Person page's own shape.
+        // route": the Person page's own shape.
         const mixed = ['person.read', ['access_role.manage', 'person_access_role.assign']];
 
         expect(satisfiesPermissionRequirement(held('person.read', 'person_access_role.assign'), mixed)).toBe(true);

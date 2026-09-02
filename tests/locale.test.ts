@@ -7,7 +7,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 /**
  * Locale resolution (issue #17): Person.locale > TenantDisplaySettings.
  * defaultLocale > Accept-Language, extending `useViewerLocale`'s existing
- * header-only mechanism rather than replacing it — see shared/locale.ts's
+ * header-only mechanism rather than replacing it: see shared/locale.ts's
  * own doc comment for why `parseAcceptLanguage` lives there unchanged from
  * `app/composables/locale.ts`'s original.
  */
@@ -122,7 +122,7 @@ describe('GET/PUT /api/me/settings', () => {
 
         expect(put.status).toBe(200);
         expect(put.body.locale).toBe('de-DE');
-        // `timezone` was not sent — the PUT leaves it untouched, still null.
+        // `timezone` was not sent, so the PUT leaves it untouched, still null.
         expect((await api('/api/me/settings', { cookie })).body).toEqual({ locale: 'de-DE', timezone: null });
     });
 
@@ -236,7 +236,7 @@ describe('PUT /api/display-settings timezone', () => {
         expect(row.timezone).toBe('America/New_York');
 
         // Never touches the display-settings singleton, which this fixture's
-        // seed leaves absent — a write scoped to `tenant` alone must not
+        // seed leaves absent, so a write scoped to `tenant` alone must not
         // create it as a side effect.
         expect(await ownerDb.tenantDisplaySettings.findUnique({ where: { tenantId: TENANT_A } })).toBeNull();
     });

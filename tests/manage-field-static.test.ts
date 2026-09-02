@@ -13,7 +13,7 @@ import { login } from './helpers/client';
  * string on the first keystroke.
  *
  * It was invisible to anyone with `time_grid.update` for months, because the
- * bespoke editor supplies the real control on the editable path — so the only
+ * bespoke editor supplies the real control on the editable path, so the only
  * way to catch it is to render the page AS A VIEWER, which is what this does.
  *
  * The assertion is deliberately about the CHARACTER of the output rather than
@@ -39,7 +39,7 @@ beforeAll(async () => {
     await seed();
 
     // A break makes `breaks` a NON-EMPTY array. With no rows the field is `[]`,
-    // which stringifies to "" and hides the defect entirely — the reason this
+    // which stringifies to "" and hides the defect entirely: the reason this
     // needs a fixture rather than the seed's bare grid.
     await ownerDb.timeGridBreak.create({
         data: {
@@ -53,7 +53,7 @@ beforeAll(async () => {
     });
 
     /**
-     * The shared viewer holds exactly `session.read` — pinned by
+     * The shared viewer holds exactly `session.read`, pinned by
      * `auth-permissions.test.ts`, which asserts that set with `toEqual`. So the
      * grant needed to reach a TimeGrid page is made HERE rather than in the
      * shared seed, where it would break that assertion.
@@ -99,7 +99,7 @@ describe('a TimeGrid with named breaks', () => {
         expect(html).not.toContain('[object Object]');
     });
 
-    it('shows the break exactly once — the section, not a phantom generic field', async () => {
+    it('shows the break exactly once: the section, not a phantom generic field', async () => {
         const html = await page(`/manage/time-grids/${GRID}`, viewerCookie);
 
         // Two labels meant the array was ALSO being handed to the generic

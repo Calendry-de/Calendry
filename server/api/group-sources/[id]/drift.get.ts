@@ -3,7 +3,7 @@
  * cosmetic. Nitro matches a concrete directory ahead of a parameterised one, so
  * creating `server/api/groups/[id]/anything.ts` SHADOWS
  * `server/api/[resource]/[id]/[relation].ts` for the whole `/api/groups/*`
- * prefix — and every Group relation the generic route serves
+ * prefix, and every Group relation the generic route serves
  * (`groups/terms`, `groups/availability`, `groups/sources`) starts answering
  * 404 from the PAGE router, which reads as a missing page rather than a broken
  * API. Measured: putting these two files there broke group availability, a
@@ -19,7 +19,7 @@ import { sourceDrift } from '../../../utils/groupSources';
  *
  * COUNTS, NOT IDS. The page needs to say "2 would be added, 1 removed", and
  * shipping the person ids would make this a way to read a roll the caller may
- * not otherwise be able to see — `group.read` is not `person.read`.
+ * not otherwise be able to see: `group.read` is not `person.read`.
  */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');

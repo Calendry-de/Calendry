@@ -6,7 +6,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
  * Tenant-configured default access role for new People (issue #25).
  *
  * Reverses `resources.ts`'s previous "never auto-grant on Person create"
- * stance — see `applyDefaultAccessRole`'s own doc comment for the reasoning.
+ * stance; see `applyDefaultAccessRole`'s own doc comment for the reasoning.
  * The negative cases here (dangling default, missing permission) are the
  * ones that make that reversal safe, not the happy path alone.
  */
@@ -122,7 +122,7 @@ describe('deleting a role that is the configured default', () => {
 
         expect(res.status).toBe(409);
 
-        // Still configured — the delete never happened.
+        // Still configured: the delete never happened.
         const settings = await api('/api/auth-settings', { cookie: cookieAdmin });
 
         expect(settings.body.defaultAccessRoleId).toBe(roleId);
@@ -132,7 +132,7 @@ describe('deleting a role that is the configured default', () => {
 describe('permission enforcement', () => {
     it('refuses a write from someone holding only tenant.update, not person_access_role.assign', async () => {
         const { cookie } = await login(ACCOUNTS.viewerA, TEST_PASSWORD);
-        // viewerA holds only session.read — covers "neither", the write-guard
+        // viewerA holds only session.read, covering "neither", the write-guard
         // API test's own precedent for what a negative case must show.
         const res = await api('/api/auth-settings', {
             method: 'PUT', cookie, body: JSON.stringify({ defaultAccessRoleId: roleId }),

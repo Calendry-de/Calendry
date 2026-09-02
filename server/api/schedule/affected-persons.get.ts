@@ -48,7 +48,7 @@ defineRouteMeta({
  * Cohort member who is not in that Seminar is not affected by the Seminar's
  * session. Using the conflict set here would over-notify.
  *
- * Delivery (email/push) is out of scope — this returns the resolved list only.
+ * Delivery (email/push) is out of scope: this returns the resolved list only.
  */
 export default defineEventHandler(async (event) => {
     const query = await getValidatedQuery(event, querySchema.parse);
@@ -65,7 +65,7 @@ export default defineEventHandler(async (event) => {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
         }
 
-        // Sequential — `tx` is one shared connection; concurrent queries on it
+        // Sequential, because `tx` is one shared connection; concurrent queries on it
         // trip pg's deprecated overlapping-query warning.
         const assignedPeople = await tx.sessionPerson.findMany({
             where: { sessionId: session.id },

@@ -50,7 +50,7 @@
                                     <option
                                         :selected="!tenant.federation"
                                         value=""
-                                    >— none —</option>
+                                    >(none)</option>
                                     <option
                                         v-for="federation in federations"
                                         :key="federation.id"
@@ -71,7 +71,7 @@
                         </tr>
 
                         <!--
-                            Issue #84 — GDPR erasure. IMMEDIATE and
+                            Issue #84: GDPR erasure. IMMEDIATE and
                             IRREVERSIBLE, so the confirmation is not a modal
                             that could be dismissed on reflex: the operator
                             must type the tenant's own slug back before the
@@ -168,7 +168,7 @@
                     >
                         <td>{{ federation.slug }}</td>
                         <td>{{ federation.name }}</td>
-                        <td>{{ federation.tenants.map((t) => t.slug).join(', ') || '—' }}</td>
+                        <td>{{ federation.tenants.map((t) => t.slug).join(', ') || '(none)' }}</td>
                         <td>{{ new Date(federation.createdAt).toLocaleDateString() }}</td>
                     </tr>
                     <tr v-if="federations.length === 0">
@@ -302,14 +302,14 @@ import { STAFF_LOGIN_ROUTE } from '~/utils/routes';
  * internal tool, not a polished tenant-facing surface).
  *
  * Every request here goes through `POST/GET /api/staff/*`, gated by
- * `requireStaffIdentity` — a tenant Account session cannot reach these
+ * `requireStaffIdentity`: a tenant Account session cannot reach these
  * routes at all, so there is nothing to gate client-side beyond "do we have
  * a staff session"; `auth.global.ts` deliberately does not check that (see
  * `STAFF_ROUTE` in `ANONYMOUS_ROUTES`), so this page checks it itself by
  * simply trying the fetch and redirecting to `/staff/login` on 401/403.
  */
 definePageMeta({ layout: 'empty' });
-useHead({ title: 'Staff — tenants' });
+useHead({ title: 'Staff: tenants' });
 
 interface StaffTenant {
     id: string;
@@ -338,7 +338,7 @@ const { data, error, refresh } = await useAsyncData(
 
 // No staff session (or one that expired/was revoked): bounce to the staff
 // login page rather than rendering an empty, indistinguishable-from-"no
-// tenants yet" table — the exact "no data vs. fetch failed" trap CLAUDE.md
+// tenants yet" table, the exact "no data vs. fetch failed" trap CLAUDE.md
 // names.
 if (error.value) {
     await navigateTo({ path: STAFF_LOGIN_ROUTE, query: { redirect: route.fullPath } });
@@ -348,11 +348,11 @@ const tenants = computed(() => data.value?.rows ?? []);
 const listError = computed(() => (error.value ? 'Could not load tenants.' : ''));
 
 /**
- * Federation list — issue #64's UI half. A SEPARATE `useAsyncData` rather
+ * Federation list, issue #64's UI half. A SEPARATE `useAsyncData` rather
  * than folded into the tenants response: the two are independent resources
  * (a Federation without a Tenant yet is a normal, freshly-created state),
  * and the tenants fetch above already owns the "no session, bounce to
- * login" redirect for this page — a second identical redirect here would be
+ * login" redirect for this page, and a second identical redirect here would be
  * redundant, so a failure here just renders its own error note instead.
  */
 const federationsData = await useAsyncData(
@@ -424,7 +424,7 @@ async function createTenant() {
 
         createdInfo.value = result.initialPassword
             ? `Created '${result.tenant.slug}'. Initial admin password (shown once): ${result.initialPassword}`
-            : `Created '${result.tenant.slug}'. Reused the existing account for ${result.person.email} — its password is unchanged.`;
+            : `Created '${result.tenant.slug}'. Reused the existing account for ${result.person.email}; its password is unchanged.`;
 
         form.slug = '';
         form.name = '';
@@ -434,7 +434,7 @@ async function createTenant() {
         form.timezone = '';
 
         await refresh();
-        // A new tenant may have named an existing federationSlug — that
+        // A new tenant may have named an existing federationSlug, so that
         // federation's member list just changed too.
         await federationsData.refresh();
     } catch (caught) {
@@ -475,7 +475,7 @@ async function createFederation() {
         });
 
         createFederationInfo.value = result.alreadyExisted
-            ? `Federation '${result.federation.slug}' already existed — nothing created.`
+            ? `Federation '${result.federation.slug}' already existed; nothing created.`
             : `Created federation '${result.federation.slug}'.`;
 
         federationForm.slug = '';
@@ -531,7 +531,7 @@ async function confirmErase(tenant: StaffTenant) {
             body: { confirmSlug: eraseConfirmInput.value },
         });
 
-        eraseSuccess.value = `Erased '${tenant.slug}' — ${result.personCount} `
+        eraseSuccess.value = `Erased '${tenant.slug}': ${result.personCount} `
             + `${result.personCount === 1 ? 'person' : 'people'} and ${result.accountsErased} `
             + `now-ownerless login${result.accountsErased === 1 ? '' : 's'} removed.`;
 

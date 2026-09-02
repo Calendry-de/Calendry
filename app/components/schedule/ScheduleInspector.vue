@@ -3,8 +3,8 @@
         `tabindex="-1"` and the data attribute exist for ONE caller: the page
         restores focus here after an edit whose subject left the view, so a
         keyboard user lands on the panel that still describes what they changed
-        rather than on `<body>`. Not in the tab order — -1 is programmatic focus
-        only — and already named, so it announces as a region on arrival.
+        rather than on `<body>`. Not in the tab order (-1 is programmatic focus
+        only), and already named, so it announces as a region on arrival.
     -->
     <aside
         class="inspector"
@@ -65,7 +65,7 @@
                          sit. `placedSession` is null exactly then, so nothing
                          below reads the placement fields without it. -->
                     <dd v-if="!placedSession">
-                        In the spare bank — not currently placed.
+                        In the spare bank, not currently placed.
                     </dd>
                     <dd v-else>
                         <!-- The full date: "Tuesday, 09:00–12:15" leaves the
@@ -109,12 +109,12 @@
                         <p
                             v-if="session.rooms.length > 1"
                             class="inspector_hint"
-                        >The solver places a session in one room — the extras are kept here but not sent to it.</p>
+                        >The solver places a session in one room; the extras are kept here but not sent to it.</p>
                     </dd>
                 </div>
                 <div v-if="editable || session.kind">
                     <dt>Kind</dt>
-                    <dd v-if="!editable">{{ session.kind?.name ?? '—' }}</dd>
+                    <dd v-if="!editable">{{ session.kind?.name ?? 'None' }}</dd>
                     <dd v-else>
                         <select
                             class="inspector_control"
@@ -167,13 +167,13 @@
                     <p
                         v-if="canAssignLecturer && !lecturerEditable && session?.offeringId !== null"
                         class="inspector_hint"
-                    >Lock this session to override who teaches it — otherwise the next solve
+                    >Lock this session to override who teaches it, otherwise the next solve
                         would silently replace your choice.</p>
                 </div>
 
                 <!--
                     Substitutions / Vertretungen (issue #30). Rendered whenever
-                    THERE IS SOMETHING TO SHOW — an active substitute — OR the
+                    THERE IS SOMETHING TO SHOW (an active substitute) OR the
                     caller may create one, so a substitute reading their own
                     timetable sees who is covering it even without
                     `session.substitute`, and a viewer with neither sees nothing
@@ -182,7 +182,7 @@
 
                     A SEPARATE FACT FROM "Lecturer" ABOVE ON PURPOSE: the
                     original assignment is untouched by a substitution, so the
-                    two rows can — and often will — disagree, and that
+                    two rows can, and often will, disagree, and that
                     disagreement IS the information this row exists to show.
                 -->
                 <div v-if="session.substitution || canSubstitute">
@@ -196,8 +196,8 @@
                         covering this session." advisory and an empty search box
                         under every session on the board: on a panel that also
                         says "Lecturer: Dozent S" two rows above, that read as a
-                        contradiction — as though the class had nobody teaching
-                        it — rather than as "there is no Vertretung today", which
+                        contradiction (as though the class had nobody teaching
+                        it) rather than as "there is no Vertretung today", which
                         is true of almost every session almost every week.
 
                         The button is the declaration. A person is only asked for
@@ -259,7 +259,7 @@
                             plain click silently cleared every other person.
 
                             Searchable, so a name is typed rather than hunted
-                            for. `options` stays the page's whole directory —
+                            for. `options` stays the page's whole directory:
                             not because this picker needs it, but because the
                             grid does, to label the attendees of every drawn
                             Session. Search here removes the scrolling, not that
@@ -334,7 +334,7 @@
                         :key="violation.id"
                     >
                         {{ describeViolation(violation, lookup) }}
-                        <span class="inspector_muted">— {{ violation.constraint.name }}</span>
+                        <span class="inspector_muted">· {{ violation.constraint.name }}</span>
                     </li>
                 </ul>
                 <p class="inspector_note">
@@ -356,7 +356,7 @@
                     class="inspector_hint"
                 >Unlock this session before moving it.</p>
 
-                <!-- SWAP AND LOCK BOTH NEED A PLACEMENT TO ACT ON — a banked
+                <!-- SWAP AND LOCK BOTH NEED A PLACEMENT TO ACT ON: a banked
                      Session (issue #22) has none, and the server refuses
                      either against one. Hidden here rather than merely
                      disabled, matching how Delete is absent for an
@@ -384,7 +384,7 @@
 
                 <!--
                     THE SPARE BANK (issue #22). Only an Offering-linked Session
-                    carries demand worth preserving — an Event has none, and
+                    carries demand worth preserving; an Event has none, and
                     Delete below is its equivalent. Not a two-step confirm like
                     Delete: banking is reversible (place it again), unlike
                     removing an Event entirely.
@@ -403,9 +403,9 @@
                 >Unlock this session before moving it to the spare bank.</p>
 
                 <!--
-                    EVENTS ONLY. An Offering-linked Session cannot be deleted —
+                    EVENTS ONLY. An Offering-linked Session cannot be deleted:
                     its Offering's frequency would go unmet and the next solve
-                    would place it again — so the action is absent rather than
+                    would place it again. So the action is absent rather than
                     disabled.
                 -->
                 <template v-if="canDelete && session.offeringId === null">
@@ -475,7 +475,7 @@ const props = defineProps<{
      * Session, which `session.update` explicitly does not. */
     canAssignLecturer: boolean;
     /**
-     * Covering a Session someone cannot teach (issue #30) — its own permission,
+     * Covering a Session someone cannot teach (issue #30) is its own permission,
      * separate from `canAssignLecturer`: covering is an operational act, not an
      * editing authority over the Offering, and needs no lock.
      */
@@ -511,7 +511,7 @@ const locale = useViewerLocale();
 
 /**
  * An Offering-linked Session takes its kind, groups and people from its Offering
- * and from solver output, so the route refuses an edit — and offering a control
+ * and from solver output, so the route refuses an edit; offering a control
  * the server will reject is worse than showing none.
  */
 const editable = computed(() => props.canUpdate && props.session?.offeringId === null);
@@ -519,7 +519,7 @@ const editable = computed(() => props.canUpdate && props.session?.offeringId ===
 /**
  * Safe from the next solve, and therefore safe to override here: an Event
  * (structurally out of scope regardless of `isLocked`) or a Session already
- * locked — `planMaterialization` skips a locked Session entirely, on a rebuild
+ * locked: `planMaterialization` skips a locked Session entirely, on a rebuild
  * as much as a repair. Anything else would be silently discarded by the next
  * apply, which `lecturers.post.ts` refuses.
  */
@@ -530,7 +530,7 @@ const lecturerRelation: RelationDef = {
     key: 'lecturers',
     label: 'Lecturer',
     help: 'Who leads this session. Changing it here overrides what the Offering or the '
-        + 'solver assigned, permanently — the whole reason a lock is required first.',
+        + 'solver assigned, permanently. That is the whole reason a lock is required first.',
     resource: 'persons',
     valueKey: 'personId',
     searchable: true,
@@ -544,7 +544,7 @@ const personRelation: RelationDef = {
     help: 'Individuals attending in their own right, beyond whole groups.',
     resource: 'persons',
     valueKey: 'personId',
-    // People are a flat list, not a hierarchy — the one difference from groups.
+    // People are a flat list, not a hierarchy: the one difference from groups.
     searchable: true,
     // Handles BOTH shapes on purpose: `options` below is the page's directory,
     // where the name is already composed, while a search result comes straight
@@ -567,20 +567,20 @@ const groupRelation: RelationDef = {
 /**
  * A COMPUTED, unlike the three above: its `resource` names THIS Session, so it
  * has to stay in sync as the panel is reused for a different one. Candidates
- * come from `substitute-candidates.get.ts` rather than `/api/persons` — that
- * route already filters to people free at this Session's own slot (issue #30:
+ * come from `substitute-candidates.get.ts` rather than `/api/persons`, because
+ * that route already filters to people free at this Session's own slot (issue #30:
  * "filter to people who are free, not let a clash be created and warned about
  * after"), which `/api/persons` has no way to do.
  *
  * `valueKey: 'id'` rather than `'personId'`: this relation has no join row of
- * its own shape to key by — `rows` below is a single synthetic entry standing
+ * its own shape to key by: `rows` below is a single synthetic entry standing
  * in for "the current substitute", built directly from the candidate's `id`.
  */
 const substituteRelation = computed<RelationDef>(() => ({
     key: 'substitute',
     label: 'Covered by',
     help: 'Somebody else teaches this one occurrence. The original lecturer keeps the '
-        + 'Offering and this reverts on its own next week — nothing here is permanent.',
+        + 'Offering and this reverts on its own next week; nothing here is permanent.',
     resource: `sessions/${props.session?.id ?? ''}/substitute-candidates`,
     valueKey: 'id',
     searchable: true,
@@ -589,7 +589,7 @@ const substituteRelation = computed<RelationDef>(() => ({
 
     /*
      * NO `emptyWarning`, deliberately. That field exists for a relation whose
-     * emptiness is a PROBLEM — `access-roles`, where it means a person can sign
+     * emptiness is a PROBLEM, like `access-roles`, where it means a person can sign
      * in and be shown nothing. A session with no substitute is not a problem; it
      * is what almost every session looks like almost every week, and flagging it
      * in the warning style said the class had nobody teaching it while the
@@ -600,7 +600,7 @@ const substituteRelation = computed<RelationDef>(() => ({
      */
 }));
 
-/** At most one — the picker's "assigned" row is just today's substitute, if any. */
+/** At most one: the picker's "assigned" row is just today's substitute, if any. */
 const substituteRows = computed(() => (props.session?.substitution
     ? [{ id: props.session.substitution.coveringPersonId }]
     : []));
@@ -610,8 +610,8 @@ const substituteRows = computed(() => (props.session?.substitution
  *
  * PURELY LOCAL, and it has to be: it records that somebody clicked "Add a
  * substitute", which is a statement about this panel and not about the Session.
- * Once a substitution exists the flag stops mattering — the picker renders off
- * `session.substitution` — so this only ever gates the empty case.
+ * Once a substitution exists the flag stops mattering, because the picker
+ * renders off `session.substitution`, so this only ever gates the empty case.
  */
 const addingSubstitute = ref(false);
 
@@ -619,9 +619,9 @@ const addingSubstitute = ref(false);
  * What the resting "Covered by" row says when there is no substitute.
  *
  * TWO WORDINGS, because one of them is false half the time. "Taught by the
- * assigned lecturer" is the reassurance this row exists to give — it is what
- * makes "no substitute" read as normal rather than as nobody teaching the class
- * — but a Session with no lecturer assigned yet would then be told it has one.
+ * assigned lecturer" is the reassurance this row exists to give: it is what
+ * makes "no substitute" read as normal rather than as nobody teaching the class.
+ * But a Session with no lecturer assigned yet would then be told it has one.
  * That is the same class of untruth this whole change was fixing, one row lower.
  */
 const coverRestingLabel = computed(() => (lecturers.value.length > 0
@@ -663,7 +663,7 @@ function onLecturerRemove(value: string) {
 }
 
 /**
- * Unlike lecturers/rooms/groups, this is not "send the whole set" — a
+ * Unlike lecturers/rooms/groups, this is not "send the whole set": a
  * substitution has at most one covering Person, so picking a new one simply
  * REPLACES it server-side (`substitute.post.ts` upserts on `session_id`).
  */
@@ -672,7 +672,7 @@ function onSubstituteAdd(value: string) {
 }
 
 /**
- * Removes the overlay entirely — "wrong person picked" or "no longer needed".
+ * Removes the overlay entirely: "wrong person picked" or "no longer needed".
  *
  * Closes the form with it. Leaving it open would drop the panel straight back to
  * an empty picker, which is the state this change exists to stop it resting in;
@@ -729,7 +729,7 @@ function onRoomsChange(event: Event) {
 
 /**
  * The selected Session, narrowed to its placed shape, or null when there is
- * none selected OR it is banked (issue #22) — the one place the template
+ * none selected OR it is banked (issue #22). It is the one place the template
  * checks before reading `dayOfWeek`/`blockIndex`/`termWeek`.
  */
 const placedSession = computed<PlacedScheduleSession | null>(() => (
@@ -743,7 +743,7 @@ const endBlock = computed(() => (placedSession.value
 
 const worst = computed(() => (props.violations.some((v) => v.severity === 'HARD') ? 'hard' : 'soft'));
 
-// The split lives in `composables/schedule.ts` — see `LECTURER_ROLE_KEY` for
+// The split lives in `composables/schedule.ts`; see `LECTURER_ROLE_KEY` for
 // why it is one definition and not a string literal per component.
 const lecturers = computed(() => lecturersOf(props.session?.people ?? []));
 const attendees = computed(() => attendeesOf(props.session?.people ?? []));
@@ -752,7 +752,7 @@ const attendees = computed(() => attendeesOf(props.session?.people ?? []));
  * The read-only renderings, resolved here rather than in the template.
  *
  * Each was a `.map().join()` inside an interpolation, so it rebuilt an array and
- * a string on every render of a panel that re-renders on every selection — and
+ * a string on every render of a panel that re-renders on every selection, and
  * the name resolution it does is a lookup per row. As computeds they resolve once
  * per change of the thing they describe.
  */
@@ -768,7 +768,7 @@ const attendeeNames = computed(() => attendees.value
 .inspector {
     /*
      * SIZED, NOT RESERVED. A flat `width: 320px` was held whether or not anything
-     * was selected — a third of a 1440px screen for a panel that is empty most of
+     * was selected: a third of a 1440px screen for a panel that is empty most of
      * the time, crushing the day columns to ~46px of text each. It now asks for a
      * comfortable measure and yields, and the empty state shrinks it further.
      */
@@ -789,8 +789,8 @@ const attendeeNames = computed(() => attendees.value
         width: 100%;
     }
 
-    /* Nothing selected: a prompt, not a panel. It keeps a presence — a column
-       that vanishes and returns makes the grid jump on every selection — but
+    /* Nothing selected: a prompt, not a panel. It keeps a presence (a column
+       that vanishes and returns makes the grid jump on every selection) but
        stops claiming a reading width for one sentence. */
     &:has(.inspector_empty) {
         width: clamp(180px, 16vw, 220px);
@@ -978,7 +978,7 @@ const attendeeNames = computed(() => attendees.value
             font-weight: 650;
 
             /* One step darker than $warning700, which measured 3.23:1 on this
-               panel's own soft tint — under the 4.5:1 text minimum, on the
+               panel's own soft tint, under the 4.5:1 text minimum, on the
                heading that names the product's signature state. */
             color: $warning800;
             text-transform: uppercase;

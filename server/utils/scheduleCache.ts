@@ -5,7 +5,7 @@ import { invalidate } from './cache';
  * `GET /api/ics/stream.ics`, `GET /api/sessions`, `GET /api/schedule/context`,
  * `GET /api/screens/board`.
  *
- * SCOPING. Every key is rooted at a tenant, then a "bucket" — either a
+ * SCOPING. Every key is rooted at a tenant, then a "bucket": either a
  * specific Term id, or the literal string `all` for a response that is not
  * pinned to one Term (an `ics_link` with `scope: 'ALL'`, `/api/sessions` with
  * no `termId` filter, and the screen board, which resolves "today's" Term
@@ -14,19 +14,19 @@ import { invalidate } from './cache';
  * INVALIDATION IS DELIBERATELY GENEROUS, per the issue: "over-invalidating
  * only costs a cache miss; under-invalidating serves a wrong answer."
  * `invalidateScheduleCache()` is the ONLY entry point, called from
- * `appendEvent()` (server/utils/sessionEvents.ts) — the single choke point
+ * `appendEvent()` (server/utils/sessionEvents.ts), the single choke point
  * every schedule-changing write already passes through (manual edits,
  * Generation apply, and a solver repair run's result, which only becomes
  * visible in the schedule once applied via the same route that calls
  * `appendEvent`). Given a Term id, it drops that Term's own bucket AND the
  * `all` bucket, since an all-Terms view's answer may include that Term. Given
- * no Term id (a tenant-wide Generation — a MANUAL_BASELINE or an import), it
+ * no Term id (a tenant-wide Generation, a MANUAL_BASELINE or an import), it
  * drops every bucket for the tenant, term-specific or not.
  */
 
 const CACHE_PREFIX = 'calendry:cache:v1';
 
-/** Backstop only — event-driven invalidation above should almost always win. */
+/** Backstop only: event-driven invalidation above should almost always win. */
 export const SCHEDULE_CACHE_TTL_SECONDS = 180;
 
 type Bucket = string | 'all';
@@ -43,7 +43,7 @@ function scheduleCacheKey(tenantId: string, bucket: Bucket, rest: string): strin
     return `${bucketRoot(tenantId, bucket)}${rest}`;
 }
 
-/** `GET /api/schedule/context` — always resolves to one concrete Term. */
+/** `GET /api/schedule/context`: always resolves to one concrete Term. */
 export function contextCacheKey(options: {
     tenantId: string;
     termId: string;
@@ -56,7 +56,7 @@ export function contextCacheKey(options: {
 }
 
 /**
- * `GET /api/sessions` — `termId` is an OPTIONAL query filter; omitting it
+ * `GET /api/sessions`: `termId` is an OPTIONAL query filter; omitting it
  * spans every Term the caller may see, so that response lives in the `all`
  * bucket rather than any one Term's.
  */
@@ -90,7 +90,7 @@ export function sessionsCacheKey(options: {
 }
 
 /**
- * `GET /api/ics/stream.ics` — keyed per `ics_link` id. A `TERM`-scoped link
+ * `GET /api/ics/stream.ics`: keyed per `ics_link` id. A `TERM`-scoped link
  * lives in that Term's bucket; an `ALL`-scoped link (or the edge case of a
  * `TERM` link with no `termId`, which resolves zero Terms) lives in `all`,
  * since it draws from every Term.
@@ -102,13 +102,13 @@ export function icsCacheKey(options: { tenantId: string; linkId: string; scope: 
 }
 
 /**
- * `GET /api/screens/board` — keyed per tenant + room-scope, as the issue
+ * `GET /api/screens/board`: keyed per tenant + room-scope, as the issue
  * specifies. Bucketed under `all` rather than a Term: the route resolves
  * "today's" Term itself from the wall clock rather than taking one as an
  * input, so there is no Term id available at cache-key time.
  *
  * Deliberately excludes `screenName` and `generatedAt` from what gets cached
- * — see the route, which computes those fresh on every call, cache hit or
+ * see the route, which computes those fresh on every call, cache hit or
  * not. Two screens can share a room scope (and so a cache key) while having
  * different names; caching the name would serve one screen's identity to the
  * other, which is exactly the "stale/wrong data rendering as if it were
@@ -122,7 +122,7 @@ export function boardCacheKey(options: { tenantId: string; roomIds: string[] }):
 
 /**
  * The single invalidation entry point, called from `appendEvent()`. `termId`
- * is the affected Generation's own `termId` — `null` for a tenant-wide one.
+ * is the affected Generation's own `termId`, `null` for a tenant-wide one.
  */
 export async function invalidateScheduleCache(tenantId: string, termId: string | null): Promise<void> {
     if (termId) {
@@ -132,6 +132,6 @@ export async function invalidateScheduleCache(tenantId: string, termId: string |
         return;
     }
 
-    // No Term to scope to — drop everything cached for this tenant.
+    // No Term to scope to: drop everything cached for this tenant.
     await invalidate(tenantRoot(tenantId));
 }

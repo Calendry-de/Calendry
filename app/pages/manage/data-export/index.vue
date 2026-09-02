@@ -6,7 +6,7 @@
         <p class="intro">
             For a departing institution taking its data with it, or answering a Right to
             Access request that spans more than one person. A single Person's own record can
-            be exported from their own page instead — this is everything at once.
+            be exported from their own page instead; this is everything at once.
         </p>
 
         <div class="actions">
@@ -31,14 +31,14 @@ import CommonButton from '~/components/common/CommonButton.vue';
 import { useSession } from '~/composables/session';
 
 /**
- * The tenant-wide half of issue #84 — `GET /api/tenant/export`. Bespoke
+ * The tenant-wide half of issue #84: `GET /api/tenant/export`. Bespoke
  * settings page rather than a registry entity, same reasoning as
  * `/manage/curriculum-progression`: there is no list of rows to CRUD, just
- * one action, and both download buttons are plain links — the route answers
+ * one action, and both download buttons are plain links: the route answers
  * with `content-disposition: attachment`, so no fetch/blob handling is
  * needed here.
  *
- * Erasing a tenant has NO matching page here — it is staff-only
+ * Erasing a tenant has NO matching page here: it is staff-only
  * (`DELETE /api/staff/tenants/:id`), never tenant self-service, so it lives
  * in the staff panel instead. See shared/permissions.ts's `tenant.export`
  * comment.

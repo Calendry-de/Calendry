@@ -6,7 +6,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
 const bodySchema = z.object({ reason: z.string().nullish() }).optional();
 
 /**
- * Undo a substitution — the "wrong person picked" correction, and the only way
+ * Undo a substitution: the "wrong person picked" correction, and the only way
  * back to "nobody is covering this" short of waiting for the Session itself to
  * change. Deliberately NOT the "cancelled vs uncovered" question the ticket
  * scopes to Cancel-to-spare-bank: this never touches whether the Session

@@ -6,7 +6,7 @@
         <!--
             A REAL <label for>, not a styled div.
             This was a `<div class="input_label">` sitting OUTSIDE the `<label>`
-            that wraps the input, with no `for`, no `id` and no aria-label — so
+            that wraps the input, with no `for`, no `id` and no aria-label, so
             the visible text was not associated with the field at all and the
             accessible name fell back to the placeholder, or to nothing. Every
             form in the product was affected; it surfaced on the landing page

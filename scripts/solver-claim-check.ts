@@ -1,10 +1,10 @@
 /**
- * Stage 4 verification — that the claim mechanism cannot double-poll a run.
+ * Stage 4 verification: that the claim mechanism cannot double-poll a run.
  *
  * A genuine multi-instance test is not feasible here (one container), so this
  * drives the REAL `claimDueRuns()` from several concurrent callers against the
- * real database. That exercises exactly what matters — the advisory lock, the
- * `FOR UPDATE SKIP LOCKED` claim and the `next_poll_at` lease — because the
+ * real database. That exercises exactly what matters (the advisory lock, the
+ * `FOR UPDATE SKIP LOCKED` claim and the `next_poll_at` lease) because the
  * mechanism lives in Postgres, not in the process. Two app instances would hit
  * the same rows the same way.
  *
@@ -35,7 +35,7 @@ try {
      * Each planted run needs its OWN term: `solver_run_one_active_per_term` is a
      * partial unique index over (tenant_id, term_id) for active statuses, so six
      * RUNNING rows on one term is exactly what Stage 2 made impossible. (The
-     * first draft of this script tried, and got the 23505 — the guarantee
+     * first draft of this script tried, and got the 23505: the guarantee
      * demonstrating itself.)
      *
      * They carry no externalRunId, so an actual poll would be a no-op. The
@@ -93,7 +93,7 @@ try {
     line('     correctly get nothing rather than racing for the same rows)');
 
     // -- 2. The lease ---------------------------------------------------------
-    rule('IMMEDIATE re-claim — the lease must hide the rows just taken');
+    rule('IMMEDIATE re-claim: the lease must hide the rows just taken');
 
     const second = await claimDueRuns(tenant.id);
 
@@ -119,7 +119,7 @@ try {
     const third = await claimDueRuns(tenant.id);
 
     line(`  claimed: ${third.length} of ${planted.length}  ${third.length === planted.length ? '✓' : '✗'}`);
-    line('    (nothing is lost if an instance dies mid-poll — the lease simply expires)');
+    line('    (nothing is lost if an instance dies mid-poll: the lease simply expires)');
 
     // -- verdict --------------------------------------------------------------
     const ok = duplicates.length === 0

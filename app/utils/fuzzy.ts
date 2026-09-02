@@ -6,7 +6,7 @@
  * thing it replaces.
  *
  * The scoring is what separates a useful palette from a frustrating one. Typing
- * "rm" should rank "Rooms" above "Terms" even though both contain r and m —
+ * "rm" should rank "Rooms" above "Terms" even though both contain r and m,
  * so matches at word starts and matches in contiguous runs are worth far more
  * than bare subsequence hits.
  */
@@ -90,7 +90,7 @@ export function fuzzyMatch(query: string, text: string): FuzzyResult | null {
  * Best score for a query against a labelled item with secondary search terms.
  *
  * The label is weighted above keywords so that a hit on the visible text always
- * outranks a hit on an invisible synonym — a result whose reason for appearing
+ * outranks a hit on an invisible synonym: a result whose reason for appearing
  * is not on screen reads as a bug.
  */
 export function fuzzyScoreEntry(query: string, label: string, keywords: string[]): FuzzyResult | null {

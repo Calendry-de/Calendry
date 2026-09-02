@@ -3,14 +3,14 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * `no_unplaced_session` (shared/constraintTypes.ts) — the HARD structural check
+ * `no_unplaced_session` (shared/constraintTypes.ts): the HARD structural check
  * that a Session an Offering still owes has not fallen into the spare bank
  * (issue #22) and been left there.
  *
  * A PER-SESSION type, like `no_session_spanning_break`, but the exact opposite
  * shape: it fires on the ABSENCE of a placement rather than a fact about one.
  * `bank.post.ts` writes it directly rather than through `refreshViolations()`
- * — see that route's file comment — so this exercises the real route, not the
+ * (see that route's file comment), so this exercises the real route, not the
  * evaluator function directly.
  */
 const TENANT = 'test-tenant-a';

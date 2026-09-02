@@ -1,5 +1,5 @@
 /**
- * Lists every tenant and its slug — read-only, no confirmation needed.
+ * Lists every tenant and its slug: read-only, no confirmation needed.
  *
  * OWNER CONNECTION, NOT THE APP ROLE. `tenant` sits above `withTenant()`: there
  * is no tenant context yet to scope by, so an app-role query outside a request
@@ -24,10 +24,10 @@ async function main() {
             },
         });
 
-        console.log(`${describeTarget(connectionString)} — ${tenants.length} tenant(s)\n`);
+        console.log(`${describeTarget(connectionString)}: ${tenants.length} tenant(s)\n`);
 
         if (tenants.length === 0) {
-            console.log('(none — run `bun run provision:tenant` first)');
+            console.log('(none, run `bun run provision:tenant` first)');
 
             return;
         }

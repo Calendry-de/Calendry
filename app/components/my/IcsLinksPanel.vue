@@ -3,7 +3,7 @@
         <h2>Calendar links</h2>
         <p class="links_hint">
             A link an external calendar app (Google Calendar, Outlook, Apple Calendar…)
-            re-fetches on its own schedule — never downloaded once and forgotten. Unlike
+            re-fetches on its own schedule, never downloaded once and forgotten. Unlike
             an API token this address stays visible here so you can re-copy it any time;
             deleting a link stops it immediately.
         </p>
@@ -235,12 +235,12 @@ interface GroupOption {
  * lost by fetching after mount.
  *
  * REFERENCE DATA COMES FROM `GET /api/me/ics-links/context`, not the generic
- * `term.read`/`group.read`-gated CRUD lists — same reasoning
+ * `term.read`/`group.read`-gated CRUD lists: same reasoning
  * `/api/me/exam-requests/context` gives (issue #108): this page's own gate is
  * `ics_link.generate_own`/`ics_link.generate` alone, and a page must not need
  * a wider permission than its own gate implies just to draw its form.
  * `canTargetGroups` names the group-picker capability explicitly rather than
- * the client inferring it from `groups` being non-empty — a tenant with zero
+ * the client inferring it from `groups` being non-empty: a tenant with zero
  * Groups would otherwise look ungated.
  */
 const request = useRequestFetch();

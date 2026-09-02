@@ -5,7 +5,7 @@ import { SCHEDULE_PERMISSIONS } from '~/utils/schedulePermissions';
 import { HOME_ROUTE } from '~/utils/routes';
 
 /**
- * The navigation registry — one typed list behind the header, `CommonAppShell`'s
+ * The navigation registry: one typed list behind the header, `CommonAppShell`'s
  * sidebar (on `/dashboard` and every `/manage/*` page), and the Ctrl+K palette.
  * What places exist, what they are called, and who may see them; not fetching,
  * not the palette's open/close machine, not permissions themselves.
@@ -27,7 +27,7 @@ export interface NavEntry {
     keywords: string[];
     /**
      * Catalogue permission(s) required to see this entry at all. Absent means
-     * "always visible" — used only for account actions, which are about the
+     * "always visible", used only for account actions, which are about the
      * session rather than tenant data.
      *
      * AN AND OF ORS (`PermissionRequirement`, the same shape the relation gates
@@ -38,7 +38,7 @@ export interface NavEntry {
      *     ['session.read', 'term.read']           both
      *     [['session.read', 'session.read_own']]  either
      *
-     * The all-of form came first, from `/schedule` — which used to draw nothing
+     * The all-of form came first, from `/schedule`, which used to draw nothing
      * without six separate reads, so offering the link on the strength of one of
      * them led straight to a blank page. The any-of form arrived with
      * `session.read_own`: the schedule is now reachable two ways, and an entry
@@ -77,14 +77,14 @@ function manageEntries(): NavEntry[] {
 /**
  * Every PLACE: the entries that are a destination rather than a session action.
  *
- * Module-level and PURE, unlike the account entries in `useNavRegistry` below —
+ * Module-level and PURE, unlike the account entries in `useNavRegistry` below:
  * nothing here closes over a ref, a cookie or the router, so it needs no Nuxt
  * instance. That is the point: it makes the registry's destinations importable
  * from a plain unit test, which is how `tests/nav-groups.test.ts` can check
  * that `CommonAppShell`'s sidebar grouping covers every one of them.
  *
  * All of this used to live inside `useNavRegistry`'s computed, where no test
- * could reach it — and `/manage/data-export` sat unclassified by `NAV_GROUPS`
+ * could reach it, and `/manage/data-export` sat unclassified by `NAV_GROUPS`
  * for exactly that reason, reachable in the header and in Ctrl+K but silently
  * missing from the app's one persistent nav.
  */
@@ -102,7 +102,7 @@ export function navPlaces(): NavEntry[] {
             keywords: ['home', 'start', 'dashboard', 'overview'],
             // HOME_ROUTE, not the literal: it is the single definition of where
             // a signed-in session belongs, and this entry was the one place that
-            // still spelled it out — so changing it would have moved the
+            // still spelled it out, so changing it would have moved the
             // post-login redirect while leaving the Home link pointing at the
             // old page.
             to: HOME_ROUTE,
@@ -111,12 +111,12 @@ export function navPlaces(): NavEntry[] {
         {
             id: 'schedule',
             label: 'Schedule',
-            description: 'The week grid — see, select and move sessions.',
+            description: 'The week grid: see, select and move sessions.',
             icon: 'material-symbols:calendar-view-week-outline',
             section: 'schedule',
             keywords: ['schedule', 'timetable', 'grid', 'week', 'calendar', 'sessions'],
             /*
-             * EITHER read key — see `schedulePermissions.ts`, which the route
+             * EITHER read key: see `schedulePermissions.ts`, which the route
              * middleware reads too, so the link and the destination cannot
              * disagree. It was six permissions, all required, until the page
              * stopped assembling the institution's directory in order to draw
@@ -148,7 +148,7 @@ export function navPlaces(): NavEntry[] {
              * It was `session.read`, which is how "anybody who may look at a
              * timetable" came to be offered every solver proposal this tenant had
              * ever produced. A Generation is PROPOSED placements, not the applied
-             * ones — a different data set, and now a different key.
+             * ones: a different data set, and now a different key.
              */
             permission: 'generation.read',
             to: '/schedule/proposals',
@@ -162,7 +162,7 @@ export function navPlaces(): NavEntry[] {
             keywords: ['my', 'me', 'self', 'own', 'settings', 'availability', 'preferences'],
             /*
              * IN THE HEADER, gated on ANY of the section's own keys
-             * (`MY_HUB_PERMISSIONS`) — not one hardcoded permission. Without
+             * (`MY_HUB_PERMISSIONS`), not one hardcoded permission. Without
              * this entry the section was unreachable by clicking: `ViewMenu`
              * renders only entries carrying `inHeader`, and its sub-pages
              * deliberately do not.
@@ -174,12 +174,12 @@ export function navPlaces(): NavEntry[] {
              * and `/my/teaching-pattern` (`offering.set_scheduling_pattern`)
              * joined later without this entry changing, so a lecturer holding
              * only one of THOSE two keys never saw "My settings" in the
-             * header at all — correctly gated pages, unreachable navigation.
+             * header at all: correctly gated pages, unreachable navigation.
              * `MY_HUB_PERMISSIONS` is the any-of set of every sub-page's key,
              * shared with `middleware/my.ts` so hub and pages cannot drift
              * apart again the same way.
              *
-             * Unlike `manage`, this hub DOES name a permission — "may use at
+             * Unlike `manage`, this hub DOES name a permission: "may use at
              * least one section" is expressible here because the section is
              * four pages, not an open-ended entity list.
              */
@@ -196,8 +196,8 @@ export function navPlaces(): NavEntry[] {
             keywords: ['availability', 'unavailable', 'veto', 'blackout', 'absence', 'busy', 'my'],
             /*
              * ONE permission, and deliberately not the six-permission shape
-             * `/schedule` needs. Everything this page renders — the grid, the
-             * block times, the person's own rows — travels in the response of
+             * `/schedule` needs. Everything this page renders (the grid, the
+             * block times, the person's own rows) travels in the response of
              * the single endpoint behind this key, precisely so the link cannot
              * lead somewhere that then 403s on a reference fetch. Read from
              * `MY_SECTION_PERMISSIONS`, the same map `middleware/my.ts` reads,
@@ -218,10 +218,10 @@ export function navPlaces(): NavEntry[] {
              * (issue #108): its own requests and `GET
              * /api/me/exam-requests/context` (offerings led, exam kinds,
              * grids, terms, calendar periods) are both gated on
-             * `exam.request_own` alone — replacing four generic CRUD reads
+             * `exam.request_own` alone, replacing four generic CRUD reads
              * that each needed a wider `<resource>.read` a lecturer holding
              * only this key would not have held. `exam.request_own` is the
-             * section's authority — "may I ask for an exam" — and gating on
+             * section's authority ("may I ask for an exam"), and gating on
              * anything wider would hide the page from the people it is for.
              */
             permission: MY_SECTION_PERMISSIONS['/my/exams'],
@@ -240,14 +240,14 @@ export function navPlaces(): NavEntry[] {
         {
             id: 'my.teaching-pattern',
             label: 'My teaching pattern',
-            description: 'How each module you lead is placed — spread across the term, or kept together.',
+            description: 'How each module you lead is placed: spread across the term, or kept together.',
             icon: 'material-symbols:calendar-view-week-outline',
             section: 'my',
             keywords: ['pattern', 'block', 'distributed', 'spread', 'module', 'offering', 'teaching', 'my'],
             /*
              * Same shape as `my.exams`: one key names the section's authority
              * ("may I set my own module's pattern"), and the page's other
-             * fetch — the list of modules to choose from — is scoped to the
+             * fetch (the list of modules to choose from) is scoped to the
              * SAME key server-side (`GET /api/me/offerings`), so there is no
              * wider permission for this gate to under-name. Read from
              * `MY_SECTION_PERMISSIONS`, matching `middleware/my.ts`.
@@ -258,11 +258,11 @@ export function navPlaces(): NavEntry[] {
         {
             id: 'my.account',
             label: 'My account',
-            description: 'Your own display locale — dates and numbers, not UI language.',
+            description: 'Your own display locale: dates and numbers, not UI language.',
             icon: 'material-symbols:translate',
             section: 'my',
             keywords: ['locale', 'language', 'date', 'format', 'account', 'my'],
-            // Deliberately NO permission — anyone signed in may set their own
+            // Deliberately NO permission: anyone signed in may set their own
             // locale, unlike every other `/my` entry which needs
             // `availability.manage_own`. Reachability still inherits the hub's
             // own gate (the `my` entry above) until that is revisited on its
@@ -272,12 +272,12 @@ export function navPlaces(): NavEntry[] {
         {
             /*
              * MOVED from `/manage/external-references` (issue #115), and now
-             * permission-gated where it previously carried none — see
+             * permission-gated where it previously carried none; see
              * `ics_link.generate_own`/`ics_link.generate`'s own comments in
              * shared/permissions.ts for why. Self-service over the caller's
              * own data (or, with the wider key, over Groups they may target),
              * never institution data, so `section: 'my'` alongside
-             * availability/exams/preferences is the right home — it was
+             * availability/exams/preferences is the right home. It was
              * filed under Management only because it started out
              * permission-less and self-service pages had nowhere else to go.
              */
@@ -296,7 +296,7 @@ export function navPlaces(): NavEntry[] {
         {
             id: 'manage.display',
             label: 'Display',
-            description: 'How the schedule is drawn — colour sources, online marking, fallbacks.',
+            description: 'How the schedule is drawn: colour sources, online marking, fallbacks.',
             icon: 'material-symbols:palette-outline',
             section: 'manage',
             keywords: ['display', 'colour', 'color', 'theme', 'highlight', 'online', 'appearance', 'palette'],
@@ -304,14 +304,14 @@ export function navPlaces(): NavEntry[] {
              * `tenant.read`, and NOT the endpoint's own gate.
              *
              * This entry used to be `session.read` on the reasoning that the page
-             * explains why your schedule looks the way it does — which put an
+             * explains why your schedule looks the way it does, which put an
              * institution's settings in the navigation of everybody who can see a
              * timetable, next to Proposals, which had the same problem. Settings
              * are the institution's, so the key is the institution's.
              *
              * `GET /api/display-settings` still accepts `session.read` as well,
              * deliberately: the schedule needs the COLOURS to draw. The endpoint
-             * being wider than the link is the point, not an oversight — see that
+             * being wider than the link is the point, not an oversight; see that
              * route's own note.
              */
             permission: 'tenant.read',
@@ -328,7 +328,7 @@ export function navPlaces(): NavEntry[] {
             // same reason: this is the institution's setting, so the nav gate
             // is the institution's permission, not the wider write gate the
             // page itself additionally requires (`tenant.update` AND
-            // `person_access_role.assign` — see `/api/auth-settings`).
+            // `person_access_role.assign`; see `/api/auth-settings`).
             permission: 'tenant.read',
             to: '/manage/access-defaults',
         },
@@ -340,7 +340,7 @@ export function navPlaces(): NavEntry[] {
             section: 'manage',
             keywords: ['export', 'download', 'gdpr', 'data', 'backup', 'right to access', 'portability'],
             // The page's own gate, unlike `manage.display`/`manage.access-defaults`
-            // above: there is no wider "look" permission this splits from — reading
+            // above: there is no wider "look" permission this splits from; reading
             // and downloading are the same action here.
             permission: 'tenant.export',
             to: '/manage/data-export',
@@ -353,7 +353,7 @@ export function navPlaces(): NavEntry[] {
             section: 'manage',
             keywords: ['phase', 'progression', 'advance', 'curriculum', 'plan', 'semester', 'promote', 'cohort'],
             // The same key `ManageGroupApplyPlan.vue`'s single-Group "Advance"
-            // button already needs — this is the bulk form of the identical
+            // button already needs. This is the bulk form of the identical
             // action, so it needs no wider authority than that one does.
             permission: 'offering_plan.apply',
             to: '/manage/curriculum-progression',
@@ -368,7 +368,7 @@ export function navPlaces(): NavEntry[] {
             /*
              * `exam.review` and not `exam.request_own`. A page whose only
              * actions are approve and reject is not worth offering to somebody
-             * who can do neither — the same reasoning the unavailability review
+             * who can do neither; the same reasoning the unavailability review
              * entry below gives for gating on the narrower key.
              */
             permission: 'exam.review',
@@ -385,7 +385,7 @@ export function navPlaces(): NavEntry[] {
              * Read needs either administration key; DECIDING needs manage_any.
              * The nav gates on the narrower one because a page whose only
              * actions are approve and reject is not worth offering to somebody
-             * who can do neither — the overview below is where `read_any`
+             * who can do neither. The overview below is where `read_any`
              * belongs.
              */
             permission: 'availability.manage_any',
@@ -399,7 +399,7 @@ export function navPlaces(): NavEntry[] {
             section: 'manage',
             keywords: ['preferences', 'preferred days', 'mornings', 'staff', 'lecturer'],
             /*
-             * `read_any` is enough to reach this page — viewing who prefers what
+             * `read_any` is enough to reach this page: viewing who prefers what
              * without being able to change it is the whole reason that key
              * exists as its own grant rather than being implied by manage_any.
              * The page itself renders read-only without manage_any.

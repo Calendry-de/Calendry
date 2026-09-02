@@ -6,7 +6,7 @@
             role="alert"
         >
             Showing {{ list.rows.value.length }} of {{ list.total.value }} rules. This view needs the
-            whole set to group them correctly — raise <code>listPageSize</code> for constraints.
+            whole set to group them correctly, so raise <code>listPageSize</code> for constraints.
         </p>
 
         <p
@@ -36,10 +36,10 @@
         <!--
             SEVERITY IS NOW A FILTER, NOT THE GROUPING.
 
-            Grouping by category (what a rule is ABOUT — days, rooms, exams…) means
+            Grouping by category (what a rule is ABOUT: days, rooms, exams…) means
             a section can hold both hard and soft rules, so each row carries its own
             severity badge (`ManageConstraintRow`) and this bar narrows which
-            severities show, across every category at once — never fewer than one,
+            severities show, across every category at once, never fewer than one,
             since there is no other way back to the rest of the list from here.
         -->
         <div
@@ -73,7 +73,7 @@
             ONE `<details>` PER CATEGORY, native rather than a hand-rolled
             disclosure: it is keyboard- and screen-reader-operable for free, and
             `open` needs no state here for the same reason `open` on a row is local
-            to that row — nothing outside a section acts on whether it is expanded.
+            to that row: nothing outside a section acts on whether it is expanded.
         -->
         <details
             v-for="group in categoryGroups"
@@ -125,7 +125,7 @@
             </ul>
 
             <!--
-                SUPERSEDED RULES — a subsection, never interleaved above.
+                SUPERSEDED RULES: a subsection, never interleaved above.
 
                 Only rendered when the tenant actually HOLDS such a row. These
                 are rules whose type has been replaced: they still apply while
@@ -160,7 +160,7 @@
         </details>
 
         <!--
-            ADDITIONAL RULES — every non-default instance, in one place.
+            ADDITIONAL RULES: every non-default instance, in one place.
 
             These are NOT listed again under their base rule's row. A variant is
             only meaningful relative to the rule it qualifies, so showing it in
@@ -183,7 +183,7 @@
                         <span class="cgrid_count">{{ variants.length }}</span>
                     </h2>
                     <p>
-                        Extra instances of a rule, each narrowed to particular session kinds — a
+                        Extra instances of a rule, each narrowed to particular session kinds: a
                         different weight for seminars than for lectures, say. The tenant-wide
                         version above still applies everywhere these do not.
                     </p>
@@ -200,7 +200,7 @@
                 >
                     <!--
                         A GROUP OF ONE renders exactly as an ungrouped variant always
-                        has — issue #103 asks that grouping only kick in where it
+                        has. Issue #103 asks that grouping only kick in where it
                         actually saves scrolling, never as a pointless wrapper around
                         a config nothing else shares.
                     -->
@@ -213,7 +213,7 @@
                         :kinds="kinds"
                         :row="group.row"
                         :scope-required="true"
-                        :subtitle="`${group.type.label} — narrowed from the tenant-wide rule.`"
+                        :subtitle="`${group.type.label}: narrowed from the tenant-wide rule.`"
                         :type="group.type"
                         @update:enabled="setEnabled(group.row, $event)"
                         @update:param="setParam(group.row, $event.key, $event.value)"
@@ -295,7 +295,7 @@ import { groupConstraintVariants } from '~/utils/constraintGrouping';
  * The constraint list, as a configuration surface rather than a table of rows.
  *
  * BESPOKE because the generic list answers "which rows exist?", and for
- * constraints the catalogue is fixed with one default row per type per tenant —
+ * constraints the catalogue is fixed with one default row per type per tenant,
  * so the interesting state is which are ON and how they are tuned. A table with
  * an "Add" button framed thirteen switches as a collection you populate, which
  * is how tenants ended up with types silently unevaluated.
@@ -318,7 +318,7 @@ const props = defineProps<{
 }>();
 
 // Declared so the page's v-model bindings resolve; this view has no pagination
-// or search of its own — the set is thirteen rows and always complete.
+// or search of its own: the set is thirteen rows and always complete.
 defineModel<string>('search', { required: true });
 defineModel<number>('page', { required: true });
 
@@ -336,7 +336,7 @@ const busy = ref(new Set<string>());
 const error = ref<string | null>(null);
 
 /**
- * Both severities visible by default — the filter narrows, it never starts
+ * Both severities visible by default; the filter narrows, it never starts
  * narrowed. Never allowed to reach zero: an empty filter would hide every
  * rule with no control left on screen to widen it back.
  */
@@ -368,7 +368,7 @@ const defaultByType = computed(() => new Map(
  * Paired rather than passed bare, because the row component renders from the
  * TYPE (severity, description, parameter list) and a variant that named a type
  * outside the catalogue would otherwise render an empty shell. One that does is
- * dropped here and reported by `unknownTypeRows` instead — the same
+ * dropped here and reported by `unknownTypeRows` instead, the same
  * report-never-omit rule the missing-type alarm follows.
  */
 const allVariants = computed(() => rows.value
@@ -391,8 +391,8 @@ const variants = computed(() => allVariants.value
 /**
  * Issue #103: variants sharing the exact same type/severity/weight/params/
  * enabled state, collapsed to one entry each. Computed from `variants`
- * alone — the whole set the grid already holds (see `listPageSize` on
- * `CONSTRAINT_ENTITY`) — so this needs no fetch of its own and reflects
+ * alone, the whole set the grid already holds (see `listPageSize` on
+ * `CONSTRAINT_ENTITY`), so this needs no fetch of its own and reflects
  * every edit immediately, the same as everything else on this page.
  */
 const variantGroups = computed(() => groupConstraintVariants(variants.value));
@@ -411,7 +411,7 @@ const kindsData = useAsyncData(
     () => kindRequest<{ rows: { id: string; name: string }[] }>('/api/session-kinds', {
         query: { limit: 200 },
     }),
-    // A failed fetch degrades to ids rather than blanking the row — the 6c rule.
+    // A failed fetch degrades to ids rather than blanking the row: the 6c rule.
     { default: () => ({ rows: [] as { id: string; name: string }[] }) },
 );
 
@@ -441,8 +441,8 @@ const missingTypes = computed(() => defaultConstraintTypes()
 /**
  * Rows naming a type the catalogue does not describe.
  *
- * Such a row cannot be rendered — there is no severity, description or
- * parameter list to render it FROM — but it is still stored, still enabled and
+ * Such a row cannot be rendered: there is no severity, description or
+ * parameter list to render it FROM, but it is still stored, still enabled and
  * still read by `assembleSolverInput`, which skips it with its own reason. So
  * it is reported here rather than dropped silently: a rule nobody can see is
  * how `no_double_booking_person` stayed missing for a whole stage.
@@ -465,7 +465,7 @@ interface Entry { type: ConstraintTypeDef; row: ConstraintRow }
  * `/api/constraints` returned 14 rows and the page rendered 13, while the rule was
  * still enabled and still being sent to the solver.
  *
- * A deprecated type with NO row stays hidden — show what a tenant HAS, never invite
+ * A deprecated type with NO row stays hidden: show what a tenant HAS, never invite
  * them to adopt what is superseded.
  */
 function entriesForCategory(category: ConstraintCategory, deprecated: boolean): Entry[] {
@@ -502,8 +502,8 @@ function supersededBy(type: ConstraintTypeDef): string {
 
 /**
  * One collapsible section per category, in `CONSTRAINT_CATEGORY_ORDER`.
- * A category with nothing to show — every type filtered out by severity, or
- * (in principle) none defined yet — is dropped rather than rendered empty.
+ * A category with nothing to show, whether every type filtered out by severity or
+ * (in principle) none defined yet, is dropped rather than rendered empty.
  */
 const categoryGroups = computed(() => CONSTRAINT_CATEGORY_ORDER
     .map((category) => {
@@ -524,7 +524,7 @@ const categoryGroups = computed(() => CONSTRAINT_CATEGORY_ORDER
  *
  * Deliberately not a form with a Save button. Each row is an independent rule
  * and there is no state spanning them, so a single Save would make thirteen
- * unrelated edits succeed or fail together — the same objection the relations
+ * unrelated edits succeed or fail together, the same objection the relations
  * panel already records for PUT-set sub-resources.
  */
 async function patch(row: ConstraintRow, body: Record<string, unknown>) {
@@ -572,12 +572,12 @@ const setParam = (row: ConstraintRow, key: string, value: unknown) =>
     patch(row, { params: { ...(row.params ?? {}), [key]: value } });
 
 /**
- * The whole scope set, replaced wholesale — `writeChildren` deletes and
+ * The whole scope set, replaced wholesale: `writeChildren` deletes and
  * recreates, so a partial list would silently drop the kinds it omits.
  *
  * Clearing a DEFAULT row's scopes is legal and widens it back to tenant-wide.
  * Clearing a VARIANT's is refused by `constraintBeforeUpdate` with a 422, which
- * lands in `error` below — the row warns first, but the server is the authority.
+ * lands in `error` below; the row warns first, but the server is the authority.
  */
 const setScopes = (row: ConstraintRow, kindIds: string[]) =>
     patch(row, { scopes: kindIds.map((kindId) => ({ kindId })) });
@@ -588,7 +588,7 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
  * COLOURS COME FROM THE GENERATED TOKEN SET, not names invented here. This block
  * used `--error-color`, `--primary-color`, `--border-color` and
  * `--text-secondary-color`; none exist. `background: var(--primary-color)` had no
- * fallback, so the declaration was invalid and resolved to `transparent` — under
+ * fallback, so the declaration was invalid and resolved to `transparent`; under
  * `color: #fff` the SOFT badge was white text on the page background, and the one
  * label distinguishing preferences from defects was unreadable.
  *
@@ -669,7 +669,7 @@ const setScopes = (row: ConstraintRow, kindIds: string[]) =>
     }
 
     /*
-     * `<details>` GIVES THE COLLAPSE FOR FREE — keyboard- and screen-reader-
+     * `<details>` GIVES THE COLLAPSE FOR FREE: keyboard- and screen-reader-
      * operable with no JS state to own here, matching why a row's own
      * disclosure (`ManageConstraintRow`) is a plain local ref: nothing outside
      * one section acts on whether it is expanded.

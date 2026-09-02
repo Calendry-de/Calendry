@@ -2,10 +2,10 @@ import type { Tx } from './tenantDb';
 import type { XlsxSheet } from './xlsxExport';
 
 /**
- * The tenant-wide half of issue #84 — everything this institution owns, one
+ * The tenant-wide half of issue #84: everything this institution owns, one
  * sheet per entity, for a departing tenant taking a copy of their data with
  * them (or an administrator answering a Right to Access request that spans
- * more than one Person — `personExport.ts` covers exactly one).
+ * more than one Person; `personExport.ts` covers exactly one).
  *
  * DELIBERATELY FLATTER than `personExport.ts`'s bundle: that one tells a
  * human "here is everything about you" and reads accordingly; this one is a
@@ -37,7 +37,7 @@ export interface TenantExportBundle {
 }
 
 export async function buildTenantExportBundle(tx: Tx, tenantId: string): Promise<TenantExportBundle> {
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection, and concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const persons = await tx.person.findMany({
         where: { tenantId },
@@ -47,7 +47,7 @@ export async function buildTenantExportBundle(tx: Tx, tenantId: string): Promise
         },
         orderBy: { familyName: 'asc' },
     });
-    // `account`/`account_person` carry no RLS — the `person: { tenantId }`
+    // `account`/`account_person` carry no RLS: the `person: { tenantId }`
     // filter below IS the tenant boundary, the same join-based scoping
     // `accountScope()` (`server/utils/accountAdmin.ts`) uses, not a filter
     // RLS happens to also enforce.
@@ -127,7 +127,7 @@ export async function buildTenantExportBundle(tx: Tx, tenantId: string): Promise
         select: { id: true, type: true, name: true, severity: true, weight: true, isEnabled: true, isDefault: true },
         orderBy: { name: 'asc' },
     });
-    // No RLS on `audit_log` (CLAUDE.md exception 5) — explicit `tenantId`
+    // No RLS on `audit_log` (CLAUDE.md exception 5): explicit `tenantId`
     // filter is the whole boundary, matching every other read of this
     // table.
     const auditLog = await tx.auditLog.findMany({

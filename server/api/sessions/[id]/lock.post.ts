@@ -70,7 +70,7 @@ export default defineEventHandler(async (event) => {
         }
 
         /**
-         * A lock protects a PLACEMENT from the next solve (TAXONOMY.md §3) — a
+         * A lock protects a PLACEMENT from the next solve (TAXONOMY.md §3); a
          * banked Session (issue #22) has none to protect, and the next solve
          * was never going to touch it anyway (it is not sent as occupancy).
          */

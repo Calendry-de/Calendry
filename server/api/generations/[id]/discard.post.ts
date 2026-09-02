@@ -8,8 +8,8 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  *
  * WHY THIS EXISTS AT ALL. Before Stage 6a a READY Generation had no ending: it
  * sat in the list forever, and the only thing that ever moved it was being
- * superseded implicitly by the next apply. That makes the list — whose entire
- * job is "what could I apply?" — accumulate proposals nobody will ever act on,
+ * superseded implicitly by the next apply. That makes the list (whose entire
+ * job is "what could I apply?") accumulate proposals nobody will ever act on,
  * with no way to tell a live candidate from an abandoned one.
  *
  * WHY `generation.apply` GUARDS IT. Discarding is not a lesser action than
@@ -21,7 +21,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  * NOTHING IS DELETED. The Generation, its `solver_meta` and its run all remain;
  * only the status changes, so "what was proposed and rejected, and when" stays
  * answerable. SUPERSEDED is the existing terminal status for a proposal that
- * will not be applied — the same one an implicit supersede uses.
+ * will not be applied, the same one an implicit supersede uses.
  */
 const bodySchema = z.object({ reason: z.string().nullish() }).optional();
 

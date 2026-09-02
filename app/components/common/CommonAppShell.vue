@@ -118,12 +118,12 @@ import { useNavGroupCollapse, useNavRail } from '~/composables/navRail';
  * The app's one signed-in frame: a persistent, grouped section list beside
  * the content. Originally `/manage`'s own shell; `/dashboard` folded its
  * separate hub page into this same frame rather than building a second,
- * competing sidebar — so this now backs every `/manage/*` page AND
+ * competing sidebar, so this now backs every `/manage/*` page AND
  * `/dashboard`, and the name says so.
  *
  * A component rather than a Nuxt layout on purpose. A layout REPLACES the
  * default one, so a shell layout would have to restate the app header, the
- * toast container and the command palette — three things that would then exist
+ * toast container and the command palette, which would then exist
  * in two places and drift. The sidebar is derived from a registry with no
  * fetching, so re-rendering it per navigation costs nothing.
  *
@@ -173,7 +173,7 @@ function onGroupToggle(label: string, event: Event) {
  */
 useHead({ bodyAttrs: { class: 'is-framed' } });
 
-// The sidebar's permanent top link IS the header's own 'home' entry — one
+// The sidebar's permanent top link IS the header's own 'home' entry: one
 // definition of where home is and what it's called, not a second copy of its
 // icon/label/target hardcoded here.
 const navEntries = useNavEntries();
@@ -287,7 +287,7 @@ const navGroups = computed(() => groupNavEntries(sections.value));
             }
 
             /*
-             * Ink on the fill, from the light base, in BOTH themes — not
+             * Ink on the fill, from the light base, in BOTH themes, not
              * `$surface0`. The teal fill does not follow the theme swap, so a
              * label that does is measured against the wrong ground in one of
              * them: `$surface0` is near-white in the light theme, which is

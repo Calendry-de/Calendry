@@ -5,13 +5,13 @@ import { RESOURCES } from '../server/utils/resources';
 import { MANAGE_ENTITIES } from '../app/utils/manageRegistry';
 
 /**
- * `Offering.requiredLecturerCount` — "Who leads it" is a CANDIDATE POOL, not
+ * `Offering.requiredLecturerCount`: "Who leads it" is a CANDIDATE POOL, not
  * a co-teaching roster.
  *
  * Before this column existed, `assembleSolverInput` sent
  * `requiredLecturerCount: offering.lecturers.length` unconditionally, which
  * makes the wire's own FIXED-assignment case (`candidate_lecturer_ids.len()
- * == required_lecturer_count`) true for every Offering, always — attaching
+ * == required_lecturer_count`) true for every Offering, always: attaching
  * two eligible lecturers forced both onto every generated Session together.
  * See DECISIONS.md § "Lecturer candidate pools: `requiredLecturerCount`
  * decouples eligibility from assignment".
@@ -67,7 +67,7 @@ describe('what reaches the wire', () => {
         expect(offering.requiredLecturerCount).toBe(1);
     });
 
-    it('two attached lecturers, unset count: both are candidates, only one is required — the fix', async () => {
+    it('two attached lecturers, unset count: both are candidates, only one is required (the fix)', async () => {
         await attachLecturers([f.personA, f.personViewerA]);
 
         const offering = await sentOffering();
@@ -76,7 +76,7 @@ describe('what reaches the wire', () => {
         expect(offering.requiredLecturerCount).toBe(1);
     });
 
-    it('no attached lecturers, unset count: requires none — unchanged from before this column existed', async () => {
+    it('no attached lecturers, unset count: requires none (unchanged from before this column existed)', async () => {
         const offering = await sentOffering();
 
         expect(offering.candidateLecturerIds).toEqual([]);
@@ -121,7 +121,7 @@ describe('a demand the pool cannot meet', () => {
 
 describe('the write schema', () => {
     /**
-     * BOTH SCHEMAS — see `offering-required-rooms.test.ts` for why: `offerings`
+     * BOTH SCHEMAS: see `offering-required-rooms.test.ts` for why. `offerings`
      * declares `create` and `update` separately, so a bound present on one and
      * absent on the other is a hole nothing else would report.
      */
@@ -134,7 +134,7 @@ describe('the write schema', () => {
         ? { termId: 'a', kindId: 'b', title: 'T', requiredLecturerCount: value }
         : { requiredLecturerCount: value });
 
-    it('accepts any positive count — no solver-structural ceiling to enforce, unlike requiredRoomCount', () => {
+    it('accepts any positive count (no solver-structural ceiling to enforce, unlike requiredRoomCount)', () => {
         for (const [name, schema] of schemas) {
             expect(() => schema.parse(body(name, 5)), name).not.toThrow();
         }
@@ -146,7 +146,7 @@ describe('the write schema', () => {
         }
     });
 
-    it('accepts null — the derive-to-one state', () => {
+    it('accepts null (the derive-to-one state)', () => {
         for (const [name, schema] of schemas) {
             expect(() => schema.parse(body(name, null)), name).not.toThrow();
         }

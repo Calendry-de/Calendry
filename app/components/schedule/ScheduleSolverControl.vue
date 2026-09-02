@@ -108,7 +108,7 @@
                 <p class="solver_counters">{{ movesLabel }} · {{ elapsedLabel }}</p>
 
                 <!-- "move budget", NOT "complete": `progress` is
-                     movesEvaluated / maxMoves — budget consumed, not closeness to
+                     movesEvaluated / maxMoves, budget consumed, not closeness to
                      an answer. A converged run finishes at 3%. -->
                 <div
                     class="solver_budget"
@@ -123,7 +123,7 @@
                         :style="{ width: '100%', transform: `scaleX(${Math.min(1, budgetFraction)})` }"
                     />
                 </div>
-                <p class="solver_hint">move budget {{ Math.round(budgetFraction * 100) }}% used — {{ budgetCaption }}</p>
+                <p class="solver_hint">move budget {{ Math.round(budgetFraction * 100) }}% used, {{ budgetCaption }}</p>
 
                 <div
                     v-if="confirmCancel"
@@ -162,7 +162,7 @@
             >Review</CommonButton>
             <!--
                 Every other case says WHICH case it is. This branch used to read
-                "Discarded." for anything that was not APPLIED — including a
+                "Discarded." for anything that was not APPLIED, including a
                 status that never arrived, which is what a missing
                 `generation.read` now produces: a run that finished, a proposal
                 that exists, and a sentence claiming somebody threw it away.
@@ -224,7 +224,7 @@ const confirmCancel = ref(false);
 const maxMoves = ref(DEFAULT_MAX_MOVES);
 const maxWallSeconds = ref(DEFAULT_MAX_WALL_MILLIS / 1000);
 
-/** The Generation's CURRENT status — an applied proposal must stop inviting a decision. */
+/** The Generation's CURRENT status: an applied proposal must stop inviting a decision. */
 const generationStatus = ref<string | null>(null);
 const doneMeta = ref<{ placements?: number; hardViolations?: number } | null>(null);
 
@@ -243,7 +243,7 @@ const canReadGenerations = useHasPermission('generation.read');
  *
  * Four distinguishable facts, deliberately not collapsed: the caller may not
  * look, somebody applied it, somebody discarded it, or the status did not come
- * back. The last one is why this exists — it was previously indistinguishable
+ * back. The last one is why this exists: it was previously indistinguishable
  * from the third.
  */
 const doneHint = computed(() => {
@@ -277,7 +277,7 @@ async function startRun() {
  *
  * Exposed rather than duplicated as a second button here. The one-active-run
  * index means a repair and a rebuild can never run together, so they are not
- * peers in a toolbar — and one `useSolverRun` per Term is the whole point: a
+ * peers in a toolbar, and one `useSolverRun` per Term is the whole point: a
  * second instance would be a second poller and a second state machine over one
  * run. The violations panel calls this; the run then renders here exactly as a
  * rebuild does.
@@ -333,7 +333,7 @@ watch(() => run.value?.generationId, async (generationId) => {
 
 const objectiveLabel = computed(() => (
     run.value?.bestObjective === null || run.value?.bestObjective === undefined
-        ? 'objective —'
+        ? 'objective -'
         : `objective ${run.value.bestObjective.toLocaleString()}`
 ));
 
@@ -367,8 +367,8 @@ const budgetFraction = computed(() => run.value?.progress ?? 0);
 
 /** Names BOTH budgets, because either one can be what ends the run. */
 const budgetCaption = computed(() => {
-    const moves = run.value?.maxMoves ? compact(Number(run.value.maxMoves)) : '—';
-    const seconds = run.value?.maxWallMillis ? Math.round(run.value.maxWallMillis / 1000) : '—';
+    const moves = run.value?.maxMoves ? compact(Number(run.value.maxMoves)) : '-';
+    const seconds = run.value?.maxWallMillis ? Math.round(run.value.maxWallMillis / 1000) : '-';
 
     return `ends at ${moves} moves or ${seconds}s, whichever first`;
 });
@@ -385,8 +385,8 @@ const doneSummary = computed(() => {
 
         /*
          * "hard violation", not "issue". One quantity had four names across a
-         * single task — "issues" here, "Unresolved" on the proposals list,
-         * "violations" in the toolbar and inspector, "flagged" in the panel —
+         * single task ("issues" here, "Unresolved" on the proposals list,
+         * "violations" in the toolbar and inspector, "flagged" in the panel),
          * and `violation` is the product's own word for it (the table, the
          * permission key, TAXONOMY §3). "hard" is not jargon padding either:
          * this counts `hardViolations` only, so dropping it would report a
@@ -400,7 +400,7 @@ const doneSummary = computed(() => {
 
 const failedSummary = computed(() => {
     if (run.value?.status === 'CANCELLED') {
-        return 'Run cancelled — no proposal was produced.';
+        return 'Run cancelled: no proposal was produced.';
     }
 
     /**
@@ -410,7 +410,7 @@ const failedSummary = computed(() => {
      */
     if (run.value?.status === 'SUCCEEDED') {
         return 'The run succeeded, but its result could not be retrieved from the solver. '
-            + 'Nothing was lost from the schedule — run it again to get a proposal.';
+            + 'Nothing was lost from the schedule; run it again to get a proposal.';
     }
 
     return run.value?.errorDetail || 'The run failed.';
@@ -437,7 +437,7 @@ const failedSummary = computed(() => {
     }
 
     /*
-     * THE TWO ANCHORED PANELS — the budget disclosure and the live report. In flow
+     * THE TWO ANCHORED PANELS: the budget disclosure and the live report. In flow
      * they changed the toolbar's height (by ~120px and from 142px to 321px); a
      * control bar's height is page structure, a disclosure and a progress report
      * are transient content.
@@ -612,7 +612,7 @@ const failedSummary = computed(() => {
     /*
      * Server-supplied and unbounded: in flow, one long message wrapped to three
      * lines and took the bar with it. Stacks below the panels rather than beside
-     * them — if both are visible, the error is the one that must not be hidden.
+     * them: if both are visible, the error is the one that must not be hidden.
      */
     &_error {
         position: absolute;

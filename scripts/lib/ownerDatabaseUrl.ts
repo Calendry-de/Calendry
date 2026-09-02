@@ -14,14 +14,14 @@ import { existsSync } from 'node:fs';
  * Choosing between them cannot be left to "whichever is set": bun auto-loads
  * `.env`, and the app container bind-mounts the repo, so BOTH variables are
  * present inside the container. Preferring the host URL unconditionally makes
- * in-container runs (the entrypoints) connect to `localhost` — which inside a
+ * in-container runs (the entrypoints) connect to `localhost`, which inside a
  * container is the container itself.
  *
  * `/.dockerenv` is the signal: it exists in containers and not on the host.
  *
  * Owner, not the runtime role, in every case. Migrations, provisioning and
  * reference seeding all write things the app role is deliberately forbidden to
- * touch — the `permission` catalogue, for instance, carries a SELECT-only RLS
+ * touch: the `permission` catalogue, for instance, carries a SELECT-only RLS
  * policy, so an app-role INSERT is rejected outright.
  */
 function resolve(internalVar: string, hostVar: string, label: string): string {
@@ -51,8 +51,8 @@ export function resolveOwnerDatabaseUrl(): string {
  * Provisioning needs the owner because a `tenant` row cannot be inserted under
  * a policy keyed to a tenant that does not exist yet. Password reset does not:
  * `account`, `account_person` and `auth_session` are the pre-tenant plane with
- * no RLS, and the one tenant-scoped thing a reset must read — which tenants an
- * account spans — comes from `calendry_internal.account_identities()`, which
+ * no RLS, and the one tenant-scoped thing a reset must read (which tenants an
+ * account spans) comes from `calendry_internal.account_identities()`, which
  * the app role may execute. Verified empirically, not assumed.
  *
  * Using the owner anyway would mean an operator needs credentials that can drop

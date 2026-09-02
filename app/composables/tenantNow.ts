@@ -11,7 +11,7 @@ import type { TenantLocalNow } from '#shared/academicCalendar';
  * instead of mounting this. Either way it is the SAME function
  * `computeReferenceSlot` uses server-side (`shared/academicCalendar.ts`), so
  * the client's idea of "today"/"now" cannot disagree with the solver's or
- * drift into the viewer's own browser timezone — CLAUDE.md: timezone is
+ * drift into the viewer's own browser timezone. CLAUDE.md: timezone is
  * per-Person and DISPLAY-ONLY, and grid resolution is always tenant-local.
  *
  * Re-evaluated on an interval rather than once, so a mounted indicator moves
@@ -20,7 +20,7 @@ import type { TenantLocalNow } from '#shared/academicCalendar';
  * anything finer would be precision the drawing cannot show.
  */
 export function useTenantNow(timeZone: Ref<string>, intervalMs = 60_000): Ref<TenantLocalNow> {
-    // Computed at creation time too — this runs during SSR, where `onMounted`
+    // Computed at creation time too: this runs during SSR, where `onMounted`
     // never fires, so the first render already shows a real instant rather
     // than a placeholder that jumps once hydration's interval starts ticking.
     const now = ref<TenantLocalNow>(localNow(new Date(), timeZone.value)) as Ref<TenantLocalNow>;

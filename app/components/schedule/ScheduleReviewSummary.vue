@@ -4,7 +4,7 @@
             THE RISK LINE.
 
             This was a tinted panel holding a 32px numeral, a note, a type list
-            and a reassurance — four elements of chrome to say "nothing is
+            and a reassurance: four elements of chrome to say "nothing is
             wrong", and on a clean proposal the largest thing on the page was a
             `0`. The panel is gone. A clean result is one sentence; a breach gets
             the weight, because a breach is the only thing here that should stop
@@ -68,14 +68,14 @@
             `current` comes from this app's evaluator, which fills
             constraint_violation from the STRUCTURAL double-booking rules only,
             while `proposed` is the solver reporting across all 14 constraint
-            types. Measured on the same timetable they disagree — the solver
+            types. Measured on the same timetable they disagree: the solver
             reported 23 where this evaluator then found 41.
 
             THE OLD LAYOUT DEFEATED THAT ARGUMENT TWICE. First as two symmetric
             cards, where adjacency plus symmetry IS an arrow. Then as a `3fr/2fr`
             grid whose second column was described in the code as "a footing
             line" and rendered, at 1440, as a stranded aside six hundred pixels
-            from the panel it was meant to foot — a reviewer circled it and
+            from the panel it was meant to foot; a reviewer circled it and
             asked what it was.
 
             A caveat cannot strand if it is inside the same sentence as the fact
@@ -85,8 +85,8 @@
         <p class="rev_compare">
             Separately, Calendry's own {{ structuralRuleCount }} structural checks find
             <strong>{{ violations.current.hard }}</strong>
-            issue{{ violations.current.hard === 1 ? '' : 's' }} on the live schedule — a
-            different rule set, so the two counts are not a like-for-like difference.<template v-if="decidable"> They re-run after applying.</template>
+            issue{{ violations.current.hard === 1 ? '' : 's' }} on the live schedule (a
+            different rule set), so the two counts are not a like-for-like difference.<template v-if="decidable"> They re-run after applying.</template>
         </p>
 
         </div>
@@ -109,7 +109,7 @@
                 A run that answers fewer placements than it was asked for looks
                 identical to a complete one in every count on this page: the
                 missing Sessions simply appear as deletions, and "11 removed"
-                reads as a decision the solver made. It is not one — it is an
+                reads as a decision the solver made. It is not one: it is an
                 answer with holes in it, and the apply now refuses to delete on
                 it. That refusal has to be visible, or the page has quietly
                 corrected something the reviewer would want to know about.
@@ -126,7 +126,7 @@
                     offering{{ demandShort.shortOfferings === 1 ? '' : 's' }}.
                     <template v-if="withheld">
                         {{ withheld }} existing session{{ withheld === 1 ? '' : 's' }}
-                        {{ withheld === 1 ? 'is' : 'are' }} being kept rather than removed —
+                        {{ withheld === 1 ? 'is' : 'are' }} being kept rather than removed:
                         the run said nothing about {{ withheld === 1 ? 'it' : 'them' }}, which
                         is not the same as refusing to place {{ withheld === 1 ? 'it' : 'them' }}.
                     </template>
@@ -135,7 +135,7 @@
 
             <!--
                 Older runs recorded nothing about what they asked for, so the
-                check above cannot run at all. Said only when it MATTERS — a
+                check above cannot run at all. Said only when it MATTERS: a
                 proposal with no deletions rests on nothing, so warning about it
                 would be noise on every historical proposal in the list.
             -->
@@ -175,8 +175,8 @@
             </div>
 
             <!--
-                The objective is a RELATIVE score with no absolute scale — two
-                proposals for the same term measured 430 and 33,955 — so it is
+                The objective is a RELATIVE score with no absolute scale: two
+                proposals for the same term measured 430 and 33,955, so it is
                 said as a comparable quantity and pointed at the one place a
                 comparison exists.
             -->
@@ -186,8 +186,8 @@
             >
                 <dt>Score</dt>
                 <dd>
-                    {{ run.objective.toLocaleString() }} — lower is better, and only
-                    comparable with other proposals for the same term.
+                    {{ run.objective.toLocaleString() }} (lower is better, and only
+                    comparable with other proposals for the same term).
                     <NuxtLink
                         class="rev_link"
                         to="/schedule/proposals"
@@ -228,7 +228,7 @@ const props = defineProps<{
  * `shortOfferings > 0` is the test rather than `returned < required`: the
  * per-Offering count is what the plan actually withholds deletes on, so a
  * summary that spoke from the totals could claim a shortfall the plan did not
- * act on — two readings of the same run that disagree in front of the reviewer.
+ * act on: two readings of the same run that disagree in front of the reviewer.
  */
 const demandShort = computed(() => {
     const demand = props.demand;
@@ -239,7 +239,7 @@ const demandShort = computed(() => {
 const withheld = computed(() => props.plan.deletesWithheld ?? 0);
 
 /**
- * A run with no ledger that nonetheless proposes removals — the case this check
+ * A run with no ledger that nonetheless proposes removals: the case this check
  * exists for, arriving from before the check existed. Absent `demand` counts as
  * unverified: an older payload has no field, and reading that as "verified"
  * would restore exactly the silent assumption being removed.
@@ -248,7 +248,7 @@ const unverifiedDeletes = computed(() => !props.demand?.verified && props.plan.d
 
 /**
  * Derived, not written out. This label read "3 structural rules" for the whole
- * of Stage 7 after `no_double_booking_person` made it four — a user-facing
+ * of Stage 7 after `no_double_booking_person` made it four, a user-facing
  * count stating the wrong number, which nothing checks. Binding it to the
  * catalogue is what stops that recurring.
  */
@@ -324,7 +324,7 @@ const locatable = computed(() => (
      * lets this proposal be applied at all.
      *
      * `$surface2`, not `$surface1`. Panels here were `$surface1` on a `$surface1`
-     * body — the same value in both themes, so every card on this page rendered
+     * body, the same value in both themes, so every card on this page rendered
      * invisible and the composition existed only in the source. Fixed at page
      * scope; the token roles in DESIGN.md that made it possible are their own
      * change.

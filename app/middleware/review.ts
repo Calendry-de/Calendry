@@ -1,8 +1,8 @@
 import { useSession } from '~/composables/session';
 
 /**
- * Guards the two proposal routes — `/schedule/proposals` and
- * `/schedule/review/:id` — on the one permission they actually need.
+ * Guards the two proposal routes, `/schedule/proposals` and
+ * `/schedule/review/:id`, on the one permission they actually need.
  *
  * WHY NOT THE `schedule` MIDDLEWARE
  *
@@ -18,8 +18,8 @@ import { useSession } from '~/composables/session';
  *
  * It was `session.read` until the navigation made the consequence visible:
  * everybody who could look at a timetable was offered "Proposals" and could read
- * every solver run. A Generation is a set of PROPOSED placements — not the
- * applied timetable — so reviewing one is its own authority. `session.read` is
+ * every solver run. A Generation is a set of PROPOSED placements, not the
+ * applied timetable, so reviewing one is its own authority. `session.read` is
  * deliberately not required on top: demanding authority over the live schedule to
  * read a proposal would make "may review proposals" unexpressible alone.
  *
@@ -28,13 +28,13 @@ import { useSession } from '~/composables/session';
  * It does not replace the page's error branch, it removes the common case from
  * it. Without this, a caller lacking `session.read` reached the review page,
  * the preview fetch 403'd, and the page rendered "This proposal is undefined
- * and is not awaiting a decision." — a permission problem stated as a fact
+ * and is not awaiting a decision.", a permission problem stated as a fact
  * about the proposal. The page now branches on the load error too, because
  * middleware is convenience and a 403 can still arrive (a permission revoked
  * mid-session, a stale client bundle); this makes the denial arrive as a denial
  * on the first visit rather than as a sentence about the data.
  *
- * Convenience, not enforcement — same as the schedule and manage middlewares.
+ * Convenience, not enforcement: same as the schedule and manage middlewares.
  * Every API route re-checks inside its own tenant transaction.
  */
 export default defineNuxtRouteMiddleware(() => {

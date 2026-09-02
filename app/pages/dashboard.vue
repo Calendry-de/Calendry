@@ -44,7 +44,7 @@
 
         <!--
             GROUPED BY `groupNavEntries`, the same helper the sidebar reads.
-            This was one flat `auto-fill` grid of 24 undifferentiated cards —
+            This was one flat `auto-fill` grid of 24 undifferentiated cards:
             every destination the same size, the same weight and in no order a
             reader could name, sitting beside a sidebar that grouped the very
             same routes under headings. The taxonomy already existed; the more
@@ -52,7 +52,7 @@
 
             No card containers. The old ones were `$surface1` with a
             transparent border on a `$surface1` page ground, so they had no
-            visible edge at rest at all — boxes in name only. Proximity and
+            visible edge at rest at all: boxes in name only. Proximity and
             the label register do the grouping now, which is what the sidebar
             beside them already does.
         -->
@@ -115,7 +115,7 @@
             Reachable state, not a dead end: a person with a session but no
             management read permission lands here, and is told which fact is
             true rather than shown an empty grid that could equally mean the
-            page failed to load. Scoped to just this list — the sidebar may
+            page failed to load. Scoped to just this list: the sidebar may
             still offer Schedule/My settings links even when nobody has
             granted this person a management permission.
         -->
@@ -147,7 +147,7 @@ useHead({ title: 'Home' });
 
 const session = useSession();
 
-// The manage-entities overview — what `/manage/index.vue` used to render on
+// The manage-entities overview: what `/manage/index.vue` used to render on
 // its own separate hub page. Schedule and My settings are one click away in
 // CommonAppShell's sidebar already, so this list is deliberately scoped to
 // just the entities, the one group numerous and varied enough to earn a
@@ -175,13 +175,13 @@ const greeting = computed(() => {
 
 // Shared between the two actions below: only one of them is ever reachable at
 // a time (the buttons this guards render side by side), and both leave the
-// page — there is nothing to distinguish per-button.
+// page, so there is nothing to distinguish per-button.
 const busy = ref(false);
 const actionError = ref('');
 
 /**
  * Switching goes back through the login page's selection step rather than
- * duplicating that UI here — the server treats a switch as a session mutation,
+ * duplicating that UI here: the server treats a switch as a session mutation,
  * so no re-authentication is needed, only a new choice.
  */
 async function switchTenant() {
@@ -200,7 +200,7 @@ async function switchTenant() {
 }
 
 /**
- * `logout()` hits the network before it clears local state — same guard shape
+ * `logout()` hits the network before it clears local state, same guard shape
  * as login.vue's actions, so a slow or offline request cannot be fired twice
  * from one impatient click and a failure leaves a visible message rather than
  * silently doing nothing.
@@ -216,7 +216,7 @@ async function signOut() {
     try {
         await logout();
     } catch {
-        actionError.value = 'Could not sign out — check your connection and try again.';
+        actionError.value = 'Could not sign out. Check your connection and try again.';
     } finally {
         busy.value = false;
     }
@@ -447,7 +447,7 @@ async function signOut() {
 
 /*
  * The site-wide rule in layout.scss zeroes every transition/animation
- * DURATION under reduced motion, but not `animation-delay` — left alone, a
+ * DURATION under reduced motion, but not `animation-delay`. Left alone, a
  * reduced-motion visitor would still wait up to 250ms staring at invisible
  * groups before they snapped into view. Zeroing the delay here is what makes
  * that wait disappear along with the motion.

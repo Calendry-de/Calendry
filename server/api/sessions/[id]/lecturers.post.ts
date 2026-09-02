@@ -58,15 +58,15 @@ defineRouteMeta({
 });
 
 /**
- * Override who leads a Session — #7 item 4, "manual per-session override".
+ * Override who leads a Session: #7 item 4, "manual per-session override".
  *
  * WHY THIS IS NOT `details.post.ts`
  *
  * That route refuses ANY edit to an Offering-linked Session's people, groups,
  * kind or title, because all four are copied from the Offering and the solver
- * on every apply — an edit there would be silently overwritten, which is worse
- * than being refused. This route exists because the card's own question —
- * "how does an override survive a re-solve" — has one answer that needs no new
+ * on every apply, and an edit there would be silently overwritten, which is worse
+ * than being refused. This route exists because the card's own question,
+ * "how does an override survive a re-solve", has one answer that needs no new
  * solver capability: a LOCKED Session is already skipped entirely by
  * `planMaterialization` (`if (current?.isLocked) continue`), on a rebuild as
  * much as a repair. So the override is safe exactly when the Session already
@@ -77,20 +77,20 @@ defineRouteMeta({
  *
  * An Event has no Offering, so it is structurally invisible to
  * `planMaterialization`'s placement loop (which iterates the solver's OWN
- * output, keyed by Offering) regardless of `isLocked` — the same reason
+ * output, keyed by Offering) regardless of `isLocked`, the same reason
  * `POST /api/sessions` exempts one from every solve without relying on the
  * lock. Requiring a lock here too would be a guard that can never fail for the
  * one case it would apply to, which this codebase treats as worse than none.
  *
- * ONLY LECTURER MEMBERSHIP IS REPLACED — never a row that is not, this moment,
+ * ONLY LECTURER MEMBERSHIP IS REPLACED, never a row that is not, this moment,
  * part of it. `session_person`'s key is `(session_id, person_id)`, ONE row per
  * person per Session with `role_id` distinguishing lecturer from plain
- * attendee, so "lecturer" and "attendee" are not two slots — a person already
+ * attendee, so "lecturer" and "attendee" are not two slots: a person already
  * attached as an ordinary attendee and named here is PROMOTED (their row's
  * `role_id` is set), not given a second row, which the primary key would
  * refuse outright. Demoted the same way in reverse: a current lecturer dropped
  * from the list has their row DELETED, matching the "remove means the join row
- * is gone" convention every other picker in this codebase already follows — if
+ * is gone" convention every other picker in this codebase already follows; if
  * they should remain attached as a plain attendee, that is a separate,
  * deliberate choice made through the People picker, not one this route infers.
  */
@@ -114,7 +114,7 @@ export default defineEventHandler(async (event) => {
             throw createError({
                 statusCode: 409,
                 statusMessage: 'This session belongs to an Offering and is not locked, so its '
-                    + 'lecturer comes from the next solve — an override here would be silently '
+                    + 'lecturer comes from the next solve, so an override here would be silently '
                     + 'discarded by the next apply. Lock the session first.',
                 data: { field: 'isLocked', offeringId: session.offeringId, isLocked: session.isLocked },
             });
@@ -155,7 +155,7 @@ export default defineEventHandler(async (event) => {
 
         await mapDbErrors(async () => {
             // DEMOTED: a lecturer not named in the new list. Deleted, not
-            // reset to a plain attendee — see the block comment above.
+            // reset to a plain attendee: see the block comment above.
             for (const personId of before.filter((id) => !afterSet.has(id))) {
                 await tx.sessionPerson.deleteMany({
                     where: { sessionId: session.id, personId, roleId: lecturerRole.id },
@@ -163,7 +163,7 @@ export default defineEventHandler(async (event) => {
             }
 
             // ADDED OR CONFIRMED: an `upsert`, because a name already present
-            // as a plain attendee (`roleId: null`) has to be PROMOTED — the
+            // as a plain attendee (`roleId: null`) has to be PROMOTED: the
             // primary key `(sessionId, personId)` refuses a second row for the
             // same pair, so `create` alone would 409 on exactly that case.
             for (const personId of after.filter((id) => !beforeSet.has(id))) {

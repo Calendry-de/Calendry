@@ -3,7 +3,7 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * The tenant-facing Account API — the LOGIN plane, which is not a Person.
+ * The tenant-facing Account API: the LOGIN plane, which is not a Person.
  *
  * Until this, creating a Person in the management area created no way for them to
  * sign in, and the only tools that could were operator CLIs which answered "a
@@ -17,7 +17,7 @@ import { api, login } from './helpers/client';
  *      nothing else. A cross-tenant id must read as 404.
  *   2. A SHARED LOGIN'S CREDENTIAL IS NOBODY'S TO TAKE. One Account can act in
  *      several tenants; letting tenant A reset its password would be
- *      cross-tenant account takeover. Refused — and the negative cases here are
+ *      cross-tenant account takeover. Refused, and the negative cases here are
  *      the only thing separating this build from one where it is not.
  *   3. AN ORPHAN IS UNREPRESENTABLE. An Account with no `account_person` row is
  *      invisible to every tenant while its password still works, so the last
@@ -141,8 +141,8 @@ describe('listing', () => {
 
     /**
      * The shared-login flag has to survive being computed inside a tenant
-     * transaction. Read through a join to `person` it would be 1 for everybody
-     * — RLS hides the other tenant's row — and every refusal downstream would
+     * transaction. Read through a join to `person` it would be 1 for everybody,
+     * since RLS hides the other tenant's row, and every refusal downstream would
      * silently stop refusing. This is the assertion that catches that.
      */
     it('counts the other institutions a shared login serves', async () => {
@@ -254,7 +254,7 @@ describe('creating a login', () => {
     /**
      * The gap this whole feature closed. An address that already has a login is
      * the ordinary case for somebody arriving from a partner institution, and the
-     * answer has to be an offer rather than a wall — carried as a FLAG, so the
+     * answer has to be an offer rather than a wall, carried as a FLAG, so the
      * form does not have to match on the sentence.
      */
     it('reports an existing address with a machine-readable flag, then attaches on consent', async () => {
@@ -457,8 +457,8 @@ describe('a login shared with another institution', () => {
     /**
      * A save that TOUCHES nothing must not be refused. The management form
      * PATCHes every field it renders on every save, so a guard keyed on presence
-     * rather than on change would make the one editable thing — who the login
-     * acts as — unreachable through the form that edits it.
+     * rather than on change would make the one editable thing (who the login
+     * acts as) unreachable through the form that edits it.
      */
     it('accepts a save that changes nothing about the credential', async () => {
         const res = await api<AccountRow>(`/api/accounts/${shared.id}`, {
@@ -506,7 +506,7 @@ describe('deleting a person who holds a login', () => {
      * this happily and leaves an Account with no identity anywhere: invisible to
      * every list, unreachable by every reset route, still holding a working
      * password. The generic delete route grew a `beforeDelete` hook for exactly
-     * this, and it has to run BEFORE the row goes — after it, the evidence is
+     * this, and it has to run BEFORE the row goes; after it, the evidence is
      * gone too.
      */
     it('is refused, naming the login', async () => {
@@ -570,7 +570,7 @@ describe('deleting a person who holds a login', () => {
  * Not element counts and not "did not 500": the failure this codebase keeps
  * meeting is a page that renders its shell over an empty state, which passes
  * every check that does not read the values. And an absence assertion is
- * paired with a positive one every time — "the reset button is not there" is
+ * paired with a positive one every time: "the reset button is not there" is
  * true of a blank page too.
  *
  * The rendered body only, with the hydration payload cut off: that JSON carries
@@ -614,7 +614,7 @@ describe('the pages', () => {
         const html = await body(`/manage/accounts/${own.id}`, cookies.adminA);
 
         expect(html).toContain(ACCOUNTS.viewerA);
-        // The value, not just the label — a static "Acts as" over an unresolved
+        // The value, not just the label: a static "Acts as" over an unresolved
         // id is exactly the render this asserts against.
         expect(html).toContain('Vic Viewer');
         expect(html).toContain('Issue a new password');
@@ -629,7 +629,7 @@ describe('the pages', () => {
 
         expect(res.status).toBe(302);
         // Not `/dashboard`: `viewerA` holds only `session.read`, not
-        // `dashboard.view` (issue #107) — `/dashboard` itself is gated on
+        // `dashboard.view` (issue #107); `/dashboard` itself is gated on
         // that key now, so a caller who never held it is routed to
         // `/schedule`, the same destination `resolveHomeRoute()` computes
         // for this role everywhere else. See issue #112's identical finding

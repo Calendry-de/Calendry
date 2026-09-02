@@ -14,21 +14,21 @@ export const SESSION_COOKIE = 'calendry_session';
 export const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 /**
- * The STAFF session cookie — issue #76, deliberately named nothing like
+ * The STAFF session cookie (issue #76), deliberately named nothing like
  * `SESSION_COOKIE` above. A tenant session and a staff session are two
  * different principals with two different security postures (see
  * `StaffIdentity` in `tenantResolver.ts`), and a name one keystroke away from
  * the other is exactly how a route ends up reading the wrong one and treating
  * a Calendry staffer as a tenant Account, or vice versa. Same TTL as a tenant
- * session for now — nothing about issue #76 asked for a different one.
+ * session for now: nothing about issue #76 asked for a different one.
  */
 export const STAFF_SESSION_COOKIE = 'calendry_staff_session';
 export const STAFF_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 
 /**
- * Maximum password age before login treats an account like a forced reset —
- * issue #13 item 1. GLOBAL, not per-tenant: an Account is tenant-independent
- * (`CLAUDE.md`, "the auth plane") — one login can act in several
+ * Maximum password age before login treats an account like a forced reset
+ * (issue #13 item 1). GLOBAL, not per-tenant: an Account is tenant-independent
+ * (`CLAUDE.md`, "the auth plane"); one login can act in several
  * institutions, so a policy attached to it cannot be one tenant's setting
  * without meaning "whichever tenant reset it last" for everyone else.
  *
@@ -36,13 +36,13 @@ export const STAFF_SESSION_TTL_MS = 1000 * 60 * 60 * 12;
  * argues AGAINST forced periodic rotation in favour of length and a
  * breach-list check, which is why item 2 (complexity rules) is explicitly
  * left undecided rather than guessed at here. This value exists because the
- * card asked for expiry specifically, not because rotation is best practice —
+ * card asked for expiry specifically, not because rotation is best practice:
  * document that tension rather than pretend it is settled.
  */
 export const MAX_PASSWORD_AGE_MS = 1000 * 60 * 60 * 24 * 90;
 
 /**
- * scrypt from node:crypto — memory-hard, and no third-party dependency for
+ * scrypt from node:crypto: memory-hard, and no third-party dependency for
  * something this security-critical. Stored as `scrypt$<salt>$<key>`, both
  * base64; the base64 alphabet contains no '$', so the format is unambiguous.
  */
@@ -71,7 +71,7 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 /**
  * Opaque bearer token. 32 random bytes, handed to the client once and never
- * stored — only its SHA-256 goes in the database, so a database read cannot be
+ * stored: only its SHA-256 goes in the database, so a database read cannot be
  * turned into session impersonation.
  *
  * SHA-256 without a work factor is correct here (unlike for passwords): the

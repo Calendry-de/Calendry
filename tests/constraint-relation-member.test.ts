@@ -3,13 +3,13 @@ import { ACCOUNTS, TEST_PASSWORD, ownerDb, seed, teardown } from './helpers/seed
 import { api, login } from './helpers/client';
 
 /**
- * `different_time` — the first RELATION-TYPE constraint (ADR-0028 in
+ * `different_time`, the first RELATION-TYPE constraint (ADR-0028 in
  * calendry-solver): its operands are an ORDERED SET OF OFFERINGS
- * (`ConstraintRelationMember`), never `ConstraintScope` — a relation's
+ * (`ConstraintRelationMember`), never `ConstraintScope`. A relation's
  * Offerings are what the rule is ABOUT, not a filter narrowing it.
  *
- * WHY AT LEAST TWO. `defaultConstraintTypes()` excludes every relation type —
- * there is no membership a seed could choose on the tenant's behalf — so
+ * WHY AT LEAST TWO. `defaultConstraintTypes()` excludes every relation type:
+ * there is no membership a seed could choose on the tenant's behalf, so
  * every row here is tenant-authored, and one naming fewer than two Offerings
  * relates nothing. `validateConstraintShape`'s `memberCount` check is what
  * these tests pin.
@@ -59,7 +59,7 @@ const create = (body: Record<string, unknown>) => api('/api/constraints', {
 /**
  * The create path's refinement issues arrive as a ZodError whose `message` is
  * a JSON-encoded issue array (`data.name === 'ZodError'`), not the plain
- * `data.issues` the update path throws directly — same two-shape distinction
+ * `data.issues` the update path throws directly, same two-shape distinction
  * `constraint-write-guard-api.test.ts` normalises.
  */
 function refinementMessages(body: unknown): string[] {
@@ -120,7 +120,7 @@ describe('different_time', () => {
 
     it('is never seeded as a default row', async () => {
         // The seed helper provisions no `different_time` row, and neither does
-        // any other tenant bootstrap path — there is no membership a default
+        // any other tenant bootstrap path, since there is no membership a default
         // could name.
         const count = await ownerDb.constraint.count({
             where: { tenantId: TENANT, type: 'different_time', isDefault: true },

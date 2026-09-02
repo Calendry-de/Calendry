@@ -7,7 +7,7 @@ import { buildAcademicCalendar } from '../server/utils/solverCalendar';
  *
  * WHY THIS FEATURE EXISTS, recorded because the failure was invisible for
  * months: `calendar_period` had a table, a Prisma model, an RLS policy, a
- * mapper and a wire field — and no way to WRITE a row. So it was empty in every
+ * mapper and a wire field, and no way to WRITE a row. So it was empty in every
  * tenant, no week was ever classified EXAM, and `minimize_exam_week_sessions`
  * sat enabled reporting zero violations while looking like it worked. Raising
  * its weight from 5 to 1000 multiplied zero by two hundred.
@@ -24,7 +24,7 @@ const kindsOf = (weeks: { kind: number }[]) => weeks.map((w) => WEEK_KIND_NAME[w
 describe('the touch-vs-cover asymmetry', () => {
     it('gives an EXAM period every week it TOUCHES, including one it barely enters', () => {
         // The case that motivated the preview. This period ends ON the Monday of
-        // week 3, so only one of that week's seven days falls inside it — and
+        // week 3, so only one of that week's seven days falls inside it, and
         // the week is EXAM regardless. Nobody predicts that from two dates.
         const weeks = classifyWeeks(TERM_START, TERM_END, [
             { kind: 'EXAM', startDate: d('2027-09-27'), endDate: d('2027-10-18') },
@@ -35,7 +35,7 @@ describe('the touch-vs-cover asymmetry', () => {
     });
 
     it('gives a BREAK a week only when it COVERS the whole of it', () => {
-        // Same dates, different kind, different answer — which is exactly why
+        // Same dates, different kind, different answer, which is exactly why
         // the preview recomputes when `kind` changes.
         const weeks = classifyWeeks(TERM_START, TERM_END, [
             { kind: 'BREAK', startDate: d('2027-09-27'), endDate: d('2027-10-18') },
@@ -58,7 +58,7 @@ describe('the touch-vs-cover asymmetry', () => {
 
 describe('a period outside the term reclassifies nothing', () => {
     it('leaves every week TEACHING when the period is entirely before the term', () => {
-        // This is the state the API now REFUSES to create — the test pins why:
+        // This is the state the API now REFUSES to create. The test pins why:
         // the row would exist, read back correctly, appear in the list, and mean
         // absolutely nothing.
         const weeks = classifyWeeks(TERM_START, TERM_END, [
@@ -127,7 +127,7 @@ describe('overlapping periods are allowed and resolve by precedence', () => {
 describe('the preview and the wire cannot diverge', () => {
     it('buildAcademicCalendar reports exactly what classifyWeeks does', () => {
         // THE point of the shared extraction. If these ever disagree, the editor
-        // shows a tenant one thing and tells the solver another — and the tenant
+        // shows a tenant one thing and tells the solver another, and the tenant
         // has no way to see it.
         const periods = [
             { kind: 'EXAM' as const, startDate: d('2027-12-13'), endDate: d('2027-12-23') },

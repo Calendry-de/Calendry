@@ -5,7 +5,7 @@ import { withRequestTenant } from '../../utils/tenantDb';
 /**
  * One proposal, without its placements. See `[id]/preview.get.ts` for those.
  *
- * `generation.read` — see index.get.ts for why that is not `session.read`.
+ * `generation.read`: see index.get.ts for why that is not `session.read`.
  */
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id');

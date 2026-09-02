@@ -101,7 +101,7 @@ async function submit() {
     } catch (e) {
         const status = (e as { statusCode?: number }).statusCode;
 
-        // 422 is the only case worth naming — it is about the new password, not
+        // 422 is the only case worth naming: it is about the new password, not
         // about whether the account exists.
         error.value = status === 422
             ? ((e as { statusMessage?: string }).statusMessage ?? 'That password cannot be used.')
@@ -135,8 +135,8 @@ async function submit() {
         color: $content6;
     }
 
-    /* `$content7`, not `$surface7`. The ramps are named by ROLE — surfaces are
-       what things sit ON, content is what sits on them — so a surface token used
+    /* `$content7`, not `$surface7`. The ramps are named by ROLE: surfaces are
+       what things sit ON, content is what sits on them, so a surface token used
        as text is reading off the wrong ramp entirely, and at ~2:1 against the
        page it was the least legible text on a security screen. */
     &_hint {

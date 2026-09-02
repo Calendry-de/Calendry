@@ -8,17 +8,17 @@
  *
  * TWO TIERS
  *
- *   reference — required in EVERY environment, production included. Nothing
+ *   reference: required in EVERY environment, production included. Nothing
  *               here is sample content; the system is incorrect without it.
  *               Runs unconditionally.
  *
- *   fixture   — dev/test sample data. Runs only with an explicit --fixtures
+ *   fixture:  dev/test sample data. Runs only with an explicit --fixtures
  *               flag AND a non-production NODE_ENV. There are no fixtures yet;
  *               the tier exists so that adding one later cannot accidentally
  *               become part of the always-on path.
  *
  * Invoked by `prisma db seed`, and automatically by `prisma migrate reset`.
- * NOT run by `prisma migrate deploy` — production must call it explicitly, and
+ * NOT run by `prisma migrate deploy`: production must call it explicitly, and
  * both container entrypoints do.
  *
  * Flags:

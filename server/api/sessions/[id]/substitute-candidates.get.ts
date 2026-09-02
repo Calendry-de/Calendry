@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { freeSubstituteCandidates } from '../../../utils/substituteCandidates';
 import { requirePermission } from '../../../utils/requirePermission';
 import { withRequestTenant } from '../../../utils/tenantDb';
+import { isPlacedSession } from '../../../../shared/sessionPlacement';
 
 const querySchema = z.object({
     q: z.string().optional(),
@@ -9,7 +10,7 @@ const querySchema = z.object({
 });
 
 /**
- * Who may cover THIS Session right now — issue #30: "the picker for 'who can
+ * Who may cover THIS Session right now (issue #30): "the picker for 'who can
  * cover this' should filter to people who are free at that slot, not let a
  * clash be created and warned about after."
  *
@@ -33,6 +34,15 @@ export default defineEventHandler(async (event) => {
 
         if (!session) {
             throw createError({ statusCode: 404, statusMessage: 'Not found.' });
+        }
+
+        // A banked Session (issue #22) has no slot to be free or busy AT: the
+        // same precondition `move.post.ts`/`swap.post.ts`/`lock.post.ts` refuse.
+        if (!isPlacedSession(session)) {
+            throw createError({
+                statusCode: 409,
+                statusMessage: 'This session is in the spare bank and has no slot to check availability against.',
+            });
         }
 
         return freeSubstituteCandidates(tx, {

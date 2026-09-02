@@ -93,7 +93,7 @@ export default defineEventHandler(async (event) => {
          * usual `body.field ?? session.field` pattern would silently resolve to
          * `null` here. Named explicitly, with the narrowing check doubling as
          * this route's "you must supply a real target" guard for its whole
-         * "place it here" restore path — reached only when the Session is
+         * "place it here" restore path, reached only when the Session is
          * banked, since a placed one's own fields are never null.
          */
         const termWeek = body.termWeek ?? session.termWeek;
@@ -104,7 +104,7 @@ export default defineEventHandler(async (event) => {
             throw createError({
                 statusCode: 400,
                 statusMessage: 'This Session is in the spare bank and has no current placement to fall back '
-                    + 'on — provide termWeek, dayOfWeek and blockIndex to place it.',
+                    + 'on: provide termWeek, dayOfWeek and blockIndex to place it.',
             });
         }
 
@@ -126,7 +126,7 @@ export default defineEventHandler(async (event) => {
         };
         // `timeGridId` is nullable, and passing null to a Prisma `id` filter is
         // a type error that would only have degraded to "no guard at all" at
-        // runtime — the query matches nothing, `grid` is null, and the check is
+        // runtime: the query matches nothing, `grid` is null, and the check is
         // silently skipped. Exactly the failure shape this project keeps
         // designing against, so the null case is named rather than filtered.
         const grid = session.timeGridId

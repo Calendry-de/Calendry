@@ -26,8 +26,8 @@ export NODE_ENV=development
 # the fixture tenants concurrently with their own teardown/seed cycles.
 export CALENDRY_SOLVER_POLL=off
 # Same reasoning for the session sweeper. It could not actually damage a fixture
-# — it only deletes rows expired for 30+ days, and test sessions are minutes old
-# — but a suite racing a background job is a suite that fails once a week for no
+# (it only deletes rows expired for 30+ days, and test sessions are minutes old),
+# but a suite racing a background job is a suite that fails once a week for no
 # reason anyone can reproduce.
 export CALENDRY_SESSION_SWEEP=off
 

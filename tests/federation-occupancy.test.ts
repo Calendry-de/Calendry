@@ -8,7 +8,7 @@ import { assembleSolverInput } from '../server/utils/solverInput';
  *
  * Two properties are under test and they pull in opposite directions:
  *
- *   1. tenant B must SEE that a shared hall is busy when tenant A books it —
+ *   1. tenant B must SEE that a shared hall is busy when tenant A books it:
  *      without this, the solver places into hours already taken, which is why
  *      Stage 3 excluded shared rooms entirely rather than send them blind.
  *   2. tenant B must see NOTHING ELSE. This is an RLS bypass, so "it returns
@@ -25,7 +25,7 @@ interface OccupancyRow {
     /**
      * An absolute date, not a term-relative week. Terms are tenant-scoped, so
      * the other tenant's term id never matches ours and its "week 3" is not our
-     * "week 3" — the calendar is the only frame a Federation shares.
+     * "week 3": the calendar is the only frame a Federation shares.
      */
     occupied_on: Date;
     block_index: number;
@@ -49,7 +49,7 @@ beforeAll(async () => {
     await login(ACCOUNTS.adminA, TEST_PASSWORD);
 
     // Tenant A books the FEDERATION-SHARED hall. Tenant B cannot see this
-    // Session under normal RLS — that is the whole problem being solved.
+    // Session under normal RLS; that is the whole problem being solved.
     await ownerDb.sessionRoom.create({
         data: { tenantId: f.tenantA, sessionId: f.sessionA, roomId: f.roomSharedFederation },
     });
@@ -111,7 +111,7 @@ describe('federation_room_occupancy()', () => {
  * The other half of Stage 7b: the snapshot the solver actually receives.
  *
  * Stage 3 counted federation Rooms as EXCLUDED and sent an empty
- * externalOccupancy. Both flip here, and the pair has to move together — a
+ * externalOccupancy. Both flip here, and the pair has to move together: a
  * shared room sent without its occupancy is worse than one omitted, because the
  * solver would place into hours another tenant already holds.
  */
@@ -144,7 +144,7 @@ describe('assembleSolverInput with a federation', () => {
 
         expect(entry.roomId).toBe(f.roomSharedFederation);
         expect(entry.durationBlocks).toBeGreaterThan(0);
-        // Opaque by design — no identifier of the owning tenant or session.
+        // Opaque by design: no identifier of the owning tenant or session.
         expect(entry.sourceRef).not.toContain(f.tenantA);
         expect(entry.sourceRef).not.toContain(f.sessionA);
     });

@@ -9,7 +9,7 @@
  *   ScheduleSolverControl.vue              what the advanced disclosure shows
  *
  * The toolbar's comment said it was "seeded from the route's own defaults", but
- * nothing enforced that — they were two `50_000` literals that happened to
+ * nothing enforced that: they were two `50_000` literals that happened to
  * match. Raising one without the other would have been invisible in exactly the
  * worst way: the route's default would improve, every run started from the
  * toolbar would keep sending the old value explicitly, and the disclosure would
@@ -31,8 +31,8 @@
  * default it was being cut off at 21% of that, and the run ended on
  * `move_budget` every time.
  *
- * 50,000,000 buys nothing — converged is converged, and the two runs are
- * identical down to the move count — while costing ~9 s on any instance that
+ * 50,000,000 buys nothing: converged is converged, and the two runs are
+ * identical down to the move count, while costing ~9 s on any instance that
  * does NOT converge, which is too close to the wall cap (see below).
  *
  * THE CLAIM THIS REPLACES WAS FALSE, AND THAT IS THE POINT
@@ -43,7 +43,7 @@
  *
  * It does not. The same tenant needs 23.79 million. The stagnation limit counts
  * ITERATIONS without improvement, not moves, and each LNS iteration evaluates
- * many thousands of moves — so the two are not comparable quantities and the
+ * many thousands of moves, so the two are not comparable quantities and the
  * inference never held. It read as a measurement and was a guess, which is
  * exactly the drift CLAUDE.md warns about for prose nothing checks.
  *
@@ -60,12 +60,12 @@
  * reproducibility. 30 s restores ~5.5x, matching the margin the previous default
  * was chosen with.
  *
- * A run does not become slower because the cap is higher — the demo tenant still
+ * A run does not become slower because the cap is higher: the demo tenant still
  * finishes in 4.3 s by converging. The cap only bounds the pathological case.
  */
 export const DEFAULT_MAX_MOVES = 100_000_000_000;
 
-/** Backstop only — see above. Whichever budget is hit first ends the run. */
+/** Backstop only, see above. Whichever budget is hit first ends the run. */
 export const DEFAULT_MAX_WALL_MILLIS = 100_000;
 
 /**
@@ -73,8 +73,8 @@ export const DEFAULT_MAX_WALL_MILLIS = 100_000;
  *
  * `crates/core/src/solution.rs` stores a primary Room plus
  * `MAX_ADDITIONAL_ROOMS = 3` extras in a fixed-size array, so four is the whole
- * capacity. Beyond it `convert.rs` TRUNCATES rather than refusing — warn and
- * allow, like the rest of that module — and says nothing on the wire about
+ * capacity. Beyond it `convert.rs` TRUNCATES rather than refusing (warn and
+ * allow, like the rest of that module), and says nothing on the wire about
  * having done so.
  *
  * Declared here rather than as a literal at the one call site for the reason

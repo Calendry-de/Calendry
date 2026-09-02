@@ -4,7 +4,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['API tokens'],
         summary: 'List my API tokens',
-        description: 'The tokens the signed-in Person has minted — name, ceiling permissions, expiry, and when each was last used. Never the secret or its hash: those do not exist after creation. Session only; a token cannot enumerate its siblings.',
+        description: 'The tokens the signed-in Person has minted: name, ceiling permissions, expiry, and when each was last used. Never the secret or its hash: those do not exist after creation. Session only; a token cannot enumerate its siblings.',
         responses: {
             200: {
                 description: 'Bare array of the callers tokens, newest first.',
@@ -35,7 +35,7 @@ defineRouteMeta({
 
 /**
  * The caller's own tokens. Self-scoped like `/api/me/settings`: the WHERE is
- * the caller's own Person, so no permission key gates it — there is nothing
+ * the caller's own Person, so no permission key gates it: there is nothing
  * here anybody else owns.
  *
  * `tokenHash` is deliberately not selected, the same rule the screens routes

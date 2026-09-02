@@ -29,7 +29,7 @@
             </section>
 
             <!--
-                A held key with no catalogue entry should not normally happen —
+                A held key with no catalogue entry should not normally happen,
                 but silently dropping it from this view is worse than showing
                 it oddly, per CLAUDE.md's "guards must fail loudly or match
                 exactly": this is the one place that fact would otherwise
@@ -48,7 +48,7 @@
 
                 <p class="permsummary_other_note">
                     Held, but not in the permission catalogue. Likely a key that moved or was
-                    removed from <code>shared/permissions.ts</code> — worth reporting.
+                    removed from <code>shared/permissions.ts</code>; worth reporting.
                 </p>
 
                 <ul class="permsummary_list">
@@ -71,12 +71,12 @@ import { permissionCategories } from '#shared/permissions';
 
 /**
  * Replaces the raw `<details><ul>` block that used to sit directly in
- * `dashboard.vue` (issue #104) — a flat two-column list of bare permission
+ * `dashboard.vue` (issue #104): a flat two-column list of bare permission
  * key strings, with no grouping and no explanation of what a key actually
  * grants.
  *
  * Grouped by `category` from the fixed catalogue (`shared/permissions.ts`),
- * the same axis `ApiTokensPanel`'s grant picker already groups by — it is
+ * the same axis `ApiTokensPanel`'s grant picker already groups by. It is
  * the one taxonomy this app never invents a second version of. Ordered in
  * CATALOGUE order (via `permissionCategories()`), not sorted, matching that
  * component's own reasoning: a sort would put `access_role` first, which is
@@ -88,7 +88,7 @@ import { permissionCategories } from '#shared/permissions';
  * What changed is what is inside it once opened.
  */
 const props = defineProps<{
-    /** Held permission keys — a flat array, exactly `session.permissions`. */
+    /** Held permission keys: a flat array, exactly `session.permissions`. */
     permissions: readonly string[];
 }>();
 
@@ -117,7 +117,7 @@ const groups = computed<PermissionGroup[]>(() => {
         .filter((group) => group.permissions.length > 0);
 });
 
-/** Held keys that resolve to no catalogue entry at all — see the template comment. */
+/** Held keys that resolve to no catalogue entry at all; see the template comment. */
 const otherKeys = computed<string[]>(() => {
     const catalogued = new Set<string>(groups.value.flatMap((group) => group.permissions.map((permission) => permission.key)));
 
@@ -144,7 +144,7 @@ const otherKeys = computed<string[]>(() => {
 
     /*
      * Native <details> snaps its content open with no transition of its own,
-     * same trap as the block this replaced — fading and lifting the OPEN
+     * same trap as the block this replaced: fading and lifting the OPEN
      * transition alone makes the state change legible.
      */
     &[open] &_body {

@@ -44,8 +44,8 @@
         <template v-else>
             <!--
                 The tree is only shown when the full set is in hand. Built from a
-                partial page it would silently promote children to roots — their
-                parents simply absent — and there would be nothing on screen to
+                partial page it would silently promote children to roots, their
+                parents simply absent, and there would be nothing on screen to
                 say the hierarchy on display is wrong. Saying so and dropping to
                 a flat list is the honest alternative.
             -->
@@ -58,7 +58,7 @@
                     aria-hidden="true"
                 />
                 <span v-if="list.isFiltered.value">
-                    Search results are shown flat — a filtered set has no reliable
+                    Search results are shown flat: a filtered set has no reliable
                     hierarchy, because a matching group's parent may not match.
                 </span>
                 <span v-else>
@@ -147,8 +147,8 @@ import { buildGroupTree, estimatedSizes, flattenTree } from '~/utils/groupTree';
  * Groups as a hierarchy, because a flat table of nested things loses the only
  * property that distinguishes them (TAXONOMY.md §2, §6).
  *
- * This is the ONE entity with a bespoke list. Everything else about the page —
- * shell, header, permissions, create affordance — is still the shared scaffold;
+ * This is the ONE entity with a bespoke list. Everything else about the page
+ * (shell, header, permissions, create affordance) is still the shared scaffold;
  * only the rows in the middle are different.
  */
 const props = defineProps<{
@@ -172,7 +172,7 @@ const showTree = computed(() => props.list.isComplete.value && !props.list.isFil
 /**
  * Only meaningful alongside `showTree`: summing nested groups needs the whole
  * set in hand, the same requirement `buildGroupTree` has for the hierarchy
- * itself. Read as `derivedSizes.get(node.id)` — never for a node whose own
+ * itself. Read as `derivedSizes.get(node.id)`, never for a node whose own
  * `expectedSize` is already set, which always wins.
  */
 const derivedSizes = computed(() => estimatedSizes(props.list.rows.value));
@@ -386,7 +386,7 @@ function toggle(id: string) {
     &_loading {
         display: flex;
         justify-content: center;
-        padding: 60px 0; // Empty-state spacing, hand-tuned — not on the scale.
+        padding: 60px 0; // Empty-state spacing, hand-tuned, not on the scale.
     }
 
     &_pager {

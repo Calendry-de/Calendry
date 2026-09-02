@@ -15,12 +15,12 @@ import { MAX_WIRE_ROOMS_PER_SESSION } from '../shared/solverBudget';
  * `Session.room_ids` closes that, and the convention is the sharp part: EMPTY
  * for an ordinary single-Room Session, because `room_id` alone is already the
  * complete answer and `partition_sessions` reads a non-empty list as
- * authoritative. A one-element echo is not "more correct" — it is a second
+ * authoritative. A one-element echo is not "more correct": it is a second
  * spelling of one state, and the encoded bytes feed `inputHash`.
  *
  * The report moved rather than retired. Beyond `MAX_WIRE_ROOMS_PER_SESSION` the
  * solver TRUNCATES, warn-and-allow, and says nothing on the wire about having
- * done so — which is the old failure again, one cap higher.
+ * done so, which is the old failure again, one cap higher.
  */
 let f: Fixtures;
 

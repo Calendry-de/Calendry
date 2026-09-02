@@ -119,7 +119,7 @@ import { useOverlay } from '~/composables/overlay';
 import ScheduleMiniMonth from './ScheduleMiniMonth.vue';
 
 /**
- * Group/Room/Person — actual narrowing filters, moved here verbatim from
+ * Group/Room/Person: actual narrowing filters, moved here verbatim from
  * `ScheduleToolbar` (same gating rule: "a filter exists when it has
  * something to choose between", same models), just laid out vertically in a
  * panel instead of a horizontal row. A toggleable overlay rather than a
@@ -127,7 +127,7 @@ import ScheduleMiniMonth from './ScheduleMiniMonth.vue';
  * `schedule/index.vue` for why a fixed reservation was removed once already
  * and should not come back here.
  *
- * TERM DELIBERATELY LIVES IN `ScheduleToolbar` INSTEAD, not here — it is not
+ * TERM DELIBERATELY LIVES IN `ScheduleToolbar` INSTEAD, not here: it is not
  * a filter (it does not narrow what the caller can already see; it decides
  * WHICH schedule is being looked at), so burying it behind this panel's
  * toggle made the single most-used control on the page a two-click action.
@@ -224,8 +224,8 @@ function trapFocus(event: KeyboardEvent) {
     display: flex;
     justify-content: flex-start;
 
-    // `black`, NOT `content0`: `content0` is a THEME-RELATIVE text colour —
-    // dark mode swaps it to near-white (`app/utils/styles.ts`) — so a scrim
+    // `black`, NOT `content0`: `content0` is a THEME-RELATIVE text colour,
+    // dark mode swaps it to near-white (`app/utils/styles.ts`), so a scrim
     // built from it turned into a light wash instead of a dimming backdrop
     // exactly when the surrounding UI was already dark. A backdrop must dim
     // regardless of theme, which is what the theme-INVARIANT `black`/

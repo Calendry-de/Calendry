@@ -3,16 +3,16 @@ import type { XlsxSheet } from './xlsxExport';
 
 /**
  * GDPR Right to Access, per Person (issue #84). Everything this application
- * holds ABOUT one Person, gathered from every table that names them —
+ * holds ABOUT one Person, gathered from every table that names them:
  * scheduling data (TAXONOMY.md §2/§3), authorization grants (§4), the
  * credential that signs them in, and their own slice of the security audit
  * trail (issue #78).
  *
- * DELIBERATELY EXCLUDED, both for the same reason — a full export must not
+ * DELIBERATELY EXCLUDED, both for the same reason: a full export must not
  * hand out a live credential, only an account of what exists:
- *   - `ApiToken.tokenHash` / `IcsLink.token` — secrets, not personal data
+ *   - `ApiToken.tokenHash` / `IcsLink.token`: secrets, not personal data
  *     the request is entitled to see in the clear.
- *   - `AccountPerson`/`Account.passwordHash` — never leaves the database at
+ *   - `AccountPerson`/`Account.passwordHash`: never leaves the database at
  *     all.
  * Both tables are still represented, by name/metadata only (see
  * `apiTokens`/`icsLinks` below).
@@ -99,7 +99,7 @@ export interface PersonExportBundle {
 
 /**
  * Gathers everything the export covers, inside the caller's own tenant
- * transaction — every query below runs behind ordinary RLS, exactly like any
+ * transaction: every query below runs behind ordinary RLS, exactly like any
  * other route, so this can never be handed a `personId` outside the caller's
  * tenant without also passing `tenantId` and having every `where` clause
  * agree; `personRow` below still checks explicitly, matching the "guards
@@ -126,7 +126,7 @@ export async function buildPersonExportBundle(tx: Tx, tenantId: string, personId
         throw createError({ statusCode: 404, statusMessage: 'Not found.' });
     }
 
-    // Sequential — `tx` is one shared connection; concurrent queries on it
+    // Sequential: `tx` is one shared connection; concurrent queries on it
     // trip pg's deprecated overlapping-query warning.
     const accountLink = await tx.accountPerson.findUnique({
         where: { personId },
@@ -191,7 +191,7 @@ export async function buildPersonExportBundle(tx: Tx, tenantId: string, personId
         where: { personId },
         select: { id: true, name: true, scope: true, lastUsedAt: true, createdAt: true },
     });
-    // No RLS on `audit_log` (CLAUDE.md exception 5) — scoped by BOTH
+    // No RLS on `audit_log` (CLAUDE.md exception 5): scoped by BOTH
     // `tenantId` and `actorPersonId` explicitly, since the table carries
     // no FK to enforce it for us.
     const auditLog = await tx.auditLog.findMany({

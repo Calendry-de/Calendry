@@ -6,8 +6,8 @@ import { api, login } from './helpers/client';
  * A Session must always resolve to a real slot in its TimeGrid.
  *
  * WHY THIS IS REFUSED RATHER THAN WARNED. "Warn and allow" (TAXONOMY.md §3)
- * covers hard-CONSTRAINT violations, and its mechanism is `constraint_violation`
- * — a row keyed to a `constraint_id`. "Outside the grid" is not one of the 14
+ * covers hard-CONSTRAINT violations, and its mechanism is `constraint_violation`,
+ * a row keyed to a `constraint_id`. "Outside the grid" is not one of the 14
  * catalogue types and cannot become one, so there is nowhere to record such a
  * warning. It is not a worse schedule; it is a Session that resolves to no time.
  *
@@ -18,7 +18,7 @@ import { api, login } from './helpers/client';
  *
  * THE COUNTER-EXAMPLES ARE THE POINT. Three of the six cases below assert that
  * an edit SUCCEEDS. Without them this suite passes just as well against a guard
- * that refuses every TimeGrid update outright — which would look like working
+ * that refuses every TimeGrid update outright, which would look like working
  * protection and would make the grid uneditable.
  */
 const GRID = 'test-grid-a';
@@ -76,7 +76,7 @@ describe('narrowing a TimeGrid', () => {
         expect(JSON.stringify(res.body)).toContain('Databases');
         expect(JSON.stringify(res.body)).toContain('1 existing Session');
 
-        // The refusal must leave the grid untouched — a 409 that half-applied
+        // The refusal must leave the grid untouched: a 409 that half-applied
         // would be worse than no guard at all.
         expect((await gridNow()).blocksPerDay).toBe(8);
     });
@@ -149,8 +149,8 @@ describe('edits that cannot orphan anything', () => {
         // the index space is blocksPerDay x activeDays. A guard keyed on "any
         // TimeGrid edit" would reject this, and would be wrong.
         //
-        // The Session is deliberately placed at block 6 — outside a 4-block day
-        // — to prove the check is scoped to the index space rather than simply
+        // The Session is deliberately placed at block 6 (outside a 4-block day)
+        // to prove the check is scoped to the index space rather than simply
         // finding nothing to complain about.
         await placeSession(2, 6);
 

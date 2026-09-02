@@ -113,7 +113,7 @@ import { useCommandPalette } from '~/composables/commandPalette';
  *
  * PERMISSIONS: this component never filters. Its entire input is
  * `useNavEntries()`, which has already removed anything the caller lacks the
- * permission to open — so there is no code path here that could surface a
+ * permission to open, so there is no code path here that could surface a
  * hidden section by forgetting a check.
  */
 const palette = useCommandPalette();
@@ -155,7 +155,7 @@ function trapFocus(event: KeyboardEvent) {
 
     padding: 12vh var(--space-6) var(--space-6);
 
-    // `black`, not the theme-relative `content0` — see `ScheduleFilterPanel`'s
+    // `black`, not the theme-relative `content0`: see `ScheduleFilterPanel`'s
     // own comment on this exact backdrop rule for why: `content0` flips to
     // near-white in dark mode, turning a dimming scrim into a light wash.
     background: varToRgba('black', 0.45);
@@ -284,7 +284,7 @@ function trapFocus(event: KeyboardEvent) {
             color: $surface7;
         }
 
-        // Highlight rather than :hover — the pointer and the keyboard drive the
+        // Highlight rather than :hover: the pointer and the keyboard drive the
         // same single highlight, so hover styling would produce two.
         &--active {
             background: $primary500;

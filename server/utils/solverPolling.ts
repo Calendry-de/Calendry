@@ -13,7 +13,7 @@ import {
 } from './solverClient';
 
 /**
- * Stage 4 — how often a run is asked about, and what each answer means.
+ * Stage 4: how often a run is asked about, and what each answer means.
  *
  * Shared by the background poller (which owns correctness) and the on-demand
  * `GET /api/solver/runs/:id` (which owns latency for someone watching). One
@@ -75,7 +75,7 @@ export function classifyPollFailure(error: unknown): PollFailure {
         return 'forgotten';
     }
 
-    // Anything else — UNAVAILABLE, DEADLINE_EXCEEDED, a broken channel — is
+    // Anything else (UNAVAILABLE, DEADLINE_EXCEEDED, a broken channel) is
     // treated as transient. Erring toward "leave it alone" is deliberate: the
     // cost of being wrong is a stale row, not a destroyed one.
     return 'unreachable';
@@ -122,8 +122,8 @@ export interface RecoveryOutcome {
 /**
  * Asks again for the result of a run that succeeded but whose result never arrived.
  *
- * `pollSolverRun()` records a terminal status even when the result fetch throws —
- * losing the transition would leave the run looking active and block the term — but
+ * `pollSolverRun()` records a terminal status even when the result fetch throws.
+ * Losing the transition would leave the run looking active and block the term, but
  * nothing then retried, and the poller claims only active statuses, so such a row
  * was never looked at again: no result, no Generation, no way to get one.
  *
@@ -169,7 +169,7 @@ export async function recoverRunResult(tx: Tx, run: {
          * times would only delay the same answer by six minutes.
          */
         if (classifyPollFailure(error) === 'forgotten') {
-            return giveUp('The solver no longer holds this run\'s result — it restarted and its '
+            return giveUp('The solver no longer holds this run\'s result: it restarted and its '
                 + 'in-memory registry was lost. The run succeeded, but its output cannot be recovered.');
         }
 
@@ -192,7 +192,7 @@ export async function recoverRunResult(tx: Tx, run: {
     }
 
     /**
-     * The solver answered but no longer calls this run succeeded — its registry
+     * The solver answered but no longer calls this run succeeded: its registry
      * recycled the id, or it disagrees with what was recorded. Attaching a
      * result under those circumstances would be worse than admitting the loss.
      */
@@ -239,7 +239,7 @@ export async function recoverRunResult(tx: Tx, run: {
  *
  * The result is fetched in the SAME step that observes a terminal status, not
  * later: the solver holds it in memory only, so "I will come back for it" is a
- * promise a restart can break. `include_result` is otherwise left off — the
+ * promise a restart can break. `include_result` is otherwise left off, since the
  * proto adds the flag precisely so routine polling stays cheap.
  *
  * When that fetch DOES fail, `recoverRunResult()` above is what asks again.
@@ -259,7 +259,7 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
                 where: { id: run.id },
                 data: {
                     status: 'FAILED',
-                    errorDetail: 'The solver no longer knows this run — it restarted and its in-memory '
+                    errorDetail: 'The solver no longer knows this run: it restarted and its in-memory '
                         + 'run registry was lost. The run cannot be recovered or resumed.',
                     finishedAt: new Date(),
                     lastPolledAt: new Date(),
@@ -295,7 +295,7 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
      */
     let result: unknown;
     /**
-     * Its own column because the point is to be QUERYABLE — "which runs are not
+     * Its own column because the point is to be QUERYABLE: "which runs are not
      * reproducible?" is a filter, not a JSON traversal. It went unwritten until
      * Stage 6a, so it was NULL on every row while its schema comment told readers
      * to consult it, and a filter returned nothing that read like "no such runs".
@@ -343,7 +343,7 @@ export async function pollSolverRun(tx: Tx, run: PollableRun): Promise<PollOutco
 
     /**
      * The Generation is created HERE, by whichever path observed the terminal
-     * transition — not in the poller. It lived there first, and the on-demand route
+     * transition, not in the poller. It lived there first, and the on-demand route
      * silently stole the transition: a user opening the page before the next tick
      * left the poller nothing to observe, so NO Generation was ever created and the
      * result sat captured and unusable.

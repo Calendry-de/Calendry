@@ -5,14 +5,14 @@
 
             `ScheduleReviewGrid` renders `76px repeat(var(--day-count), 1fr)` at
             every width, and chips already subdivide to a quarter of a column at
-            desktop when four share a slot — so on a 360px screen it was six
+            desktop when four share a slot, so on a 360px screen it was six
             ~47px columns of 11px text. PRODUCT.md records genuine mobile support
             as confirmed and DESIGN.md commits to replacing the week grid outright
             below 1365px; `/schedule` does exactly that with `ScheduleAgenda`, and
             this is the same move over the diff.
 
             Same data, same vocabulary (DIFF_TAG / DIFF_ICON), different
-            structure — a day at a time, ordered by time, which is how a change
+            structure: a day at a time, ordered by time, which is how a change
             list is actually read when you cannot see the week.
         -->
         <div
@@ -111,7 +111,7 @@ const props = defineProps<{
  * Opens on the first day that has something to look at, not on Monday.
  *
  * A proposal can leave a day untouched; landing on an empty tab reads as "this
- * proposal did nothing" — the same failure the week picker had before it started
+ * proposal did nothing", the same failure the week picker had before it started
  * annotating its options.
  */
 const activeDay = ref(
@@ -123,7 +123,7 @@ const activeDay = ref(
 /*
  * The day is passed, and that matters: `blockTime` without one resolves the
  * UNIVERSAL timeline, so on a day carrying its own `time_grid_break` rows every
- * clock time here would have been off by that day's break minutes — silently,
+ * clock time here would have been off by that day's break minutes, silently,
  * and only for the tenants who configured them.
  */
 const slotLabel = (placement: Placement) => (
@@ -201,7 +201,7 @@ function countFor(day: number): number {
     &_count {
         min-width: 18px;
         padding: var(--space-1) var(--space-2);
-        border-radius: 9px; // Half the 18px min-width — a circular badge, not a scale step.
+        border-radius: 9px; // Half the 18px min-width: a circular badge, not a scale step.
 
         font-size: var(--font-size-xs);
         font-variant-numeric: tabular-nums;
@@ -249,7 +249,7 @@ function countFor(day: number): number {
         }
     }
 
-    // The same three encodings as the grid's chips — icon, border, word — so the
+    // The same three encodings as the grid's chips (icon, border, word), so the
     // two presentations teach one vocabulary rather than two.
     &_chip {
         display: flex;
@@ -265,7 +265,7 @@ function countFor(day: number): number {
          * AI-slop accent stripe, and its remedy is to remove it. Here the stripe
          * is not decoration: it is the diff encoding. Each state overrides only
          * `border-left-color`/`-style`, so deleting it would delete the signal
-         * this component exists to carry — and a left gutter marking added and
+         * this component exists to carry, and a left gutter marking added and
          * removed lines is the convention every diff tool already taught the
          * reader. Earned by the brief, not reached for by habit.
          */
@@ -286,7 +286,7 @@ function countFor(day: number): number {
             background: $surface3;
         }
 
-        // Recession by token, not by opacity — the same fix as the grid's, for
+        // Recession by token, not by opacity: the same fix as the grid's, for
         // the same measured reason: `opacity: 0.6` flattens the chip background
         // into its own text before compositing, which put the majority state's
         // title at 4.19:1 against a 4.5:1 floor.
@@ -301,7 +301,7 @@ function countFor(day: number): number {
             border-left-color: $error600;
             // DASHED, and that is the greyscale channel. Green and red sit at
             // almost the same luminance (1.29:1), so colour alone cannot tell
-            // "added" from "removed" for a reader who cannot see hue — the exact
+            // "added" from "removed" for a reader who cannot see hue, the exact
             // pair this grid must never confuse. The stripe style, the icon, the
             // word and the strikethrough all survive greyscale; the hue is the
             // redundant fourth cue, not the load-bearing one.

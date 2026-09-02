@@ -5,7 +5,7 @@
     >
         <!--
             The menu button and the inline links are the same registry rendered
-            two ways, and exactly one is visible at a time — CSS decides which,
+            two ways, and exactly one is visible at a time: CSS decides which,
             at `$navCollapseAt`. Both are always in the DOM so the switch needs
             no JS and cannot disagree with the stylesheet.
         -->
@@ -39,7 +39,7 @@
         <button
             class="header__menu_search"
             type="button"
-            aria-label="Search — Ctrl K"
+            aria-label="Search (Ctrl K)"
             @click="openPalette()"
         >
             <Icon
@@ -62,7 +62,7 @@ import { useHeaderNav } from '~/composables/navigation';
  * no entry ever had. Both are gone; entries come from `useHeaderNav()`.
  *
  * Active/inactive uses `primary`/`secondary` rather than the old
- * `secondary-875`, which CommonButton accepts but has no styles for — one of
+ * `secondary-875`, which CommonButton accepts but has no styles for. One of
  * the two callers of that unimplemented variant is now off it.
  */
 const headerNav = useHeaderNav();
@@ -78,7 +78,7 @@ function openPalette() {
 
 /*
  * The drawer is MOUNTED IN THE LAYOUT, beside the command palette, and opened
- * from here by writing this shared flag — the same split, for the same reason.
+ * from here by writing this shared flag, the same split, for the same reason.
  * The drawer owns a focus trap, an overlay claim and a body scroll lock; a
  * second instance rendered from this component would hold all three twice, and
  * a leaked overlay claim silently stops Escape working on /schedule.

@@ -11,11 +11,11 @@ web
 Three audiences share one schedule surface, with affordances gated by per-tenant
 permissions rather than by separate screens (confirmed):
 
-- **Timetablers / administrators** — power users who spend extended sessions
+- **Timetablers / administrators**: power users who spend extended sessions
   constructing and repairing a term's timetable. They make many repeated edits.
-- **Department heads** — review a mostly-solved schedule and make occasional
+- **Department heads**: review a mostly-solved schedule and make occasional
   targeted changes. They need confidence before committing a move.
-- **Lecturers** — read-mostly view of the sessions that concern them.
+- **Lecturers**: read-mostly view of the sessions that concern them.
 
 The same screen serves all three; what changes is which affordances appear,
 driven by the caller's permissions (`session.move`, `session.lock`, …).
@@ -54,7 +54,7 @@ Two mechanisms a neighbouring calendar product could not truthfully copy:
 
 - **Time is per-tenant.** Block length, blocks per day, active days and start
   hour come from the tenant's TimeGrid. Nothing about grid shape may be
-  hardcoded — no assumed Mon–Fri, no assumed block count (TAXONOMY.md §2).
+  hardcoded: no assumed Mon–Fri, no assumed block count (TAXONOMY.md §2).
 - **Scale is adjustable and varies by tenant** (user's words). The view must not
   assume a session count; filtering is central, and view density is intended to
   be adjustable rather than fixed. *Interpretation flagged for confirmation:

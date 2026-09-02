@@ -6,7 +6,7 @@
         <div class="bar_group">
             <!--
                 Term lives HERE, not in `ScheduleFilterPanel` with Group/Room/
-                Person: it is not a filter — it does not narrow what a caller
+                Person: it is not a filter; it does not narrow what a caller
                 who can already see the data sees, it decides WHICH schedule
                 (whole term of data) is being looked at at all, the same kind
                 of choice `resolveTermId()`/`patchScheduleSettings()` persist
@@ -31,7 +31,7 @@
             </label>
 
             <!--
-                Group/Room/Person moved to `ScheduleFilterPanel` — a
+                Group/Room/Person moved to `ScheduleFilterPanel`, a
                 toggleable drawer rather than a permanent reservation, for the
                 same reason `.schedule_side` in `schedule/index.vue` gave up its
                 fixed width. This button is the only trace of them left here.
@@ -57,7 +57,7 @@
         </div>
 
         <!--
-            VIEW STATE — nothing here changes the schedule. Second in the DOM as
+            VIEW STATE: nothing here changes the schedule. Second in the DOM as
             well as on screen; when the bar was a wrapping flex row the two
             disagreed at some widths.
         -->
@@ -91,12 +91,12 @@
                 {{ violationCount }} violation{{ violationCount === 1 ? '' : 's' }}
             </button>
         </div>
-        <!-- ACTIONS — the only controls here that change anything, which is why
+        <!-- ACTIONS: the only controls here that change anything, which is why
              they hold the right edge on their own. -->
         <div class="bar_group bar_group--end">
             <!--
                 ISSUE #109. Gated on `solverTermId` alone, like the buttons
-                after it — not on today actually falling inside the visible
+                after it, not on today actually falling inside the visible
                 term/week, which the page decides at CLICK time and answers
                 with a graceful fallback (nearest boundary week) rather than by
                 hiding the control, per the issue's own note that "no term
@@ -125,7 +125,7 @@
                 THE DURABLE WAY TO A PROPOSAL. The solver's own "Review" button
                 lives in a transient state a reload destroys, so a proposal was
                 reachable for minutes by one person. Gated on `generation.read`,
-                not `solver.trigger` — whoever reviews a schedule is usually not
+                not `solver.trigger`: whoever reviews a schedule is usually not
                 whoever may generate one, and not everybody who may READ one may
                 see proposals either.
             -->
@@ -149,7 +149,7 @@
 
             <!--
                 ITS OWN GATE (availability.manage_own), unrelated to any of the
-                above — see the component's own comment. Last in the group,
+                above; see the component's own comment. Last in the group,
                 matching the solver control's own reasoning: its anchored panel
                 opens toward the bar's right edge.
             -->
@@ -180,7 +180,7 @@ const props = defineProps<{
     violationCount: number;
     canReadViolations: boolean;
     canTriggerSolver: boolean;
-    /** `session.read` — deliberately not `solver.trigger`; see the link's note. */
+    /** `session.read`, deliberately not `solver.trigger`; see the link's note. */
     canReviewProposals: boolean;
     canCreateSession: boolean;
     creating: boolean;
@@ -197,7 +197,7 @@ const selectedTermName = computed(
     () => props.terms.find((t) => t.id === (termIdModel.value || props.terms[0]?.id))?.name ?? '',
 );
 
-// Owned by the page, toggling `ScheduleFilterPanel` — not a data filter itself.
+// Owned by the page, toggling `ScheduleFilterPanel`, not a data filter itself.
 const filtersOpenModel = defineModel<boolean>('filtersOpen', { required: true });
 
 // View state, owned by the page: neither affects the API query.
@@ -210,8 +210,8 @@ const showViolationsModel = defineModel<boolean>('showViolations', { required: t
  *
  * Forwarded rather than lifted: one poller and one state machine per Term is
  * the invariant, and the run has to render in this bar wherever it was started
- * from. `null` when the control is not mounted — no `solver.trigger`, or no
- * resolved Term — and the caller is gated on the same permission, so this is a
+ * from. `null` when the control is not mounted (no `solver.trigger`, or no
+ * resolved Term), and the caller is gated on the same permission, so this is a
  * belt-and-braces guard rather than the boundary.
  */
 const solverControl = useTemplateRef<{ startRepair: () => Promise<void> }>('solverControl');
@@ -226,7 +226,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
      * sized by one group and the bar's height is a constant through every
      * solver state and every length of tenant name.
      *
-     * One row does not fit at 1440 — the exact scope-group width shifted when
+     * One row does not fit at 1440: the exact scope-group width shifted when
      * Term joined it (previously just the Filters toggle: measured then at
      * 621px against a 1408px row) and has not been re-measured since, but the
      * underlying reason a single row fails is unchanged: `view`/`actions`
@@ -242,7 +242,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
     /*
      * Above `.schedule_body` so the solver's and blocked-day panels overlay the
      * grid instead of displacing it; `.schedule_side` is sticky and later in the
-     * DOM. Must also outrank `ScheduleGrid`'s own sticky corner (z-index: 3) —
+     * DOM. Must also outrank `ScheduleGrid`'s own sticky corner (z-index: 3):
      * that cell creates its own stacking context with nothing in between to
      * contain it, so it compared directly against this one and painted over
      * both anchored panels regardless of their own (locally-scoped) z-index.
@@ -293,7 +293,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         }
 
         /*
-         * On a phone the cap is the container, not 220px — more than half the
+         * On a phone the cap is the container, not 220px: more than half the
          * row, so two fields could no longer share one and the filters went from
          * two rows to four (303px against 468px with German names).
          */
@@ -414,7 +414,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         }
     }
 
-    // Same treatment as `ManageList.vue`'s `.list_badge` — a small filled count,
+    // Same treatment as `ManageList.vue`'s `.list_badge`: a small filled count,
     // not a new badge language.
     &_filters-count {
         padding: var(--space-1) var(--space-3);

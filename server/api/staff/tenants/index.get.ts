@@ -5,7 +5,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Staff'],
         summary: 'Calendry staff: list every tenant',
-        description: 'Cross-tenant tenant list for Calendry staff (issue #76). Requires a staff session (StaffIdentity) — never reachable by a tenant Account or API token, and never routed through withRequestTenant/RLS: a staff principal has no single tenant to scope a query to, so this reads through the OWNER database connection instead.',
+        description: 'Cross-tenant tenant list for Calendry staff (issue #76). Requires a staff session (StaffIdentity): never reachable by a tenant Account or API token, and never routed through withRequestTenant/RLS. A staff principal has no single tenant to scope a query to, so this reads through the OWNER database connection instead.',
         responses: {
             200: {
                 description: 'Every tenant, newest first.',
@@ -43,13 +43,13 @@ defineRouteMeta({
 });
 
 /**
- * Lists every tenant across the whole install — the "tenant list / help
+ * Lists every tenant across the whole install: the "tenant list / help
  * view" half of issue #76.
  *
  * `requireStaffIdentity` throws before this handler ever touches the
  * database if the caller is not `kind === 'staff'`, so a tenant-scoped
  * Account or API token gets the identical 403 a request with no session at
- * all would — this route simply does not exist for them.
+ * all would; this route simply does not exist for them.
  */
 export default defineEventHandler(async (event) => {
     requireStaffIdentity(event);

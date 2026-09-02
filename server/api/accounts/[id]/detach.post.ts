@@ -9,7 +9,7 @@ import { withRequestTenant } from '../../../utils/tenantDb';
  *
  * FOR A SHARED LOGIN ONLY, and that restriction is what makes the whole scheme
  * closed. An Account with no `account_person` row is invisible to every tenant
- * while its password still works — so detaching the last identity is refused
+ * while its password still works, so detaching the last identity is refused
  * (`assertDetachable`) rather than warned about, and the two rules are exact
  * complements:
  *

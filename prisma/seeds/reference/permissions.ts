@@ -2,7 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { PERMISSIONS } from '../../../shared/permissions';
 
 /**
- * REFERENCE seed — required in every environment, production included.
+ * REFERENCE seed: required in every environment, production included.
  *
  * The `permission` catalogue is the fixed set of actions the code implements.
  * Tenants bundle these into AccessRoles but can never invent one, because a
@@ -26,7 +26,7 @@ export async function seedPermissions(
     options: { prune?: boolean } = {},
 ): Promise<PermissionSeedResult> {
     // One round trip to learn what already exists, rather than a findUnique per
-    // row — this runs on every deploy.
+    // row, since this runs on every deploy.
     const existing = await prisma.permission.findMany({ select: { key: true } });
     const existingKeys = new Set(existing.map((p) => p.key));
 
@@ -51,7 +51,7 @@ export async function seedPermissions(
 
     // Widened to `string`: compared against `existingKeys`, which is a plain DB
     // column and therefore can legitimately hold a key that is no longer a
-    // `PermissionKey` at all — that mismatch is exactly what `stale` reports.
+    // `PermissionKey` at all: that mismatch is exactly what `stale` reports.
     const desiredKeys = new Set<string>(PERMISSIONS.map((p) => p.key));
     const stale = [...existingKeys].filter((key) => !desiredKeys.has(key)).sort();
 

@@ -13,7 +13,7 @@
  * things and both are *expected*: a freshly provisioned tenant has no TimeGrid
  * (provisioning deliberately creates none, since TAXONOMY.md §2 forbids
  * assuming a grid shape) and no Term. Neither is an error, and neither should
- * be reachable by the same code path as a failed fetch — an empty state that
+ * be reachable by the same code path as a failed fetch: an empty state that
  * can also mean "the request broke" hides bugs.
  */
 defineProps<{ title: string }>();
@@ -24,7 +24,7 @@ defineSlots<{ default: () => unknown }>();
 <style scoped lang="scss">
 .blank {
     max-width: 52ch;
-    padding: 40px var(--space-7); // 40px has no scale match — the other half already is one.
+    padding: 40px var(--space-7); // 40px has no scale match; the other half already is one.
     border-radius: var(--radius-xl);
     background: $surface1;
 

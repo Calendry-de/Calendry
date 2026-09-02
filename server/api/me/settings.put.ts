@@ -5,13 +5,13 @@ import { withRequestTenant } from '../../utils/tenantDb';
 
 /**
  * Set (or clear) the signed-in Person's own `locale` (issue #17) and, now,
- * `timezone`. Both `null` clears the field — display/export only, so
+ * `timezone`. Both `null` clears the field (display/export only), so
  * "unset" is a real, meaningful state, not an error. Self-service, same as
  * the GET: no permission beyond being signed in, because this writes only
  * the caller's own row.
  *
  * `locale` stays REQUIRED (unchanged since issue #17); `timezone` is
- * OPTIONAL — omitting it leaves the stored value untouched, so an existing
+ * OPTIONAL: omitting it leaves the stored value untouched, so an existing
  * caller that only ever knew about `locale` keeps working unmodified rather
  * than being forced to start naming a field it has never heard of.
  */

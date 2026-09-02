@@ -9,7 +9,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Curriculum plans'],
         summary: 'Advance every eligible Group to its own next curriculum plan',
-        description: 'The bulk "phase change" action: every Group holding an application whose plan names a successor (nextPlanId) AND a later Term exists to move into gets that successor plan applied for that Term — each Group to its OWN target, not one plan/term picked for everybody. Manual only, triggered from the curriculum-progression settings page; nothing here runs on its own. Idempotent per Group/plan/term the same way a single apply is: re-running finds every Offering already has the Group and changes nothing.',
+        description: 'The bulk "phase change" action: every Group holding an application whose plan names a successor (nextPlanId) AND a later Term exists to move into gets that successor plan applied for that Term, each Group to its OWN target, not one plan/term picked for everybody. Manual only, triggered from the curriculum-progression settings page; nothing here runs on its own. Idempotent per Group/plan/term the same way a single apply is: re-running finds every Offering already has the Group and changes nothing.',
         responses: {
             200: { description: 'advanced: one entry per Group actually moved. failed: one entry per (plan, term) batch that could not be applied, naming every Group it would have covered.' },
             403: { description: 'Caller lacks offering_plan.apply.' },
@@ -37,8 +37,8 @@ interface FailedBatch {
 }
 
 /**
- * Bulk "advance" — issue #100's actual shape once "which phase is a Group
- * in" turned out to already be answerable with no new entity: nothing here
+ * Bulk "advance": issue #100's actual shape once "which phase is a Group
+ * in" turned out to already be answerable with no new entity. Nothing here
  * is stored either, it just runs the SAME per-Group advance a person could
  * already trigger one at a time (`ManageGroupApplyPlan.vue`'s "Advance"
  * button), for every Group that has one, in a single action.
@@ -46,12 +46,12 @@ interface FailedBatch {
  * BATCHED BY (targetPlanId, targetTermId), not by Group: several Groups
  * landing on the same successor plan and Term share one apply pass, the same
  * reuse `POST /api/offering-plan-apply/:id`'s own `groupIds` bulk shape
- * relies on — and for the same reason, each batch is SEQUENTIAL across its
+ * relies on. For the same reason, each batch is SEQUENTIAL across its
  * Groups (`applyOfferingPlanItems` reads "what already exists" then writes,
  * so a concurrent second Group in the same batch would race that read).
  *
  * A GROUP CAN HAVE MORE THAN ONE ELIGIBLE ADVANCE (on more than one plan at
- * once) — each is its own entry here, exactly matching what clicking
+ * once): each is its own entry here, exactly matching what clicking
  * "Advance" on each of that Group's rows individually would do.
  *
  * A batch failing (the successor plan has no items yet, or a template is

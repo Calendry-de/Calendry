@@ -18,13 +18,13 @@
  *
  * It is a status pill, not a warning banner: the neutral surface and the accent
  * dot are the same pair the app uses for "the system is telling you where it
- * is", and deliberately not the error or warning palette — those two mean a
+ * is", and deliberately not the error or warning palette, since those two mean a
  * violation in this product and must keep meaning only that (DESIGN.md, "State
  * colors are separate and mean only themselves").
  */
 defineProps<{
     label: string;
-    /** Optional trailing fact — a version, a date. Rendered quieter than the label. */
+    /** Optional trailing fact, such as a version or a date. Rendered quieter than the label. */
     detail?: string;
 }>();
 </script>
@@ -53,7 +53,7 @@ defineProps<{
 
         background: $primary500;
 
-        // Present, not noticed — and it collapses under prefers-reduced-motion
+        // Present, not noticed, and it collapses under prefers-reduced-motion
         // through the global rule in layout.scss.
         animation: status-pulse 2.4s ease-in-out infinite;
     }

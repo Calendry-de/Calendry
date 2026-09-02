@@ -7,7 +7,7 @@ import { withRequestTenant } from '../../../../utils/tenantDb';
 /**
  * Revoke one of a login's Person's API tokens, as this institution's admin.
  *
- * `account.manage`, not `account.read` — this is a write, same tier as
+ * `account.manage`, not `account.read`: this is a write, same tier as
  * resetting a password or signing a login out everywhere. NOT gated behind
  * `assertSoleTenant`: a token acts as the Person inside THIS tenant alone
  * (`ApiToken.tenantId`), so revoking one has no cross-tenant reach the way a
@@ -15,7 +15,7 @@ import { withRequestTenant } from '../../../../utils/tenantDb';
  *
  * `deleteMany` with the person predicate in the WHERE, the same shape the
  * self-service route uses: somebody else's token id, or a token id belonging
- * to a person outside this scope, deletes zero rows and reads as 404 —
+ * to a person outside this scope, deletes zero rows and reads as 404,
  * never as a permission error that confirms the row exists.
  */
 export default defineEventHandler(async (event) => {

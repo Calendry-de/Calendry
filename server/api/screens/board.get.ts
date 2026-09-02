@@ -14,12 +14,12 @@ import { resolveScreenKey } from '../../utils/authDb';
  * ROOM-CENTRIC, and that is the whole reason this is a route rather than a
  * query parameter on the schedule. Every existing view answers "when is this
  * group/person busy"; somebody standing in a corridor is asking the transposed
- * question — "what is happening in the rooms around me, and is this one free
+ * question: "what is happening in the rooms around me, and is this one free
  * right now". The grid cannot be reshaped into that answer by filtering.
  *
  * AUTHORITY IS THE KEY, NOT A PERMISSION. A screen resolves to a
  * `ScreenIdentity` whose `actorPersonId` is null, so `requirePermission()` would
- * throw 403 for it no matter which permission were named — deliberately: a
+ * throw 403 for it no matter which permission were named. That is deliberate: a
  * display holds no role and must never be able to acquire one. Its authority is
  * its room scope, and this route is the only thing that reads it.
  *
@@ -32,8 +32,8 @@ export default defineEventHandler(async (event) => {
 
     /*
      * The REVOKED case, answered before identity resolution. The resolver treats
-     * an inactive screen as no identity at all — correct for it, since a revoked
-     * key must not act — but that would reach the display as a bare 401, which
+     * an inactive screen as no identity at all (correct for it, since a revoked
+     * key must not act), but that would reach the display as a bare 401, which
      * looks exactly like a mistyped URL. A screen that has been deliberately
      * turned off should say so, because that is a fact somebody walking past can
      * act on.
@@ -52,7 +52,7 @@ export default defineEventHandler(async (event) => {
 
     return withRequestTenant(event, async (tx, identity) => {
         if (identity.kind !== 'screen') {
-            // Everyone but the device pays the ordinary permission — a human
+            // Everyone but the device pays the ordinary permission: a human
             // previewing, an API token just the same. `!== 'screen'` rather
             // than `=== 'account'` so a principal added later is gated here by
             // default instead of slipping through unchecked.
@@ -62,8 +62,8 @@ export default defineEventHandler(async (event) => {
         const now = new Date();
 
         /*
-         * The scope itself. An EMPTY `roomIds` means every room — fail-open,
-         * matching the table — so it becomes an absent filter rather than
+         * The scope itself. An EMPTY `roomIds` means every room (fail-open,
+         * matching the table), so it becomes an absent filter rather than
          * `in: []`, which would silently match nothing and produce a blank
          * display for the most common configuration there is. Read straight
          * off the identity, with no query: it is also exactly what the cache
@@ -74,13 +74,13 @@ export default defineEventHandler(async (event) => {
         /*
          * A liveness stamp, recorded on EVERY successful fetch and therefore
          * before anything that can return early, and NEVER affected by the
-         * cache below — a screen that only ever hits a cached response must
+         * cache below: a screen that only ever hits a cached response must
          * still be marked seen.
          *
          * Two bugs live here, both shipped and both caught by checking the column
          * rather than the response. First it was a fire-and-forget
          * `getPrisma().$executeRaw` OUTSIDE this transaction, which matched zero
-         * rows every time — the app role runs under `FORCE ROW LEVEL SECURITY`
+         * rows every time, because the app role runs under `FORCE ROW LEVEL SECURITY`
          * and there is no `current_tenant_id()` out there. Then, once inside, it
          * sat AFTER the no-term return, so every display in the institution
          * looked dead for the whole summer.
@@ -96,13 +96,13 @@ export default defineEventHandler(async (event) => {
          * Cache freshness (issue #66): keyed per tenant + room-scope, as
          * polled continuously by wall-mounted displays. `screenName` and
          * `generatedAt` are deliberately assembled AFTER this, never inside
-         * it — see `boardCacheKey`'s own comment on why (two screens can
+         * it; see `boardCacheKey`'s own comment on why (two screens can
          * share a room scope while having different names).
          *
          * "Immediately visible after a manual edit" depends on
          * `invalidateScheduleCache()` firing from `appendEvent()`
          * (server/utils/sessionEvents.ts). The TTL backstop additionally
-         * bounds how stale `current`/`next`/`isNow` can get between events —
+         * bounds how stale `current`/`next`/`isNow` can get between events:
          * those are minute-sensitive even with no schedule change at all
          * (a class starting or ending), which an event-only invalidation
          * would never catch; "today's board barely changes minute to
@@ -127,7 +127,7 @@ type BoardPayload =
 async function buildBoardPayload(tx: Tx, options: { tenantId: string; scopedRoomIds: string[]; now: Date }): Promise<BoardPayload> {
     /*
      * "Today" and "now" are the TENANT's, never the server's
-     * (Tenant.timezone — all grid logic runs in that zone). The server
+     * (Tenant.timezone: all grid logic runs in that zone). The server
      * clock is typically UTC in a container, so deriving the weekday or
      * the minute-of-day from it would shift every entry for an
      * institution in another zone, and flip the day entirely around
@@ -157,11 +157,11 @@ async function buildBoardPayload(tx: Tx, options: { tenantId: string; scopedRoom
     });
 
     /*
-     * NO TERM RUNNING is a legitimate, common state — the summer between two
-     * terms — and it is NAMED rather than left to look like an outage.
+     * NO TERM RUNNING is a legitimate, common state (the summer between two
+     * terms), and it is NAMED rather than left to look like an outage.
      *
      * The rooms still come back, empty. A corridor display in August should
-     * read "Room A — Free", which is true and useful, plus a line saying no
+     * read "Room A: Free", which is true and useful, plus a line saying no
      * term is running; returning nothing at all would make a working screen
      * indistinguishable from a broken one for two months of the year. An
      * earlier version returned `rooms: []` here and did exactly that.
@@ -187,9 +187,9 @@ async function buildBoardPayload(tx: Tx, options: { tenantId: string; scopedRoom
 
     /**
      * `.filter(isPlacedSession)` narrows `blockIndex` to `number` below.
-     * Redundant with the `where` clause at runtime — `termWeek`/`dayOfWeek`
+     * Redundant with the `where` clause at runtime: `termWeek`/`dayOfWeek`
      * are equality-matched against concrete numbers, so a banked Session
-     * (issue #22, both null) can never be a row here — but a WHERE clause
+     * (issue #22, both null) can never be a row here. But a WHERE clause
      * proves nothing to the type checker.
      */
     const sessions = (await tx.session.findMany({

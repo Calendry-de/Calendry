@@ -6,7 +6,7 @@ import { FALLBACK_LOCALE, parseAcceptLanguage } from '#shared/locale';
  * WHY THIS IS NOT JUST `navigator.language`
  *
  * The schedule renders on the SERVER first. `navigator` does not exist there,
- * and Node's default locale is not the viewer's — so formatting with the
+ * and Node's default locale is not the viewer's, so formatting with the
  * "current" locale on each side produces different text for the same date, and
  * Vue patches mismatched TEXT on hydration while explicitly refusing to patch
  * mismatched ATTRIBUTES. This codebase has been bitten by that class four times
@@ -20,15 +20,15 @@ import { FALLBACK_LOCALE, parseAcceptLanguage } from '#shared/locale';
  *
  * WHY NOT REFINE TO `navigator.language` AFTER MOUNT
  *
- * It would almost always be identical — `navigator.language` is the first entry
- * of `Accept-Language` — so the only reliable effect would be re-rendering
+ * It would almost always be identical, since `navigator.language` is the first
+ * entry of `Accept-Language`, so the only reliable effect would be re-rendering
  * every date on every load to produce the same text. Where they DO differ, the
  * header is the better answer anyway: it is what the user configured their
  * browser to request content in.
  *
  * EXTENDED FOR ISSUE #17: a signed-in visitor's session already carries the
  * fully resolved locale (`SessionState.locale`, computed server-side by
- * `resolveLocale` from Person → Tenant → this same header parse — see
+ * `resolveLocale` from Person → Tenant → this same header parse; see
  * `shared/locale.ts`). That value wins when present; the header-only
  * `useState` below is now specifically the ANONYMOUS-route answer
  * (`auth.global.ts`'s `ANONYMOUS_ROUTES` never call `fetchSession()`, so

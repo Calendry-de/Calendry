@@ -22,7 +22,7 @@ import type { LandingFeature } from '~/utils/landingContent';
 /**
  * The technical section's contents, composed for the inverse band.
  *
- * The page had exactly one moment of scale — the `h1` — and then ran at 13px
+ * The page had exactly one moment of scale (the `h1`), and then ran at 13px
  * for four fifths of its length. This is the second one, and it is spent on the
  * most defensible sentence available: a measured number. Set large, in running
  * prose, with tabular numerals for the same reason every clock time in the

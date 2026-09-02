@@ -19,7 +19,7 @@ const bodySchema = z.object({
 
 /**
  * A lecturer sets how THEIR OWN module is taught across the term (issue
- * #28) — the same field an administrator already writes through
+ * #28), the same field an administrator already writes through
  * `PATCH /api/offerings/:id`, narrowed to a single field and to Offerings
  * the caller actually leads.
  *
@@ -27,7 +27,7 @@ const bodySchema = z.object({
  * generic route is gated on `offering.update`, a much wider authority (title,
  * groups, capacity, everything else an Offering is) that this feature must
  * not require. Session's editing operations are explicit verbs for the same
- * reason — the permission and the write have to name the same thing.
+ * reason: the permission and the write have to name the same thing.
  *
  * CO-TAUGHT OFFERINGS: last write wins. Any Person currently in
  * `OfferingLecturer` for this module may set it; there is no vote and no
@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
         await requirePermission(event, tx, 'offering.set_scheduling_pattern');
 
         // Ownership checked against `OfferingLecturer`, never assumed from
-        // holding the permission alone — see `assertLecturesOffering`.
+        // holding the permission alone; see `assertLecturesOffering`.
         await assertLecturesOffering(tx, identity, offeringId);
 
         const updated = await tx.offering.update({

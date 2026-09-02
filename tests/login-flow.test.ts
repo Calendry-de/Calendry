@@ -5,7 +5,7 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 /**
  * Page-level routing for the login flow.
  *
- * The route guard is a convenience, not a security boundary — the API enforces
+ * The route guard is a convenience, not a security boundary: the API enforces
  * auth independently. It is still worth testing, because a guard that silently
  * lets an unauthenticated visitor onto a page produces a broken screen full of
  * failed requests, and one that bounces a signed-in user produces a redirect
@@ -36,7 +36,7 @@ afterAll(async () => {
 
 describe('unauthenticated routing', () => {
     it('redirects a protected page to /login', async () => {
-        // `/` is the PUBLIC landing page, so the protected home is /dashboard —
+        // `/` is the PUBLIC landing page, so the protected home is /dashboard,
         // and this assertion has to name it, or the suite would be testing the
         // guard against a route the guard deliberately ignores.
         const res = await page('/dashboard');

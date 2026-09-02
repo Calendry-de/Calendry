@@ -6,10 +6,10 @@ import { ACCOUNTS, type Fixtures, TEST_PASSWORD, ownerDb, seed, teardown } from 
 import { assembleSolverInput, encodeInput } from '../server/utils/solverInput';
 
 /**
- * SolverInputSnapshot (issue #24) — the full `SolverInput` a run sent, not
+ * SolverInputSnapshot (issue #24): the full `SolverInput` a run sent, not
  * just its hash. Exercised at the data layer (round-trip through gzip +
  * RLS) and through the real `GET /api/solver/runs/[id]/snapshot` route
- * (permission gate, 404 shapes) — never through a real `POST /api/solver/runs`,
+ * (permission gate, 404 shapes), never through a real `POST /api/solver/runs`,
  * which would need a live solver run to complete.
  */
 let f: Fixtures;
@@ -90,7 +90,7 @@ describe('GET /api/solver/runs/[id]/snapshot', () => {
         expect(res.status).toBe(200);
         expect(res.body.runId).toBe(run.id);
         // `toJSON` round-trips through the wire encoding, which is the fact
-        // this endpoint exists to prove — not a structural-equality accident.
+        // this endpoint exists to prove, not a structural-equality accident.
         expect(SolverInput.encode(SolverInput.fromJSON(res.body.input)).finish())
             .toEqual(SolverInput.encode(input).finish());
 
@@ -123,7 +123,7 @@ describe('GET /api/solver/runs/[id]/snapshot', () => {
         const res = await api(`/api/solver/runs/${run.id}/snapshot`, { cookie });
 
         // Through the real app-role connection, not `ownerDb` (a superuser,
-        // which bypasses RLS regardless of FORCE and so cannot exercise it) —
+        // which bypasses RLS regardless of FORCE and so cannot exercise it):
         // the route's own `tenantId` filter on `solverRun.findFirst` is the
         // thing under test here, RLS is the second layer behind it.
         expect(res.status).toBe(404);

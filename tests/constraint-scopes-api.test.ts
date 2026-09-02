@@ -7,8 +7,8 @@ import { api, login } from './helpers/client';
  * duplicates.
  *
  * WHY THE GUARD EXISTS. Every live catalogue type now has a DEFAULT row per
- * tenant, so a second unscoped row of the same type is not an "additional rule"
- * — it is a second tenant-wide rule with its own weight, and both are sent to
+ * tenant, so a second unscoped row of the same type is not an "additional rule":
+ * it is a second tenant-wide rule with its own weight, and both are sent to
  * the solver. That is the duplicate-constraint defect this project already
  * fixed once, and the "Add scoped variant" button reintroduced it by creating
  * rows it had no way to scope.
@@ -84,7 +84,7 @@ describe('a variant of a type that already has a default', () => {
     });
 
     it('is ACCEPTED when it names a kind, and stores the scope in the same request', async () => {
-        const res = await create({ name: 'Exam weeks — seminars', scopes: [{ kindId }] });
+        const res = await create({ name: 'Exam weeks: seminars', scopes: [{ kindId }] });
 
         expect(res.status).toBe(201);
         expect(res.body.isDefault).toBe(false);
@@ -94,7 +94,7 @@ describe('a variant of a type that already has a default', () => {
             select: { kindId: true, offeringId: true },
         });
 
-        // One request, both rows — not "create then scope", which would leave a
+        // One request, both rows, not "create then scope", which would leave a
         // window where the variant was an unscoped duplicate.
         expect(scopes).toEqual([{ kindId, offeringId: null }]);
     });

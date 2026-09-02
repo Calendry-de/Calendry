@@ -14,9 +14,9 @@ services:
       - PORT=3000
       - HOME=/app
       # `environment` beats `env_file`, so this overrides .env's HOST value
-      # without editing it — host-run tooling still needs 127.0.0.1 there.
+      # without editing it: host-run tooling still needs 127.0.0.1 there.
       - CALENDRY_SOLVER_ADDR=solver:50051
-      # ⚠ UNVERIFIED — NEEDS REVISITING. Left in place so it is not forgotten,
+      # ⚠ UNVERIFIED, NEEDS REVISITING. Left in place so it is not forgotten,
       # but do not trust it until someone actually runs `docker compose up`.
       #
       # This was built for the .npmrc mechanism, which Stage 1 replaced with
@@ -26,7 +26,7 @@ services:
       #
       # The constraint that made it awkward still stands: the dev container runs
       # `bun install` from its ENTRYPOINT (the repo is bind-mounted), so a
-      # BuildKit secret cannot reach it — and HOME is /app, which IS the repo,
+      # BuildKit secret cannot reach it, and HOME is /app, which IS the repo,
       # so mounting at $HOME/.bunfig.toml would drop a token into the working
       # tree. The likely fix is `bun install -c /run/secrets/bunfig` in
       # entrypoint.dev.sh, but a probe of `-c` produced no registry request, so
@@ -39,9 +39,9 @@ services:
       - "51212:51212"
     volumes:
       - .:/app:rw
-      # Read-only, and the host path is the developer's own ~/.npmrc — the token
+      # Read-only, and the host path is the developer's own ~/.npmrc: the token
       # never enters the repo or any image layer.
-      # ⚠ Same deferral as the variable above — path and mechanism unverified.
+      # ⚠ Same deferral as the variable above: path and mechanism unverified.
       - ${HOME}/.npmrc:/run/secrets/npmrc:ro
     depends_on:
       db:
@@ -50,13 +50,13 @@ services:
         condition: service_started
 
   db:
-    # Must match docker-compose.yml — dev and prod on different major versions
+    # Must match docker-compose.yml: dev and prod on different major versions
     # means migrations are verified against something production never runs.
     image: 'postgres:18.1-alpine'
     # Published for HOST-side tooling only: the Prisma CLI, the integration
     # tests and `provision:tenant` all run outside the compose network, where
     # the `db` hostname does not resolve. Deliberately not 5432, so this cannot
-    # collide with a Postgres already installed on the machine. Dev only — the
+    # collide with a Postgres already installed on the machine. Dev only; the
     # production compose file exposes nothing.
     ports:
       - "55432:5432"
@@ -89,7 +89,7 @@ services:
   redis:
     # Published for HOST-side tooling only, same reasoning as db/solver above.
     # Not 6379, so this cannot collide with a Redis already installed on the
-    # machine — matches db's 55432 for the same reason. REDIS_URL_HOST in
+    # machine, matching db's 55432 for the same reason. REDIS_URL_HOST in
     # .env(.example) points here.
     ports:
       - "63790:6379"

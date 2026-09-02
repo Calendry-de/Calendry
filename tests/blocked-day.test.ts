@@ -4,7 +4,7 @@ import { api, login } from './helpers/client';
 import { isoWeekday } from '../shared/academicCalendar';
 
 /**
- * "I cannot teach this day" — issue #2, filed from `/schedule` rather than
+ * "I cannot teach this day": issue #2, filed from `/schedule` rather than
  * `/my/availability`.
  *
  * ONE ROUTE, TWO ENTRY SHAPES, not a new endpoint: `POST /api/me/availability/
@@ -13,7 +13,7 @@ import { isoWeekday } from '../shared/academicCalendar';
  * to exactly one Term.
  *
  * WHY A TERM AT ALL. `PersonUnavailability.termId IS NULL` means "every
- * term" — correct for a recurring pattern ("every Friday"), and wrong for a
+ * term": correct for a recurring pattern ("every Friday"), and wrong for a
  * single date: `weeks:[2]` with no term reached both of this fixture's terms
  * at once before `termId` existed, months apart on the calendar. A
  * date-derived row is unambiguously one term's week, so this is the one
@@ -46,7 +46,7 @@ describe('a single date', () => {
 
         // The whole point: a term IS recorded, unlike the recurring path.
         expect(row.termId).toBe(f.termA);
-        // ONE weekday — the one the date falls on — not every day of the week.
+        // ONE weekday (the one the date falls on), not every day of the week.
         expect(row.days).toEqual([isoWeekday(new Date(DATE))]);
         // Every block that day, not a narrower slice: "I can't teach THIS DAY".
         expect(row.blocks).toEqual([]);
@@ -82,7 +82,7 @@ describe('a single date', () => {
 });
 
 describe('the recurring pattern, unchanged', () => {
-    it('still writes no Term — "every Friday, every term" — exactly as before', async () => {
+    it('still writes no Term, "every Friday, every term", exactly as before', async () => {
         const res = await api<{ id: string }>('/api/me/availability/vetoes', {
             method: 'POST', cookie, body: JSON.stringify({ days: [5], blocks: [], weeks: [] }),
         });

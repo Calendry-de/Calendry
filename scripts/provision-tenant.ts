@@ -5,7 +5,7 @@
  * -------------------------------------
  * The app role literally cannot create a tenant. The RLS write policy on
  * `tenant` is `id = calendry.current_tenant_id()`, which is unsatisfiable for a
- * row that does not exist yet — there is no context to set. Provisioning
+ * row that does not exist yet, since there is no context to set. Provisioning
  * therefore needs the OWNER connection.
  *
  * Exposing this over HTTP would mean the Nuxt process holds owner credentials,
@@ -14,25 +14,25 @@
  * property that the running application cannot do any of those things.
  *
  * ISSUE #76 ADDED A SECOND CALLER: `POST /api/staff/tenants`, gated by
- * `requireStaffIdentity()` — a Calendry-staff-only credential, the fourth
- * tenant-isolation exception (CLAUDE.md, DECISIONS.md "Staff principal — the
+ * `requireStaffIdentity()`, a Calendry-staff-only credential and the fourth
+ * tenant-isolation exception (CLAUDE.md, DECISIONS.md "Staff principal, the
  * fourth tenant-isolation exception"). That is still not self-service signup
  * (an ordinary tenant Account can never reach it), so the property this
  * comment describes is unchanged: the RUNTIME app role still cannot create a
  * tenant, and the owner credential still never leaves routes gated
- * specifically for it. The actual tenant-creation logic lives in ONE place —
+ * specifically for it. The actual tenant-creation logic lives in ONE place,
  * `calendry_internal.staff_create_tenant()`, a SECURITY DEFINER SQL function
- * (issue #105) — called via `provisionTenantViaFunction()`
+ * (issue #105), called via `provisionTenantViaFunction()`
  * (`server/utils/staffCreateTenant.ts`) so this CLI and that route share one
  * implementation rather than two that can drift, the way they briefly did
- * between issues #105 and #107. This file is the CLI shell around it —
+ * between issues #105 and #107. This file is the CLI shell around it:
  * argument parsing, the owner connection (needed only because `tenant`'s RLS
- * write policy is unsatisfiable before the row exists — the function itself
+ * write policy is unsatisfiable before the row exists; the function itself
  * is what runs privileged, not this connection), and reporting.
  *
- * `calendry_internal.staff_create_tenant()` is already atomic on its own — a
- * single statement invoking a SQL function, see the migration's own
- * "ATOMICITY" note — so this CLI wraps it in no `$transaction` of its own: a
+ * `calendry_internal.staff_create_tenant()` is already atomic on its own, a
+ * single statement invoking a SQL function (see the migration's own
+ * "ATOMICITY" note), so this CLI wraps it in no `$transaction` of its own: a
  * failure leaves no half-built tenant for someone to discover later.
  *
  *   bun run provision:tenant -- \
@@ -75,7 +75,7 @@ async function main() {
     } catch (error) {
         console.error(
             `\n${error instanceof Error ? error.message : String(error)}\n\n`
-            + 'Provisioning requires the OWNER connection — the runtime role cannot\n'
+            + 'Provisioning requires the OWNER connection: the runtime role cannot\n'
             + 'create tenants by design.\n',
         );
         process.exit(1);
@@ -91,7 +91,7 @@ async function main() {
         console.log(`\nProvisioned tenant '${result.tenant.slug}' (${result.tenant.id})`);
         console.log(`  Admin Person : ${result.person.id} <${result.person.email}>`);
         console.log(`  Access role  : tenant-admin (all ${PERMISSIONS.length} permissions)`);
-        console.log('  Access role  : member (session.read_own) — the default, assign it to people');
+        console.log('  Access role  : member (session.read_own): the default, assign it to people');
         console.log(`  Domain role  : lecturer (is_system)`);
         console.log(
             `  Constraints  : ${DEFAULT_CONSTRAINTS.length} default rows`
@@ -100,7 +100,7 @@ async function main() {
         );
 
         if (result.account.reusedAccount) {
-            console.log('\n  Existing account reused — the current password is unchanged.');
+            console.log('\n  Existing account reused: the current password is unchanged.');
         } else {
             console.log(`\n  Initial password: ${result.initialPassword}`);
             console.log('  Shown once and never recoverable. Must be changed at first sign-in.');
@@ -115,14 +115,14 @@ async function main() {
             console.error(`\n${message}\n`);
         } else if (rawPostgresErrorCode(error) === '23505') {
             // `calendry_internal.staff_create_tenant()` raises the ordinary
-            // `unique_violation` SQLSTATE for a duplicate slug — surfaced via
+            // `unique_violation` SQLSTATE for a duplicate slug, surfaced via
             // `$queryRaw` as a P2010 wrapper, not the P2002
             // `Prisma.PrismaClientKnownRequestError` a `tx.tenant.create()`
             // call used to raise, so the old `message.includes('Unique
             // constraint')` text match no longer fires. See
             // `rawPostgresErrorCode()`'s own comment
             // (`server/utils/staffCreateTenant.ts`) for why `.originalCode`
-            // is the only reliable field here — same check
+            // is the only reliable field here, same check
             // `POST /api/staff/tenants` uses for the identical error.
             console.error(`\nA tenant with slug '${slug}' already exists. Provisioning creates, it does not update.\n`);
         } else if (isUnreachableDatabaseError(message)) {

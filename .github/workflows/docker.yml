@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       # bun install fetches @calendry-de/calendry-proto from GitHub Packages.
-      # PACKAGES_READ_TOKEN must be a CLASSIC PAT with read:packages — the
+      # PACKAGES_READ_TOKEN must be a CLASSIC PAT with read:packages: the
       # registry refuses fine-grained tokens. Written outside the build context
       # and passed as a BuildKit secret so it never lands in a layer.
       - name: Write registry credential
@@ -130,7 +130,7 @@ jobs:
           COUNT="$(docker compose -f docker-compose.yml exec -T db \
             psql -U calendry -d calendrydb -tAc 'select count(*) from permission')"
           echo "permission rows: ${COUNT}"
-          [ "${COUNT}" -ge 1 ] || { echo "::error::permission catalogue empty — db seed did not run"; exit 1; }
+          [ "${COUNT}" -ge 1 ] || { echo "::error::permission catalogue empty: db seed did not run"; exit 1; }
 
       - name: Logs on failure
         if: failure()

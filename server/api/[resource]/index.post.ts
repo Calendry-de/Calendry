@@ -93,7 +93,7 @@ defineRouteMeta({
                                     curriculumPlanId: {
                                         type: 'string',
                                         nullable: true,
-                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering — an administrative hint, never derived from or resolved against its actual offerings.',
+                                        description: 'The curriculum plan this group INTENDS to follow, before it has a single offering: an administrative hint, never derived from or resolved against its actual offerings.',
                                     },
                                 },
                             },
@@ -215,7 +215,7 @@ defineRouteMeta({
                             {
                                 title: 'offering-templates',
                                 type: 'object',
-                                description: 'A reusable Offering shape (issue #8); every field is optional except `name` — a template states only the part of the shape it wants to fix. Never federation-ownable.',
+                                description: 'A reusable Offering shape (issue #8); every field is optional except `name`, since a template states only the part of the shape it wants to fix. Never federation-ownable.',
                                 required: ['name'],
                                 properties: {
                                     name: {
@@ -571,7 +571,7 @@ export default defineEventHandler(async (event) => {
     return withRequestTenant(event, async (tx, identity) => {
         await requireAnyPermission(event, tx, crudPermission(resource as string, 'create'));
 
-        // tenant_id comes from resolved identity, never from the request body —
+        // tenant_id comes from resolved identity, never from the request body:
         // otherwise a caller could mint rows into another tenant. The RLS WITH
         // CHECK clause would reject that anyway; this makes it unrepresentable.
         //
