@@ -1478,6 +1478,7 @@ export function manageEntities(t: Translate): ManageEntity[] {
                 { key: 'color', label: t('common.field.colour'), format: 'swatch' },
                 { key: 'type', label: t('manage.sessionKind.column.type') },
                 { key: 'requiresGroup', label: t('manage.sessionKind.column.requiresGroup'), format: 'boolean' },
+                { key: 'requiresLecturer', label: t('manage.sessionKind.column.requiresLecturer'), format: 'boolean' },
             ],
             fields: [
                 {
@@ -1530,6 +1531,12 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     label: t('manage.sessionKind.field.requiresGroup.label'),
                     type: 'boolean',
                     help: t('manage.sessionKind.field.requiresGroup.help'),
+                },
+                {
+                    key: 'requiresLecturer',
+                    label: t('manage.sessionKind.field.requiresLecturer.label'),
+                    type: 'boolean',
+                    help: t('manage.sessionKind.field.requiresLecturer.help'),
                 },
             ],
         },

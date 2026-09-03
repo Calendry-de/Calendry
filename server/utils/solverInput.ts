@@ -236,6 +236,24 @@ export interface AssemblyReport {
      */
     offeringsWithInsufficientLecturers: { id: string; title: string; required: number; available: number }[];
     /**
+     * Offerings sent with an EMPTY candidate pool and no explicit
+     * `requiredLecturerCount` (issue #130). The derivation
+     * `requiredLecturerCount ?? Math.min(1, pool.length)` is deliberate for a
+     * non-empty pool, and collapses to zero for an empty one: the wire then
+     * reads "requires zero lecturers", identical to what a genuinely
+     * lecturer-free kind (self-directed study, `SessionKind.requiresLecturer
+     * = false`) sends on purpose. This is the ONLY signal that tells the two
+     * apart, so it is reported rather than silently accepted for every OTHER
+     * kind, where an empty pool means nobody has staffed the Offering yet.
+     *
+     * Disjoint from `offeringsWithInsufficientLecturers` above: that entry
+     * fires on an explicit, too-large `requiredLecturerCount`; this one fires
+     * only when the count was never set at all, so a tenant who explicitly
+     * wrote `requiredLecturerCount: 0` — a deliberate per-Offering statement,
+     * not the kind's default — is not reported either.
+     */
+    offeringsWithNoLecturerAssigned: { id: string; title: string }[];
+    /**
      * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO` of
      * the teaching week. Warn-and-allow (TAXONOMY.md §3): an administrator already
      * approved it, but an infeasible term traces back to somebody's calendar more
@@ -1266,6 +1284,7 @@ export async function assembleSolverInput(
         id: string; title: string; members: number; expected: number;
     }[] = [];
     const offeringsWithInsufficientLecturers: AssemblyReport['offeringsWithInsufficientLecturers'] = [];
+    const offeringsWithNoLecturerAssigned: AssemblyReport['offeringsWithNoLecturerAssigned'] = [];
     const offeringsWithUnsatisfiableRoomRestriction: AssemblyReport['offeringsWithUnsatisfiableRoomRestriction'] = [];
     const offeringsWithRestrictionBelowRoomCount: AssemblyReport['offeringsWithRestrictionBelowRoomCount'] = [];
     const pinnedRoomsNotSent: AssemblyReport['pinnedRoomsNotSent'] = [];
@@ -1522,6 +1541,21 @@ export async function assembleSolverInput(
                     required: offering.requiredLecturerCount,
                     available: offering.lecturers.length,
                 });
+            }
+
+            /*
+             * `requiredLecturerCount === null`, not merely falsy: an explicit
+             * `0` is the tenant overriding the kind's default for this ONE
+             * Offering (a study period inside an otherwise-taught kind, say),
+             * and is as deliberate as `SessionKind.requiresLecturer = false`
+             * itself. Only the case nobody actually decided is reported.
+             */
+            if (
+                offering.requiredLecturerCount === null
+                && offering.lecturers.length === 0
+                && offering.kind.requiresLecturer
+            ) {
+                offeringsWithNoLecturerAssigned.push({ id: wireId, title: offering.title });
             }
 
             const minCapacity = offering.requiredCapacity ?? derived?.capacity ?? 0;
@@ -2095,6 +2129,7 @@ export async function assembleSolverInput(
             offeringsWithNoDerivableCapacity,
             offeringsWithPartialEnrolment,
             offeringsWithInsufficientLecturers,
+            offeringsWithNoLecturerAssigned,
             offeringsWithUnsatisfiableRoomRestriction,
             offeringsWithRestrictionBelowRoomCount,
             groupsWithForcedOnlineAboveShareCap,

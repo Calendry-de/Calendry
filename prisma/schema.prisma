@@ -1350,6 +1350,17 @@ model SessionKind {
   /// (TAXONOMY.md §9.5).
   requiresGroup Boolean @default(true) @map("requires_group")
 
+  /// Declares whether an Offering of this kind is expected to carry a
+  /// lecturer. TRUE (every kind that predates this column) preserves the
+  /// status quo: an empty `offering_lecturer` pool on such an Offering is
+  /// reported (`AssemblyReport.offeringsWithNoLecturerAssigned`), because
+  /// nothing else distinguishes "nobody has staffed this yet" from "this kind
+  /// never needs one" — the solver reads an empty pool as "requires zero
+  /// lecturers" either way (issue #130). Set FALSE for a kind such as
+  /// self-directed study, where an empty pool is the correct, permanent state
+  /// and the report would otherwise fire on every run forever.
+  requiresLecturer Boolean @default(true) @map("requires_lecturer")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

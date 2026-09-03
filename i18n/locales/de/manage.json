@@ -192,7 +192,8 @@
         "column": {
             "key": "Schlüssel",
             "type": "Typ",
-            "requiresGroup": "Mit Gruppen"
+            "requiresGroup": "Mit Gruppen",
+            "requiresLecturer": "Braucht Lehrkraft"
         },
         "field": {
             "key": {
@@ -209,6 +210,10 @@
             "requiresGroup": {
                 "label": "Hat Gruppen",
                 "help": "Ob bei Terminen dieser Art Gruppen zugeordnet sein sollen. Damit lässt sich eine gruppenbasierte Regel ablehnen, wenn sie auf eine Art zielt, die gar keine Gruppen hat."
+            },
+            "requiresLecturer": {
+                "label": "Braucht Lehrkraft",
+                "help": "Aus für Arten wie selbstständiges Lernen, bei denen ein Angebot ohne zugeordnete Person korrekt ist statt unbesetzt. Standardmäßig an: Ein Angebot einer Art, die eine Lehrkraft braucht und niemandem zugeordnet ist, wird beim nächsten Solver-Lauf gemeldet."
             }
         }
     },

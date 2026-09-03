@@ -192,7 +192,8 @@
         "column": {
             "key": "Key",
             "type": "Type",
-            "requiresGroup": "Has groups"
+            "requiresGroup": "Has groups",
+            "requiresLecturer": "Needs a lecturer"
         },
         "field": {
             "key": {
@@ -209,6 +210,10 @@
             "requiresGroup": {
                 "label": "Carries groups",
                 "help": "Whether sessions of this kind are expected to have Groups assigned. Lets a group-based constraint be rejected when aimed at a kind that has none."
+            },
+            "requiresLecturer": {
+                "label": "Needs a lecturer",
+                "help": "Off for a kind such as self-directed study, where an offering with nobody assigned is correct rather than unstaffed. On by default: an offering of a kind that needs one and has nobody assigned is flagged on the next solver run."
             }
         }
     },

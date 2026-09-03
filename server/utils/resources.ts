@@ -1411,6 +1411,12 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             // Lets the API reject a Group-scoped constraint aimed at a kind that
             // carries no Groups (TAXONOMY.md §9.5).
             requiresGroup: z.boolean().optional(),
+            // False for a kind whose Offerings are meant to carry no lecturer
+            // (self-directed study): suppresses
+            // `offeringsWithNoLecturerAssigned` for every Offering of this
+            // kind, since an empty pool there is correct rather than
+            // unstaffed (issue #130).
+            requiresLecturer: z.boolean().optional(),
             /*
              * The FIXED classification behind the tenant's own `key`/`name`.
              * Rules that are only meaningful about one class of session derive
@@ -1422,6 +1428,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             name: z.string().min(1).optional(),
             color: z.string().nullish(),
             requiresGroup: z.boolean().optional(),
+            requiresLecturer: z.boolean().optional(),
             type: z.enum(SESSION_KIND_TYPES).optional(),
         }),
         filters: z.object({ key: z.string().optional() }),

@@ -501,6 +501,10 @@ defineRouteMeta({
                                     requiresGroup: {
                                         type: 'boolean',
                                     },
+                                    requiresLecturer: {
+                                        type: 'boolean',
+                                        description: 'False for a kind whose Offerings are meant to carry no lecturer (self-directed study).',
+                                    },
                                     type: {
                                         type: 'string',
                                         enum: ['TEACHING', 'EXAM', 'ADMIN'],
