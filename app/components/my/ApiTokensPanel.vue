@@ -1,6 +1,7 @@
 <template>
     <section class="tokens">
-        <h2>{{ t('my.apiTokens.head') }}</h2>
+        <!-- No heading of its own: this panel has exactly one home,
+             `/my/api-tokens`, whose `h1` already says the same words. -->
         <p class="tokens_hint">{{ t('my.apiTokens.hint') }}</p>
 
         <p
@@ -107,7 +108,9 @@
 
         <CommonButton
             v-if="!creating"
-            type="secondary"
+            class="tokens_create"
+            type="outline"
+            icon="material-symbols:add"
             @click="startCreate"
         >{{ t('my.apiTokens.startCreate') }}</CommonButton>
 
@@ -663,13 +666,10 @@ async function copy(value: string) {
     flex-direction: column;
     gap: var(--space-5);
 
-    h2 {
-        font-size: var(--font-size-lg);
-        color: $content2;
-    }
-
     &_hint {
         max-width: 68ch;
+        margin: 0;
+
         font-size: var(--font-size-sm);
         line-height: 1.5;
         color: $content7;
@@ -684,6 +684,9 @@ async function copy(value: string) {
         font-size: var(--font-size-sm);
         color: $content7;
     }
+
+    // Its own width, not the column's (see `IcsLinksPanel`).
+    &_create { align-self: flex-start; }
 
     &_list {
         display: flex;

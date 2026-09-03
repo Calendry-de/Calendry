@@ -85,7 +85,11 @@ const props = defineProps({
         // button--type-secondary-875 class. Either add the SCSS or migrate that
         // caller to an implemented variant. ('transparent' was the other half
         // of this gap and now has styles.)
-        type: String as PropType<'primary' | 'secondary' | 'secondary-black' | 'secondary-875' | 'destructive' | 'link' | 'transparent'>,
+        // 'outline' is the hairline ghost: a visible control at rest for
+        // actions that are neither THE action (primary fill) nor chrome on
+        // other content (transparent). 'secondary' has no fill at rest, so a
+        // lone "Create…" button drawn with it read as a stray line of text.
+        type: String as PropType<'primary' | 'secondary' | 'secondary-black' | 'secondary-875' | 'destructive' | 'link' | 'transparent' | 'outline'>,
         default: 'primary',
     },
     orientation: {
@@ -377,6 +381,61 @@ const getAttrs = computed(() => {
 
     &--type-destructive .button_content {
         color: $error600;
+    }
+
+    /*
+     * THE HAIRLINE GHOST: `$surface5` edge, `$surface0` fill, `--radius-md`,
+     * the shape the schedule toolbar's toggles and the dashboard's account
+     * actions already draw by hand. Every state is restated (as `transparent`
+     * does) because the base `@include pc` hover above would otherwise fill
+     * it teal on wide viewports.
+     */
+    &--type-outline {
+        gap: var(--space-3);
+
+        padding: var(--space-3) var(--space-6);
+        border: 1px solid $surface5;
+        border-radius: var(--radius-md);
+
+        font-size: var(--font-size-sm);
+        color: $content5;
+
+        background: $surface0;
+
+        transition: border-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+            color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+            background 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+        @include pc {
+            &,
+            &:hover,
+            &:focus,
+            &:active {
+                background: $surface0;
+            }
+        }
+
+        @include hover {
+            &:hover {
+                border-color: $surface6;
+                color: $content2;
+                background: $surface0;
+            }
+        }
+
+        &:active,
+        &:focus {
+            background: $surface2;
+        }
+
+        &:focus-visible {
+            outline: 2px solid $primary600;
+            outline-offset: 1px;
+        }
+
+        .button_icon {
+            color: $content6;
+        }
     }
 
     &--orientation-vertical {

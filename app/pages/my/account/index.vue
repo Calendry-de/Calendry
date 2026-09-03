@@ -205,9 +205,11 @@ async function save() {
 <style scoped lang="scss">
 .intro {
     max-width: 68ch;
-    margin: 0 0 var(--space-7);
-    font-size: var(--font-size-sm);
-    color: $content7;
+    margin: 0;
+
+    font-size: var(--font-size-md);
+    line-height: var(--leading-prose);
+    color: $content6;
 }
 
 .note {
@@ -236,7 +238,10 @@ async function save() {
         flex-direction: column;
         gap: var(--space-5);
 
+        /* `margin: 0`: the browser's 0.83em on an `h2` doubled the group's own
+           gap, so the two sections floated apart from their fields. */
         h2 {
+            margin: 0;
             font-size: var(--font-size-lg);
             color: $content2;
         }
@@ -258,13 +263,16 @@ async function save() {
         flex-direction: column;
         gap: var(--space-2);
 
-        max-width: 24ch;
+        /* Wide enough for its own placeholder ("e.g. de-DE, leave empty to
+           inherit"), which 24ch clipped mid-word. */
+        max-width: 40ch;
 
         font-size: var(--font-size-sm);
         font-weight: 600;
         color: $content4;
 
         input {
+            width: 100%;
             padding: var(--space-3) var(--space-5);
             border: 1px solid $surface4;
             border-radius: var(--radius-lg);

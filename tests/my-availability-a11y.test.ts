@@ -313,11 +313,11 @@ describe('the hub is navigable by landmark and heading', () => {
          * saying nothing about the group above it.
          */
         expect(html).toMatch(/<h2[^>]*class="[^"]*groups_heading/);
-        expect(html).toMatch(/<h3[^>]*class="[^"]*cards_label/);
+        expect(html).toMatch(/<h3[^>]*class="[^"]*rows_label/);
 
         // And the level that moved is genuinely gone, not merely joined: a
         // card still rendering at `h2` would satisfy both matches above.
-        expect(html).not.toMatch(/<h2[^>]*class="[^"]*cards_label/);
+        expect(html).not.toMatch(/<h2[^>]*class="[^"]*rows_label/);
     });
 });
 

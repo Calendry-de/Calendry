@@ -9,13 +9,13 @@
             <CommonButton
                 href="/api/me/export?format=json"
                 icon="material-symbols:data-object"
-                type="secondary"
+                type="outline"
             >{{ t('common.action.downloadJson') }}</CommonButton>
 
             <CommonButton
                 href="/api/me/export?format=xlsx"
                 icon="material-symbols:table-outline"
-                type="secondary"
+                type="outline"
             >{{ t('common.action.downloadExcel') }}</CommonButton>
         </div>
     </section>
@@ -45,10 +45,9 @@ const { t } = useT();
     flex-direction: column;
     gap: var(--space-5);
 
-    padding: var(--space-7);
-    border-radius: var(--radius-xl);
-
-    background: $surface1;
+    /* Flat. It was a `$surface1` card on the `$surface1` page ground: no
+       visible edge, only a 24px indent that made the section look misaligned
+       under the page's own intro. */
 
     h2 {
         margin: 0;

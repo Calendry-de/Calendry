@@ -1,6 +1,7 @@
 <template>
     <section class="links">
-        <h2>{{ t('my.icsLinks.head') }}</h2>
+        <!-- No heading of its own: this panel has exactly one home,
+             `/my/calendar-links`, whose `h1` already says the same words. -->
         <p class="links_hint">{{ t('my.icsLinks.hint') }}</p>
 
         <p
@@ -59,7 +60,9 @@
 
         <CommonButton
             v-if="!creating"
-            type="secondary"
+            class="links_create"
+            type="outline"
+            icon="material-symbols:add"
             @click="startCreate"
         >{{ t('my.icsLinks.startCreate') }}</CommonButton>
 
@@ -414,17 +417,18 @@ async function copy(id: string, url: string) {
     flex-direction: column;
     gap: var(--space-5);
 
-    h2 {
-        font-size: var(--font-size-lg);
-        color: $content2;
-    }
-
     &_hint {
         max-width: 68ch;
+        margin: 0;
+
         font-size: var(--font-size-sm);
         line-height: 1.5;
         color: $content7;
     }
+
+    // Its own width, not the column's: a stretched, borderless button is a
+    // centred line of text nobody reads as a control.
+    &_create { align-self: flex-start; }
 
     &_empty {
         margin: 0;

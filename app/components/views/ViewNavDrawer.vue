@@ -68,6 +68,47 @@
                 </nav>
 
                 <!--
+                    THE SIDEBAR'S SECTIONS, grouped exactly as `CommonAppShell`
+                    groups them (`useAppSections` + `groupNavEntries`, the same
+                    two calls). Below 820px the shell renders no sidebar at all
+                    (see its own comment), so this drawer is the ONLY way from
+                    one management page to its siblings on a phone; without
+                    these groups the manage area would be reachable solely
+                    through the dashboard hub. Compact rows, no blurb: the
+                    header entries above are three destinations a first-time
+                    reader needs explained, these are a directory to scan.
+                -->
+                <nav
+                    v-if="groups.length"
+                    class="drawer_sections"
+                    :aria-label="t('nav.shell.sections')"
+                >
+                    <div
+                        v-for="group in groups"
+                        :key="group.id"
+                        class="drawer_group"
+                    >
+                        <h3 class="drawer_group-label">{{ group.label }}</h3>
+                        <NuxtLink
+                            v-for="entry in group.entries"
+                            :key="entry.id"
+                            class="drawer_section"
+                            :class="{ 'drawer_section--on': entry.active }"
+                            :to="entry.to!"
+                            :aria-current="entry.active ? 'page' : undefined"
+                            @click="close"
+                        >
+                            <Icon
+                                class="drawer_section-icon"
+                                :name="entry.icon"
+                                aria-hidden="true"
+                            />
+                            <span>{{ entry.label }}</span>
+                        </NuxtLink>
+                    </div>
+                </nav>
+
+                <!--
                     Search reaches the drawer because the header's own search
                     button is `display: none` below 1366px and Ctrl+K needs a
                     keyboard. Without this row the command palette (a real
@@ -95,7 +136,8 @@
 <script setup lang="ts">
 import { useT } from '~/composables/i18n';
 import type { ResolvedNavEntry } from '~/composables/navigation';
-import { useHeaderNav } from '~/composables/navigation';
+import { useAppSections, useHeaderNav } from '~/composables/navigation';
+import { groupNavEntries } from '~/utils/navGroups';
 import { useOverlay } from '~/composables/overlay';
 
 const { t } = useT();
@@ -121,6 +163,11 @@ const { t } = useT();
 const open = useState('calendry.nav.open', () => false);
 
 const entries = useHeaderNav();
+
+/* The one taxonomy the sidebar reads, so the drawer and the sidebar can never
+   disagree about what belongs where. Permission-filtered upstream. */
+const sections = useAppSections();
+const groups = computed(() => groupNavEntries(sections.value, t));
 
 /*
  * Resolved rather than imported: `NuxtLink` is a globally-registered component,
@@ -255,6 +302,12 @@ onMounted(() => {
     background: varToRgba('black', 0.45);
 
     &_panel {
+        // Its own scroller: with every management section in it the panel
+        // is taller than a phone, and a fixed sheet that cannot scroll simply
+        // cuts the last group off.
+        scrollbar-width: thin;
+
+        overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: var(--space-5);
@@ -358,6 +411,63 @@ onMounted(() => {
 
         .drawer_icon {
             color: $primary700;
+        }
+    }
+
+    &_sections {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-5);
+
+        padding-top: var(--space-5);
+        border-top: 1px solid $surface3;
+    }
+
+    &_group {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+
+        /* The 11px uppercase register the sidebar's own group headings use. */
+        &-label {
+            margin: 0 0 var(--space-2);
+            padding: 0 var(--space-5);
+
+            font-size: var(--font-size-xs);
+            font-weight: 650;
+            color: $content7;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    }
+
+    /* Same row as the sidebar's link, at the drawer's 44px touch height. */
+    &_section {
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
+
+        min-height: 44px;
+        padding: var(--space-3) var(--space-5);
+        border-radius: var(--radius-lg);
+
+        font-size: var(--font-size-md);
+        font-weight: 600;
+        color: $content5;
+        text-decoration: none;
+
+        &-icon {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            color: $surface7;
+        }
+
+        &--on {
+            color: $content0Orig;
+            background: $primary500;
+
+            .drawer_section-icon { color: $content0Orig; }
         }
     }
 

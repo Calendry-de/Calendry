@@ -38,55 +38,59 @@
     >
         <h2 class="counts_heading">{{ t('dashboard.counts.heading') }}</h2>
 
-        <div
+        <!--
+            THE QUIETER ROW, one line: "2 people · 0 groups · 0 rooms …", each
+            a link to the entity it counts. Six tiles with uppercase captions
+            used to spend ~70px on facts that are AMBIENT: a room count is
+            never good or bad, and a reader who wants it is orienting, not
+            deciding. Same row grammar as the queues above, one type step
+            smaller, so the two differ by size and by order and nothing else.
+        -->
+        <ul
             v-if="pending"
-            class="counts_grid"
+            class="counts_list"
             aria-hidden="true"
         >
-            <!--
-                Skeleton in the FINAL SHAPE, not a spinner: same tile count,
-                same two-line stack, so the strip does not resize when the
-                numbers land. `aria-hidden` because a screen reader gains
-                nothing from six placeholder tiles.
-            -->
-            <div
+            <li
                 v-for="index in skeletonCount"
                 :key="index"
-                class="counts_tile counts_tile--skeleton"
+                class="counts_item counts_item--skeleton"
             >
                 <span class="counts_skeleton counts_skeleton--value"/>
                 <span class="counts_skeleton counts_skeleton--label"/>
-            </div>
-        </div>
+            </li>
+        </ul>
 
-        <div
+        <ul
             v-else
-            class="counts_grid"
+            class="counts_list"
         >
-            <NuxtLink
+            <li
                 v-for="count in counts"
                 :key="count.key"
-                class="counts_tile"
-                :to="count.to"
             >
-                <!--
-                    A failed count renders as the word, never as 0 and never as a
-                    dash: "no rows" and "could not ask" are different facts, and
-                    drawing them the same way is what makes a broken tile
-                    invisible. Zero is a real answer and gets the real numeral.
-                -->
-                <span
-                    v-if="count.total === null"
-                    class="counts_value counts_value--unavailable"
-                >{{ t('dashboard.counts.unavailable') }}</span>
-                <span
-                    v-else
-                    class="counts_value"
-                >{{ count.total.toLocaleString() }}</span>
+                <NuxtLink
+                    class="counts_item"
+                    :to="count.to"
+                >
+                    <!--
+                        A failed count renders as the word, never as 0 and
+                        never as a dash: "no rows" and "could not ask" are
+                        different facts. Zero is a real answer.
+                    -->
+                    <span
+                        v-if="count.total === null"
+                        class="counts_value counts_value--unavailable"
+                    >{{ t('dashboard.counts.unavailable') }}</span>
+                    <span
+                        v-else
+                        class="counts_value"
+                    >{{ count.total.toLocaleString() }}</span>
 
-                <span class="counts_label">{{ count.label }}</span>
-            </NuxtLink>
-        </div>
+                    <span class="counts_label">{{ count.label }}</span>
+                </NuxtLink>
+            </li>
+        </ul>
     </section>
 </template>
 
@@ -125,20 +129,20 @@ const skeletonCount = computed(() => (props.counts.length > 0 ? props.counts.len
 </script>
 
 <style scoped lang="scss">
+/* Same facts-row grammar as `ReviewQueues`; the heading column width is
+   duplicated by hand so the two rows align. */
 .counts {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
+    display: grid;
+    grid-template-columns: minmax(8rem, 11rem) minmax(0, 1fr);
+    gap: var(--space-3) var(--space-6);
+    align-items: baseline;
 
-    /*
-     * The 11px uppercase label register DESIGN.md reserves for group headings,
-     * the same one the review queues' heading and the sidebar's own headings
-     * use. An `h2` because this is a real section of the page and belongs in
-     * the document outline.
-     */
+    @include mobile() {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     &_heading {
         margin: 0;
-        padding: 0 var(--space-5);
 
         font-size: var(--font-size-xs);
         font-weight: 650;
@@ -147,70 +151,54 @@ const skeletonCount = computed(() => (props.counts.length > 0 ? props.counts.len
         letter-spacing: 0.05em;
     }
 
-    /*
-     * GAP AS HAIRLINE: the 1px gap reveals the container's own `$surface4`
-     * between tiles, so separators land exactly on the grid in any wrap
-     * configuration. `overflow: hidden` keeps the outer edge from showing a
-     * stray 1px of it on the container's own boundary.
-     */
-    &_grid {
-        overflow: hidden;
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-        gap: 1px;
+    &_list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2) var(--space-6);
 
-        background: $surface4;
+        margin: 0;
+        padding: 0;
 
-        @include mobile() {
-            grid-template-columns: repeat(2, 1fr);
-        }
+        list-style: none;
     }
 
-    &_tile {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-1);
+    &_item {
+        display: inline-flex;
+        gap: var(--space-3);
+        align-items: baseline;
 
-        // Tighter than the queues' `--space-5 --space-6`, which is half of what
-        // makes this the quieter strip; the other half is the value size below.
-        padding: var(--space-4) var(--space-5);
+        margin: 0 calc(-1 * var(--space-3));
+        padding: var(--space-1) var(--space-3);
+        border-radius: var(--radius-sm);
 
         text-decoration: none;
 
-        // The page ground, so a tile is not a box. Only the gap reads.
-        background: $surface1;
-
-        transition: 0.15s;
+        transition: background 140ms cubic-bezier(0.16, 1, 0.3, 1);
 
         @include hover() {
             &:hover {
                 background: $surface2;
+
+                .counts_label { color: $content3; }
             }
         }
 
-        &--skeleton {
-            cursor: default;
+        &:focus-visible {
+            outline: 2px solid $primary600;
+            outline-offset: 1px;
         }
+
+        &--skeleton { cursor: default; }
     }
 
+    /* One step under the queues' `--font-size-lg`: the ordinary value
+       register. Tabular, because these change in place on refresh. */
     &_value {
-        /*
-         * `--font-size-lg` (17px), against the review queues' `--font-size-xl`
-         * (24px). DESIGN.md's in-app scale tops out at 17px for section titles
-         * and reserves 24px for page titles, so this is the ordinary value
-         * register and the queues are the page's one promoted number. Growing
-         * the queues instead would have needed 32px, the display step, which
-         * on a cockpit surface reads as a marketing page rather than a hero.
-         *
-         * TABULAR NUMERALS, per DESIGN.md's own named rule: these are counts
-         * that change in place on refresh, and proportional digits make the
-         * strip shiver as they do.
-         */
-        font-size: var(--font-size-lg);
+        font-size: var(--font-size-md);
         font-weight: 650;
         font-variant-numeric: tabular-nums;
         line-height: var(--leading-tight);
-        color: $content1;
+        color: $content2;
 
         &--unavailable {
             font-size: var(--font-size-sm);
@@ -220,30 +208,24 @@ const skeletonCount = computed(() => (props.counts.length > 0 ? props.counts.len
     }
 
     &_label {
-        font-size: var(--font-size-xs);
-        font-weight: 650;
+        font-size: var(--font-size-sm);
         color: $content7;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        transition: color 140ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 
-    /*
-     * A shimmer would need an infinite loop on the home page's first paint.
-     * A still block at the value's own height reserves the space, which is the
-     * whole job, and costs no frames.
-     */
     &_skeleton {
+        display: inline-block;
         border-radius: var(--radius-sm);
         background: $surface3;
 
         &--value {
-            width: 2.5ch;
-            height: var(--font-size-lg);
+            width: 2ch;
+            height: var(--font-size-md);
         }
 
         &--label {
             width: 7ch;
-            height: var(--font-size-xs);
+            height: var(--font-size-sm);
         }
     }
 }

@@ -1,7 +1,8 @@
 <template>
     <div
+        ref="root"
         class="tt"
-        :class="`tt--${ variant }`"
+        :class="[`tt--${ variant }`, { 'tt--armed': armed, 'tt--play': playing }]"
         aria-hidden="true"
     >
         <div class="tt_frame">
@@ -21,6 +22,7 @@
                     gridColumn: target.col,
                     gridRow: target.row,
                     '--range-start': `${ 6 + (index * 4) }%`,
+                    '--i': index,
                 }"
             />
 
@@ -33,6 +35,7 @@
                     gridColumn: chip.col,
                     gridRow: `${ chip.row } / span ${ chip.span ?? 1 }`,
                     '--range-start': `${ 6 + (index * 5) }%`,
+                    '--i': index,
                 }"
             >
                 <span class="tt_chipTitle"/>
@@ -73,6 +76,17 @@
  * to remove: a browser without scroll-driven animations, and a reader who asked
  * for reduced motion, both get the finished frame rather than an empty grid.
  * Only `opacity` and `transform` are animated.
+ *
+ * THE FALLBACK, for browsers with no scroll timeline (Firefox 154 still
+ * reports `animation-timeline: view()` unsupported): the SAME keyframes, run
+ * once on a clock instead of scrubbed, started by an IntersectionObserver
+ * the first time the figure is a third on screen. Until then it holds the
+ * `from` frame. Still CSS animations, so they stay smooth while the page is
+ * busy; the observer only flips one class and then disconnects. Armed on the
+ * client only, after `CSS.supports` says no, and never under reduced motion,
+ * so the server-rendered frame and every other reader keep the finished
+ * picture. Before this, a desktop Firefox reader got a still grid while the
+ * same page animated on their phone.
  */
 import type { TimetableVariant } from '~/utils/landingContent';
 
@@ -158,6 +172,34 @@ const SCRIPTS: Record<TimetableVariant, Script> = {
 };
 
 const script = computed(() => SCRIPTS[props.variant]);
+
+const root = useTemplateRef<HTMLElement>('root');
+
+/** Fallback mode: hold the start frame until the figure scrolls into view. */
+const armed = ref(false);
+/** The one-shot trigger: set once, never unset, so the story cannot rewind. */
+const playing = ref(false);
+
+onMounted(() => {
+    const scrubbable = CSS.supports('animation-timeline: view()');
+    const motionOk = window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+
+    if (scrubbable || !motionOk || !root.value) {
+        return;
+    }
+
+    armed.value = true;
+
+    const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+            playing.value = true;
+            observer.disconnect();
+        }
+    }, { threshold: 0.35 });
+
+    observer.observe(root.value);
+    onBeforeUnmount(() => observer.disconnect());
+});
 </script>
 
 <style scoped lang="scss">
@@ -319,6 +361,74 @@ const script = computed(() => SCRIPTS[props.variant]);
         .tt--people .tt_chip--other {
             animation-name: tt-recede;
             animation-range: entry 16% cover 48%;
+        }
+    }
+}
+
+/*
+ * THE TIMED FALLBACK. Same keyframes as the scrubbed scripts above, on a clock,
+ * once. `--i` is the chip's index, set inline beside `--range-start`, and it
+ * gives the 60ms stagger the scroll range gave the scrubbed version. The house
+ * ease-out; durations in the explanatory band, since this is a marketing
+ * figure and nothing here is waiting on a click.
+ *
+ * Armed (`tt--armed`) holds the `from` frame; `tt--play` starts the clock.
+ * `animation-fill-mode: both` is what makes a delayed chip sit at its start
+ * frame during its delay rather than flashing to the finished one.
+ */
+@media (prefers-reduced-motion: no-preference) {
+    @supports not (animation-timeline: view()) {
+        .tt--armed .tt_chip,
+        .tt--armed .tt_target {
+            opacity: 0;
+        }
+
+        .tt--armed.tt--play .tt_chip,
+        .tt--armed.tt--play .tt_target {
+            animation-duration: 560ms;
+            animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+            animation-fill-mode: both;
+            animation-delay: calc(var(--i, 0) * 60ms);
+        }
+
+        .tt--armed.tt--play.tt--model .tt_chip,
+        .tt--armed.tt--play.tt--editing .tt_chip,
+        .tt--armed.tt--play.tt--people .tt_chip--own {
+            animation-name: tt-arrive;
+        }
+
+        // One answer, not six decisions: the proposal lands together, and the
+        // slots still on offer follow it.
+        .tt--armed.tt--play.tt--solver .tt_chip {
+            animation-name: tt-propose;
+            animation-duration: 480ms;
+            animation-delay: 0ms;
+        }
+
+        .tt--armed.tt--play.tt--solver .tt_target {
+            animation-name: tt-offer;
+            animation-duration: 400ms;
+            animation-delay: calc(360ms + var(--i, 0) * 80ms);
+        }
+
+        // The edit lands after the field has settled; the clash announces itself
+        // after the edit.
+        .tt--armed.tt--play.tt--editing .tt_chip--moves {
+            animation-name: tt-travel;
+            animation-duration: 640ms;
+            animation-delay: 320ms;
+        }
+
+        .tt--armed.tt--play.tt--editing .tt_chip--clashes {
+            animation-name: tt-flag;
+            animation-duration: 720ms;
+            animation-delay: 560ms;
+        }
+
+        .tt--armed.tt--play.tt--people .tt_chip--other {
+            animation-name: tt-recede;
+            animation-duration: 900ms;
+            animation-delay: calc(120ms + var(--i, 0) * 40ms);
         }
     }
 }

@@ -22,7 +22,6 @@
         "saveError": "Could not save. Nothing has been changed."
     },
     "apiTokens": {
-        "head": "API tokens",
         "hint": "A bearer credential for scripts and integrations, restricted to whichever permissions you pick below and never more than you hold. Losing an access role narrows every token minted from it immediately. The secret is shown once, right after creation, and cannot be recovered afterwards; revoking a token takes effect straight away.",
         "loadError": "Could not load your API tokens.",
         "permissionCount": "{count} permission | {count} permissions",
@@ -79,7 +78,6 @@
         "intro": "A token lets a script act as you, limited to the permissions you pick below. It can never do more than you can: revoking one of your access roles narrows every token derived from it, immediately."
     },
     "icsLinks": {
-        "head": "Calendar links",
         "hint": "A link an external calendar app (Google Calendar, Outlook, Apple Calendar…) re-fetches on its own schedule, never downloaded once and forgotten. Unlike an API token this address stays visible here so you can re-copy it any time; deleting a link stops it immediately.",
         "loadError": "Could not load your calendar links.",
         "scopeRolling": "All terms · next {count} week | All terms · next {count} weeks",

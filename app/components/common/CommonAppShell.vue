@@ -226,10 +226,20 @@ const navGroups = computed(() => groupNavEntries(sections.value, t));
     padding: var(--space-7) var(--space-7) var(--space-8);
 
     @include mobile() {
-        flex-direction: column;
         gap: var(--space-6);
-        align-items: stretch;
         padding: var(--space-5);
+    }
+
+    /*
+     * NO SIDEBAR BELOW THE HEADER'S COLLAPSE POINT. Under 820px the app header
+     * folds its nav into the hamburger drawer, and `ViewNavDrawer` renders the
+     * SAME grouped sections this sidebar does, so a second copy here was a
+     * ~300px block of links above every page on a phone, saying what the menu
+     * button already offers. Between 820 and 1365px the drawer does not exist,
+     * so the sidebar stays, as a column (below).
+     */
+    @include navCollapsed() {
+        flex-direction: column;
     }
 
     &_nav {
@@ -264,16 +274,23 @@ const navGroups = computed(() => groupNavEntries(sections.value, t));
             width: 56px;
         }
 
+        /*
+         * A STICKY COLUMN, not a horizontal strip, from 820 to 1365px. The
+         * strip laid the groups side by side, scrolled sideways past the
+         * viewport, and (its row's default `stretch`) drew the active Home
+         * link as a ~320px teal slab beside the tallest group. Here the
+         * document scrolls (`layout.scss` lifts the framed scroll under
+         * 1365px), so the column pins itself and caps at the viewport.
+         */
         @include mobile() {
-            overflow: auto visible;
-            flex-direction: row;
-            width: 100%;
+            position: sticky;
+            top: var(--space-5);
+            align-self: flex-start;
+            max-height: calc(100dvh - var(--space-9));
+        }
 
-            // The rail is a desktop affordance; a horizontal strip has no
-            // second axis to reclaim, so mobile ignores the collapsed state.
-            &.shell_nav--rail { width: 100%; }
-
-            span { white-space: nowrap; }
+        @include navCollapsed() {
+            display: none;
         }
 
         &-link {
@@ -496,7 +513,7 @@ const navGroups = computed(() => groupNavEntries(sections.value, t));
         align-items: flex-end;
         justify-content: space-between;
 
-        @include mobile() {
+        @include navCollapsed() {
             flex-direction: column;
             align-items: stretch;
         }

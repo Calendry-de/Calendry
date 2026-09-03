@@ -15,11 +15,15 @@
             <!--
                 GROUPED, through the same `groupNavEntries()` the sidebar and
                 the dashboard use, so the headings a reader sees here cannot
-                disagree with the ones in the nav beside them. The hub was a
-                flat wall of cards in which "API tokens" and "Export my data"
-                had no home at all: both were panels stacked under the locale
-                form on `/my/account`, whose own card reads "Your own display
-                locale".
+                disagree with the ones in the nav beside them.
+
+                A SETTINGS LIST, NOT A CARD GRID. Nine outlined cards in three
+                columns, each carrying an icon, a title and a wrapped blurb,
+                read as a wall the eye had to search; and their borders were
+                the darkest thing on the page. Rows separated by hairlines are
+                the shape every settings surface a reader already knows uses:
+                one destination per line, scanned top to bottom, the blurb
+                beside the name where it is read once and then skipped.
             -->
             <section
                 v-for="group in groups"
@@ -27,28 +31,37 @@
                 class="groups_group"
             >
                 <!--
-                    `h2` for the group and `h3` for each card, so heading
-                    navigation reflects the actual nesting. The cards were
-                    `h2` when the page was flat.
+                    `h2` for the group and `h3` for each row, so heading
+                    navigation reflects the actual nesting.
                 -->
                 <h2 class="groups_heading">{{ group.label }}</h2>
 
-                <div class="cards">
-                    <NuxtLink
+                <ul class="rows">
+                    <li
                         v-for="entry in group.entries"
                         :key="entry.id"
-                        class="cards_card"
-                        :to="entry.to!"
                     >
-                        <Icon
-                            class="cards_icon"
-                            :name="entry.icon"
-                            aria-hidden="true"
-                        />
-                        <h3 class="cards_label">{{ entry.label }}</h3>
-                        <span class="cards_hint">{{ entry.description }}</span>
-                    </NuxtLink>
-                </div>
+                        <NuxtLink
+                            class="rows_row"
+                            :to="entry.to!"
+                        >
+                            <Icon
+                                class="rows_icon"
+                                :name="entry.icon"
+                                aria-hidden="true"
+                            />
+                            <span class="rows_text">
+                                <h3 class="rows_label">{{ entry.label }}</h3>
+                                <span class="rows_hint">{{ entry.description }}</span>
+                            </span>
+                            <Icon
+                                class="rows_chevron"
+                                name="material-symbols:chevron-right"
+                                aria-hidden="true"
+                            />
+                        </NuxtLink>
+                    </li>
+                </ul>
             </section>
         </nav>
     </CommonPage>
@@ -72,7 +85,16 @@ useHead(() => ({ title: t('my.index.pageTitle') }));
  * manage index does it: one array rendered several ways cannot drift, and the
  * permission filter is already applied there.
  */
-const entries = computed(() => useNavEntries().value.filter((entry) => entry.section === 'my'));
+/*
+ * MINUS THIS PAGE. The `my` entry's target IS `/my`, so the hub used to open
+ * with a card pointing at itself ("Meine Einstellungen: Ihre eigene
+ * Verfügbarkeit…"), the same self-link the dashboard drops as noise.
+ */
+const route = useRoute();
+const navEntries = useNavEntries();
+const entries = computed(() => navEntries.value.filter(
+    (entry) => entry.section === 'my' && entry.to !== route.path,
+));
 
 /*
  * `groupNavEntries` drops any destination no `NAV_GROUPS` entry claims, which
@@ -88,90 +110,124 @@ const groups = computed(() => groupNavEntries(entries.value, t));
 .intro {
     max-width: 68ch;
     margin: 0;
-    font-size: var(--font-size-sm);
-    color: $content7;
+
+    font-size: var(--font-size-md);
+    line-height: var(--leading-prose);
+    color: $content6;
 }
 
 /*
- * `auto-fill` only ever produced one usable row of tracks once the page column
- * had a width to fill: under `CommonPage`'s old `align-items: center` this grid
- * shrink-wrapped to 504.7px inside a 1376px box, which is what left a ragged
- * orphan card on a third row. `auto-fit` collapses empty tracks instead, so a
- * two-entry section does not leave a phantom column.
+ * `--space-8`, the in-app ceiling, between groups; `--space-3` from a heading
+ * to its list. (The previous rules named `--space-xl`, `--space-s`,
+ * `--font-size-label` and `--textSoft`, none of which exist in
+ * `tokens-root.scss`, so the headings rendered at body size and the groups
+ * had no gap at all.)
  */
 .groups {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-8);
 
+    /* A settings list is read, not filled: cap the measure so a row's hint
+       stays one line at desktop and the chevron sits near the text. */
+    max-width: 760px;
+
+    /* The 11px uppercase label register the sidebar's group headings use. */
     &_heading {
-        margin: 0 0 var(--space-s);
+        margin: 0 0 var(--space-3);
+        padding: 0 var(--space-5);
 
-        font-size: var(--font-size-label);
-        font-weight: 600;
-        color: rgb(var(--textSoft));
+        font-size: var(--font-size-xs);
+        font-weight: 650;
+        color: $content7;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
     }
 }
 
-.cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: var(--space-5);
+.rows {
+    display: flex;
+    flex-direction: column;
 
-    &_card {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid $surface3;
 
-        padding: var(--space-6);
+    list-style: none;
 
-        /*
-         * A visible EDGE, because these are click targets and their fill was
-         * `$surface1` on a `$surface1` page ground (1.00:1), so the card only
-         * became visible on hover, at 1.09:1. The palette has no raised surface
-         * to give them, so the boundary does the work; 3.14:1 clears 1.4.11.
-         */
-        border: 1px solid varToRgba('content7', 0.65);
-        border-radius: var(--radius-xl);
+    /* Hairlines between rows: the surface-ramp edge DESIGN.md gives an
+       occupied cell, never a box per row. */
+    > li {
+        border-bottom: 1px solid $surface3;
+    }
+
+    &_row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: var(--space-5);
+        align-items: center;
+
+        padding: var(--space-4) var(--space-5);
+        border-radius: var(--radius-md);
 
         text-decoration: none;
 
-        &:hover {
-            background: $surface2;
+        transition: background 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+        @include hover() {
+            &:hover {
+                background: $surface2;
+
+                .rows_chevron { color: $content5; }
+            }
         }
 
         &:focus-visible {
             outline: 2px solid $primary600;
-            outline-offset: var(--space-1);
+            outline-offset: -2px;
         }
+
+        // Thumb-reached below 700px.
+        @include mobileOnly() { min-height: 56px; }
     }
 
+    /*
+     * NOT the accent. DESIGN.md spends `$primary` on one idea, "where a
+     * session may land", and states it is never decorative; a hub icon is
+     * decoration. `$content7` also clears 1.4.11 where teal (2.94:1) did not.
+     */
     &_icon {
-        width: 22px;
-
-        /*
-         * NOT the accent. DESIGN.md spends `$primary` on one idea, "where a
-         * session may land", and states it is never decorative; a hub icon is
-         * decoration. It also measured 2.94:1 on this ground, failing 1.4.11 as
-         * a 22px glyph. `$content7` is 7.28:1 and spends nothing.
-         */
-        height: 22px;
+        width: 20px;
+        height: 20px;
         color: $content7;
+    }
+
+    &_text {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+        min-width: 0;
     }
 
     &_label {
         margin: 0;
         font-size: var(--font-size-md);
-        font-weight: 680;
+        font-weight: 600;
         color: $content2;
     }
 
     &_hint {
         font-size: var(--font-size-sm);
-        line-height: 1.5;
+        line-height: var(--leading-prose);
         color: $content7;
+    }
+
+    /* The affordance: this row goes somewhere. Quiet until hovered. */
+    &_chevron {
+        width: 18px;
+        height: 18px;
+        color: $surface7;
+        transition: color 140ms cubic-bezier(0.16, 1, 0.3, 1);
     }
 }
 </style>

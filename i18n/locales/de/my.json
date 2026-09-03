@@ -22,7 +22,6 @@
         "saveError": "Speichern nicht möglich. Es wurde nichts geändert."
     },
     "apiTokens": {
-        "head": "API-Tokens",
         "hint": "Ein Bearer-Token für Skripte und Integrationen, begrenzt auf die Berechtigungen, die Sie unten auswählen, und nie weitergehend als Ihre eigenen. Verlieren Sie eine Berechtigungsrolle, verengt das jedes daraus erzeugte Token sofort. Der geheime Wert wird genau einmal angezeigt, direkt nach dem Anlegen, und lässt sich danach nicht mehr abrufen; ein Widerruf wirkt unmittelbar.",
         "loadError": "Ihre API-Tokens konnten nicht geladen werden.",
         "permissionCount": "{count} Berechtigung | {count} Berechtigungen",
@@ -79,7 +78,6 @@
         "intro": "Mit einem Token handelt ein Skript in Ihrem Namen, begrenzt auf die Berechtigungen, die Sie unten auswählen. Es kann nie mehr als Sie selbst: Wird Ihnen eine Berechtigungsrolle entzogen, verengt das jedes daraus abgeleitete Token – sofort."
     },
     "icsLinks": {
-        "head": "Kalender-Abos",
         "hint": "Eine Adresse, die eine externe Kalender-App (Google Calendar, Outlook, Apple Calendar …) von selbst regelmäßig neu abruft – kein einmaliger Download, der dann veraltet. Anders als bei einem API-Token bleibt diese Adresse hier sichtbar, Sie können sie also jederzeit erneut kopieren; das Löschen eines Abos beendet es sofort.",
         "loadError": "Ihre Kalender-Abos konnten nicht geladen werden.",
         "scopeRolling": "Alle Semester · nächste {count} Woche | Alle Semester · nächste {count} Wochen",

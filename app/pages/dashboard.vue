@@ -38,16 +38,25 @@
             >{{ termLine }}</p>
         </template>
 
+        <!--
+            QUIET, both of them. Sign out was `secondary-black`, a filled grey
+            block and the single loudest element on the home page, for an
+            action the header's account control already offers on every page.
+            The hairline ghost (`dash_action`) matches the schedule toolbar's
+            control shape: present, findable, not the headline.
+        -->
         <template #actions>
             <CommonButton
                 v-if="(session?.availableTenants.length ?? 0) > 1"
+                class="dash_action"
                 type="secondary"
                 :disabled="busy"
                 @click="switchTenant"
             >{{ t('dashboard.action.switchInstitution') }}</CommonButton>
 
             <CommonButton
-                type="secondary-black"
+                class="dash_action"
+                type="secondary"
                 :disabled="busy"
                 @click="signOut"
             >{{ busy ? t('dashboard.action.signOutBusy') : t('dashboard.action.signOut') }}</CommonButton>
@@ -68,15 +77,27 @@
             who holds none of the review permissions sees nothing here and
             the page opens on the shape strip exactly as it did before.
         -->
-        <DashboardReviewQueues
-            :queues="queues ?? []"
-            :pending="queuesStatus === 'pending'"
-        />
+        <!--
+            ONE RECESSED BAND FOR BOTH FACTS ROWS. They were two strips of
+            tiles (three 24px numerals, then six 17px ones) stacked over ~190px;
+            as two text lines sharing a heading column they read as a small
+            table, and `$surface0` recesses them the way the grid's empty
+            cells recess: ambient ground, not raised chrome.
+        -->
+        <div
+            v-if="queuesStatus === 'pending' || countsStatus === 'pending' || queues?.length || counts?.length"
+            class="dash_facts"
+        >
+            <DashboardReviewQueues
+                :queues="queues ?? []"
+                :pending="queuesStatus === 'pending'"
+            />
 
-        <DashboardInstitutionCounts
-            :counts="counts ?? []"
-            :pending="countsStatus === 'pending'"
-        />
+            <DashboardInstitutionCounts
+                :counts="counts ?? []"
+                :pending="countsStatus === 'pending'"
+            />
+        </div>
 
         <!--
             GROUPED BY `groupNavEntries`, the same helper the sidebar reads.
@@ -86,11 +107,15 @@
             same routes under headings. The taxonomy already existed; the more
             prominent surface was the one throwing it away.
 
-            No card containers. The old ones were `$surface1` with a
-            transparent border on a `$surface1` page ground, so they had no
-            visible edge at rest at all: boxes in name only. Proximity and
-            the label register do the grouping now, which is what the sidebar
-            beside them already does.
+            GROUPS AS COLUMNS, LINKS AS ONE LINE EACH. The next iteration kept
+            a two-line blurb under every destination, three per row: 24 × 60px
+            of prose repeating what the sidebar beside it already lists, which
+            is what made the home page long. A group is now a column of plain
+            links, five columns across at desktop, and the blurb survives as
+            the link's `title`, where a reader who wants it hovers for it.
+
+            No card containers, still: proximity and the label register do the
+            grouping, as they do in the sidebar.
         -->
         <div
             v-if="groups.length"
@@ -133,6 +158,7 @@
                         <NuxtLink
                             class="dash_link"
                             :to="entry.to!"
+                            :title="entry.description"
                         >
                             <Icon
                                 class="dash_link-icon"
@@ -140,7 +166,6 @@
                                 aria-hidden="true"
                             />
                             <span class="dash_link-label">{{ entry.label }}</span>
-                            <span class="dash_link-hint">{{ entry.description }}</span>
                         </NuxtLink>
                     </li>
                 </ul>
@@ -321,9 +346,61 @@ async function signOut() {
      * steps are the public landing surface's.
      */
     &_groups {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: var(--space-7) var(--space-6);
+        align-items: start;
+    }
+
+    /*
+     * THE FACTS BAND. Two rows, one hairline between them, recessed on
+     * `$surface0`. Padding inset by the rows' own negative item margins so
+     * the numerals sit on the band's text edge.
+     */
+    &_facts {
         display: flex;
         flex-direction: column;
-        gap: var(--space-8);
+        gap: var(--space-4);
+
+        padding: var(--space-5) var(--space-6);
+        border-radius: var(--radius-lg);
+
+        background: $surface0;
+
+        > * + * {
+            padding-top: var(--space-4);
+            border-top: 1px solid $surface3;
+        }
+    }
+
+    /* The bar's control shape (see `ScheduleToolbar`), on the header's two
+       account actions. `.button` in the selector outranks `CommonButton`'s own
+       variant rules without touching them. */
+    &_action.button {
+        gap: var(--space-3);
+
+        min-height: 36px;
+        padding: var(--space-3) var(--space-5);
+        border: 1px solid $surface5;
+        border-radius: var(--radius-md);
+
+        font-size: var(--font-size-sm);
+        color: $content5;
+
+        background: $surface0;
+
+        @include hover() {
+            &:hover {
+                border-color: $surface6;
+                color: $content2;
+                background: $surface0;
+            }
+        }
+
+        &:active,
+        &:focus {
+            background: $surface2;
+        }
     }
 
     &_group {
@@ -415,9 +492,9 @@ async function signOut() {
         }
 
         &-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: var(--space-2);
+            display: flex;
+            flex-direction: column;
+            gap: 1px; // Rows touch; the hover fill is what separates them.
 
             margin: 0;
             padding: 0;
@@ -434,12 +511,12 @@ async function signOut() {
      * land here rather than read the sidebar.
      */
     &_link {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: var(--space-1) var(--space-4);
-        align-items: baseline;
+        display: flex;
+        gap: var(--space-4);
+        align-items: center;
 
-        padding: var(--space-4) var(--space-5);
+        min-width: 0;
+        padding: var(--space-3) var(--space-5);
         border-radius: var(--radius-lg);
 
         text-decoration: none;
@@ -456,33 +533,25 @@ async function signOut() {
 
         /*
          * `$surface7`, not the accent. Teal on 24 icons at once was the One
-         * Signal Rule broken at scale: the colour that means "the system is
-         * offering you something to act on" cannot also be the colour of
-         * every icon on the home page. The nav's icons are this value.
+         * Signal Rule broken at scale. The nav's icons are this value.
          */
         &-icon {
-            /* Optical: aligns the glyph's body to the label's cap height rather than its baseline. */
-            transform: translateY(2px);
-
-            grid-row: 1 / span 2;
-
+            flex: none;
             width: 17px;
             height: 17px;
-
             color: $surface7;
         }
 
+        /* `sm`, so "Lehrveranstaltungsvorlagen" fits a 200px column; a label
+           that still must wrap may, and the icon stays on its first line. */
         &-label {
-            font-size: var(--font-size-md);
+            min-width: 0;
+
+            font-size: var(--font-size-sm);
             font-weight: 600;
             color: $content5;
-            transition: 0.15s;
-        }
 
-        &-hint {
-            font-size: var(--font-size-sm);
-            line-height: var(--leading-prose);
-            color: $content7;
+            transition: 0.15s;
         }
     }
 
