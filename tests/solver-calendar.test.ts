@@ -66,11 +66,35 @@ describe('TimeGrid mapping', () => {
         expect(toWireTimeGrid(GRID, 'UTC').dayStartMinute).toBe(480);
     });
 
-    it('does not carry breakMinutes onto the wire', () => {
-        // Deliberate: the solver reasons in block indices, so a gap between
-        // blocks changes no adjacency. Asserted so a well-meaning "fix" that
-        // adds it has to delete this test and read why.
-        expect(Object.keys(toWireTimeGrid(GRID, 'UTC'))).not.toContain('breakMinutes');
+    it('carries the default gap and every named break (issue #26, reversing the earlier omission)', () => {
+        // Until #26 this test asserted the gaps were NOT sent, deliberately: no
+        // evaluator read them. `MinimizeBreakSpanning` now does, and its
+        // `gap_minutes_within_span` mirrors `gapsWithinSpan()`, so the wire
+        // must carry exactly what the app renders.
+        const wire = toWireTimeGrid({
+            ...GRID,
+            breaks: [
+                { afterBlockIndex: 3, durationMinutes: 45, label: 'Lunch', dayOfWeek: null },
+                { afterBlockIndex: 3, durationMinutes: 60, label: 'Long lunch', dayOfWeek: 5 },
+            ],
+        }, 'UTC');
+
+        expect(wire.defaultGapMinutes).toBe(15);
+        expect(wire.breaks).toEqual([
+            { afterBlockIndex: 3, durationMinutes: 45, label: 'Lunch' },
+            { afterBlockIndex: 3, durationMinutes: 60, label: 'Long lunch', dayOfWeek: 5 },
+        ]);
+        // A universal break has NO dayOfWeek on the wire (real field presence),
+        // never 0: 0 is not a weekday, and presence is what the solver's
+        // precedence rule reads.
+        expect('dayOfWeek' in wire.breaks[0]!).toBe(false);
+    });
+
+    it('a grid with no gap and no breaks is byte-identical to the pre-0.15 message', () => {
+        const wire = toWireTimeGrid({ ...GRID, breakMinutes: 0, breaks: [] }, 'UTC');
+
+        expect(wire.defaultGapMinutes).toBe(0);
+        expect(wire.breaks).toEqual([]);
     });
 });
 

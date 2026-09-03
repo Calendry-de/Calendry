@@ -805,7 +805,8 @@ export async function assembleSolverInput(
         where: { id: options.termId, tenantId: options.tenantId },
         // `breaks` travels with the grid: computeReferenceSlot() resolves a
         // block from the wall clock, and a day-specific break changes which
-        // block that is. The breaks themselves are NOT forwarded to the solver;
+        // block that is. Since issue #26 the breaks ALSO reach the solver, for
+        // `MinimizeBreakSpanning` alone;
         // see toWireTimeGrid().
         include: { timeGrid: { include: { breaks: true } }, calendarPeriods: true },
     });

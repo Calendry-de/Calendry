@@ -1790,7 +1790,10 @@ never reach the solver** (verified: `toWireTimeGrid()` omits them, test
 asserts the omission); the wire carries block indices only.
 `fitsGrid()`'s criterion is the index space (`blocksPerDay × activeDays`),
 deliberately ignoring breaks; the same guard blocks narrowing the grid
-under an existing Session and gates the move route. Orphaned breaks are
+under an existing Session and gates the move route. **Reversed in part on
+2026-09-03 (issue #26)**: the gaps now travel as `default_gap_minutes` /
+`breaks`, read by exactly one evaluator; see the addendum under § "A Session
+that spans a break" below. Adjacency and conflict are still block-indexed. Orphaned breaks are
 deleted+reported; orphaned Sessions refuse the edit (DATA vs.
 CONFIGURATION asymmetry).
 
@@ -1858,6 +1861,42 @@ for different reasons:
 If a tenant genuinely needs the solver to avoid these placements, that is a
 constraint with its own recorded decision reversing this section, not a schema
 change made in passing because the gap looked like missing data.
+
+## Addendum, 2026-09-03: the constraint exists, and this section is reversed in part (issue #26)
+
+A tenant asked for exactly that constraint, and it landed the way this
+section demanded: as a recorded reversal, not a by-the-way schema edit. The
+solver half (`calendry-solver` `f13031d`, `MinimizeBreakSpanning`, unary on
+`(slot, room)`) and the wire half (`TimeGrid.default_gap_minutes` +
+`TimeGrid.breaks`, proto 0.14.0) shipped first; this repo now sends the
+tenant's real `breakMinutes` and `time_grid_break` rows from
+`toWireTimeGrid()` and carries the catalogue entry
+`minimize_break_spanning`, SOFT, default weight 3, not `defaultEnabled`.
+
+What survives of the decision above, and why each reason still holds:
+
+- **"Breaks never cross the wire" is gone; "adjacency is block-indexed" is
+  not.** The two fields feed one evaluator. Conflict detection, occupancy and
+  `SlotRef` arithmetic never read them, so a gap still changes no adjacency.
+- **Still LEGAL, still drawn honestly.** The constraint prices, it does not
+  refuse: a manual edit can still produce the placement, and the rendering
+  fix stays load-bearing. "Not universal" is answered by the weight, which is
+  the tenant-open judgement the section said a schema fact could not be.
+- **The two halves cannot drift.** `GridTime::gap_minutes_within_span`
+  mirrors `gapsWithinSpan()` exactly, INCLUDING counting the unnamed default
+  gap, so what the app draws as spanned time is what the solver charges.
+  That mirror is also the weighting warning from the card, preserved in the
+  catalogue copy: with `breakMinutes > 0` every consecutive pair is separated
+  and every multi-block Session pays; the rule exists for the long lunch
+  break, not the five-minute changeover.
+- **`dayOfWeek` is real field presence on the wire**: a universal break has
+  no `dayOfWeek`, never `0`, because presence is what the solver's
+  day-specific-beats-universal precedence reads, and `0` is not a weekday.
+
+`tests/solver-calendar.test.ts` used to assert the omission "so a well-meaning
+fix has to delete this test and read why"; it now asserts the carriage, and
+that a grid with no gap and no breaks still serializes to the pre-0.15
+bytes, so tenants without breaks keep their `inputHash`.
 
 **`gapsWithinSpan()` is the single definition** of what a span occupies but does
 not teach, beside `gapAfter`/`breakAfter`. It counts the unnamed default gap as

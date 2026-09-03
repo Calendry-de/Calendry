@@ -45,21 +45,29 @@ export function toWireTimeGrid(grid: AppTimeGrid, institutionTimezone: string): 
         activeDays: [...grid.activeDays].sort((a, b) => a - b),
         institutionTimezone,
         /*
-         * The real gaps are DELIBERATELY NOT SENT: CLAUDE.md, "TimeGrid
-         * breaks never reach the solver". The solver reasons in block INDICES,
-         * so a gap changes no adjacency and no conflict; breaks matter locally
-         * (blockTime(), blockOfMinute()). proto v0.15 added these two fields
-         * solely for `MinimizeBreakSpanning`, a constraint type this repo's
-         * catalogue does not yet carry, so nothing can read them, and these
-         * are the proto's documented "no gap" defaults, which serialize to the
-         * exact bytes the pre-0.15 message had (`inputHash` unchanged).
-         * Sending the tenant's real `breakMinutes`/`breaks` is part of landing
-         * that constraint type, which is a deliberate deploy of its own
-         * (CLAUDE.md § "A new constraint type, or one gaining a `wireField`"),
-         * never a by-the-way edit here.
+         * THE REAL GAPS TRAVEL (issue #26, reversing "TimeGrid breaks never
+         * reach the solver"; DECISIONS.md § "A Session that spans a break").
+         *
+         * The solver still reasons in block INDICES for adjacency and
+         * conflict; these two fields feed exactly one evaluator,
+         * `MinimizeBreakSpanning`, whose `GridTime::gap_minutes_within_span`
+         * mirrors `gapsWithinSpan()` here, counting the unnamed default gap as
+         * well as named breaks, so the two halves cannot drift on what "spans
+         * a break" means. A grid with `breakMinutes = 0` and no overrides
+         * serializes to the bytes the pre-0.15 message had.
+         *
+         * `dayOfWeek` is REAL FIELD PRESENCE on the wire: a day-specific row
+         * beats the universal one at the same position and only there, which
+         * is `gapAfter`'s own precedence. `null` (every day) becomes absent,
+         * never 0, because 0 is not a weekday.
          */
-        defaultGapMinutes: 0,
-        breaks: [],
+        defaultGapMinutes: grid.breakMinutes,
+        breaks: (grid.breaks ?? []).map((brk) => ({
+            afterBlockIndex: brk.afterBlockIndex,
+            durationMinutes: brk.durationMinutes,
+            label: brk.label,
+            ...(brk.dayOfWeek === null ? {} : { dayOfWeek: brk.dayOfWeek }),
+        })),
     };
 }
 

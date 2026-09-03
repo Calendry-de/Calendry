@@ -109,6 +109,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'max_consecutive_days',
     'daybreak',
     'minimize_specialized_room_use',
+    'minimize_break_spanning',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -209,7 +210,8 @@ export type WireConstraintField =
     | 'maxDays'
     | 'maxConsecutiveDays'
     | 'daybreak'
-    | 'minimizeSpecializedRoomUse';
+    | 'minimizeSpecializedRoomUse'
+    | 'minimizeBreakSpanning';
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
@@ -1563,6 +1565,36 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
                 + 'first block of the next, by the clock. 660 is eleven hours, the common '
                 + 'working-time floor.',
         }],
+    },
+
+    {
+        key: 'minimize_break_spanning',
+        category: 'days',
+        gridRelative: true,
+        wireField: 'minimizeBreakSpanning',
+        label: 'Avoid sessions that run through a break',
+        description:
+            'Discourages a multi-block session from starting before a break and '
+            + 'finishing after it, so teaching does not straddle the lunch hour. Soft: a '
+            + 'three-hour lab through a short coffee break is ordinary, and the weight says '
+            + 'how hard to steer.',
+        evaluator: 'solver',
+        /*
+         * REVERSES a recorded decision, deliberately (issue #26; DECISIONS.md
+         * § "A Session that spans a break"): such placements stay LEGAL and
+         * are drawn honestly, and manual edits may still produce them, but
+         * the solver now sees the grid's real gaps and prices spanning one.
+         *
+         * WEIGHTING WARNING, carried from the card: on a grid with
+         * `breakMinutes > 0` EVERY consecutive block pair is separated, so
+         * every multi-block Session spans a gap and this charges every one of
+         * them. It exists for the long lunch break, not the five-minute
+         * changeover; a tenant whose grid has a uniform gap and no named break
+         * should leave it off, or accept that it prices duration.
+         */
+        severity: 'SOFT',
+        defaultWeight: 3,
+        params: [],
     },
 
     {
