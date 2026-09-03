@@ -2,8 +2,17 @@
     <div class="solver">
         <!-- IDLE -->
         <template v-if="state === 'idle'">
+            <!--
+                THE ROW'S ONE PRIMARY. Every other control in the toolbar is a
+                hairline ghost (see `ScheduleToolbar`'s `.bar_group--end`), so
+                the one action that PRODUCES a schedule is the one filled
+                button on the page. `type="secondary"` until now, which
+                `CommonButton` draws as bare text at rest: the most
+                consequential action in the bar was indistinguishable from
+                the link beside it.
+            -->
             <CommonButton
-                type="secondary"
+                type="primary"
                 :disabled="preflightIssues.length > 0"
                 @click="startRun"
             >
@@ -525,16 +534,50 @@ const failedSubjectLink = computed(() => manageLinkForSubject(run.value?.parsedE
     gap: var(--space-5);
     align-items: center;
 
+    /*
+     * In the bar's control shape (36px, hairline, `--radius-md`) rather than
+     * an 12px underlined word: it opens a panel, and a disclosure that looks
+     * like body-text link is found by accident. Quieter than its neighbours
+     * (no fill, `$content6`) because it qualifies the primary beside it
+     * rather than competing with it.
+     */
     &_advanced-toggle {
         cursor: pointer;
 
-        border: 0;
+        display: flex;
+        align-items: center;
 
-        font-size: var(--font-size-xs);
-        color: $content5;
-        text-decoration: underline;
+        min-height: 36px;
+        padding: var(--space-3) var(--space-4);
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+
+        font-family: inherit;
+        font-size: var(--font-size-sm);
+        color: $content6;
 
         background: none;
+
+        transition: border-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+            color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+        @include hover() {
+            &:hover {
+                border-color: $surface5;
+                color: $content3;
+            }
+        }
+
+        &:focus-visible {
+            outline: 2px solid $primary600;
+            outline-offset: 1px;
+        }
+
+        &[aria-expanded='true'] {
+            border-color: $surface5;
+            color: $content2;
+            background: $surface0;
+        }
     }
 
     /*

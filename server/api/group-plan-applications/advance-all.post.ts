@@ -121,7 +121,10 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
 
             const plan = await tx.offeringPlan.findFirst({
                 where: { id: batch.planId, tenantId: identity.tenantId },
-                include: { items: { orderBy: { position: 'asc' }, include: { template: true } } },
+                // Nested include, not the bare `template: true` this was
+                // before issue #129: see the same comment in
+                // offering-plan-apply/[id].post.ts.
+                include: { items: { orderBy: { position: 'asc' }, include: { template: { include: { lecturers: true } } } } },
             });
 
             if (!plan || !plan.items.length) {

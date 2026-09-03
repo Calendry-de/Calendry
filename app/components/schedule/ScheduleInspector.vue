@@ -44,8 +44,14 @@
                     v-else
                     class="inspector_title"
                 >{{ sessionLabel(session) }}</h2>
+                <!--
+                    The offering code only when it adds a fact: a Session
+                    titled by its Offering ("BVT3") was captioned
+                    "BVT3 · Vorlesung", the same word twice in two sizes.
+                -->
                 <p class="inspector_sub">
-                    {{ session.offering?.code ? `${session.offering.code} · ` : '' }}{{ session.kind?.name }}
+                    {{ session.offering?.code && session.offering.code !== sessionLabel(session)
+                        ? `${session.offering.code} · ` : '' }}{{ session.kind?.name }}
                 </p>
                 <button
                     type="button"
@@ -991,6 +997,43 @@ const attendeeNames = computed(() => attendees.value
 
     /* Editable fields on an Event. Read-only Sessions render text instead, so
        these never appear where nothing may change. */
+
+    /*
+     * THE ROOM LISTBOX, in the panel's control shape. It was an unstyled
+     * `<select multiple>`: the browser's default listbox, serif-less but
+     * borderless and system-blue on selection, the one raw control on a page
+     * where every other input carries the `$surface5` hairline. Native
+     * `<option>` styling is limited to font, padding and colour, which is
+     * enough to make a selected row read as the panel's own tint.
+     */
+    &_rooms {
+        width: 100%;
+        padding: var(--space-2);
+        border: 1px solid $surface5;
+        border-radius: var(--radius-md);
+
+        font: inherit;
+        font-size: var(--font-size-sm);
+        color: $content4;
+
+        background: $surface0;
+
+        &:focus-visible {
+            border-color: $primary500;
+            outline: none;
+        }
+
+        option {
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--radius-sm);
+
+            &:checked {
+                color: $content1;
+                background: varToRgba('primary500', 0.18);
+            }
+        }
+    }
+
     &_control {
         width: 100%;
         padding: var(--space-2) var(--space-3);
@@ -1110,8 +1153,8 @@ const attendeeNames = computed(() => attendees.value
 
         :deep(.button_content) {
             overflow: hidden;
-            white-space: nowrap;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
     }
 

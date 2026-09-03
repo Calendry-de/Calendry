@@ -327,9 +327,19 @@
         "modeNote": "This display draws the board selected above. Only the scope belonging to that board is used; the other is kept, unused, in case the mode changes back.",
         "noGroups": "No groups defined yet.",
         "noRooms": "No rooms defined yet.",
+        "planOptions": "Optional: add ?columnWidth=176 to set how wide a room column is drawn, and ?rotate=12 for the seconds between pages of rooms (0 holds one page).",
         "roomsLegend": "Rooms",
         "scopeHelp": "Leave all unticked to show {everyRoom}. Ticking some restricts the display to those.",
-        "scopeLabel": "Rooms shown"
+        "scopeLabel": "Rooms shown",
+        "windowEnd": "Until",
+        "windowGrid": "The timetable's own day",
+        "windowGridEnd": "the timetable's end",
+        "windowGridStart": "the timetable's start",
+        "windowHelp": "Leave both empty to draw the timetable's own day. Setting them crops the plan to those hours, which makes each hour taller; anything scheduled outside is named under the plan rather than dropped from it.",
+        "windowLabel": "Hours shown",
+        "windowLegend": "Plan window",
+        "windowRange": "{start} to {end}",
+        "windowStart": "From"
     },
     "shared": {
         "appliesTo": "Applies to",

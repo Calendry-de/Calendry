@@ -63,9 +63,9 @@
 
         <ScheduleFilterPanel
             v-model:open="filtersOpen"
-            v-model:group-id="filters.groupId.value"
-            v-model:room-id="filters.roomId.value"
-            v-model:person-id="filters.personId.value"
+            v-model:group-ids="filters.groupIds.value"
+            v-model:room-ids="filters.roomIds.value"
+            v-model:person-ids="filters.personIds.value"
             v-model:include-nested="filters.includeNested.value"
             v-model:week="filters.week.value"
             :groups="data.groups.value"
@@ -284,8 +284,8 @@
                     :display="data.displaySettings.value"
                     :group-name="data.lookup.group"
                     :person-name="data.lookup.person"
-                    :show-group="!filters.groupId.value"
-                    :show-person="!filters.personId.value"
+                    :show-group="filters.groupIds.value.length !== 1"
+                    :show-person="filters.personIds.value.length !== 1"
                     :term-week="filters.week.value"
                     :slot-date-of="data.slotDateOf"
                     :term-start="data.term.value?.startDate ?? null"
@@ -325,8 +325,8 @@
                     :display="data.displaySettings.value"
                     :group-name="data.lookup.group"
                     :person-name="data.lookup.person"
-                    :show-group="!filters.groupId.value"
-                    :show-person="!filters.personId.value"
+                    :show-group="filters.groupIds.value.length !== 1"
+                    :show-person="filters.personIds.value.length !== 1"
                     :target-verb="editing.creating.value
                         ? t('schedule.page.targetVerbCreate')
                         : t('schedule.page.targetVerbMove')"
@@ -924,10 +924,14 @@ const showViolations = computed<boolean>({
  */
 const filtersOpen = ref(false);
 
-/** How many of Group/Room/Person are narrowing the view: the toolbar's badge. */
-const activeFilterCount = computed(() => [
-    filters.groupId.value, filters.roomId.value, filters.personId.value,
-].filter(Boolean).length);
+/**
+ * How many Groups, Rooms and People are narrowing the view: the toolbar's
+ * badge. Selections, not dimensions: "3" over a filter of two rooms and a
+ * person tells the reader what the drawer will show them; "2" would not.
+ */
+const activeFilterCount = computed(() => filters.groupIds.value.length
+    + filters.roomIds.value.length
+    + filters.personIds.value.length);
 
 /*
  * SPLIT BY SEVERITY, because one total answered neither question anybody has.
@@ -1179,21 +1183,37 @@ function reconcileFilters() {
 
     const dropped: string[] = [];
 
-    if (filters.groupId.value && data.groups.value.length
-        && !data.groups.value.some((group) => group.id === filters.groupId.value)) {
-        filters.groupId.value = '';
+    /*
+     * PER ID, not per filter: a link naming three rooms of which one has since
+     * gone keeps the two that exist and reports the one that did not, rather
+     * than clearing the whole dimension because a single id was stale.
+     */
+    function keepKnown(selected: string[], known: { id: string }[]): string[] | null {
+        if (!selected.length || !known.length) return null;
+
+        const kept = selected.filter((id) => known.some((row) => row.id === id));
+
+        return kept.length === selected.length ? null : kept;
+    }
+
+    const keptGroups = keepKnown(filters.groupIds.value, data.groups.value);
+
+    if (keptGroups) {
+        filters.groupIds.value = keptGroups;
         dropped.push(t('schedule.page.filterGroup'));
     }
 
-    if (filters.roomId.value && data.rooms.value.length
-        && !data.rooms.value.some((room) => room.id === filters.roomId.value)) {
-        filters.roomId.value = '';
+    const keptRooms = keepKnown(filters.roomIds.value, data.rooms.value);
+
+    if (keptRooms) {
+        filters.roomIds.value = keptRooms;
         dropped.push(t('schedule.page.filterRoom'));
     }
 
-    if (filters.personId.value && data.people.value.length
-        && !data.people.value.some((person) => person.id === filters.personId.value)) {
-        filters.personId.value = '';
+    const keptPeople = keepKnown(filters.personIds.value, data.people.value);
+
+    if (keptPeople) {
+        filters.personIds.value = keptPeople;
         dropped.push(t('schedule.page.filterPerson'));
     }
 
@@ -1349,22 +1369,22 @@ watch(
            any more. The Floats-Or-Flat rule has no middle. */
         box-shadow: 0 8px 24px rgb(0 0 0 / 32%);
 
-        @include mobile() {
-            right: var(--space-5);
-            bottom: var(--space-5);
-            left: var(--space-5);
-            max-width: none;
+        svg {
+            flex: none;
+            width: var(--space-6);
+            height: var(--space-6);
+            color: $success700;
         }
 
         @media (prefers-reduced-motion: no-preference) {
             animation: schedule-done-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        svg {
-            flex: none;
-            width: var(--space-6);
-            height: var(--space-6);
-            color: $success700;
+        @include mobile() {
+            right: var(--space-5);
+            bottom: var(--space-5);
+            left: var(--space-5);
+            max-width: none;
         }
     }
 

@@ -53,7 +53,19 @@ export async function applyOfferingPlanItems(
         tenantId: string;
         termId: string;
         groupId: string;
-        items: { templateId: string; template: OfferingTemplate }[];
+        /**
+         * `lecturers` REQUIRED, not optional (issue #129): every caller must
+         * say explicitly what it loaded, the same way `template` itself is
+         * required rather than fetched lazily in here. An optional field
+         * defaulting to `[]` internally would make "this template really has
+         * nobody named" and "the caller forgot the include" the same silent
+         * shape on the wire — precisely the failure class issue #130 exists
+         * to name, one column format field wide.
+         */
+        items: {
+            templateId: string;
+            template: OfferingTemplate & { lecturers: { personId: string; roleId: string | null }[] };
+        }[];
     },
 ): Promise<OfferingPlanApplyItem[]> {
     const { tenantId, termId, groupId, items } = params;
@@ -100,10 +112,31 @@ export async function applyOfferingPlanItems(
                 requiredRoleId: t.requiredRoleId,
                 requiredCapacity: t.requiredCapacity,
                 requiredRoomCount: t.requiredRoomCount ?? undefined,
+                // Mirrors requiredRoleId/requiredCapacity above: NULL means
+                // the template does not fix this, same as it did on the
+                // template itself.
+                requiredLecturerCount: t.requiredLecturerCount,
                 onlineMode: t.onlineMode ?? undefined,
                 notes: t.notes,
                 createdFromTemplateId: t.id,
                 groups: { create: { tenantId, groupId } },
+                /**
+                 * COPIED, NOT LINKED (issue #129): the same "seed, don't
+                 * bind" contract every other template column already keeps.
+                 * `t.lecturers` is the template's OWN rows
+                 * (`offering_template_lecturer`), not a reference to them, so
+                 * editing the template's roster after this moment does not
+                 * reach back and restaff an Offering already created from it.
+                 */
+                lecturers: t.lecturers.length
+                    ? {
+                        create: t.lecturers.map((lecturer) => ({
+                            tenantId,
+                            personId: lecturer.personId,
+                            roleId: lecturer.roleId,
+                        })),
+                    }
+                    : undefined,
             },
             select: { id: true, title: true },
         });

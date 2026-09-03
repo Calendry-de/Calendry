@@ -391,6 +391,14 @@
             "notes": {
                 "label": "Notes"
             }
+        },
+        "relation": {
+            "lecturers": {
+                "label": "Who leads it",
+                "help": "Named People this template seeds onto every Offering created from it, sized by \"Lecturers needed at once\" above. Optionally state the scheduling role each person fills. Copied once at apply time — editing this list later does not restaff Offerings already created from the template.",
+                "emptyHint": "No people defined yet. An Offering created from this template will have an empty lecturer pool.",
+                "rolePlaceholder": "Any role"
+            }
         }
     },
     "offeringPlan": {
@@ -474,6 +482,12 @@
             "groupIds": {
                 "label": "Groups shown",
                 "emptyHint": "No groups defined yet."
+            },
+            "planStartMinute": {
+                "label": "Plan starts at"
+            },
+            "planEndMinute": {
+                "label": "Plan ends at"
             }
         }
     },

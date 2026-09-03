@@ -68,31 +68,23 @@
                 />
 
                 <div class="fpanel_fields">
-                    <label
+                    <!--
+                        MULTI-SELECT, each dimension. "Rooms 1.1 and 1.3" and
+                        "these two cohorts" are the questions a timetabler
+                        actually asks of a week, and a single `<select>` made
+                        each of them two visits. Within a dimension the ids are
+                        a union, across dimensions an intersection; the route
+                        documents the same.
+                    -->
+                    <ScheduleFilterMultiSelect
                         v-if="showGroupFilter"
-                        class="fpanel_field"
-                    >
-                        <span>{{ t('schedule.filters.group') }}</span>
-                        <select
-                            v-model="groupIdModel"
-                            class="fpanel_select"
-                            :title="selectedName(groups, groupIdModel, t('schedule.filters.allGroups'))"
-                        >
-                            <option
-                                value=""
-                                :selected="!groupIdModel"
-                            >{{ t('schedule.filters.allGroups') }}</option>
-                            <option
-                                v-for="group in groups"
-                                :key="group.id"
-                                :value="group.id"
-                                :selected="group.id === groupIdModel"
-                            >{{ group.name }}</option>
-                        </select>
-                    </label>
+                        v-model="groupIdsModel"
+                        :label="t('schedule.filters.group')"
+                        :options="groups"
+                    />
 
                     <label
-                        v-if="groupIdModel"
+                        v-if="groupIdsModel.length"
                         class="fpanel_check"
                     >
                         <input
@@ -102,51 +94,19 @@
                         <span>{{ t('schedule.filters.includeNested') }}</span>
                     </label>
 
-                    <label
+                    <ScheduleFilterMultiSelect
                         v-if="showRoomFilter"
-                        class="fpanel_field"
-                    >
-                        <span>{{ t('schedule.filters.room') }}</span>
-                        <select
-                            v-model="roomIdModel"
-                            class="fpanel_select"
-                            :title="selectedName(rooms, roomIdModel, t('schedule.filters.allRooms'))"
-                        >
-                            <option
-                                value=""
-                                :selected="!roomIdModel"
-                            >{{ t('schedule.filters.allRooms') }}</option>
-                            <option
-                                v-for="room in rooms"
-                                :key="room.id"
-                                :value="room.id"
-                                :selected="room.id === roomIdModel"
-                            >{{ room.name }}</option>
-                        </select>
-                    </label>
+                        v-model="roomIdsModel"
+                        :label="t('schedule.filters.room')"
+                        :options="rooms"
+                    />
 
-                    <label
+                    <ScheduleFilterMultiSelect
                         v-if="showPersonFilter"
-                        class="fpanel_field"
-                    >
-                        <span>{{ t('schedule.filters.person') }}</span>
-                        <select
-                            v-model="personIdModel"
-                            class="fpanel_select"
-                            :title="selectedName(people, personIdModel, t('schedule.filters.anyone'))"
-                        >
-                            <option
-                                value=""
-                                :selected="!personIdModel"
-                            >{{ t('schedule.filters.anyone') }}</option>
-                            <option
-                                v-for="person in people"
-                                :key="person.id"
-                                :value="person.id"
-                                :selected="person.id === personIdModel"
-                            >{{ person.name }}</option>
-                        </select>
-                    </label>
+                        v-model="personIdsModel"
+                        :label="t('schedule.filters.person')"
+                        :options="people"
+                    />
                 </div>
             </div>
         </div>
@@ -158,6 +118,7 @@ import type { NamedRow, Term } from '~/composables/schedule';
 import { useOverlay } from '~/composables/overlay';
 import { useT } from '~/composables/i18n';
 import ScheduleMiniMonth from './ScheduleMiniMonth.vue';
+import ScheduleFilterMultiSelect from './ScheduleFilterMultiSelect.vue';
 
 /**
  * Group/Room/Person: actual narrowing filters, moved here verbatim from
@@ -188,19 +149,15 @@ const props = defineProps<{
 const { t } = useT();
 
 const open = defineModel<boolean>('open', { required: true });
-const groupIdModel = defineModel<string>('groupId', { required: true });
-const roomIdModel = defineModel<string>('roomId', { required: true });
-const personIdModel = defineModel<string>('personId', { required: true });
+const groupIdsModel = defineModel<string[]>('groupIds', { required: true });
+const roomIdsModel = defineModel<string[]>('roomIds', { required: true });
+const personIdsModel = defineModel<string[]>('personIds', { required: true });
 const includeNestedModel = defineModel<boolean>('includeNested', { required: true });
 const weekModel = defineModel<number>('week', { required: true });
 
-const showGroupFilter = computed(() => props.groups.length > 1 || Boolean(groupIdModel.value));
-const showRoomFilter = computed(() => props.rooms.length > 1 || Boolean(roomIdModel.value));
-const showPersonFilter = computed(() => props.people.length > 1 || Boolean(personIdModel.value));
-
-function selectedName(rows: readonly { id: string; name: string }[], id: string, fallback: string): string {
-    return rows.find((row) => row.id === id)?.name ?? fallback;
-}
+const showGroupFilter = computed(() => props.groups.length > 1 || groupIdsModel.value.length > 0);
+const showRoomFilter = computed(() => props.rooms.length > 1 || roomIdsModel.value.length > 0);
+const showPersonFilter = computed(() => props.people.length > 1 || personIdsModel.value.length > 0);
 
 const { claim, release } = useOverlay('schedule-filters');
 
@@ -332,39 +289,7 @@ function trapFocus(event: KeyboardEvent) {
         gap: var(--space-5);
     }
 
-    &_field {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
 
-        > span {
-            font-size: var(--font-size-xs);
-            font-weight: 600;
-            color: $content7;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-    }
-
-    &_select {
-        cursor: pointer;
-
-        width: 100%;
-        padding: var(--space-3) var(--space-4);
-        border: 1px solid $surface5;
-        border-radius: var(--radius-md);
-
-        font-family: inherit;
-        font-size: var(--font-size-md);
-        color: $content5;
-
-        background: $surface0;
-
-        &:focus-visible {
-            outline: 2px solid $primary600;
-            outline-offset: 1px;
-        }
-    }
 
     &_check {
         display: flex;

@@ -912,6 +912,24 @@ export function offeringTemplateEntity(t: Translate): ManageEntity {
             },
             { key: 'notes', label: t('manage.offeringTemplate.field.notes.label'), type: 'textarea' },
         ],
+        relations: [
+            {
+                key: 'lecturers',
+                label: t('manage.offeringTemplate.relation.lecturers.label'),
+                help: t('manage.offeringTemplate.relation.lecturers.help'),
+                resource: 'persons',
+                valueKey: 'personId',
+                searchable: true,
+                optionLabel: personOptionLabel,
+                extraReference: {
+                    key: 'roleId',
+                    resource: 'roles',
+                    label: (row) => String(row.name ?? row.key),
+                    placeholder: t('manage.offeringTemplate.relation.lecturers.rolePlaceholder'),
+                },
+                emptyHint: t('manage.offeringTemplate.relation.lecturers.emptyHint'),
+            },
+        ],
     };
 }
 
@@ -1676,6 +1694,27 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     },
                 },
                 { key: 'key', label: t('manage.screen.field.key.label'), type: 'text', custom: true },
+                /*
+                 * THE ROOM PLAN'S OWN HOURS (issue #131), minutes since
+                 * tenant-local midnight, NULL meaning "the timetable's own
+                 * day". Declared here so they take part in draft seeding,
+                 * dirty tracking and the save payload, `custom` because both
+                 * the control (`<input type="time">`, converting to minutes)
+                 * and its relevance (room boards only) are things the generic
+                 * field list cannot express. See `ScreenForm`.
+                 */
+                {
+                    key: 'planStartMinute',
+                    label: t('manage.screen.field.planStartMinute.label'),
+                    type: 'number',
+                    custom: true,
+                },
+                {
+                    key: 'planEndMinute',
+                    label: t('manage.screen.field.planEndMinute.label'),
+                    type: 'number',
+                    custom: true,
+                },
             ],
         },
 

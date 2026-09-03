@@ -116,10 +116,25 @@ export function useScheduleFilters() {
         });
     }
 
+    /**
+     * A MULTI-VALUED filter, carried as ONE comma-joined param (`?room=a,b`)
+     * rather than a repeated one (`?room=a&room=b`). `readParam` above treats
+     * a repeated key as unset on purpose, and ids are UUIDs, which never
+     * contain a comma, so the join is lossless. Deduplicated on write, so a
+     * double click cannot put the same id in the URL twice; empty travels as
+     * the absence of the param, same as every other filter here.
+     */
+    function listParamRef(key: string) {
+        return computed<string[]>({
+            get: () => readParam(key).split(',').filter(Boolean),
+            set: (value) => patch({ [key]: value.length ? [...new Set(value)].join(',') : undefined }),
+        });
+    }
+
     const termId = paramRef('term');
-    const groupId = paramRef('group');
-    const roomId = paramRef('room');
-    const personId = paramRef('person');
+    const groupIds = listParamRef('group');
+    const roomIds = listParamRef('room');
+    const personIds = listParamRef('person');
 
     /**
      * Clamped at the FLOOR only. A week past the end of the term needs
@@ -150,14 +165,17 @@ export function useScheduleFilters() {
     /**
      * The exact shape sent to GET /api/sessions. Optional filters are omitted
      * rather than sent empty, so the server never has to treat '' as "all".
+     * The lists go over as REPEATED keys (`roomId=a&roomId=b`, ofetch's
+     * array serialisation), which is the shape the route's `idList` schema
+     * documents; the comma form above is the URL bar's, not the API's.
      */
     const query = computed(() => ({
         termId: termId.value,
         termWeek: week.value,
-        ...(groupId.value ? { groupId: groupId.value, includeNested: includeNested.value } : {}),
-        ...(roomId.value ? { roomId: roomId.value } : {}),
-        ...(personId.value ? { personId: personId.value } : {}),
+        ...(groupIds.value.length ? { groupId: groupIds.value, includeNested: includeNested.value } : {}),
+        ...(roomIds.value.length ? { roomId: roomIds.value } : {}),
+        ...(personIds.value.length ? { personId: personIds.value } : {}),
     }));
 
-    return { termId, week, groupId, roomId, personId, includeNested, query };
+    return { termId, week, groupIds, roomIds, personIds, includeNested, query };
 }

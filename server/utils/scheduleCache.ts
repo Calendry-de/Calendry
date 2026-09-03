@@ -60,16 +60,23 @@ export function contextCacheKey(options: {
  * spans every Term the caller may see, so that response lives in the `all`
  * bucket rather than any one Term's.
  */
+/** Order-independent, and an empty list keys the same as no filter. */
+function idsKey(ids: readonly string[] | undefined): string {
+    return ids ? [...ids].sort().join(',') : '';
+}
+
 export function sessionsCacheKey(options: {
     tenantId: string;
     termId: string | undefined;
     scope: 'any' | 'own';
     actorPersonId: string | null;
     termWeek: number | undefined;
-    groupId: string | undefined;
+    /** Lists (the filters are multi-select): sorted before joining, so
+        `?roomId=a&roomId=b` and `?roomId=b&roomId=a` share one entry. */
+    groupId: readonly string[] | undefined;
     includeNested: boolean | undefined;
-    roomId: string | undefined;
-    personId: string | undefined;
+    roomId: readonly string[] | undefined;
+    personId: readonly string[] | undefined;
     offeringId: string | undefined;
     isLocked: boolean | undefined;
     banked: boolean | undefined;
@@ -77,10 +84,10 @@ export function sessionsCacheKey(options: {
     const who = options.scope === 'own' ? `:${options.actorPersonId}` : '';
     const filters = [
         `tw=${options.termWeek ?? ''}`,
-        `g=${options.groupId ?? ''}`,
+        `g=${idsKey(options.groupId)}`,
         `n=${options.includeNested ?? ''}`,
-        `r=${options.roomId ?? ''}`,
-        `p=${options.personId ?? ''}`,
+        `r=${idsKey(options.roomId)}`,
+        `p=${idsKey(options.personId)}`,
         `o=${options.offeringId ?? ''}`,
         `l=${options.isLocked ?? ''}`,
         `b=${options.banked ?? ''}`,

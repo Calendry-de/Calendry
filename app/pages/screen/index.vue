@@ -7,8 +7,22 @@
         >{{ error }}</p>
 
         <template v-else-if="board">
+            <!--
+                THE PRODUCT, NOT THE DEVICE, is the title. A screen's name
+                ("B-block corridor", "Main entrance") is an operator's label
+                for the thing hanging on the wall: it tells the person walking
+                past where they already know they are, and it is the one string
+                here that is worth nothing at reading distance. It stays in the
+                management area, where it identifies which display somebody is
+                editing, and appears on the wall only as the small stamp below.
+            -->
             <header class="board_head">
-                <h1 class="board_title">{{ board.screenName ?? t('screen.board.fallbackName') }}</h1>
+                <h1 class="board_title">
+                    <CommonLogo
+                        :size="LOGO_SIZE"
+                        wordmark
+                    />
+                </h1>
                 <p class="board_clock">
                     <span class="board_time">{{ clock }}</span>
                     <span class="board_date">{{ today }}</span>
@@ -27,108 +41,98 @@
                 role="status"
             >{{ t('screen.board.noTerm') }}</p>
 
-            <ul class="board_rooms">
-                <li
-                    v-for="room in board.rooms"
-                    :key="room.id"
-                    class="room"
-                    :class="{ 'room--busy': room.current }"
-                >
-                    <p class="room_name">{{ room.name }}</p>
-
-                    <div class="room_state">
-                        <template v-if="room.current">
-                            <p class="room_label">{{ t('screen.room.nowLabel') }}</p>
-                            <p class="room_session">{{ room.current.title }}</p>
-                            <!--
-                                PUNCTUATION, NOT GRAMMAR (i18n/CONVENTIONS.md
-                                § "Assembled sentences"): the pieces joined here
-                                are a clock range and a list of tenant-named
-                                Groups, each already complete and never
-                                translated, so the `–` and the `·` stay in the
-                                template. Keying "{times} · {groups}" would add
-                                a message with nothing in it to translate.
-                            -->
-                            <p class="room_meta">
-                                {{ hhmm(room.current.startMinute) }}–{{ hhmm(room.current.endMinute) }}
-                                <template v-if="room.current.groups.length">
-                                    · {{ room.current.groups.join(', ') }}
-                                </template>
-                            </p>
-                        </template>
-
-                        <template v-else>
-                            <p class="room_label room_label--free">{{ t('screen.room.freeLabel') }}</p>
-                            <!--
-                                GRAMMAR, unlike the range above: "Next" is a
-                                word placed relative to the time it qualifies,
-                                so the whole clause is ONE message and a
-                                translator can move both values.
-                            -->
-                            <p
-                                v-if="room.next"
-                                class="room_meta"
-                            >
-                                {{ t('screen.room.next', { time: hhmm(room.next.startMinute), title: room.next.title }) }}
-                            </p>
-                            <p
-                                v-else
-                                class="room_meta"
-                            >{{ t('screen.room.nothingElse') }}</p>
-                        </template>
-                    </div>
-                </li>
-            </ul>
+            <ScreenRoomPlan
+                v-if="board.rooms.length"
+                :rooms="board.rooms"
+                :day="{ startMinute: board.dayStartMinute, endMinute: board.dayEndMinute }"
+                :configured="{ startMinute: board.planStartMinute, endMinute: board.planEndMinute }"
+                :minute-now="minuteNow"
+                :column-width="columnWidth"
+                :rotate-seconds="rotateSeconds"
+            />
 
             <p
-                v-if="!board.rooms.length"
+                v-else
                 class="board_message"
             >{{ t('screen.board.noRooms') }}</p>
+
+            <!--
+                WHICH DISPLAY THIS IS, for the one person who ever needs to
+                know: somebody standing in front of a wall that is showing the
+                wrong rooms, trying to say which screen to fix. Deliberately
+                tiny and in the corner — it is a reference mark, not content,
+                and at this size it costs the plan nothing.
+            -->
+            <p
+                v-if="board.screenName"
+                class="board_stamp"
+            >{{ board.screenName }}</p>
         </template>
     </div>
 </template>
 
 <script setup lang="ts">
 import { useT } from '~/composables/i18n';
+import type { RoomPlanRoom } from '~/utils/roomPlan';
+import { clampRoomPlanColumnWidth, clampRoomPlanRotateSeconds } from '~/utils/roomPlan';
 
 /**
- * The lobby display.
+ * The lobby display: today's ROOM PLAN, rooms across and the day down.
  *
  * NO CHROME AT ALL: no nav, no header, no account menu. This page is not
  * browsed, it is mounted on a wall and left running for a term, and every
  * affordance on it is a thing nobody can click. It reads at a distance and does
- * one job: which rooms are busy right now.
+ * one job: what is happening in these rooms today.
+ *
+ * IT COMPOSES, IT DOES NOT DRAW (CLAUDE.md, "Pages compose, they do not
+ * implement"). This file owns the key, the fetch, the failure states and the
+ * clock; `ScreenRoomPlan` owns measurement, paging and placement, and
+ * `app/utils/roomPlan.ts` owns the arithmetic, where it is unit-tested.
  *
  * AUTHENTICATES WITH A DEVICE KEY in its own URL, never a session cookie, which
  * is why it sits in `ANONYMOUS_ROUTES`: a session check would bounce a display
  * to a login form nobody is standing at. The key holds no permissions and is
  * scoped to rooms; `GET /api/screens/board` is what enforces it.
+ *
+ * TWO KINDS OF SETTING, in two places, and the split is deliberate.
+ *
+ * `?columnWidth=` (how wide a room column is drawn, and therefore how many
+ * rooms fit on a page) and `?rotate=` (seconds between pages, `0` to hold on
+ * one) are properties of THIS PIECE OF GLASS: a 4K wall and a spare 22" monitor
+ * want different answers from the same timetable. Nothing on the page can be
+ * clicked, so they travel in the address whoever mounts the display pastes in,
+ * clamped so a typo narrows the plan rather than breaking it.
+ *
+ * The plan's HOURS are not that. "This institution's evenings are empty" is a
+ * fact about the institution, the same for every display in the building and an
+ * operator's decision to make in the management area, so `planStartMinute` /
+ * `planEndMinute` are columns on `screen` (issue #131) and arrive in the board
+ * payload.
  */
-interface Entry {
-    id: string;
-    title: string;
-    groups: string[];
-    startMinute: number;
-    endMinute: number;
-    isNow: boolean;
-}
-
-interface BoardRoom {
-    id: string;
-    name: string;
-    isVirtual: boolean;
-    current: Entry | null;
-    next: Entry | null;
-    entries: Entry[];
-}
-
 interface Board {
     screenName: string | null;
     generatedAt: string;
+    /** Minutes since TENANT-local midnight when the response was assembled. */
+    nowMinute: number;
     state: 'ok' | 'no-term';
     termName?: string;
-    rooms: BoardRoom[];
+    /** The TimeGrid's day; null with no term running. */
+    dayStartMinute: number | null;
+    dayEndMinute: number | null;
+    /** This screen's own configured hours; null for "the timetable's own day". */
+    planStartMinute: number | null;
+    planEndMinute: number | null;
+    rooms: RoomPlanRoom[];
 }
+
+/**
+ * The lockup's type size, in px. A fixed value, not a `clamp()`: `CommonLogo`
+ * picks its stroke weights from this number (optical compensation, see its own
+ * comment), so a size the stylesheet changed behind its back would draw the
+ * wrong weight. It is a mark, not the content, and does not need to scale with
+ * the wall.
+ */
+const LOGO_SIZE = 40;
 
 definePageMeta({ layout: false });
 
@@ -139,19 +143,31 @@ const key = computed(() => String(route.query.key ?? ''));
 const board = ref<Board | null>(null);
 const error = ref('');
 
+const columnWidth = computed(() => clampRoomPlanColumnWidth(route.query.columnWidth));
+const rotateSeconds = computed(() => clampRoomPlanRotateSeconds(route.query.rotate));
+
 /*
- * A LOCAL CLOCK, ticking every second, purely so the display looks alive, but
- * "is this room busy" is decided SERVER-side (`isNow`), from the same clock that
- * chose the term week. A display left running for months would otherwise drift
- * against the schedule it draws and there would be nothing on screen to say so.
+ * A LOCAL CLOCK, ticking every second, purely so the display looks alive.
+ *
+ * WHAT TIME THE INSTITUTION THINKS IT IS comes from the response
+ * (`nowMinute`, tenant-local, from the same clock that chose the term week);
+ * this device only interpolates the seconds since that fetch, which is why
+ * `fetchedAt` is stamped beside it. A display deciding "now" from the machine
+ * behind the screen would drift against the schedule it draws for a whole term
+ * with nothing on screen to say so.
  */
 const now = ref(new Date());
+const fetchedAt = ref(now.value.getTime());
 const clock = computed(() => now.value.toTimeString().slice(0, 5));
 const today = computed(() => now.value.toDateString());
 
-function hhmm(minutes: number): string {
-    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-}
+const minuteNow = computed(() => {
+    if (!board.value) {
+        return 0;
+    }
+
+    return board.value.nowMinute + (now.value.getTime() - fetchedAt.value) / 60_000;
+});
 
 async function load(): Promise<void> {
     if (!key.value) {
@@ -162,6 +178,7 @@ async function load(): Promise<void> {
 
     try {
         board.value = await request<Board>(`/api/screens/board?key=${encodeURIComponent(key.value)}`);
+        fetchedAt.value = Date.now();
         error.value = '';
     } catch (cause) {
         const message = (cause as { data?: { message?: string } }).data?.message;
@@ -194,7 +211,12 @@ onMounted(() => {
     });
 });
 
-useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName') });
+/*
+ * THE PRODUCT, for the same reason the heading is: the screen name is not this
+ * page's to publish. Nothing on a wall reads a browser tab, and the operator
+ * previewing one already knows which key they opened.
+ */
+useHead({ title: 'Calendry' });
 </script>
 
 <style scoped lang="scss">
@@ -205,14 +227,21 @@ useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName')
  * font-size tokens: the tokens are calibrated for someone at a keyboard, and
  * borrowing them here would produce a technically consistent board nobody can
  * read from the far side of a corridor.
+ *
+ * IT IS EXACTLY THE VIEWPORT TALL, never taller: the plan inside it computes
+ * its hour height from the space it is given, so a `min-height` that let the
+ * page grow would push the end of the day off the bottom of a wall-mounted
+ * screen that nobody can scroll.
  */
 .board {
+    position: relative;
+
     display: flex;
     flex-direction: column;
-    gap: clamp(var(--space-5), 2vh, var(--space-7));
+    gap: clamp(var(--space-4), 1.5vh, var(--space-6));
 
-    min-height: 100vh;
-    padding: clamp(var(--space-5), 3vh, var(--space-8));
+    height: 100vh;
+    padding: clamp(var(--space-4), 2vh, var(--space-6));
 
     background: $surface0;
 
@@ -224,9 +253,8 @@ useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName')
     }
 
     &_title {
+        display: flex;
         margin: 0;
-        font-size: clamp(24px, 3.2vw, 56px);
-        font-weight: 700;
         color: $content1;
     }
 
@@ -238,7 +266,7 @@ useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName')
     }
 
     &_time {
-        font-size: clamp(24px, 3.2vw, 56px);
+        font-size: clamp(20px, 2.4vw, 44px);
         font-weight: 700;
         font-variant-numeric: tabular-nums;
         color: $content1;
@@ -262,74 +290,20 @@ useHead({ title: () => board.value?.screenName ?? t('screen.board.fallbackName')
         color: $content7;
     }
 
-    &_rooms {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: clamp(var(--space-4), 1.5vh, var(--space-6));
+    /*
+     * Out of flow, so it cannot take height from the plan or shift the
+     * centred page dots, and low-contrast on purpose: legible from a metre
+     * away by somebody looking for it, invisible from across the corridor.
+     */
+    &_stamp {
+        position: absolute;
+        right: var(--space-3);
+        bottom: var(--space-2);
 
         margin: 0;
-        padding: 0;
 
-        list-style: none;
-    }
-}
-
-.room {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-
-    padding: clamp(var(--space-5), 2vh, var(--space-7));
-
-    // The content ramp, because no step of the surface ramp reaches 3:1 against
-    // this ground in either theme, and on a wall, at distance, an edge that is
-    // merely almost visible is not visible.
-    border: 2px solid varToRgba('content7', 0.4);
-    border-radius: var(--radius-lg);
-
-    &--busy {
-        border-color: $primary500;
-    }
-
-    &_name {
-        margin: 0;
-        font-size: clamp(20px, 2.4vw, 40px);
-        font-weight: 700;
-        color: $content1;
-    }
-
-    &_state {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-    }
-
-    &_label {
-        margin: 0;
-
-        font-size: clamp(11px, 1vw, 18px);
-        font-weight: 700;
-        color: $primary500;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-
-        &--free {
-            color: $content7;
-        }
-    }
-
-    &_session {
-        margin: 0;
-        font-size: clamp(17px, 1.8vw, 30px);
-        font-weight: 600;
-        color: $content1;
-    }
-
-    &_meta {
-        margin: 0;
-        font-size: clamp(13px, 1.2vw, 22px);
-        font-variant-numeric: tabular-nums;
-        color: $content7;
+        font-size: 11px;
+        color: varToRgba('content7', 0.7);
     }
 }
 </style>

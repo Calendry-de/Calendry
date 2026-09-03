@@ -295,6 +295,51 @@ describe('GET /api/sessions under session.read_own', () => {
         expect(seen).toContain(ids.sessionSibling);
         expect(seen).toContain(ids.sessionUnrelated);
     });
+
+    /**
+     * The schedule's filters are multi-select: one dimension repeated is a
+     * UNION ("in room A or room B"), and the same route still takes a single
+     * id as a plain string (every test above). Pinned by CALLING the route,
+     * because the client's `request<T>()` is an unchecked assertion about
+     * what the server sends (CLAUDE.md, the `/api/[resource]` trap).
+     */
+    it('takes several ids per filter and returns their union', async () => {
+        const rooms = await api<SessionRow[]>(
+            `/api/sessions?termId=test-term-a&roomId=test-room-private-a&roomId=${ ids.otherRoom }`,
+            { cookie: cookies.viewer },
+        );
+
+        expect(rooms.status).toBe(200);
+
+        const inRooms = rooms.body.map((row) => row.id);
+
+        expect(inRooms).toContain(ids.sessionCohort);
+        expect(inRooms).toContain(ids.sessionUnrelated);
+        expect(inRooms, 'a session in neither room came back').not.toContain(ids.sessionSeminar);
+
+        const people = await api<SessionRow[]>(
+            `/api/sessions?termId=test-term-a&personId=${ ids.ownPerson }&personId=${ ids.otherPerson }`,
+            { cookie: cookies.viewer },
+        );
+
+        expect(people.status).toBe(200);
+
+        const withPeople = people.body.map((row) => row.id);
+
+        expect(withPeople).toContain(ids.sessionDirect);
+        expect(withPeople).toContain(ids.sessionUnrelated);
+        expect(withPeople).not.toContain(ids.sessionSeminar);
+
+        // Across dimensions the filters INTERSECT: Owen's sessions in Otto's
+        // room is an empty set on this fixture, and must stay one.
+        const both = await api<SessionRow[]>(
+            `/api/sessions?termId=test-term-a&personId=${ ids.ownPerson }&roomId=${ ids.otherRoom }`,
+            { cookie: cookies.viewer },
+        );
+
+        expect(both.status).toBe(200);
+        expect(both.body).toEqual([]);
+    });
 });
 
 describe('GET /api/schedule/context', () => {
@@ -427,31 +472,36 @@ describe('the page itself', () => {
      *   rooms   one room, twice    → one, so there is nothing to narrow
      *
      * The room case is the half that would otherwise go untested, and it is what
-     * distinguishes this rule from "always show them": a select offering only its
-     * placeholder claims this institution has no rooms.
+     * distinguishes this rule from "always show them": a checkbox list offering
+     * one row claims this institution has one room to choose between.
      *
      * Every absence is paired with the admin's copy of the same page, because
      * "does not contain Room" passes just as well for a page that rendered
      * nothing.
+     *
+     * The marker is each filter's LEGEND (`ScheduleFilterMultiSelect`), matched
+     * with its class so a stray "Room" in a chip's label cannot satisfy it. The
+     * drawer is `v-show`, so its markup is in the server-rendered body.
      */
     it('offers a filter to a read_own caller whenever it has options to offer', async () => {
+        const legend = (label: string) => new RegExp(`mpick_label[^>]*>${ label }<`);
         const own = await body('own');
 
         expect(own, 'sessions span two groups, so narrowing to one is offered')
-            .toContain('All groups');
+            .toMatch(legend('Group'));
         expect(own, 'two people appear, so narrowing to one is offered')
-            .toContain('Anyone');
+            .toMatch(legend('Person'));
         expect(own, 'one room, so there is nothing to narrow')
-            .not.toContain('All rooms');
+            .not.toMatch(legend('Room'));
 
         // Term stays unconditional: the frame every schedule is drawn in.
         expect(own).toContain('Term');
 
         const admin = await body('admin');
 
-        expect(admin).toContain('All groups');
-        expect(admin).toContain('All rooms');
-        expect(admin).toContain('Anyone');
+        expect(admin).toMatch(legend('Group'));
+        expect(admin).toMatch(legend('Room'));
+        expect(admin).toMatch(legend('Person'));
     });
 
     /**

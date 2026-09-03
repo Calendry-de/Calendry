@@ -149,6 +149,42 @@ describe('offering-plans: applying creates a group’s whole course load', () =>
         expect(groups.body.map((g) => g.groupId)).toContain(ids.groupCohortA);
     });
 
+    /**
+     * Issue #129/#130, end to end through the same API surface a tenant
+     * actually uses: naming a lecturer on the TEMPLATE reaches the created
+     * OFFERING's own `offering_lecturer` relation, so applying a plan no
+     * longer produces the empty pool issue #130 exists to warn about.
+     */
+    it('carries a named lecturer from the template onto the created offering', async () => {
+        const plan = await createPlan('Jahrgang 13: Standard');
+        const math = await createTemplate('Math 13');
+
+        await api(`/api/offering-templates/${math.id}/lecturers`, {
+            method: 'PUT',
+            cookie: adminCookie,
+            body: JSON.stringify([{ personId: ids.personA }]),
+        });
+
+        await api(`/api/offering-plan-items/${plan.id}`, {
+            method: 'PUT',
+            cookie: adminCookie,
+            body: JSON.stringify([{ templateId: math.id }]),
+        });
+
+        const applied = await api<{ offerings: { id: string }[] }>(`/api/offering-plan-apply/${plan.id}`, {
+            method: 'POST',
+            cookie: adminCookie,
+            body: JSON.stringify({ termId: ids.termA, groupId: ids.groupCohortA }),
+        });
+
+        const lecturers = await api<{ personId: string }[]>(
+            `/api/offerings/${applied.body.offerings[0]!.id}/lecturers`,
+            { cookie: adminCookie },
+        );
+
+        expect(lecturers.body.map((l) => l.personId)).toEqual([ids.personA]);
+    });
+
     it('refuses the whole apply when a template is missing a kind or a title', async () => {
         const plan = await createPlan('Incomplete plan');
         // No `title`, no `kindId`: a shape nobody finished fixing yet.

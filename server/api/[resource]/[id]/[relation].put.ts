@@ -11,7 +11,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Resources'],
         summary: 'Replace a relation membership set',
-        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
+        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, offering-templates/lecturers, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
         parameters: [
             { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -109,6 +109,21 @@ defineRouteMeta({
                                 },
                                 {
                                     title: 'offerings/lecturers',
+                                    type: 'object',
+                                    required: ['personId'],
+                                    properties: {
+                                        personId: {
+                                            type: 'string',
+                                        },
+                                        roleId: {
+                                            type: 'string',
+                                            nullable: true,
+                                            description: 'The scheduling role this person fills here, not an access role.',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'offering-templates/lecturers',
                                     type: 'object',
                                     required: ['personId'],
                                     properties: {

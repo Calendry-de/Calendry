@@ -290,6 +290,23 @@ export const RELATIONS: Record<string, RelationConfig> = {
         select: { personId: true, roleId: true },
     },
 
+    /**
+     * The template's OWN half of `offering_lecturer` (issue #129): a NAMED
+     * roster, so applying a plan seeds the created Offering's `lecturers`
+     * relation instead of leaving it empty (issue #130). Same shape as
+     * `offerings/lecturers` above, deliberately: a template's roster and an
+     * Offering's roster are the same kind of fact, one stored, one seeded
+     * from it.
+     */
+    'offering-templates/lecturers': {
+        parent: 'offering-templates',
+        parentModel: 'offeringTemplate',
+        model: 'offeringTemplateLecturer',
+        parentKey: 'templateId',
+        item: z.object({ personId: id, roleId: id.nullish() }),
+        select: { personId: true, roleId: true },
+    },
+
     'offerings/equipment': {
         parent: 'offerings',
         parentModel: 'offering',

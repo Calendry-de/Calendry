@@ -464,6 +464,21 @@ solver has no way to detect.
   `assembleSolverInput` clamps to the pool size and reports a mismatch rather
   than refusing the save. § "Lecturer candidate pools: `requiredLecturerCount`
   decouples eligibility from assignment".
+- **A template's lecturer pool is a STORED shape, copied at apply time, never
+  a live link.** `OfferingTemplateLecturer` (issue #129) is `OfferingLecturer`'s
+  own half on the template; `applyOfferingPlanItems` copies its rows onto the
+  created Offering's own `offering_lecturer` once, and editing a template's
+  roster afterwards must never reach back and restaff an Offering already
+  created from it — the same "seed, don't bind" contract every other template
+  column already keeps (issue #8). `requiredRoleId` is left inert rather than
+  made to compose with it: it reaches nothing downstream (zero occurrences in
+  `assembleSolverInput`), and two mechanisms naming the same slot need a
+  precedence rule, which is a decision for whoever lands it, not a silent
+  default. An empty pool a tenant did not staff, and a kind that never needs
+  one (self-directed study, `SessionKind.requiresLecturer = false`), are
+  DIFFERENT states the wire cannot tell apart on its own — see the entry
+  above and `AssemblyReport.offeringsWithNoLecturerAssigned`. § "A template
+  can name a lecturer".
 - **Tracked wire-format gaps** (on the board) each report rather than
   narrow silently. Do not "fix" one by picking a value: the solver's unbounded
   run registry, violations naming solver-invented Sessions with no join key.
@@ -508,6 +523,7 @@ The rest are area-specific: read the section before working in that area.
 | Week grids | Minute-true, rows grow, a slot stays IN FLOW, placement is px at a constant scale. Nothing is ever hidden. | § "Grid geometry" |
 | Schedule toolbar | Height is invariant; the solver's tall states are anchored panels. `.bar_select` is capped. | § "The schedule toolbar" |
 | Screens | A lobby display is a DEVICE credential, not a fourth RLS exception: resolved by secret alone through `screen_identity()`, then ordinary `withTenant()`. Key hashed, shown once, generated in the browser. Empty room scope = every room. | § "Screens" |
+| Room plan | `ROOM_BOARD` draws the whole day, rooms as columns. A DERIVED axis (the grid's day) is widened by entries, never clipped; a CONFIGURED one (`screen.plan_start_minute`/`plan_end_minute`, set in Management) is authoritative, crops, and NAMES what it cropped. "Now" is the response's tenant-local `nowMinute`, never the device clock; overlaps split into lanes; PAGING is the other thing hidden and the dots + rotation are what say so. `?columnWidth=`/`?rotate=` stay clamped URL knobs: they describe the glass, not the institution. The title is the Calendry lockup; the screen's NAME belongs to Management, and reaches the wall only as the corner stamp. | § "The room plan" |
 | Calendar links | `POST /api/me/ics-links` needs `ics_link.generate_own` (own Sessions, unchanged since issue #15) or `ics_link.generate` (also may set `groupIds`, streaming those Groups' Sessions via the SAME `ancestorGroupIds` closure `ownSessionClause` uses for a member's own timetable: `groupSessionClause` in `server/utils/scheduleScope.ts`). Lives at `/my/calendar-links`, not Management. | § "Calendar links gain a permission and a Group subject" |
 | Staff | `StaffIdentity` IS the fourth RLS exception, unlike screens: no tenant at all, ever. `requireStaffIdentity` gates `server/api/staff/*`, never `withRequestTenant`. Tenant CREATE goes through `calendry_internal.staff_create_tenant()` (SECURITY DEFINER, via ordinary `calendry_app`, issue #105); tenant LIST still reads through the OWNER connection (`getOwnerPrisma()`). `provisionTenantViaFunction()` (`server/utils/staffCreateTenant.ts`) is the ONE tenant-creation implementation, callable on whichever `PrismaClient` the caller passes (the CLI's owner connection or the route's ordinary one); `provisionTenantCore()` no longer exists. | §§ "Staff principal: the fourth tenant-isolation exception", "Staff tenant creation: SECURITY DEFINER instead of owner-Prisma" |
 

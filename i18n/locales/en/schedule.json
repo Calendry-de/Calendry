@@ -54,12 +54,15 @@
         "title": "Filters",
         "close": "Close filters",
         "group": "Group",
-        "allGroups": "All groups",
         "includeNested": "Include nested",
         "room": "Room",
-        "allRooms": "All rooms",
         "person": "Person",
-        "anyone": "Anyone"
+        "search": "Search…",
+        "searchIn": "Search {label}",
+        "noMatches": "No matches",
+        "clear": "Clear",
+        "selected": "{count} selected",
+        "remove": "Remove {name}"
     },
     "weekNav": {
         "regionLabel": "Week",

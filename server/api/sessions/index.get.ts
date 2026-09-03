@@ -5,12 +5,29 @@ import { sessionsCacheKey, SCHEDULE_CACHE_TTL_SECONDS } from '../../utils/schedu
 import { sessionReadScope } from '../../utils/scheduleScope';
 import { withRequestTenant } from '../../utils/tenantDb';
 
+const idList = z.union([z.string(), z.array(z.string())])
+    .optional()
+    .transform((value) => {
+        if (value === undefined) return undefined;
+
+        const list = (Array.isArray(value) ? value : [value]).filter(Boolean);
+
+        return list.length ? list : undefined;
+    });
+
 const querySchema = z.object({
     termId: z.string().optional(),
     termWeek: z.coerce.number().int().optional(),
-    groupId: z.string().optional(),
-    roomId: z.string().optional(),
-    personId: z.string().optional(),
+    /*
+     * REPEATABLE. `?roomId=a&roomId=b` means sessions in EITHER room: a
+     * union within one dimension, intersected across dimensions (a group AND
+     * a room). A single id still arrives as a plain string and is lifted to
+     * a one-element list, so every existing caller is unchanged; an empty
+     * list reads as "not filtering", the same as absence.
+     */
+    groupId: idList,
+    roomId: idList,
+    personId: idList,
     offeringId: z.string().optional(),
     isLocked: z.coerce.boolean().optional(),
     includeNested: z.coerce.boolean().optional(),
@@ -31,10 +48,10 @@ defineRouteMeta({
         parameters: [
             { name: 'termId', in: 'query', schema: { type: 'string' } },
             { name: 'termWeek', in: 'query', schema: { type: 'integer' } },
-            { name: 'groupId', in: 'query', schema: { type: 'string' } },
-            { name: 'includeNested', in: 'query', schema: { type: 'boolean' }, description: 'Resolve groupId through the group closure, so filtering by a Cohort also surfaces its Seminars.' },
-            { name: 'roomId', in: 'query', schema: { type: 'string' } },
-            { name: 'personId', in: 'query', schema: { type: 'string' } },
+            { name: 'groupId', in: 'query', style: 'form', explode: true, schema: { type: 'array', items: { type: 'string' } }, description: 'Repeatable (?groupId=a&groupId=b): sessions assigned to ANY of the given groups. A single id may be passed as a plain string. Composes with roomId and personId as an intersection.' },
+            { name: 'includeNested', in: 'query', schema: { type: 'boolean' }, description: 'Resolve every groupId through the group closure, so filtering by a Cohort also surfaces its Seminars.' },
+            { name: 'roomId', in: 'query', style: 'form', explode: true, schema: { type: 'array', items: { type: 'string' } }, description: 'Repeatable: sessions held in ANY of the given rooms.' },
+            { name: 'personId', in: 'query', style: 'form', explode: true, schema: { type: 'array', items: { type: 'string' } }, description: 'Repeatable: sessions attached to ANY of the given people.' },
             { name: 'offeringId', in: 'query', schema: { type: 'string' } },
             { name: 'isLocked', in: 'query', schema: { type: 'boolean' } },
         ],
@@ -107,14 +124,15 @@ export default defineEventHandler(async (event) => {
             // includeNested resolves through the closure rather than matching only
             // directly assigned groups.
             const groupIds = query.includeNested
-                ? await conflictGroupIds(tx, [query.groupId])
-                : [query.groupId];
+                ? await conflictGroupIds(tx, query.groupId)
+                : query.groupId;
 
             where.groups = { some: { groupId: { in: groupIds } } };
         }
 
-        if (query.roomId) where.rooms = { some: { roomId: query.roomId } };
-        if (query.personId) where.people = { some: { personId: query.personId } };
+        // Several ids are a UNION within the dimension: "in room A or room B".
+        if (query.roomId) where.rooms = { some: { roomId: { in: query.roomId } } };
+        if (query.personId) where.people = { some: { personId: { in: query.personId } } };
 
         /**
          * Cache freshness (issue #66): "immediately visible after a manual

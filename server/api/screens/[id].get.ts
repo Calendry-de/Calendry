@@ -28,6 +28,8 @@ export default defineEventHandler(async (event) => {
             id: screen.id,
             name: screen.name,
             mode: screen.mode,
+            planStartMinute: screen.planStartMinute,
+            planEndMinute: screen.planEndMinute,
             isActive: screen.isActive,
             lastSeenAt: screen.lastSeenAt,
             createdAt: screen.createdAt,

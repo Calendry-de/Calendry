@@ -30,6 +30,20 @@ const BODY = z.object({
     roomIds: z.array(z.string().min(1)).nullish(),
     /** The second scope axis, with the identical three-state reading. */
     groupIds: z.array(z.string().min(1)).nullish(),
+    /*
+     * The room plan's day window (issue #131), and THE ONE PLACE IN THIS ROUTE
+     * WHERE NULL DOES NOT MEAN "LEAVE IT ALONE". Null is the column's own value
+     * for "draw the timetable's own day", so it has to mean CLEAR, or the
+     * management form could set a window and never take it off again: the
+     * shared form serialises every declared field on every save, so a cleared
+     * time input arrives as null.
+     *
+     * ABSENT still means unchanged, which is what a script sending only
+     * `{ name }` gets, and the update below therefore tests `=== undefined`
+     * rather than `== null` like every other field here.
+     */
+    planStartMinute: z.number().int().min(0).max(1440).nullish(),
+    planEndMinute: z.number().int().min(0).max(1440).nullish(),
     isActive: z.boolean().nullish(),
 });
 
@@ -60,6 +74,8 @@ export default defineEventHandler(async (event) => {
                     ...(body.name == null ? {} : { name: body.name }),
                     ...(body.mode == null ? {} : { mode: body.mode }),
                     ...(body.isActive == null ? {} : { isActive: body.isActive }),
+                    ...(body.planStartMinute === undefined ? {} : { planStartMinute: body.planStartMinute }),
+                    ...(body.planEndMinute === undefined ? {} : { planEndMinute: body.planEndMinute }),
                 },
             });
 
@@ -97,7 +113,14 @@ export default defineEventHandler(async (event) => {
                 }
             }
 
-            return { id: screen.id, name: screen.name, mode: screen.mode, isActive: screen.isActive };
+            return {
+                id: screen.id,
+                name: screen.name,
+                mode: screen.mode,
+                planStartMinute: screen.planStartMinute,
+                planEndMinute: screen.planEndMinute,
+                isActive: screen.isActive,
+            };
         });
     });
 });

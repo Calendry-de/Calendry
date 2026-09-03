@@ -22,7 +22,7 @@ let roomId = '';
 
 const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:8080';
 
-interface Created { id: string; key: string; roomIds: string[] }
+interface Created { id: string; key: string; roomIds: string[]; planStartMinute: number | null; planEndMinute: number | null }
 
 /** A rendered page, with Vue's dev-mode template comments stripped. */
 async function page(path: string): Promise<string> {
@@ -324,6 +324,92 @@ describe('the management form', () => {
     });
 });
 
+describe("the room plan's own hours", () => {
+    /*
+     * Issue #131. NULL IS A REAL VALUE on these two columns, and that is the
+     * whole reason this is tested through the API rather than left to the form:
+     * every other nullable field on this route reads null as "leave it alone",
+     * these two read it as "hand the day back to the timetable", and the shared
+     * form sends null for anything untouched. Get that backwards and a window
+     * can be set once and never removed.
+     */
+    it('stores a window, returns it on both reads, and clears it with null', async () => {
+        const screen = await makeScreen({
+            name: 'Windowed board',
+            planStartMinute: 8 * 60,
+            planEndMinute: 16 * 60,
+        });
+
+        try {
+            const one = await api<{ planStartMinute: number | null; planEndMinute: number | null }>(
+                `/api/screens/${screen.id}`,
+                { cookie },
+            );
+
+            expect(one.body.planStartMinute).toBe(8 * 60);
+            expect(one.body.planEndMinute).toBe(16 * 60);
+
+            // The list carries it too: the management table and form are both
+            // fed from here, and a field missing from the list renders as an
+            // empty control over a stored value, which then saves as a clear.
+            const list = await api<{ id: string; planStartMinute: number | null }[]>('/api/screens', { cookie });
+
+            expect(list.body.find((row) => row.id === screen.id)?.planStartMinute).toBe(8 * 60);
+
+            const cleared = await api<{ planStartMinute: number | null; planEndMinute: number | null }>(
+                `/api/screens/${screen.id}`,
+                { method: 'PATCH', cookie, body: JSON.stringify({ planStartMinute: null, planEndMinute: null }) },
+            );
+
+            expect(cleared.status).toBe(200);
+            expect(cleared.body.planStartMinute).toBeNull();
+            expect(cleared.body.planEndMinute).toBeNull();
+        } finally {
+            await api(`/api/screens/${screen.id}`, { method: 'DELETE', cookie });
+        }
+    });
+
+    it('leaves the window alone when the field is absent, unlike null', async () => {
+        const screen = await makeScreen({ name: 'Untouched window', planStartMinute: 9 * 60 });
+
+        try {
+            const renamed = await api<{ planStartMinute: number | null }>(`/api/screens/${screen.id}`, {
+                method: 'PATCH',
+                cookie,
+                body: JSON.stringify({ name: 'Renamed' }),
+            });
+
+            expect(renamed.body.planStartMinute, 'a rename must not clear the window').toBe(9 * 60);
+        } finally {
+            await api(`/api/screens/${screen.id}`, { method: 'DELETE', cookie });
+        }
+    });
+
+    it('refuses a window whose ends are crossed, by name', async () => {
+        // Refused loudly rather than clamped or swapped: a display drawing a
+        // different day than the one it was told to is the invisible failure,
+        // and the person who can fix it is the one submitting this form.
+        const res = await api('/api/screens', {
+            method: 'POST',
+            cookie,
+            body: JSON.stringify({ name: 'Backwards', planStartMinute: 16 * 60, planEndMinute: 8 * 60 }),
+        });
+
+        expect(res.status).toBe(400);
+    });
+
+    it('accepts one end on its own', async () => {
+        const screen = await makeScreen({ name: 'Open ended', planStartMinute: 7 * 60 });
+
+        try {
+            expect(screen.planStartMinute).toBe(7 * 60);
+            expect(screen.planEndMinute).toBeNull();
+        } finally {
+            await api(`/api/screens/${screen.id}`, { method: 'DELETE', cookie });
+        }
+    });
+});
+
 describe('the display page', () => {
     it('renders without a session, and is not bounced to login', async () => {
         const screen = await makeScreen({ name: 'Wall display' });
@@ -339,6 +425,22 @@ describe('the display page', () => {
             // The guard exempts `/screen`; a redirect would render the login page
             // on a wall for a device that has no way to sign in.
             expect(html).not.toMatch(/name="password"/);
+
+            /*
+             * THE PLAN ITSELF IS SERVER-RENDERED, rooms and all. The paging
+             * that hides rooms past the first page is a CLIENT measurement
+             * (`roomPlanColumnsPerPage` reads an unmeasured viewport as "every
+             * room"), so SSR carries the whole institution: asserting a room
+             * name here is what would catch a plan that renders its frame and
+             * no columns, which on a wall is indistinguishable from a building
+             * with nothing booked in it.
+             */
+            expect(html, "the plan's time axis must render").toContain('Time');
+
+            const rooms = await api<{ name: string }[]>('/api/rooms', { cookie });
+
+            expect(rooms.body.length, 'the fixture needs a room for this to prove anything').toBeGreaterThan(0);
+            expect(html, `the plan must name ${rooms.body[0]!.name}`).toContain(rooms.body[0]!.name);
         } finally {
             await api(`/api/screens/${screen.id}`, { method: 'DELETE', cookie });
         }

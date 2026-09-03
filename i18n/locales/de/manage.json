@@ -391,6 +391,14 @@
             "notes": {
                 "label": "Notizen"
             }
+        },
+        "relation": {
+            "lecturers": {
+                "label": "Wer leitet sie",
+                "help": "Namentlich benannte Personen, die diese Vorlage auf jedes daraus erstellte Angebot überträgt, in der Größe von „Gleichzeitig benötigte Lehrkräfte“ weiter oben. Optional können Sie angeben, welche Planungsrolle jede Person ausfüllt. Wird nur beim Anwenden einmalig kopiert — eine spätere Änderung dieser Liste besetzt bereits erstellte Angebote nicht nachträglich neu.",
+                "emptyHint": "Es sind noch keine Personen definiert. Ein aus dieser Vorlage erstelltes Angebot hätte einen leeren Lehrkräfte-Pool.",
+                "rolePlaceholder": "Beliebige Rolle"
+            }
         }
     },
     "offeringPlan": {
@@ -474,6 +482,12 @@
             "groupIds": {
                 "label": "Angezeigte Gruppen",
                 "emptyHint": "Noch keine Gruppen festgelegt."
+            },
+            "planStartMinute": {
+                "label": "Plan beginnt um"
+            },
+            "planEndMinute": {
+                "label": "Plan endet um"
             }
         }
     },

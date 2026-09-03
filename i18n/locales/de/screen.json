@@ -1,16 +1,19 @@
 {
     "board": {
-        "fallbackName": "Raumbelegung",
         "noTerm": "Heute läuft kein Semester.",
         "noRooms": "Für diese Anzeigetafel sind keine Räume hinterlegt.",
         "missingKey": "Dieser Anzeige fehlt der Schlüssel. Öffnen Sie die Adresse, mit der die Anzeigetafel eingerichtet wurde.",
-        "unreachable": "Der Stundenplan ist nicht erreichbar."
+        "unreachable": "Der Stundenplan ist nicht erreichbar.",
+        "timeColumn": "Zeit",
+        "pagerLabel": "Raumseiten",
+        "pageLabel": "Räume {from} bis {to} von {total}",
+        "outsideWindow": "{count} Veranstaltung außerhalb von {from}–{to} | {count} Veranstaltungen außerhalb von {from}–{to}"
     },
     "room": {
         "nowLabel": "Jetzt",
         "freeLabel": "Frei",
-        "next": "Als Nächstes {time} · {title}",
-        "nothingElse": "Heute nichts mehr"
+        "nothingElse": "Heute nichts mehr",
+        "covering": "{name} (Vertretung)"
     },
     "plan": {
         "fallbackName": "Vertretungsplan",

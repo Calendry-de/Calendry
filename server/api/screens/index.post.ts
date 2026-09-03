@@ -53,8 +53,22 @@ const BODY = z.object({
      * GROUP, and a form where nobody ticked a group sends `null`.
      */
     groupIds: z.array(z.string().min(1)).nullish(),
+    /*
+     * The room plan's own day window, minutes since tenant-local midnight
+     * (issue #131). NULL IS A REAL VALUE here, not merely "untouched": it means
+     * "draw the timetable's own day", which is the default and the commonest
+     * choice, so the two ends are independently nullable rather than a pair.
+     *
+     * Bounded here as well as by the column's CHECK, because a 400 naming the
+     * field is a better answer than a database error naming a constraint.
+     */
+    planStartMinute: z.number().int().min(0).max(1440).nullish(),
+    planEndMinute: z.number().int().min(0).max(1440).nullish(),
     isActive: z.boolean().nullish(),
-});
+}).refine(
+    (body) => body.planStartMinute == null || body.planEndMinute == null || body.planStartMinute < body.planEndMinute,
+    { message: 'The room plan must start before it ends.', path: ['planEndMinute'] },
+);
 
 export default defineEventHandler(async (event) => {
     const body = await readValidatedBody(event, BODY.parse);
@@ -71,6 +85,10 @@ export default defineEventHandler(async (event) => {
                     name: body.name,
                     tokenHash: hashToken(key),
                     mode: body.mode ?? 'ROOM_BOARD',
+                    // `?? null` rather than omitted: absent and null both mean
+                    // "the timetable's own day", which is this column's NULL.
+                    planStartMinute: body.planStartMinute ?? null,
+                    planEndMinute: body.planEndMinute ?? null,
                     isActive: body.isActive ?? true,
                 },
             });
@@ -109,6 +127,8 @@ export default defineEventHandler(async (event) => {
                 id: screen.id,
                 name: screen.name,
                 mode: screen.mode,
+                planStartMinute: screen.planStartMinute,
+                planEndMinute: screen.planEndMinute,
                 isActive: screen.isActive,
                 roomIds: body.roomIds ?? [],
                 groupIds: body.groupIds ?? [],

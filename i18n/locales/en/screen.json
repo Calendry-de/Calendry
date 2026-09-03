@@ -1,16 +1,19 @@
 {
     "board": {
-        "fallbackName": "Room board",
         "noTerm": "No term is running today.",
         "noRooms": "This screen has no rooms to show.",
         "missingKey": "This display has no key. Open it with the address the screen was set up with.",
-        "unreachable": "Could not reach the timetable."
+        "unreachable": "Could not reach the timetable.",
+        "timeColumn": "Time",
+        "pagerLabel": "Room pages",
+        "pageLabel": "Rooms {from} to {to} of {total}",
+        "outsideWindow": "{count} session outside {from}–{to} | {count} sessions outside {from}–{to}"
     },
     "room": {
         "nowLabel": "Now",
         "freeLabel": "Free",
-        "next": "Next {time} · {title}",
-        "nothingElse": "Nothing else today"
+        "nothingElse": "Nothing else today",
+        "covering": "{name} (covering)"
     },
     "plan": {
         "fallbackName": "Substitution plan",

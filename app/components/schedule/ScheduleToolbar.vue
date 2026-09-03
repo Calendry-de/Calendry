@@ -278,59 +278,50 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 <style scoped lang="scss">
 .bar {
     /*
-     * TWO NAMED ROWS, NOT A WRAPPING FLEX ROW. One row per group, so each row is
-     * sized by one group and the bar's height is a constant through every
-     * solver state and every length of tenant name.
+     * ONE ROW OF ONE CONTROL LANGUAGE. Three named areas: what is being looked
+     * at (scope), how it is being read (view), and the only things that change
+     * anything (actions), which alone hold the right edge. The actions area is
+     * the one allowed to grow, and it WRAPS inside itself, right-aligned, so a
+     * long tenant label or the German copy costs the bar a second line of
+     * actions and never collides with the view toggle beside it. (That
+     * collision was real: at 1024px the violations toggle rendered under the
+     * blocked-day button, because the view column was the `1fr` track and the
+     * content-sized actions column left it 130px.)
      *
-     * One row does not fit at 1440: the exact scope-group width shifted when
-     * Term joined it (previously just the Filters toggle: measured then at
-     * 621px against a 1408px row) and has not been re-measured since, but the
-     * underlying reason a single row fails is unchanged: `view`/`actions`
-     * alone already vary enough on their own (a longer tenant name re-wraps
-     * the filters, and so does the solver: 254px idle against 112px running)
-     * that `scope` growing by one field does not change the conclusion, only
-     * the margin.
-     *
-     * `--space-7` (24px) between areas against `--space-5` (12px) within one.
+     * NO CARD. The bar carried `$surface1` at `--radius-xl` on a `$surface1`
+     * page: an invisible frame whose only visible effect was 24px of padding
+     * and a 150px-tall region for four controls. A hairline underneath
+     * separates chrome from schedule instead, the way an occupied cell is told
+     * from an empty one: by an edge, not a fill.
      */
     position: relative;
 
     /*
      * Above `.schedule_body` so the solver's and blocked-day panels overlay the
-     * grid instead of displacing it; `.schedule_side` is sticky and later in the
-     * DOM. Must also outrank `ScheduleGrid`'s own sticky corner (z-index: 3):
-     * that cell creates its own stacking context with nothing in between to
-     * contain it, so it compared directly against this one and painted over
-     * both anchored panels regardless of their own (locally-scoped) z-index.
+     * grid instead of displacing it; must also outrank `ScheduleGrid`'s sticky
+     * corner (z-index: 3), which compares directly against this one.
      */
     z-index: 4;
 
     display: grid;
-    grid-template-areas:
-        'scope scope'
-        'view actions';
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-6) var(--space-7);
+    grid-template-areas: 'scope view actions';
+    grid-template-columns: auto auto minmax(0, 1fr);
+    gap: var(--space-5) var(--space-7);
+    align-items: center;
+
+    padding: 0 0 var(--space-5);
+    border-bottom: 1px solid $surface5;
+
+    @include mobile() {
+        grid-template-areas:
+            'scope view'
+            'actions actions';
+        grid-template-columns: auto minmax(0, 1fr);
+    }
 
     /*
-     * `end` puts the buttons on the selects' optical line rather than the
-     * labels' 16px above. It was `flex-start` because a tall in-flow solver
-     * dragged every select down to meet it; safe again ONLY while the solver's
-     * tall states stay out of flow (see `ScheduleSolverControl`).
-     */
-    align-items: end;
-
-    padding: var(--space-5) var(--space-6);
-    border-radius: var(--radius-xl);
-
-    background: $surface1;
-
-    /*
-     * 44px ON A PHONE ONLY. The 35px toggle and ~34px selects match each other on
-     * the desktop row and are comfortable mouse targets; forcing 44px there would
-     * make the toggle taller than the select beside it for no one's benefit. Below
-     * 700px the same controls are thumb-reached, which is the condition
-     * `ScheduleAgenda` and `ScheduleWeekNav` already apply it under.
+     * 44px ON A PHONE ONLY: the same controls are thumb-reached there, the
+     * condition `ScheduleAgenda` and `ScheduleWeekNav` already apply it under.
      */
     @include mobileOnly() {
         grid-template-areas:
@@ -339,26 +330,20 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
             'actions';
         grid-template-columns: minmax(0, 1fr);
 
-        /* Tighter rows than the desktop's 16px: on a phone the toolbar already
-           costs 303px before any schedule appears. */
-        gap: var(--space-5) var(--space-7);
         #{&}_select,
         #{&}_filters-toggle,
         #{&}_violations-toggle {
             min-height: 44px;
         }
 
-        /*
-         * On a phone the cap is the container, not 220px: more than half the
-         * row, so two fields could no longer share one and the filters went from
-         * two rows to four (303px against 468px with German names).
-         */
         #{&}_field { flex: 1 1 140px; }
 
         #{&}_select {
             width: 100%;
             max-width: 100%;
         }
+
+        #{&}_group--end :deep(.button) { min-height: 44px; }
     }
 
     &_group {
@@ -366,24 +351,22 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         grid-area: scope;
         flex-wrap: wrap;
         gap: var(--space-4) var(--space-5);
-        align-items: flex-end;
+        align-items: center;
 
         /* So a long tenant name shrinks the group rather than the bar. */
         min-width: 0;
 
         &--view { grid-area: view; }
 
-        /* No auto margin: it made the group's position depend on which wrap
-           line it landed on. */
-        &--end { grid-area: actions; }
+        &--end {
+            grid-area: actions;
+            justify-content: flex-end;
+        }
     }
 
     /*
      * A STATEMENT, NOT A CONTROL. No fill, no border, no hover: it names what
-     * the bar is looking at, and anything that looks pressable in this group
-     * is pressable. The transparent border is there so its box height matches
-     * the toggles beside it exactly and `align-items: flex-end` puts all three
-     * on one optical line.
+     * the bar is looking at, and anything that looks pressable here is.
      */
     &_scope {
         display: flex;
@@ -391,8 +374,6 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         align-items: center;
 
         margin: 0;
-        padding: var(--space-4) 0;
-        border: 1px solid transparent;
 
         font-size: var(--font-size-sm);
         font-weight: 600;
@@ -406,10 +387,16 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         }
     }
 
+    /*
+     * LABEL BESIDE THE VALUE, not stacked over it. Stacked, the 12px caption
+     * added a whole text line to the bar's height for a word that reads just as
+     * well as a prefix; and the bar's height is what everything under it waits
+     * behind.
+     */
     &_field {
         display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
+        gap: var(--space-4);
+        align-items: center;
 
         // Lets the select's `max-width` bind: a flex item's default
         // `min-width: auto` is its content, i.e. the widest option.
@@ -437,13 +424,15 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 
         min-width: 120px;
         max-width: 220px;
+        min-height: 36px;
         padding: var(--space-3) var(--space-4);
         border: 1px solid $surface5;
         border-radius: var(--radius-md);
 
         font-family: inherit;
-        font-size: var(--font-size-md);
-        color: $content5;
+        font-size: var(--font-size-sm);
+        font-weight: 600;
+        color: $content3;
         text-overflow: ellipsis;
 
         background: $surface0;
@@ -456,6 +445,14 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 
     &_muted { color: $content7; }
 
+    /*
+     * THE BAR'S ONE BUTTON SHAPE: 36px, hairline, `--radius-md`, 14px. The two
+     * toggles below draw it directly; the action buttons (`CommonButton`s
+     * owned by this bar, the solver control and the blocked-day control) are
+     * given the same shape through `:deep` further down, so a reader meets one
+     * kind of control across the row instead of bordered toggles beside bare
+     * text runs that happened to be buttons.
+     */
     &_filters-toggle,
     &_violations-toggle {
         cursor: pointer;
@@ -464,7 +461,8 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         gap: var(--space-3);
         align-items: center;
 
-        padding: var(--space-4) var(--space-5);
+        min-height: 36px;
+        padding: var(--space-3) var(--space-5);
         border: 1px solid $surface5;
         border-radius: var(--radius-md);
 
@@ -474,6 +472,9 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
 
         background: $surface0;
 
+        transition: border-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+            color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
         svg {
             width: 15px;
             height: 15px;
@@ -482,7 +483,7 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
         @include hover() {
             &:hover {
                 border-color: $surface6;
-                color: $content4;
+                color: $content3;
             }
         }
 
@@ -495,6 +496,77 @@ defineExpose({ startRepair: () => solverControl.value?.startRepair() });
             border-color: $primary500;
             color: $content2;
             background: varToRgba('primary500', 0.16);
+        }
+    }
+
+    /*
+     * The action buttons, in the bar's shape. Scoped to the TRANSPARENT and
+     * SECONDARY variants that sit directly in this row (Add event / Cancel
+     * event, Proposals, the blocked-day trigger) and to nothing inside the
+     * solver's or blocked-day's anchored panels, which have their own button
+     * roles. The solver's idle trigger is the row's one PRIMARY: it is the only
+     * action here that produces a schedule, and it keeps `CommonButton`'s
+     * primary fill untouched.
+     */
+    &_group--end {
+        > :deep(.button--type-transparent),
+        > :deep(.button--type-secondary),
+        :deep(.blockday > .button--type-transparent) {
+            gap: var(--space-3);
+
+            min-height: 36px;
+            padding: var(--space-3) var(--space-5);
+            border: 1px solid $surface5;
+            border-radius: var(--radius-md);
+
+            font-size: var(--font-size-sm);
+            color: $content5;
+
+            background: $surface0;
+
+            transition: border-color 140ms cubic-bezier(0.16, 1, 0.3, 1),
+                color 140ms cubic-bezier(0.16, 1, 0.3, 1);
+
+            @include hover() {
+                &:hover {
+                    border-color: $surface6;
+                    color: $content2;
+                    background: $surface0;
+                }
+            }
+
+            &:active,
+            &:focus {
+                background: $surface2;
+            }
+
+            .button_icon {
+                width: 15px;
+                min-width: 15px;
+                color: $content6;
+            }
+        }
+
+        /* The active "Cancel event" state: the same shape, pressed. */
+        > :deep(.button--type-secondary) {
+            border-color: $primary500;
+            color: $content2;
+            background: varToRgba('primary500', 0.16);
+        }
+
+        :deep(.solver > .button--type-primary) {
+            gap: var(--space-3);
+
+            min-height: 36px;
+            padding: var(--space-3) var(--space-6);
+
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+
+            svg {
+                width: 16px;
+                height: 16px;
+            }
         }
     }
 

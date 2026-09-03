@@ -413,6 +413,7 @@ model Tenant {
   offeringEquipment            OfferingEquipment[]
   offeringRooms                OfferingRoom[]
   offeringTemplates            OfferingTemplate[]
+  offeringTemplateLecturers     OfferingTemplateLecturer[]
   offeringPlans                OfferingPlan[]
   offeringPlanItems            OfferingPlanItem[]
   sessions                     Session[]
@@ -480,6 +481,7 @@ model Person {
   memberships       Membership[]
   sessionPeople     SessionPerson[]
   offeringLecturers OfferingLecturer[]
+  offeringTemplateLecturers OfferingTemplateLecturer[]
   generations       Generation[]
   sessionEvents     SessionEvent[]
   accountLink       AccountPerson?
@@ -535,6 +537,7 @@ model Role {
   offerings         Offering[]
   offeringLecturers OfferingLecturer[]
   offeringTemplates OfferingTemplate[]
+  offeringTemplateLecturers OfferingTemplateLecturer[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -1215,6 +1218,25 @@ model Screen {
   /// happens before any tenant is known.
   tokenHash String @map("token_hash")
 
+  /// `ROOM_BOARD` only: the first and last minute of the day this display
+  /// draws, as minutes since TENANT-local midnight.
+  ///
+  /// NULL MEANS "THE TIMETABLE'S OWN DAY" (first block start / last block end
+  /// for the weekday being drawn), which is the right default and what every
+  /// screen predating issue #131 keeps. Either end may be set on its own and
+  /// overrides only that end: a corridor whose lessons all finish by four
+  /// wants the evening back, and the plan then spends its whole height on the
+  /// hours that carry something.
+  ///
+  /// A configured window is AUTHORITATIVE, unlike the derived one, which any
+  /// Session outside it widens: the point of setting it is to make the drawn
+  /// hours bigger, and an outlier that silently restored the full day would
+  /// make the setting look broken. So the plan CLIPS to it and NAMES what
+  /// falls outside (`roomPlanOutsideWindow`), the same contract its room
+  /// paging keeps.
+  planStartMinute Int? @map("plan_start_minute")
+  planEndMinute   Int? @map("plan_end_minute")
+
   /// Revocation without deletion, so a display taken down for a week keeps its
   /// name and room scope.
   isActive Boolean @default(true) @map("is_active")
@@ -1612,6 +1634,38 @@ model OfferingLecturer {
   @@map("offering_lecturer")
 }
 
+/// OfferingTemplate ↔ Person (issue #129): the template's OWN half of
+/// `OfferingLecturer` above, one row per named lecturer. A STORED SHAPE, not
+/// a live link: `applyPlan` copies these rows onto the created Offering once,
+/// at apply time (`server/utils/offeringPlans.ts`), the same "seed, don't
+/// bind" contract `OfferingTemplate`'s other columns already keep — editing a
+/// template's roster must not retroactively restaff Offerings already created
+/// from it, or a term's own history changes under it.
+///
+/// A NAMED PERSON on a REUSABLE SHAPE, deliberately, where `requiredRoleId`
+/// above deliberately avoided one: the shape a template preserves ("Mr
+/// Schmidt teaches Maths, 4x/week") is exactly what a school means by a
+/// template, per issue #8's own motivating example. `requiredRoleId` is left
+/// as it was (unread by anything downstream) rather than made to compose with
+/// this: two mechanisms for the same slot need a precedence rule, and that is
+/// a design question for whoever lands it, not a silent default.
+model OfferingTemplateLecturer {
+  templateId String  @map("template_id")
+  personId   String  @map("person_id")
+  tenantId   String  @map("tenant_id")
+  roleId     String? @map("role_id")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template OfferingTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  person   Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+  role     Role?            @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@id([templateId, personId])
+  @@index([personId])
+  @@index([tenantId])
+  @@map("offering_template_lecturer")
+}
+
 /// Offering ↔ Equipment: the "needs a Room with equipment Y" requirement.
 model OfferingEquipment {
   offeringId  String @map("offering_id")
@@ -1711,15 +1765,25 @@ model OfferingTemplate {
   durationBlocks    Int?    @map("duration_blocks")
   schedulingPattern SchedulingPattern? @map("scheduling_pattern")
 
-  /// The "lecturer pool" hint (TAXONOMY.md's Role, not a specific Person): a
-  /// school's "Mr Schmidt" is named on the created Offering's `lecturers`
-  /// relation, one Person at a time, through the ordinary Offering form;
-  /// this stays a Role reference so the shape itself never hardcodes an
-  /// individual.
+  /// The "lecturer pool" hint (TAXONOMY.md's Role, not a specific Person).
+  ///
+  /// UNREAD BY ANYTHING (issue #129's audit): never reaches
+  /// `assembleSolverInput`, never seeds the created Offering's pool, never
+  /// filters a picker. Left exactly as it was rather than wired to compose
+  /// with `OfferingTemplateLecturer` below: two mechanisms naming the same
+  /// slot need a precedence rule, which is a decision for whoever lands that,
+  /// not a default this column should acquire silently.
   requiredRoleId String? @map("required_role_id")
 
   requiredCapacity  Int?     @map("required_capacity")
   requiredRoomCount Int?     @map("required_room_count")
+
+  /// Mirrors `Offering.requiredLecturerCount` (issue #129): NULL derives to
+  /// one lecturer chosen from the pool at solve time, same as the Offering's
+  /// own column, so "two co-teachers on every session" survives being copied
+  /// from a template rather than needing to be re-typed on each created
+  /// Offering.
+  requiredLecturerCount Int? @map("required_lecturer_count")
 
   /// Moved with `Offering.onlineMode`, which it seeds: a template holding a
   /// boolean the Offering no longer has would be a shape that cannot be
@@ -1739,6 +1803,7 @@ model OfferingTemplate {
   kind         SessionKind? @relation(fields: [kindId], references: [id], onDelete: SetNull)
   requiredRole Role?        @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
 
+  lecturers       OfferingTemplateLecturer[]
   seededOfferings Offering[]
   planItems       OfferingPlanItem[]
 

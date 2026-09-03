@@ -257,6 +257,12 @@ async function main() {
                     name: `${m.code}: ${m.title}`, title: m.title, kindId: kindByKey.get(m.kind)!,
                     frequency, durationBlocks: 1, requiredRoleId: lecturerRole?.id ?? null,
                 },
+                // Demo templates never name a real lecturer (there is no
+                // "Mr Schmidt" in this fixture), but `applyOfferingPlanItems`
+                // requires the relation explicitly loaded either way (issue
+                // #129): an absent include here would be indistinguishable
+                // from a deliberately empty roster.
+                include: { lecturers: true },
             });
 
             templateByCode.set(m.code, template);

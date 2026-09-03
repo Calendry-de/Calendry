@@ -527,18 +527,42 @@ const slots = computed(() => props.grid.activeDays.flatMap((day, index) => clust
                 padding: 3px 8px; // Hand-tuned for the single-line compact chip; 3px has no scale match.
             }
 
+            /*
+             * WHAT GIVES WAY FIRST, on one line. The title is what identifies
+             * a session, so it is the LAST thing to shrink and never below
+             * `5ch`; the kind name inside the meta run is the first, because
+             * the dot beside it already carries the kind wherever a colour
+             * is configured, and the room code (`flex: none`) is kept whole.
+             *
+             * It was the other way round: `.chip_meta { flex: none }` against
+             * `.chip_title { flex: 0 1 auto }`, so on the live tenant's
+             * crowded week (7–15 sessions per block) every chip at 1440px
+             * read "09:00 · Vorlesung R 1.5" with the title ellipsised to a
+             * one-pixel sliver: a column of 183 chips repeating the one kind
+             * the tenant has, and naming none of the sessions.
+             */
             :deep(.chip_meta) {
-                flex: none;
+                flex: 0 4 auto;
             }
 
+            :deep(.chip_kind) { min-width: 0; }
+
+            :deep(.chip_room) { flex: none; }
+
             :deep(.chip_title) {
-                flex: 0 1 auto;
+                flex: 1 1 auto;
+                min-width: 5ch;
                 white-space: nowrap;
             }
 
             // The stack has no position to read a time off, so the chip states
             // it. This is the whole reason the stacked form is not lossy.
-            :deep(.chip_time) { display: inline; }
+            // Medium weight: it is a fact, not the headline, and in a block of
+            // twelve stacked chips it is the same fact twelve times.
+            :deep(.chip_time) {
+                display: inline;
+                font-weight: 500;
+            }
 
             // On one line the who/which parts join the row rather than stacking
             // under it, and give way first: the offering and the room identify

@@ -327,9 +327,19 @@
         "modeNote": "Diese Anzeigetafel zeigt die oben gewählte Tafel. Verwendet wird nur der Geltungsbereich dieser Tafel; der andere bleibt ungenutzt erhalten, falls der Modus wieder gewechselt wird.",
         "noGroups": "Noch keine Gruppen festgelegt.",
         "noRooms": "Noch keine Räume festgelegt.",
+        "planOptions": "Optional: ?columnWidth=176 legt fest, wie breit eine Raumspalte gezeichnet wird, ?rotate=12 die Sekunden zwischen den Raumseiten (0 bleibt auf einer Seite).",
         "roomsLegend": "Räume",
         "scopeHelp": "Lassen Sie alle Häkchen weg, um {everyRoom} anzuzeigen. Werden einzelne angehakt, zeigt die Anzeigetafel nur diese.",
-        "scopeLabel": "Angezeigte Räume"
+        "scopeLabel": "Angezeigte Räume",
+        "windowEnd": "Bis",
+        "windowGrid": "Der Tag des Stundenplans",
+        "windowGridEnd": "Ende des Stundenplans",
+        "windowGridStart": "Beginn des Stundenplans",
+        "windowHelp": "Bleiben beide Felder leer, wird der Tag des Stundenplans gezeichnet. Sind sie gesetzt, zeigt der Plan nur diese Zeiten und jede Stunde wird höher; was außerhalb liegt, wird unter dem Plan benannt und nicht weggelassen.",
+        "windowLabel": "Angezeigte Zeiten",
+        "windowLegend": "Zeitfenster des Plans",
+        "windowRange": "{start} bis {end}",
+        "windowStart": "Von"
     },
     "shared": {
         "appliesTo": "Gilt für",

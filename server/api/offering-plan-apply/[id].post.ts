@@ -97,7 +97,11 @@ export default defineEventHandler(async (event) => {
             include: {
                 items: {
                     orderBy: { position: 'asc' },
-                    include: { template: true },
+                    // Nested include, not the bare `template: true` this was
+                    // before issue #129: the created Offering's lecturer pool
+                    // is seeded from these rows, so a shallow load would seed
+                    // an empty one for every plan, silently.
+                    include: { template: { include: { lecturers: true } } },
                 },
             },
         });

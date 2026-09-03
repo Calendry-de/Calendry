@@ -51,7 +51,7 @@ role assignment, and the solver's run registry. Check the code first; it is free
 | Solver: behaviour | Solver: warn-and-allow · Solver: determinism & `maxMoves` · Solver: Stage 2 · Solver: Stage 4 polling · Solver run result recovery · Solver: virtual room capacity-1 · `violations.ts` · The demand ledger, and why a short answer cannot authorise a delete |
 | Solver: constraints | `MinimizeRoomRank` gains `invert` · `MinimizeBlockUsage` · Per-person preferences · Stage 5: two pre-existing bugs it uncovered · `PersonPreferenceFit.roles` · Constraint `params` at the write boundary |
 | Solver: operations | Solver & proto: operational detail |
-| Schedule UI | Schedule display standards · Grid geometry · The schedule toolbar · TimeGrid breaks · A Session that spans a break · Stage 6c: why the review screen shows two panels |
+| Schedule UI | Schedule display standards · Grid geometry · The room plan · The schedule toolbar · TimeGrid breaks · A Session that spans a break · Stage 6c: why the review screen shows two panels |
 | Odds and ends | `CommonButton` rendered a `<div>` · The 100%-slot-occupancy schedule shape · Two vatsim-radar attributions |
 
 ---
@@ -2019,6 +2019,107 @@ confirmation, never inside a PATCH that also renames things. Revoking
 
 ---
 
+# The room plan: the lobby display draws the whole day, and says what it hides
+
+The room board began as one card per Room reading "Now: Databases, 09:00–10:30"
+or "Free". That answers one question and only at the minute somebody looks. The
+questions people actually stand in a corridor asking are "where is my lecture",
+"which room is free at four" and "who has the lab after us", and all three are
+read off a PICTURE of the day: rooms across, time down, which is the same
+transposition the route itself exists for. It now draws that
+(`ScreenRoomPlan.vue` + `app/utils/roomPlan.ts`), and the now line plus the
+greyed-out past are what keep the original one-minute question answerable at a
+glance.
+
+**Geometry is the week grid's, without reusing its code.** Minute-true, one
+constant scale for the whole plan, nothing hidden inside a column
+(§ "Grid geometry" is the same argument made once already). It cannot reuse
+`useGridGeometry`, because the board payload carries no TimeGrid at all, only
+per-entry minutes; what it takes instead is the properties, and the arithmetic
+lives in a pure module with a unit test (`tests/room-plan.test.ts`) because this
+suite has no component-mounting harness and a wall display is the one surface
+nobody is watching for a drawing bug.
+
+Four decisions worth not undoing:
+
+- **The axis is the GRID's day, widened by entries, never clipped to them.**
+  `dayStartMinute`/`dayEndMinute` are sent (first block start, last block end,
+  for THIS weekday, so a day-specific break gets its own window) rather than
+  inferred from what happens to be placed: an axis derived from the entries
+  redraws itself every time somebody moves a Session, and a plan whose 09:00
+  line sits at a different height each morning is not a plan. An entry OUTSIDE
+  the grid's day still widens the window, because clipping one would delete a
+  lesson from a wall with nothing to say it was ever there.
+- **`nowMinute` is the tenant's minute, from the server, per request.** It is
+  assembled outside the cache (like `generatedAt`) and the display interpolates
+  only the seconds since the fetch. Per-entry `isNow` stays in the payload but
+  is as stale as the cache TTL, which is why the drawing does not read it: a
+  display deciding "now" from the machine behind the screen drifts against the
+  schedule it draws for a whole term with nothing on screen to say so.
+- **Paging is the one thing genuinely hidden, so it is ANNOUNCED.** Rooms past
+  the configured column width move to another page; the dots underneath say how
+  many pages there are and which one this is, each dot names the rooms it stands
+  for, and the rotation brings every page back on a timer. Twenty rooms silently
+  drawn as eight is indistinguishable from an institution with eight rooms. The
+  column count is a CLIENT measurement of the track element (not the body minus
+  the gutter: the grid has a gap in it, and being a few pixels out pages one
+  column early for the life of the display), and an unmeasured viewport reads as
+  EVERY room, so SSR carries the whole institution rather than a guess the
+  client cannot reconstruct.
+- **Two kinds of setting, in two places.** `?columnWidth=` and `?rotate=` (`0`
+  holds one page) are properties of THAT PIECE OF GLASS — a 4K wall and a spare
+  22" monitor want different answers from one timetable — and nothing on the
+  page can be clicked, so they travel in the address whoever mounts the display
+  pastes in, clamped so a typo narrows the plan instead of dividing by zero. The
+  plan's HOURS are not that kind of fact: "this institution's evenings are
+  empty" is the same for every display in the building, so
+  `screen.plan_start_minute` / `plan_end_minute` are columns (issue #131), set
+  in the management area and carried in the board payload. A configured window
+  is the one thing on the plan allowed to CROP the day, and it therefore names
+  what it cropped (`roomPlanOutsideWindow` → "2 sessions outside 08:00–16:00"),
+  the same bargain the paging dots make. Widening back for one evening outlier
+  was the alternative and is worse: the setting would look broken, which is how
+  a setting stops being used. Each end is independent (a CHECK bounds both into
+  a day and orders them only when both are set), so "start at seven, end
+  wherever the timetable does" is expressible, and NULL means "the timetable's
+  own day" — no backfill, since nothing seeds `screen`.
+
+**Two Sessions in one Room at one time SPLIT the column into lanes**, counted
+per overlap cluster so a morning clash does not halve the afternoon. A double
+booking is wrong but real, and a corridor display is one of the few places
+somebody would notice it; drawing one over the other would hide the very thing
+worth seeing. An empty column says "Nothing else today" for the same reason: an
+empty column and a column that failed to draw look identical, and most rooms are
+free most of the day.
+
+The lecturer on a block is the one who is ACTUALLY there: a covering lecturer
+(issue #30) replaces the named one on the plan, rendered with the same
+`${given} ${family}` spelling `substitutionBoard.ts` uses, because the two
+boards hang in the same corridor.
+
+**The title is the PRODUCT, not the device.** The heading was the screen's own
+name ("B-block corridor"), which is an operator's label for a piece of
+hardware: it tells the person walking past where they already know they are,
+and it was the largest string on the wall. It is now the Calendry lockup
+(`CommonLogo`, `wordmark`), the name lives in the management area where it
+identifies which display somebody is editing, and the wall keeps it only as an
+11px stamp in the bottom-right corner — out of flow, so it can neither take
+height from the plan nor shift the centred page dots. That stamp is not
+decoration: the person standing in front of a wall showing the wrong rooms
+needs to be able to say WHICH screen to fix. The document title is
+`Calendry` for the same reason, and `screen.board.fallbackName` went with the
+heading. The substitution plan (`/screen/substitutions`) still titles itself
+with its screen name; matching it up is a deliberate follow-up, not an
+oversight.
+
+**The first hour label is anchored, not centred.** Every axis label sits
+centred on its own gridline, which is what keeps it level with the hour it
+names — except the first, whose gridline IS the plan's top edge, so centring it
+cut the opening hour of the day in half. Shipped that way once and it read as a
+rendering fault, which on a wall is indistinguishable from a broken display.
+
+---
+
 # Two vatsim-radar attributions are deliberate
 
 `modules/styles.ts` and `app/scss/variables.scss` carry attribution comments to
@@ -2997,6 +3098,65 @@ shape; a pin names specific Rooms, and the two only compose once somebody
 decides what applying a plan to a second building should do. The template's
 `allowOnline → onlineMode` move was NOT optional and shipped here: a template
 holding a boolean the Offering no longer has is a shape that cannot be copied.
+
+# A template can name a lecturer (issue #129)
+
+`OfferingTemplate.requiredRoleId` stayed a Role reference so a template never
+hardcoded an individual: "Mr Schmidt" was meant to be named on the created
+Offering's own `lecturers` relation, through the ordinary Offering form. An
+audit for issue #129 found that promise unkept — the column reaches nothing.
+Zero occurrences in `assembleSolverInput`, no picker filter, no seed step. A
+template built from issue #8's own motivating example, "Maths, 4x/week, Mr
+Schmidt", captured everything except Mr Schmidt, and every plan-applied
+Offering came back with an empty lecturer pool (issue #130's silent-zero bug,
+found first).
+
+## `OfferingTemplateLecturer`, not a wired-up `requiredRoleId`
+
+Two shapes could have closed the gap: expand `requiredRoleId` into every
+Person holding that Role at apply time, or let a template name People
+directly. Went with named People, because that is literally what issue #8's
+own example wants and what a school actually means by a template — a Role
+expansion answers a different question ("anyone who can", a pool) from the
+one a curriculum plan is trying to answer ("this specific person teaches
+this"). `requiredRoleId` is left exactly as it was: two mechanisms naming the
+same slot would need a precedence rule, and deciding that is future work, not
+a silent default this change should invent.
+
+`OfferingTemplateLecturer` is `OfferingLecturer`'s own shape, one table over:
+`(templateId, personId)` composite key, optional `roleId`, same cascades. Not
+a link — a STORED shape, matching every other template column: `applyPlan`
+copies the rows onto the created Offering's own `offering_lecturer` at apply
+time, and editing the template's roster afterwards does not reach back and
+restaff an Offering already created from it. Verified directly: editing a
+template's lecturers after applying it left the earlier Offering's roster
+unchanged (`tests/offering-template-lecturers.test.ts`).
+
+## `requiredLecturerCount` was ALREADY half-shipped, unsafely
+
+While tracing every column a template mirrors, `requiredLecturerCount` turned
+up already wired into the zod schema (`server/utils/resources.ts`) and the
+manage-registry form (`app/utils/manageRegistry.ts`) — with NO DATABASE
+COLUMN behind it. The generic CRUD route's `delegate()` erases Prisma's
+static typing (`args: unknown`, by design, since one route serves every
+resource), so this compiled clean and would have failed at the FIRST save
+with a raw ``Unknown argument `requiredLecturerCount` `` from Prisma — a 500
+with no relation to what the tenant did wrong. Landed in this migration
+rather than filed as a third ticket: it is the same gap #129 already exists
+to close, on the same column mirroring `Offering.requiredLecturerCount`
+that #129's own proposal called for.
+
+## Every caller had to load the relation explicitly
+
+`applyOfferingPlanItems`'s `items[].template.lecturers` is REQUIRED, not
+optional defaulting to `[]`. An optional field would make "this template
+really has nobody named" and "the caller forgot the include" the identical
+silent shape — precisely issue #130's failure class, one field wide. All
+three callers (`offering-plan-apply/[id].post.ts`,
+`group-plan-applications/advance-all.post.ts`, `scripts/seed-demo-schedule.ts`)
+needed their `include: { template: true }` (or bare `upsert`) changed to load
+`lecturers` explicitly; the type change is what caught all three at compile
+time rather than at the first tenant to hit the untested path.
 
 # `Week.exam_group_ids` is sent EMPTY, and empty is the answer
 

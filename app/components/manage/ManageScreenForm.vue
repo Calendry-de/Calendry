@@ -28,6 +28,19 @@
 
                 <p class="issued_url">{{ issued }}</p>
 
+                <!--
+                    THE ROOM PLAN'S TWO KNOBS, named where the address is
+                    handed over, because the display itself has nothing to
+                    click and the URL is the only place they can be set. Only
+                    for the board that reads them: offering them alongside a
+                    substitution plan's address would describe settings that
+                    board ignores.
+                -->
+                <p
+                    v-if="screenMode === 'ROOM_BOARD'"
+                    class="issued_hint"
+                >{{ t('manageUi.screenForm.planOptions') }}</p>
+
                 <p class="issued_warn">
                     <Icon
                         name="material-symbols:warning-outline"
@@ -121,6 +134,63 @@
                 </fieldset>
 
                 <p class="scope_help">{{ t('manageUi.screenForm.modeNote') }}</p>
+            </div>
+
+            <!--
+                THE PLAN'S OWN HOURS (issue #131), room board only: the
+                substitution plan draws a list, not a day, and has no axis for
+                these to mean anything on.
+
+                Not fields on the generic list, for two reasons. They are
+                MODE-SPECIFIC, which the generic list cannot express, and they
+                are stored as minutes since midnight while the only sane
+                control for them is `<input type="time">`; the conversion lives
+                here rather than becoming a new generic field type for one
+                entity's pair of columns.
+            -->
+            <div
+                v-if="screenMode === 'ROOM_BOARD'"
+                class="scope"
+            >
+                <p class="scope_label">{{ t('manageUi.screenForm.windowLabel') }}</p>
+
+                <!--
+                    EMPTY MEANS THE TIMETABLE'S OWN DAY, stated rather than
+                    implied, the same way the scope's empty state is: a blank
+                    time input reads as "no plan at all", and what it actually
+                    means is "whatever the TimeGrid says today runs from".
+                -->
+                <p class="scope_help">{{ t('manageUi.screenForm.windowHelp') }}</p>
+
+                <p
+                    v-if="readonly"
+                    class="scope_static"
+                >{{ windowSummary }}</p>
+
+                <fieldset
+                    v-else
+                    class="window"
+                >
+                    <legend class="scope_legend">{{ t('manageUi.screenForm.windowLegend') }}</legend>
+
+                    <label class="window_field">
+                        <span>{{ t('manageUi.screenForm.windowStart') }}</span>
+                        <input
+                            :value="planStart"
+                            type="time"
+                            @change="setWindow('planStartMinute', $event)"
+                        >
+                    </label>
+
+                    <label class="window_field">
+                        <span>{{ t('manageUi.screenForm.windowEnd') }}</span>
+                        <input
+                            :value="planEnd"
+                            type="time"
+                            @change="setWindow('planEndMinute', $event)"
+                        >
+                    </label>
+                </fieldset>
             </div>
         </template>
     </ManageEntityForm>
@@ -270,6 +340,64 @@ onMounted(() => {
     }
 });
 
+/**
+ * The plan window, as the `<input type="time">` pair sees it.
+ *
+ * MINUTES IN THE DATABASE, `HH:MM` IN THE CONTROL, and this is the only place
+ * that converts. The column is minutes since tenant-local midnight because
+ * that is what every other time in this product is (a TimeGrid block, a
+ * blackout, the board's own entries) and because it is timezone-free: an
+ * `HH:MM` string would have to be read against some zone to be compared with a
+ * block boundary, and the whole point of `Tenant.timezone` is that only one
+ * zone is ever involved.
+ */
+function minutesOf(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function clockOf(minutes: number | null): string {
+    if (minutes === null) {
+        return '';
+    }
+
+    return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
+const planStart = computed(() => clockOf(minutesOf(draft.value.planStartMinute)));
+const planEnd = computed(() => clockOf(minutesOf(draft.value.planEndMinute)));
+
+const windowSummary = computed(() => {
+    const start = planStart.value;
+    const end = planEnd.value;
+
+    if (!start && !end) {
+        return t('manageUi.screenForm.windowGrid');
+    }
+
+    // One end alone is a legitimate configuration ("start at seven, end
+    // wherever the timetable does"), so the missing half is NAMED rather than
+    // rendered as a gap in a range.
+    return t('manageUi.screenForm.windowRange', {
+        start: start || t('manageUi.screenForm.windowGridStart'),
+        end: end || t('manageUi.screenForm.windowGridEnd'),
+    });
+});
+
+/**
+ * NULL ON AN EMPTY INPUT, never left at the old value: clearing the field is
+ * how somebody hands the day back to the TimeGrid, and the PATCH route reads
+ * null on these two columns as CLEAR for exactly that reason.
+ */
+function setWindow(field: 'planStartMinute' | 'planEndMinute', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+
+    draft.value = {
+        ...draft.value,
+        [field]: match ? Number(match[1]) * 60 + Number(match[2]) : null,
+    };
+}
+
 function toggle(id: string): void {
     const next = selected.value.includes(id)
         ? selected.value.filter((current) => current !== id)
@@ -322,6 +450,12 @@ async function copy(): Promise<void> {
         overflow-wrap: anywhere;
 
         background: $surface2;
+    }
+
+    &_hint {
+        margin: 0;
+        font-size: var(--font-size-xs);
+        color: $content7;
     }
 
     &_warn {
@@ -409,6 +543,29 @@ async function copy(): Promise<void> {
         &:focus-within {
             outline: 2px solid $primary600;
             outline-offset: 2px;
+        }
+    }
+}
+
+.window {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    &_field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-1);
+
+        font-size: var(--font-size-sm);
+        color: $content7;
+
+        &:focus-within {
+            color: $content1;
         }
     }
 }

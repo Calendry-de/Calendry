@@ -44,6 +44,11 @@ export default defineEventHandler(async (event) => {
             id: screen.id,
             name: screen.name,
             mode: screen.mode,
+            // Both ends travel on every row whatever the mode, for the same
+            // reason both scope axes do: the form has to render what applies
+            // and switching modes must not discard the other's setting.
+            planStartMinute: screen.planStartMinute,
+            planEndMinute: screen.planEndMinute,
             isActive: screen.isActive,
             lastSeenAt: screen.lastSeenAt,
             createdAt: screen.createdAt,
