@@ -254,6 +254,21 @@ export interface AssemblyReport {
      */
     offeringsWithNoLecturerAssigned: { id: string; title: string }[];
     /**
+     * Series whose per-Group LECTURER PIN (`offering_group.lecturer_person_id`,
+     * issue #131) names a person who is NOT in the Offering's candidate pool,
+     * so the pin was IGNORED and the series sent with the pool instead.
+     *
+     * The pin is meant to narrow the pool, never to widen it: honouring a pin
+     * outside the pool would put someone on the wire as a candidate whom
+     * `OfferingLecturer` — the one authority on who leads an Offering, for
+     * self-service and for `/api/me/offerings` alike — says does not. Reported
+     * rather than refused at the write for the reason the pool has no CHECK
+     * against `requiredLecturerCount` either: the roster and the pin are
+     * saved by separate requests, and the pool can shrink under a pin at any
+     * time. Keyed by WIRE id (the series), since only that series is affected.
+     */
+    offeringsWithLecturerPinOutsidePool: { id: string; title: string; groupId: string; personId: string }[];
+    /**
      * People whose APPROVED unavailability removes at least `HEAVY_VETO_RATIO` of
      * the teaching week. Warn-and-allow (TAXONOMY.md §3): an administrator already
      * approved it, but an infeasible term traces back to somebody's calendar more
@@ -1285,6 +1300,7 @@ export async function assembleSolverInput(
     }[] = [];
     const offeringsWithInsufficientLecturers: AssemblyReport['offeringsWithInsufficientLecturers'] = [];
     const offeringsWithNoLecturerAssigned: AssemblyReport['offeringsWithNoLecturerAssigned'] = [];
+    const offeringsWithLecturerPinOutsidePool: AssemblyReport['offeringsWithLecturerPinOutsidePool'] = [];
     const offeringsWithUnsatisfiableRoomRestriction: AssemblyReport['offeringsWithUnsatisfiableRoomRestriction'] = [];
     const offeringsWithRestrictionBelowRoomCount: AssemblyReport['offeringsWithRestrictionBelowRoomCount'] = [];
     const pinnedRoomsNotSent: AssemblyReport['pinnedRoomsNotSent'] = [];
@@ -1534,12 +1550,62 @@ export async function assembleSolverInput(
                 });
             }
 
-            if (offering.requiredLecturerCount !== null && offering.requiredLecturerCount > offering.lecturers.length) {
+            /*
+             * WHO MAY LEAD THIS SERIES (issue #131).
+             *
+             * The Offering-wide pool (`offering_lecturer`), unless THIS series'
+             * Group carries a LECTURER PIN (`offering_group.lecturer_person_id`,
+             * the "Klassenlehrer"): then the one pinned person, and nobody
+             * else. A pin makes the series the wire's own FIXED shape
+             * (`candidates.length === requiredLecturerCount`), which is what
+             * lets a per-person rule such as `LecturerVeto` precompute its mask
+             * for it — a genuine pool cannot be evaluated against one person's
+             * calendar before the search has chosen who leads (the run
+             * refusal that surfaced this).
+             *
+             * WHICH GROUP'S PIN: the series' own when split; the single Group
+             * when unsplit with exactly one (that series IS the Group); none
+             * when the Offering has no Group at all. An unsplit Offering never
+             * has two Groups (`splitsIntoSeries` is `>= 2`), so no
+             * Group-per-series ambiguity is left unhandled here.
+             *
+             * A pin OUTSIDE the pool is reported and IGNORED, never honoured:
+             * the pin narrows who may lead, it does not appoint. The pool is
+             * saved by a separate request, so this state is reachable (remove
+             * the pinned person from "Who leads it") and the write already
+             * warned about it; the series falls back to the pool exactly as if
+             * the pin were null, so nothing narrows silently either way.
+             */
+            const poolIds = offering.lecturers.map((link) => link.personId);
+            const pinGroupId = seriesGroupId ?? (groupIds.length === 1 ? groupIds[0]! : null);
+            const pinnedPersonId = pinGroupId === null
+                ? null
+                : offering.groups.find((link) => link.groupId === pinGroupId)?.lecturerPersonId ?? null;
+
+            let candidateLecturerIds = poolIds;
+
+            if (pinnedPersonId !== null) {
+                if (poolIds.includes(pinnedPersonId)) {
+                    candidateLecturerIds = [pinnedPersonId];
+                } else {
+                    offeringsWithLecturerPinOutsidePool.push({
+                        id: wireId,
+                        title: offering.title,
+                        groupId: pinGroupId!,
+                        personId: pinnedPersonId,
+                    });
+                }
+            }
+
+            // Against the SERIES' candidates, not the Offering's pool: a pinned
+            // series has exactly one, so an explicit co-teaching count of two
+            // is a demand this series cannot meet, and is reported as such.
+            if (offering.requiredLecturerCount !== null && offering.requiredLecturerCount > candidateLecturerIds.length) {
                 offeringsWithInsufficientLecturers.push({
                     id: wireId,
                     title: offering.title,
                     required: offering.requiredLecturerCount,
-                    available: offering.lecturers.length,
+                    available: candidateLecturerIds.length,
                 });
             }
 
@@ -1552,7 +1618,7 @@ export async function assembleSolverInput(
              */
             if (
                 offering.requiredLecturerCount === null
-                && offering.lecturers.length === 0
+                && candidateLecturerIds.length === 0
                 && offering.kind.requiresLecturer
             ) {
                 offeringsWithNoLecturerAssigned.push({ id: wireId, title: offering.title });
@@ -1623,15 +1689,18 @@ export async function assembleSolverInput(
             // asked to fill a gap a human is holding open on purpose.
             requiredSessionCount: Math.max(0, offering.frequency - bankedCount),
             durationBlocks: offering.durationBlocks,
-            candidateLecturerIds: offering.lecturers.map((link) => link.personId),
+            // The SERIES' candidates: the pool, or the one pinned person; see
+            // the derivation above.
+            candidateLecturerIds,
             // NULL (every Offering nobody has touched) derives to one lecturer,
-            // chosen by the solver from the pool; see the column's schema
-            // comment. Clamped to the pool size either way: an explicit count
-            // above it is reported in `offeringsWithInsufficientLecturers`
-            // above rather than sent as a demand nothing can satisfy.
+            // chosen by the solver from the candidates; see the column's schema
+            // comment. Clamped to the candidate count either way: an explicit
+            // count above it is reported in `offeringsWithInsufficientLecturers`
+            // above rather than sent as a demand nothing can satisfy. For a
+            // pinned series that clamp is what makes `1 === 1`, the fixed shape.
             requiredLecturerCount: Math.min(
-                offering.requiredLecturerCount ?? Math.min(1, offering.lecturers.length),
-                offering.lecturers.length,
+                offering.requiredLecturerCount ?? Math.min(1, candidateLecturerIds.length),
+                candidateLecturerIds.length,
             ),
             // The SERIES' own group, not the Offering's whole set. This is
             // what makes each series independent, and it is what comes back in
@@ -2130,6 +2199,7 @@ export async function assembleSolverInput(
             offeringsWithPartialEnrolment,
             offeringsWithInsufficientLecturers,
             offeringsWithNoLecturerAssigned,
+            offeringsWithLecturerPinOutsidePool,
             offeringsWithUnsatisfiableRoomRestriction,
             offeringsWithRestrictionBelowRoomCount,
             groupsWithForcedOnlineAboveShareCap,

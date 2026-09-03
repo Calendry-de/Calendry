@@ -135,7 +135,28 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
             ));
 
             if (def.extraReference) {
-                optionUrls.set(`${def.key}:extra`, urlFor(def.extraReference.resource));
+                /*
+                 * `fromRelation`: the options are the SIBLING relation's current
+                 * rows, labelled by `?ids=` exactly as a searchable relation
+                 * labels its own, and `null` (no request) when the sibling is
+                 * empty, since `?ids=` with nothing is a deliberate 400. The
+                 * sibling is looked up by key in the same `defs`, so a sibling
+                 * this caller may not see yields no options rather than a 403
+                 * inside the wave.
+                 */
+                const sibling = def.extraReference.fromRelation
+                    ? defs.findIndex((other) => other.key === def.extraReference!.fromRelation)
+                    : -1;
+
+                optionUrls.set(`${def.key}:extra`, def.extraReference.fromRelation
+                    ? (sibling === -1
+                        ? null
+                        : relationOptionsUrl(
+                            { ...def, resource: def.extraReference.resource, searchable: true },
+                            (sets[sibling] ?? []).map((row) => String(row[defs[sibling]!.valueKey])),
+                            urlFor(def.extraReference.resource),
+                        ))
+                    : urlFor(def.extraReference.resource));
             }
         }
 
@@ -250,6 +271,19 @@ export function useEntityRelations(entity: ManageEntity, id: string | undefined)
             drafts.value = { ...drafts.value, [def.key]: returned };
             warnings.value = { ...warnings.value, [def.key]: notes };
             saved.value = { ...saved.value, [def.key]: true };
+
+            /*
+             * A relation some sibling's `extraReference.fromRelation` points
+             * at has just changed, so that sibling's option list is stale:
+             * refetch the wave. Adding someone to "Who leads it" is what makes
+             * them pinnable, and without this they would not be until a
+             * reload. `seed()` runs off the data watcher, and the just-saved
+             * set is what the server holds, so the reseed changes nothing the
+             * user can see beyond the new options.
+             */
+            if (defs.some((other) => other.extraReference?.fromRelation === def.key)) {
+                await asyncData.refresh();
+            }
         } catch (error) {
             // Roll back rather than leave the UI showing a membership the
             // database refused.

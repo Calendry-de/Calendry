@@ -306,8 +306,10 @@
         "relation": {
             "groups": {
                 "label": "Groups this is for",
-                "help": "Nesting propagates: assigning a cohort also blocks its seminars. Only groups available in this offering’s term are listed.",
-                "emptyHint": "No groups available in this term."
+                "help": "Nesting propagates: assigning a cohort also blocks its seminars. Only groups available in this offering’s term are listed. Each group can name its fixed lecturer, drawn from “Who leads it”: then that group’s sessions are always led by that person, and the solver chooses from the pool only for the others.",
+                "emptyHint": "No groups available in this term.",
+                "lecturerPlaceholder": "Solver chooses from the pool",
+                "lecturerLabel": "Fixed lecturer for this group"
             },
             "lecturers": {
                 "label": "Who leads it",

@@ -63,7 +63,8 @@
                     class="picker_row-extra"
                 >
                     <span class="sr-only">{{
-                        t('manageUi.picker.extraRoleLabel', { label: def.label })
+                        def.extraReference.srLabel
+                            ?? t('manageUi.picker.extraRoleLabel', { label: def.label })
                     }}</span>
                     <select
                         :disabled="readonly || busy"
@@ -85,6 +86,18 @@
                             :selected="String(option.id) === String(row[def.extraReference.key] ?? '')"
                             :value="String(option.id)"
                         >{{ def.extraReference.label(option) }}</option>
+                        <!--
+                            A stored value NONE of the options names (a pinned
+                            lecturer since removed from the pool). Without this
+                            option the browser falls back to the first one and
+                            the select would SAY the placeholder while the row
+                            holds a pin: the `<select>` trap, one row over.
+                        -->
+                        <option
+                            v-if="missingExtraValue(row)"
+                            selected
+                            :value="missingExtraValue(row)"
+                        >{{ t('manageUi.picker.extraMissing') }}</option>
                     </select>
                 </label>
 
@@ -361,6 +374,28 @@ const emit = defineEmits<{
 }>();
 
 /** Nesting stays visible in the flat select, so picking a cohort is not a guess. */
+/**
+ * The row's extra-reference value when no option carries it, else `null`.
+ * See the template: the value must stay VISIBLE, or the select misreports it.
+ */
+function missingExtraValue(row: RelationRow): string | null {
+    const extra = props.def.extraReference;
+
+    if (!extra) {
+        return null;
+    }
+
+    const value = row[extra.key];
+
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    return props.extraOptions.some((option) => String(option.id) === String(value))
+        ? null
+        : String(value);
+}
+
 const allOptions = computed(() => (props.def.indentTree
     ? indentedOptions(props.options)
     : props.options.map((row) => ({ value: String(row.id), label: props.def.optionLabel(row) }))));

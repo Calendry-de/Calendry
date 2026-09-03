@@ -160,6 +160,56 @@ async function groupTermScopeWarnings(ctx: {
     });
 }
 
+/** One Group whose lecturer pin names somebody outside the Offering's pool. */
+interface StrandedLecturerPin {
+    groupName: string;
+    personName: string;
+}
+
+/**
+ * Groups of this Offering whose per-Group lecturer pin (issue #131,
+ * `offering_group.lecturer_person_id`) names a person who is NOT in the
+ * Offering's candidate pool (`offering_lecturer`).
+ *
+ * Shared by BOTH writes that can produce the state: saving `groups` with a
+ * pin the picker never offered, and saving `lecturers` so that a pinned
+ * person leaves the pool. The pin is deliberately not a foreign key onto the
+ * pool (see the schema comment on `OfferingGroup`), so this is the only place
+ * the two tables are read together at write time.
+ *
+ * WARNS RATHER THAN REFUSES, for the same reason the pool has no CHECK against
+ * `requiredLecturerCount`: the two sets are saved by separate requests, and
+ * refusing the roster edit would make "remove Ms Y from the pool" fail on a
+ * pin the editor may not even see. `assembleSolverInput` reports the same
+ * condition and falls back to the pool for that series, so nothing silently
+ * narrows; this note is what tells the person who just saved that it will.
+ */
+async function lecturerPinWarnings(ctx: { tx: Tx; tenantId: string; id: string }): Promise<string[]> {
+    const stranded = await ctx.tx.$queryRaw<StrandedLecturerPin[]>`
+        SELECT g.name                          AS "groupName",
+               concat_ws(' ', p.given_name, p.family_name) AS "personName"
+          FROM offering_group og
+          JOIN "group" g  ON g.id = og.group_id
+          JOIN person p   ON p.id = og.lecturer_person_id
+         WHERE og.offering_id = ${ctx.id}
+           AND og.tenant_id = ${ctx.tenantId}
+           AND og.lecturer_person_id IS NOT NULL
+           AND NOT EXISTS (
+                   SELECT 1
+                     FROM offering_lecturer ol
+                    WHERE ol.offering_id = og.offering_id
+                      AND ol.person_id = og.lecturer_person_id
+               )
+         ORDER BY g.name
+    `;
+
+    return stranded.map((row) => (
+        `${row.groupName} is pinned to ${row.personName}, who is not in "Who leads it". `
+        + 'The pin is kept but ignored: the solver will choose from the pool for that group '
+        + 'until the person is added back or the pin is cleared.'
+    ));
+}
+
 const id = z.string().min(1);
 
 export const RELATIONS: Record<string, RelationConfig> = {
@@ -270,15 +320,33 @@ export const RELATIONS: Record<string, RelationConfig> = {
         select: { termId: true, availableFrom: true, availableTo: true },
     },
 
+    /**
+     * Which Groups an Offering is for — one row per SERIES of a split Offering.
+     *
+     * `lecturerPersonId` is the per-Group LECTURER PIN (issue #131): the one
+     * person who always leads THIS Group's Sessions, narrowing that series'
+     * wire candidates below the Offering-wide pool. Null (the default, and what
+     * every row was before the column existed) means "choose from the pool".
+     * Meant to name a pool member; a pin outside it is warned about here, and
+     * reported and ignored at assembly, never silently honoured or silently
+     * dropped. See the schema comment on `OfferingGroup` for why it is not a
+     * foreign key onto the pool.
+     */
     'offerings/groups': {
         parent: 'offerings',
         parentModel: 'offering',
         model: 'offeringGroup',
         parentKey: 'offeringId',
-        item: z.object({ groupId: id }),
-        select: { groupId: true },
+        item: z.object({ groupId: id, lecturerPersonId: id.nullish() }),
+        select: { groupId: true, lecturerPersonId: true },
+        warnAfterWrite: lecturerPinWarnings,
     },
 
+    /**
+     * The candidate pool: who MAY lead the Offering. Warns when the new roster
+     * leaves a per-Group pin (`offerings/groups` above) naming somebody who is
+     * no longer in it.
+     */
     'offerings/lecturers': {
         parent: 'offerings',
         parentModel: 'offering',
@@ -288,6 +356,7 @@ export const RELATIONS: Record<string, RelationConfig> = {
         // not an access role. Nullable: many kinds do not constrain it.
         item: z.object({ personId: id, roleId: id.nullish() }),
         select: { personId: true, roleId: true },
+        warnAfterWrite: lecturerPinWarnings,
     },
 
     /**

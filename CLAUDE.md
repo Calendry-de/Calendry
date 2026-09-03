@@ -479,6 +479,21 @@ solver has no way to detect.
   DIFFERENT states the wire cannot tell apart on its own — see the entry
   above and `AssemblyReport.offeringsWithNoLecturerAssigned`. § "A template
   can name a lecturer".
+- **A per-Group lecturer pin NARROWS a series' candidates; it never appoints.**
+  `OfferingGroup.lecturerPersonId` (issue #131, the "Klassenlehrer") makes ONE
+  series of a split Offering the wire's own FIXED shape (`[pin]`, required 1),
+  which is what lets a per-person rule such as `LecturerVeto` precompute for
+  it; the siblings keep the pool. It is a column on the series row, and
+  deliberately NOT a foreign key onto `offering_lecturer`: the pool is a
+  PUT-set replaced by delete-then-insert, so any cascade would wipe every pin
+  on every roster save. Membership is checked where the two are read together,
+  in `assembleSolverInput`: a pin outside the pool is REPORTED
+  (`AssemblyReport.offeringsWithLecturerPinOutsidePool`) and the series falls
+  back to the pool, never sent as a candidate `OfferingLecturer` does not
+  name. Both relation writes warn (`{ rows, warnings }`, so
+  `offerings/groups` and `offerings/lecturers` no longer answer a bare array).
+  Part B of #131, choosing a lecturer for a GENUINE pool before placement, is
+  solver work and belongs in that repo. § "A per-Group lecturer pin".
 - **Tracked wire-format gaps** (on the board) each report rather than
   narrow silently. Do not "fix" one by picking a value: the solver's unbounded
   run registry, violations naming solver-invented Sessions with no join key.

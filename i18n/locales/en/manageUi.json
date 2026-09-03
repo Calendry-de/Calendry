@@ -282,6 +282,7 @@
         "addToLabel": "Add to {label}",
         "alreadyAdded": "Already added",
         "clearSearch": "Clear search",
+        "extraMissing": "No longer among the options (kept as stored)",
         "extraRoleLabel": "{label} role",
         "noMatches": "No matches for “{term}”.",
         "noneAssigned": "None assigned.",

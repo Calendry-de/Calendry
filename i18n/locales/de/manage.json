@@ -306,8 +306,10 @@
         "relation": {
             "groups": {
                 "label": "Gruppen, für die sie gilt",
-                "help": "Verschachtelung wirkt weiter: Wird ein Jahrgang zugeordnet, sind auch dessen Seminargruppen belegt. Aufgeführt werden nur Gruppen, die im Semester dieser Lehrveranstaltung verfügbar sind.",
-                "emptyHint": "In diesem Semester ist keine Gruppe verfügbar."
+                "help": "Verschachtelung wirkt weiter: Wird ein Jahrgang zugeordnet, sind auch dessen Seminargruppen belegt. Aufgeführt werden nur Gruppen, die im Semester dieser Lehrveranstaltung verfügbar sind. Jede Gruppe kann ihre feste Lehrkraft benennen, ausgewählt aus „Wer leitet sie“: Deren Termine leitet dann immer diese Person, und der Solver wählt nur für die übrigen Gruppen aus dem Pool.",
+                "emptyHint": "In diesem Semester ist keine Gruppe verfügbar.",
+                "lecturerPlaceholder": "Solver wählt aus dem Pool",
+                "lecturerLabel": "Feste Lehrkraft für diese Gruppe"
             },
             "lecturers": {
                 "label": "Wer leitet sie",

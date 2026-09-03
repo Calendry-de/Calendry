@@ -282,6 +282,7 @@
         "addToLabel": "Hinzufügen zu: {label}",
         "alreadyAdded": "Bereits hinzugefügt",
         "clearSearch": "Suche zurücksetzen",
+        "extraMissing": "Nicht mehr unter den Optionen (wie gespeichert beibehalten)",
         "extraRoleLabel": "Rolle ({label})",
         "noMatches": "Keine Treffer für „{term}“.",
         "noneAssigned": "Nichts zugeordnet.",

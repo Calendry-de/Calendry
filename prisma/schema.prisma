@@ -482,6 +482,7 @@ model Person {
   sessionPeople     SessionPerson[]
   offeringLecturers OfferingLecturer[]
   offeringTemplateLecturers OfferingTemplateLecturer[]
+  pinnedOfferingGroups OfferingGroup[] @relation("OfferingGroupLecturer")
   generations       Generation[]
   sessionEvents     SessionEvent[]
   accountLink       AccountPerson?
@@ -1599,18 +1600,48 @@ enum TenantMode {
   @@map("tenant_mode")
 }
 
+/// Offering ↔ Group: one row per SERIES of a split Offering (TAXONOMY.md's
+/// "N Groups attached = N independent parallel series").
+///
+/// `lecturerPersonId` is the per-Group LECTURER PIN (issue #131, the
+/// "Klassenlehrer"): "for THIS Offering, THIS Group's Sessions are always led
+/// by THIS person." A column on the series row rather than a table of its own,
+/// because the pin is a fact ABOUT the series: it cannot outlive the Group's
+/// attachment to the Offering, and one series has at most one fixed leader.
+///
+/// NULL means the series draws on the Offering-wide pool (`OfferingLecturer`),
+/// exactly as every series did before this column existed. Set, it NARROWS
+/// that series' wire candidates to the one person, which makes the wire's
+/// own "fixed assignment" shape (`candidates.length === requiredLecturerCount`)
+/// true for that series and nothing else — no proto or solver change.
+///
+/// Meant to name a member of the pool, and NOT bounded by a foreign key onto
+/// `offering_lecturer`: the pool is a PUT-set replaced wholesale
+/// (delete-then-insert) by a separate request, so a composite FK with any
+/// cascade would wipe or refuse every pin on every roster save, even one that
+/// kept the pinned person. `assembleSolverInput` checks membership at assembly
+/// instead, reports a pin outside the pool
+/// (`AssemblyReport.offeringsWithLecturerPinOutsidePool`) and falls back to
+/// the pool for that series; `relations.ts` warns at both writes. Same
+/// reasoning as `Offering.requiredLecturerCount` having no CHECK against the
+/// pool (DECISIONS.md § "Lecturer candidate pools").
 model OfferingGroup {
-  offeringId String @map("offering_id")
-  groupId    String @map("group_id")
-  tenantId   String @map("tenant_id")
+  offeringId       String  @map("offering_id")
+  groupId          String  @map("group_id")
+  tenantId         String  @map("tenant_id")
+  lecturerPersonId String? @map("lecturer_person_id")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   offering Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  // SET NULL, not CASCADE: losing the person clears the pin and the series
+  // falls back to the pool; it must not detach the Group from the Offering.
+  lecturer Person?  @relation("OfferingGroupLecturer", fields: [lecturerPersonId], references: [id], onDelete: SetNull)
 
   @@id([offeringId, groupId])
   @@index([groupId])
   @@index([tenantId])
+  @@index([lecturerPersonId])
   @@map("offering_group")
 }
 

@@ -241,6 +241,26 @@ export interface RelationDef {
         resource: string;
         label: (row: EntityRow) => string;
         placeholder: string;
+        /**
+         * Restrict the options to the rows CURRENTLY IN a sibling relation of
+         * the same entity, named by its `key`, instead of the whole resource.
+         *
+         * The per-Group lecturer pin (issue #131) is why: a Group's fixed
+         * lecturer must be one of the Offering's own "Who leads it" pool, so
+         * offering every Person in the institution would make the picker
+         * assert a choice the assembly then reports and ignores. The options
+         * are fetched by `?ids=` from the sibling's rows (the same labelling
+         * request a searchable relation already makes), and refetched whenever
+         * the sibling is saved, so adding someone to the pool makes them
+         * pinnable without a reload.
+         */
+        fromRelation?: string;
+        /**
+         * The screen-reader label for the per-row select. Defaults to the
+         * "{label} role" wording, which is right for the one extra reference
+         * that existed before this field did and wrong for every other.
+         */
+        srLabel?: string;
     };
     emptyHint?: string;
     /**
@@ -724,6 +744,24 @@ export function offeringEntity(t: Translate): ManageEntity {
                 // cohort the tenant has ever had, so nothing stopped attaching a
                 // 2024 cohort to a 2027 Offering.
                 scopeBy: { filter: 'termId', from: 'termId' },
+                /*
+                 * THE LECTURER PIN (issue #131), per Group: the one person who
+                 * always leads THIS Group's Sessions, the school's own
+                 * "Klassenlehrer". Drawn from the `lecturers` relation below
+                 * (`fromRelation`), never from every Person: a pin outside
+                 * the pool is reported and ignored at assembly, so offering
+                 * it here would be offering a choice that does nothing.
+                 * Empty (the placeholder) means the solver chooses from the
+                 * pool, which is what every Group did before this existed.
+                 */
+                extraReference: {
+                    key: 'lecturerPersonId',
+                    resource: 'persons',
+                    fromRelation: 'lecturers',
+                    label: personOptionLabel,
+                    placeholder: t('manage.offering.relation.groups.lecturerPlaceholder'),
+                    srLabel: t('manage.offering.relation.groups.lecturerLabel'),
+                },
                 emptyHint: t('manage.offering.relation.groups.emptyHint'),
             },
             {

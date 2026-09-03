@@ -133,14 +133,15 @@ describe('silence when there is nothing to warn about', () => {
 
 describe('the conditional response shape did not leak', () => {
     it('keeps a BARE ARRAY for every relation without warnAfterWrite', async () => {
-        // THE regression this suite exists for. Only `groups/terms` declares the
-        // hook; if the shape change reached the shared route unconditionally,
-        // these callers would silently receive an object where they read an
-        // array, and `Array.isArray` on an object is false, so the picker would
-        // render an empty set rather than erroring.
+        // THE regression this suite exists for. Only the relations that declare
+        // the hook (`groups/terms`, and since issue #131 `offerings/groups` and
+        // `offerings/lecturers`, which warn about a stranded lecturer pin) may
+        // answer with an object; if the shape change reached the shared route
+        // unconditionally, these callers would silently receive an object where
+        // they read an array, and `Array.isArray` on an object is false, so the
+        // picker would render an empty set rather than erroring.
         const bare: [string, unknown[]][] = [
-            [`/api/offerings/${OFFERING}/groups`, [{ groupId: GROUP_NO_USAGE }]],
-            [`/api/offerings/${OFFERING}/lecturers`, []],
+            [`/api/offerings/${OFFERING}/rooms`, []],
             [`/api/offerings/${OFFERING}/equipment`, []],
             [`/api/persons/test-person-a/roles`, []],
             [`/api/persons/test-person-a/groups`, []],
@@ -156,7 +157,7 @@ describe('the conditional response shape did not leak', () => {
         }
     });
 
-    it('returns the object shape ONLY for groups/terms', async () => {
+    it('returns the object shape for a relation that declares the hook (groups/terms)', async () => {
         const res = await api<unknown>(`/api/groups/${GROUP_NO_USAGE}/terms`, {
             method: 'PUT', cookie, body: JSON.stringify([]),
         });

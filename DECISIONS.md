@@ -3158,6 +3158,124 @@ needed their `include: { template: true }` (or bare `upsert`) changed to load
 `lecturers` explicitly; the type change is what caught all three at compile
 time rather than at the first tenant to hit the untested path.
 
+# A per-Group lecturer pin (issue #131)
+
+A real run was refused outright with `UNIMPLEMENTED`: an Offering created from
+a curriculum-plan template (issue #129) named two lecturers, its
+`requiredLecturerCount` derived to 1 of 2 — a genuine pool — and the tenant's
+HARD `lecturer_veto` covered its kind. The solver's `convert.rs` refuses to
+build a veto mask for a pool Offering, because WHICH person's calendar to
+check is a decision the search itself makes, not an input to it. Not a bug in
+pool selection (issue #61) and not `lecturer_consistency` (issue #7); the same
+structural gap issue #124 names for Person→Room: anything keyed on the
+specific person who leads a Session cannot be precomputed per Offering at
+build time once that person is chosen during search.
+
+Of the three unblocking moves available that day, two were refused by the
+tenant (drop to one lecturer; disable the veto for the kind) and the third
+(set the count to the pool size) forces every Session to book BOTH people,
+which is not what a pool is for. What the school actually meant was the
+fourth thing: each cohort has ITS teacher. A fact about one series of the
+Offering, which the wire already had a place for and the app had never
+filled.
+
+## Why a column on `offering_group`, not a pin table and not `OfferingLecturer.groupId`
+
+Issue #131 left the shape open between a new `(offeringId, groupId, personId)`
+table and a `groupId` column on `OfferingLecturer`. Neither was taken.
+
+`OfferingLecturer.groupId` breaks the table's primary key (`(offeringId,
+personId)`; a nullable column cannot join it) and, worse, its meaning:
+`OfferingLecturer` is the ONE authority on who leads an Offering, read by
+self-service scheduling-pattern edits and `/api/me/offerings`, and a row
+scoped to one Group would make "leads it" sometimes mean "leads part of it"
+for every reader. A separate pin table keeps "the pool" and "a pin" apart
+cleanly, but has to re-derive the one thing `offering_group` already IS: the
+per-series row. TAXONOMY.md's 2026-08-24 correction made N attached Groups N
+independent series, and `assembleSolverInput`'s `seriesGroups.map` is the
+loop over exactly those rows. The pin is a property of a series, so it lives
+on the series row: `offering_group.lecturer_person_id`, nullable. It cannot
+outlive the Group's attachment (dropping the Group drops the row), one series
+has at most one fixed leader, and the generic `ManageRelationPicker` already
+renders a per-row reference (`extraReference`, built for the lecturer's
+scheduling Role), so the Offering stays on the generic scaffold rather than
+growing a bespoke slot.
+
+## Why the pin is NOT a foreign key onto the pool
+
+The pin is meant to name a member of `offering_lecturer`, and a composite
+foreign key `(offering_id, lecturer_person_id) → offering_lecturer(offering_id,
+person_id)` would say so in the schema. It was written and taken out again.
+`[relation].put.ts` replaces a set by DELETE-then-INSERT inside one
+transaction ("the diff logic would be three code paths where this is one"),
+so `ON DELETE CASCADE` clears every pin on every roster save and `ON DELETE
+SET NULL` does the same one step later, even when the pinned person is in
+the new roster; `RESTRICT` turns "add a third lecturer" into a 500 for as
+long as any Group is pinned. Making the route diff-aware for one relation
+would have been the larger change and the one most likely to regress the
+other thirteen.
+
+So the schema says only that the pinned person exists (`FK → person, ON DELETE
+SET NULL`: losing the person clears the pin, it does not detach the Group).
+Membership is checked where the two tables are read together. This is the
+same conclusion the pool already reached for `requiredLecturerCount` (§
+"Lecturer candidate pools"): two sets saved by two requests cannot be bound
+by a CHECK, so the assembly clamps and reports.
+
+## Narrow, never appoint
+
+A pin outside the pool is reachable (remove the pinned person from "Who
+leads it") and has two honest readings: honour it, or ignore it. Ignoring
+won. Honouring would put someone on the wire as a candidate whom
+`OfferingLecturer` says does not lead the Offering, so the solver's answer
+and the app's own authority would disagree about who teaches what, silently.
+`assembleSolverInput` therefore reports the series on
+`AssemblyReport.offeringsWithLecturerPinOutsidePool` (wire id, Group, Person)
+and sends the pool for it, exactly as if the pin were null; nothing narrows
+without a report either way. Both relation writes (`offerings/groups` and
+`offerings/lecturers`) run the same `lecturerPinWarnings` hook and answer
+`{ rows, warnings }`, so the person who just saved is told at the moment
+the state arises, not at the next solver run. `tests/group-term-scope-
+warning.test.ts`'s bare-array list moved those two relations to the envelope
+side, deliberately: the shape change is the point of the hook.
+
+The unsplit case is handled by the same rule, not a special one: an Offering
+with exactly one Group is one series and that series IS the Group, so its
+pin applies; with none there is nothing to pin; with two or more it splits.
+`splitsIntoSeries` is `>= 2`, so no Group-per-series ambiguity is left.
+
+An explicit `requiredLecturerCount` above one against a pinned series is
+clamped to one and reported on `offeringsWithInsufficientLecturers` with
+`available: 1`, keyed by the series' wire id: the count is a fact about the
+Offering, the pin about one series, and only that series cannot meet it.
+
+## What the picker had to learn
+
+`extraReference.fromRelation` restricts the per-row options to a SIBLING
+relation's current rows (fetched by `?ids=`, the labelling request a
+searchable relation already makes, `null` when the sibling is empty), and
+`useEntityRelations.persist` refetches the wave after saving a relation that
+some sibling points at, so adding a person to the pool makes them pinnable
+without a reload. A stored value none of the options names (a pin whose
+person has since left the pool) is rendered as its own labelled `<option>`:
+without it the browser falls back to the first option and the select would
+SAY "solver chooses" while the row holds a pin — the `<select>` trap from
+CLAUDE.md, one row over.
+
+## Part B is solver work, and stays there
+
+Issue #131's other half — for a GENUINE pool, choose one lecturer per series
+BEFORE placement so `LecturerVeto` precomputes for it — is real solver design
+(what the pre-pass optimises for, what becomes of `lecturer_consistency`
+once inconsistency is structurally impossible, whether the proto needs a
+"who fixed this" signal) and belongs in `calendry-solver` behind an ADR, per
+CLAUDE.md's "never author solver logic here". This app consumes whatever
+lands the way it consumed issue #61. The pin is what a school that KNOWS its
+Klassenlehrer uses today; the pre-pass is for the Offerings where it does
+not care who.
+
+---
+
 # `Week.exam_group_ids` is sent EMPTY, and empty is the answer
 
 Proto v0.18.0 added `Week.exam_group_ids`: which Groups a week is an EXAM week

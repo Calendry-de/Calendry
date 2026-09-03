@@ -11,7 +11,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Resources'],
         summary: 'Replace a relation membership set',
-        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, offering-templates/lecturers, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
+        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. The RESPONSE is a bare array too, except for groups/terms, offerings/groups and offerings/lecturers, which answer { rows, warnings }. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, offering-templates/lecturers, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
         parameters: [
             { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -101,9 +101,15 @@ defineRouteMeta({
                                     title: 'offerings/groups',
                                     type: 'object',
                                     required: ['groupId'],
+                                    description: 'One row per series of a split offering. Responds with { rows, warnings }: a pin naming a person outside the offering’s lecturer pool is warned about, not refused.',
                                     properties: {
                                         groupId: {
                                             type: 'string',
+                                        },
+                                        lecturerPersonId: {
+                                            type: 'string',
+                                            nullable: true,
+                                            description: 'Per-group lecturer pin: the one person who always leads this group’s sessions, narrowing the series below the offering-wide pool. Null means the solver chooses from the pool. Should name a member of offerings/lecturers; a pin outside it is reported by the solver-input assembly and ignored for that series.',
                                         },
                                     },
                                 },
