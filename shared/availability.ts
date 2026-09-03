@@ -233,49 +233,55 @@ export interface TouchedWeek {
     index: number;
     start: string;
     end: string;
-    /** False when the range covers only part of this week: the over-block. */
+    /**
+     * The ISO weekdays of this week the absence actually covers, clamped to
+     * the term. EMPTY MEANS ALL SEVEN, the wire's own convention, so a whole
+     * week and its window agree without translation.
+     */
+    days: number[];
+    /** True when the absence covers the week Monday to Sunday. */
     whole: boolean;
 }
 
 export interface HolidayResolution {
+    /** Every week the range touches: what the stored row's `weeks` carries. */
     weeks: number[];
     touched: TouchedWeek[];
-    /** Weeks blocked in full despite the person being away for only part of them. */
+    /** Weeks the absence covers only in part (issue #118: shown, no longer over-blocked). */
     partial: TouchedWeek[];
+    /**
+     * The PRECISE wire spelling of the range: whole weeks as one
+     * `{days: [], weeks: [...]}` window, each distinct set of partial days as
+     * one `{days, weeks}` window. What `approvedBlackoutsFor` sends for a
+     * dated row.
+     */
+    windows: UnavailabilityWindow[];
 }
 
 /**
- * Which term weeks a date range blocks.
+ * Which term weeks a date range blocks, and exactly which days of each.
  *
- * A WEEK IS BLOCKED IF THE RANGE TOUCHES IT AT ALL: the same rule
- * `classifyWeeks` applies to EXAM periods, and deliberately NOT the "covers the
- * whole week" rule it applies to BREAK and HOLIDAY.
+ * ONE ROW OF THE WIRE FORMAT CANNOT SAY THIS. A window is conjunctive within a
+ * row (`{days, blocks, weeks}` all AND together), so "Wednesday onward in
+ * week 4, all of week 5, Monday and Tuesday of week 6" is up to three
+ * products, and until issue #118 this function rounded every touched week UP
+ * to a whole one so a holiday could stay a single row (a row is the unit of
+ * approval, and three rows are three separately approvable items). That was
+ * the fail-closed direction for a hard constraint, and it was SHOWN, but it
+ * silently spent Monday and Tuesday of every mid-week absence, term after
+ * term.
  *
- * That looks backwards at first glance, since this feature is literally called
- * a holiday. The distinction is what the two rules are FOR. A BREAK week is a
- * statement about the whole institution's calendar, so requiring full coverage
- * stops one bank holiday from cancelling a week of teaching for everybody. This
- * is a statement about one person's availability, and the two failure
- * directions are not symmetric:
+ * The solver side was checked (calendry-solver `0a16574`, a CI-pinned test):
+ * the axes INTERSECT, `blackouts` is a repeated field, and the format is
+ * already fully expressive. So the stored row still carries every touched
+ * week (unchanged for listing, counting and the weeks-need-a-term CHECK), the
+ * row ALSO carries the real dates, and `windows` here is the precise spelling
+ * the single solver read path expands them into. `partial` is now purely
+ * informative: the form lists which days of an end week are covered.
  *
- *   over-block   the solver loses part of a week it could have used. Costly.
- *   under-block  somebody is scheduled to teach while demonstrably abroad.
- *
- * "Covers" would under-block every range that starts or ends mid-week, which is
- * most of them. For a hard constraint this project consistently takes the
- * fail-closed direction.
- *
- * THE PRECISE ALTERNATIVE WAS CONSIDERED AND COSTS MORE THAN IT SAVES. A window
- * is conjunctive within a row (`{days, blocks, weeks}` all AND together), so
- * "all of week 5, but only Wednesday onward in week 4" cannot be said in ONE
- * row. It needs up to three, and then a holiday is three rows in the approval
- * queue that can be approved separately: an administrator could approve
- * two-thirds of somebody's holiday. Grouping them back into one decision needs a
- * column and a concept this feature does not otherwise want.
- *
- * So the over-block is accepted, bounded (at most the two partial end weeks),
- * and SHOWN: `partial` is what the form reports before anything is submitted,
- * which turns an imprecise rule into an informed choice rather than a surprise.
+ * Whole weeks share one window because `weeks` is a set; partial weeks are
+ * grouped by their day set for the same reason, so a Mon–Wed absence in two
+ * different weeks is one window, not two.
  *
  * The arithmetic is IMPORTED, never reimplemented. `weekIndexOf` exists because
  * this same Monday-anchored calculation had been written twice and agreed until
@@ -293,32 +299,70 @@ export function resolveHolidayWeeks(
     const firstTouched = Math.max(0, weekIndexOf(termStart, from));
     const lastTouched = Math.min(lastWeek, weekIndexOf(termStart, to));
 
+    // Clamped to the term: a day outside it has no slot to block, and
+    // reporting it as "covered" would show a person days the timetable never
+    // had.
+    const coverFrom = Math.max(from.getTime(), termStart.getTime());
+    const coverTo = Math.min(to.getTime(), termEnd.getTime());
+
     const weeks: number[] = [];
     const touched: TouchedWeek[] = [];
     const partial: TouchedWeek[] = [];
+    const wholeWeeks: number[] = [];
+    const partialByDays = new Map<string, { days: number[]; weeks: number[] }>();
 
     for (let index = firstTouched; index <= lastTouched; index += 1) {
         const weekStart = addDays(mondayOf(termStart), index * 7);
         const weekEnd = addDays(weekStart, 6);
-        // "Whole" means the ABSENCE covers the week, not that the week lies
-        // inside the term; a range ending on Wednesday leaves Thu/Fri blocked
-        // for nothing, and that is exactly what `partial` reports.
+        // "Whole" means the ABSENCE covers the week Monday to Sunday, not that
+        // the week lies inside the term.
         const whole = from.getTime() <= weekStart.getTime() && to.getTime() >= weekEnd.getTime();
+
+        const covered = ISO_WEEKDAYS.filter((day) => {
+            const at = addDays(weekStart, day - 1).getTime();
+
+            return at >= coverFrom && at <= coverTo;
+        });
 
         const entry: TouchedWeek = {
             index,
             start: isoDate(weekStart),
             end: isoDate(weekEnd),
+            days: whole ? [] : covered,
             whole,
         };
 
         weeks.push(index);
         touched.push(entry);
 
-        if (!whole) {
+        if (whole) {
+            wholeWeeks.push(index);
+        } else {
             partial.push(entry);
+
+            const key = covered.join(',');
+            const group = partialByDays.get(key) ?? { days: covered, weeks: [] };
+
+            group.weeks.push(index);
+            partialByDays.set(key, group);
         }
     }
 
-    return { weeks, touched, partial };
+    const windows: UnavailabilityWindow[] = [];
+
+    if (wholeWeeks.length) {
+        windows.push({ days: [], blocks: [], weeks: wholeWeeks });
+    }
+
+    for (const group of partialByDays.values()) {
+        // A partial week whose covered days all fall outside the term (an
+        // absence starting the Saturday before a Monday-start term, say)
+        // covers nothing in it: no window, rather than a `days: []` one that
+        // would read as the WHOLE week.
+        if (group.days.length) {
+            windows.push({ days: group.days, blocks: [], weeks: group.weeks });
+        }
+    }
+
+    return { weeks, touched, partial, windows };
 }

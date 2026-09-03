@@ -140,6 +140,7 @@
         "effectApproved": "In effect from the next schedule run.",
         "effectRejected": "Not in effect. Remove it, or talk to an administrator.",
         "holidayRow": "{term}: week {weeks}, away all day | {term}: weeks {weeks}, away all day",
+        "holidayRowDates": "{term}: away {from} – {to}",
         "holidayRowTerm": "term",
         "reviewerNote": "Reviewer: {note}",
         "submittedAt": "Submitted {created}",

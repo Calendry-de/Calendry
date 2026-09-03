@@ -634,11 +634,12 @@ describe('holiday entry', () => {
     // Fixture term A runs 2026-10-01 to 2027-02-28.
     const IN_TERM = { startDate: '2026-11-04', endDate: '2026-11-13' };
 
-    it('turns a date range into whole weeks, anchored to the term', async () => {
+    it('turns a date range into its term weeks AND stores the dates, so the ends stay precise', async () => {
         const created = await api<{
             id: string; status: string; weeks: number[];
+            absentFrom: string; absentTo: string;
             term: { id: string; name: string };
-            touched: { index: number; whole: boolean }[];
+            touched: { index: number; whole: boolean; days: number[] }[];
         }>('/api/me/availability/holidays', {
             method: 'POST',
             cookie: cookies.lecturer,
@@ -652,16 +653,24 @@ describe('holiday entry', () => {
 
         const row = await ownerDb.personUnavailability.findFirstOrThrow({ where: { id: created.body.id } });
 
-        // Days and blocks empty = every day, every block, OF THOSE WEEKS. The
-        // term is what makes the week indices mean anything.
+        // Days and blocks empty, weeks = every touched week: what every reader
+        // of the ROW lists and counts. The term is what makes the week indices
+        // mean anything.
         expect(row.days).toEqual([]);
         expect(row.blocks).toEqual([]);
+        expect(row.weeks).toEqual([5, 6]);
         expect(row.termId).toBe(f.termA);
 
-        // A Wednesday-to-Friday range touches two weeks and covers neither in
-        // full, and the response says so: the form shows this before submitting
-        // rather than leaving the over-block to be discovered in a timetable.
-        expect(created.body.touched.some((week) => !week.whole)).toBe(true);
+        // THE DATES (issue #118): stored on the row, echoed in the response, and
+        // what `approvedBlackoutsFor` expands instead of the whole weeks above.
+        expect(row.absentFrom?.toISOString().slice(0, 10)).toBe(IN_TERM.startDate);
+        expect(row.absentTo?.toISOString().slice(0, 10)).toBe(IN_TERM.endDate);
+        expect(created.body.absentFrom.slice(0, 10)).toBe(IN_TERM.startDate);
+
+        // A Wednesday-to-Friday range touches two weeks and covers neither
+        // Monday to Sunday; each end week names the days it does cover, which
+        // is what the form shows before submitting.
+        expect(created.body.touched.map((week) => week.days)).toEqual([[3, 4, 5, 6, 7], [1, 2, 3, 4, 5]]);
     });
 
     it('refuses a range that falls outside every term, naming them', async () => {

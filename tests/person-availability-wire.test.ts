@@ -235,40 +235,56 @@ describe('week-scoped windows are anchored to their term', () => {
 });
 
 /**
- * A date range blocks every week it TOUCHES.
+ * A date range is spelled EXACTLY (issue #118).
  *
- * The same rule `classifyWeeks` applies to EXAM periods, and deliberately not
- * the "covers the whole week" rule it applies to BREAK and HOLIDAY; see
- * `resolveHolidayWeeks` for why the two failure directions are not symmetric.
+ * Every touched week is still listed (`weeks`, what the stored row carries and
+ * the review queue counts), but the WIRE windows name only the days the
+ * absence covers: a Wednesday-to-Friday absence no longer blocks Monday and
+ * Tuesday. The axes intersect (calendry-solver `0a16574` pins it), so
+ * `{days:[3,4,5], weeks:[1]}` is Wed–Fri of week 1 and of no other week.
  */
-describe('resolving a date range to weeks', () => {
+describe('resolving a date range to weeks and days', () => {
     // A Monday-starting term, so week boundaries are easy to reason about.
     const START = new Date('2027-10-04');
     const END = new Date('2027-12-24');
 
-    it('blocks a partial week in full, and says which weeks were partial', () => {
+    it('names the covered days of each partial end week, and spells them as two windows', () => {
         // Wednesday of week 1 to Friday of week 2.
         const out = resolveHolidayWeeks(START, END, new Date('2027-10-13'), new Date('2027-10-22'));
 
         expect(out.weeks).toEqual([1, 2]);
-        // Neither end is covered in full, so both are reported as over-blocked,
-        // which is what the form shows before anything is submitted.
-        expect(out.partial.map((week) => week.index)).toEqual([1, 2]);
+        expect(out.partial.map((week) => [week.index, week.days])).toEqual([[1, [3, 4, 5, 6, 7]], [2, [1, 2, 3, 4, 5]]]);
+        expect(out.windows).toEqual([
+            { days: [3, 4, 5, 6, 7], blocks: [], weeks: [1] },
+            { days: [1, 2, 3, 4, 5], blocks: [], weeks: [2] },
+        ]);
     });
 
-    it('reports nothing partial when the range covers whole weeks', () => {
+    it('sends whole weeks as ONE window with empty days, and nothing partial', () => {
         // Monday of week 1 to Sunday of week 2.
         const out = resolveHolidayWeeks(START, END, new Date('2027-10-11'), new Date('2027-10-24'));
 
         expect(out.weeks).toEqual([1, 2]);
         expect(out.partial).toEqual([]);
+        expect(out.windows).toEqual([{ days: [], blocks: [], weeks: [1, 2] }]);
     });
 
-    it('blocks the single week a one-day absence touches', () => {
+    it('a range across three weeks is head, whole middle, tail: three windows, one row', () => {
+        // Thursday of week 1 through Tuesday of week 3.
+        const out = resolveHolidayWeeks(START, END, new Date('2027-10-14'), new Date('2027-10-26'));
+
+        expect(out.windows).toEqual([
+            { days: [], blocks: [], weeks: [2] },
+            { days: [4, 5, 6, 7], blocks: [], weeks: [1] },
+            { days: [1, 2], blocks: [], weeks: [3] },
+        ]);
+    });
+
+    it('a one-day absence is that weekday of that week and nothing else', () => {
         const out = resolveHolidayWeeks(START, END, new Date('2027-10-14'), new Date('2027-10-14'));
 
         expect(out.weeks).toEqual([1]);
-        expect(out.partial).toHaveLength(1);
+        expect(out.windows).toEqual([{ days: [4], blocks: [], weeks: [1] }]);
     });
 
     it('clamps to the term rather than running past either end', () => {
@@ -279,5 +295,75 @@ describe('resolving a date range to weeks', () => {
         // `weekCountOf` is the authority on how many weeks a term has; a range
         // running past the end must not invent one.
         expect(out.weeks[out.weeks.length - 1]).toBe(11);
+        // The range covers every week Monday to Sunday, so one whole window.
+        expect(out.windows).toEqual([{ days: [], blocks: [], weeks: out.weeks }]);
+    });
+
+    it('clamps the covered DAYS to the term too: the days before a mid-week term start are not "covered"', () => {
+        // Term starts Thursday 2027-10-07; absence from the Monday before.
+        const thursdayStart = new Date('2027-10-07');
+        const out = resolveHolidayWeeks(thursdayStart, END, new Date('2027-10-04'), new Date('2027-10-08'));
+
+        expect(out.weeks).toEqual([0]);
+        expect(out.windows).toEqual([{ days: [4, 5], blocks: [], weeks: [0] }]);
+    });
+});
+
+/**
+ * The single read path expands a DATED row into those windows; a row without
+ * dates (a recurring pattern, or an absence recorded before issue #118)
+ * travels exactly as stored.
+ */
+describe('approvedBlackoutsFor expands a dated absence', () => {
+    // Fixture term A runs 2026-10-01 (a Thursday) to 2027-02-28. Wednesday
+    // 2026-11-04 to Friday 2026-11-13 is weeks 5 and 6.
+    const FROM = new Date('2026-11-04');
+    const TO = new Date('2026-11-13');
+
+    it('sends the days actually away, not the whole weeks the row lists', async () => {
+        await ownerDb.personUnavailability.create({
+            data: {
+                tenantId: f.tenantA, personId: f.personMultiA, days: [], blocks: [], weeks: [5, 6],
+                absentFrom: FROM, absentTo: TO, termId: f.termA,
+                status: 'APPROVED', createdByPersonId: f.personMultiA,
+                decidedByPersonId: f.personMultiA, decidedAt: new Date(),
+            },
+        });
+
+        const byPerson = await ownerDb.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET LOCAL calendry.tenant_id = '${f.tenantA}'`);
+
+            return approvedBlackoutsFor(tx as never, [f.personMultiA], f.termA);
+        });
+
+        expect(byPerson.get(f.personMultiA)).toEqual([
+            { days: [3, 4, 5, 6, 7], blocks: [], weeks: [5] },
+            { days: [1, 2, 3, 4, 5], blocks: [], weeks: [6] },
+        ]);
+    });
+
+    it('a pre-#118 absence without dates still travels as its whole weeks', async () => {
+        // WEEK_SEVEN is such a row, seeded above with no dates: `[1]`, as stored.
+        const byPerson = await ownerDb.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET LOCAL calendry.tenant_id = '${f.tenantA}'`);
+
+            return approvedBlackoutsFor(tx as never, [f.personA], f.termA);
+        });
+
+        expect(byPerson.get(f.personA)).toContainEqual(WEEK_SEVEN);
+    });
+
+    it('the database refuses half a date pair, and a dated row with no term', async () => {
+        const base = {
+            tenantId: f.tenantA, personId: f.personMultiA, days: [], blocks: [], weeks: [],
+            status: 'PENDING' as const, createdByPersonId: f.personMultiA,
+        };
+
+        await expect(ownerDb.personUnavailability.create({
+            data: { ...base, absentFrom: FROM, termId: f.termA },
+        })).rejects.toThrow();
+        await expect(ownerDb.personUnavailability.create({
+            data: { ...base, absentFrom: FROM, absentTo: TO },
+        })).rejects.toThrow();
     });
 });

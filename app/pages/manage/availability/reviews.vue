@@ -84,6 +84,7 @@
             <template v-if="mode === 'holiday'">
                 <AvailabilityHolidayForm
                     ref="holidayForm"
+                    :active-days="grid?.activeDays"
                     :busy="busy === 'entry'"
                     :error="entryError"
                     :submit-label="t('managePages.availabilityReviews.record')"
@@ -239,6 +240,7 @@
 </template>
 
 <script setup lang="ts">
+import { isoDate } from '#shared/academicCalendar';
 import type { TermWindow } from '#shared/availability';
 import type { TimeGrid } from '~/composables/schedule';
 import AvailabilityBlockPicker from '~/components/availability/AvailabilityBlockPicker.vue';
@@ -280,6 +282,9 @@ interface ReviewRow {
     days: number[];
     blocks: number[];
     weeks: number[];
+    /** ISO date-times of a date-range absence (issue #118); null on a pattern. */
+    absentFrom: string | null;
+    absentTo: string | null;
     termId: string | null;
     term: { name: string } | null;
     reason: string | null;
@@ -347,6 +352,17 @@ const canDecide = useHasPermission('availability.manage_any');
 function describeRow(row: ReviewRow): string {
     if (row.weeks.length === 0) {
         return describeWindow(t, row, grid.value);
+    }
+
+    // A DATED absence (issue #118) reads as its dates: that is what the person
+    // entered, and since the dates are what reaches the solver, listing the
+    // touched weeks would overstate what is blocked.
+    if (row.absentFrom && row.absentTo) {
+        return t('managePages.availabilityReviews.holidayRowDates', {
+            term: row.term?.name ?? t('managePages.availabilityReviews.holidayRowTerm'),
+            from: isoDate(new Date(row.absentFrom)),
+            to: isoDate(new Date(row.absentTo)),
+        });
     }
 
     // ONE plural message: `week{s}` was a word split across an expression, so

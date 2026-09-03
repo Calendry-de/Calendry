@@ -27,6 +27,9 @@ export interface UnavailabilityRow {
     days: number[];
     blocks: number[];
     weeks: number[];
+    /** The real dates of a date-range absence (issue #118); null on a pattern. */
+    absentFrom: Date | null;
+    absentTo: Date | null;
     reason: string | null;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     decisionNote: string | null;
@@ -61,14 +64,45 @@ export async function approvedBlackoutsFor(
             status: 'APPROVED',
             OR: [{ termId: null }, { termId }],
         },
-        select: { personId: true, days: true, blocks: true, weeks: true },
+        select: {
+            personId: true,
+            days: true,
+            blocks: true,
+            weeks: true,
+            absentFrom: true,
+            absentTo: true,
+            term: { select: { startDate: true, endDate: true } },
+        },
         orderBy: { createdAt: 'asc' },
     });
 
     for (const row of rows) {
         const windows = byPerson.get(row.personId) ?? [];
 
-        windows.push({ days: row.days, blocks: row.blocks, weeks: row.weeks });
+        /*
+         * A DATED absence (issue #118) is expanded here, and only here, into
+         * the precise windows its dates spell: the stored `days: [], weeks:
+         * [touched...]` is the whole-week rounding this row's dates exist to
+         * replace, kept for listing and counting, never sent when the dates
+         * are present. Recurring patterns and pre-#118 absences have no dates
+         * and travel as stored.
+         *
+         * The CHECK guarantees a dated row has a term; `term` is still typed
+         * nullable by Prisma, so the fallback is the stored triple rather
+         * than a crash, and it is the SAME answer the row gave before this
+         * branch existed.
+         */
+        if (row.absentFrom && row.absentTo && row.term) {
+            windows.push(...resolveHolidayWeeks(
+                row.term.startDate,
+                row.term.endDate,
+                row.absentFrom,
+                row.absentTo,
+            ).windows);
+        } else {
+            windows.push({ days: row.days, blocks: row.blocks, weeks: row.weeks });
+        }
+
         byPerson.set(row.personId, windows);
     }
 

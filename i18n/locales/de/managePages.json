@@ -130,6 +130,7 @@
         "statusRejected": "ABGELEHNT",
         "decisionNote": "Notiz: {note}",
         "holidayRow": "{term}: Woche {weeks}, ganztägig abwesend | {term}: Wochen {weeks}, ganztägig abwesend",
+        "holidayRowDates": "{term}: abwesend {from} – {to}",
         "holidayRowTerm": "Semester",
         "decisionError": "Die Entscheidung konnte nicht erfasst werden.",
         "deleteError": "Das konnte nicht gelöscht werden."

@@ -238,26 +238,23 @@ describe('plural forms select on the count', () => {
         // a `<strong>`; the message and its form selection are the same either
         // way, which is what this asserts.
         expect(t('availability.holidayForm.previewHead', { term: 'Winter', count: 1 }))
-            .toBe('Winter · 1 week blocked');
+            .toBe('Winter · 1 week affected');
         expect(t('availability.holidayForm.previewHead', { term: 'Winter', count: 4 }))
-            .toBe('Winter · 4 weeks blocked');
+            .toBe('Winter · 4 weeks affected');
     });
 
-    it('carries the over-block warning\'s own verb AND pronoun in each form', () => {
-        // The case `i18n/CONVENTIONS.md` uses as its worked example: this was
-        // `'One week is'`/`` `${n} weeks are` `` and `'it'`/`'them'` interleaved
-        // with the prose, so neither English half was a sentence and no German
-        // one could be written at all.
-        expect(t('availability.holidayForm.partialWarning', { count: 1 })).toBe(
-            'One week is blocked in full even though your absence covers only part of it.'
-            + ' A week is blocked if your absence touches it at all: the scheduler cannot be'
-            + ' told about part of a week in one entry.',
-        );
-        expect(t('availability.holidayForm.partialWarning', { count: 3 })).toBe(
-            '3 weeks are blocked in full even though your absence covers only part of them.'
-            + ' A week is blocked if your absence touches it at all: the scheduler cannot be'
-            + ' told about part of a week in one entry.',
-        );
+    it('names the covered days of a partial week, now that a partial week is honoured exactly (issue #118)', () => {
+        // The over-block disclosure this replaced ("the whole week is blocked")
+        // became false once the dates reach the solver, and was removed in the
+        // same change rather than left to reassure people about a rounding
+        // that no longer happens.
+        expect(t('availability.holidayForm.weekDays', { days: 'Wednesday, Thursday, Friday' }))
+            .toBe('(only Wednesday, Thursday, Friday)');
+    });
+
+    it('reads a dated absence as its dates, not as its touched weeks', () => {
+        expect(t('my.availability.holidayRowDates', { term: 'Winter', from: '2026-11-04', to: '2026-11-13' }))
+            .toBe('Winter: away 2026-11-04 – 2026-11-13');
     });
 });
 

@@ -3158,6 +3158,88 @@ needed their `include: { template: true }` (or bare `upsert`) changed to load
 `lecturers` explicitly; the type change is what caught all three at compile
 time rather than at the first tenant to hit the untested path.
 
+# A mid-week absence blocks the days away, not the week (issue #118)
+
+`resolveHolidayWeeks` rounded every touched week UP to a whole one, on
+purpose and disclosed in the form: a person away Wednesday to Friday blocked
+Monday and Tuesday as well. The reasoning was recorded in the function's own
+comment and was sound as far as it went — one row of the wire's
+`days × blocks × weeks` product cannot spell "Wed–Fri of week 5, all of week
+6, Mon–Tue of week 7" (that is up to three products), and splitting one
+absence into three rows would make it three separately approvable items in
+the review queue. Fail-closed on a hard constraint, bounded to the two end
+weeks, shown before submitting. Also, term after term, silently spending two
+teaching days of every ordinary mid-week holiday.
+
+## The diagnosis in the ticket was wrong, and the solver side proved it
+
+Issue #118 was filed as a three-repo change: a date-precise axis on the proto,
+an evaluator for it in the solver, columns here. It was first moved to
+Blocked on the proto. Then the solver side checked the actual semantics and
+pinned them by test (calendry-solver `0a16574`,
+`crates/core/tests/mid_week_absence.rs`): the three axes INTERSECT, so
+`{days:[3,4,5], weeks:[5]}` is exactly Wednesday to Friday of week 5 and of
+no other week; `blackouts` is a repeated field; any set of `(week, day,
+block)` cells is some union of such products. The ticket's counter-example
+("also matches every OTHER week that has a Monday/Tuesday") described a
+union, which the format never was. A fourth axis would have been a second
+way to say what the format already says. Scope collapsed to this repo and to
+one question: how to keep a holiday ONE row while sending up to three
+windows.
+
+## The row keeps the dates; the read path does the spelling
+
+`person_unavailability.absent_from` / `absent_to` (both or neither, ordered,
+and requiring a `term_id` like the week indices they expand into). The row
+still stores `days: [], blocks: [], weeks: [every touched week]`, exactly as
+before, because every reader of a ROW — the self-service list, the review
+queue, `blockedSlotSummary`'s week-scoped count, the weeks-need-a-term
+CHECK — lists or counts rows and was right to. What changed is the ONE
+solver read path, `approvedBlackoutsFor`: a row carrying dates is expanded
+by `resolveHolidayWeeks(...).windows` into whole weeks as one
+`{days: [], weeks: [...]}` window plus one `{days, weeks}` window per
+distinct set of partial days; a row without dates travels as stored. So an
+absence is still one row, one approval, one deletion, and the wire is exact.
+
+Why not simply store the precise windows as several rows and group them with
+a column: that is the "concept this feature does not otherwise want" the
+old comment named, and it would have put the grouping rule (approve all or
+none, delete all or none) into every route that touches a row. Why not
+store ONLY the dates and drop the triple: the review queue, the summary and
+the CHECK all read the triple today, and "the whole weeks touched" is a true
+statement about the row that costs nothing to keep. The schema comment says
+plainly that this is the one place the row is not the wire message.
+
+## What was NOT backfilled, and why
+
+Absences recorded before the columns existed have no dates and cannot get
+them: the dates were never stored, only the weeks they rounded to. They keep
+blocking whole weeks, which is what the administrator approved. A person who
+wants the precision re-enters the absence (delete-then-resubmit is already
+the only edit path) and it goes through approval again, as any tightening
+or loosening of a hard constraint should.
+
+## The disclosure had to go in the same change
+
+`AvailabilityHolidayForm.vue` said "you are away for part of it, but the
+whole week is blocked", with a plural warning under the list. Once the dates
+reach the solver that sentence is false, and a false reassurance about a
+rounding that no longer happens is worse than none. Each end week now names
+the days it covers (`TouchedWeek.days`, EMPTY for a whole week — the wire's
+own convention, so a whole week and its window agree without translation),
+and the partial-week styling stopped being a warning colour. The list pages
+read a dated row as its dates (`holidayRowDates`) rather than as its touched
+weeks, which would now overstate what is blocked.
+
+## Related, other axis
+
+Issue #126 records the OPPOSITE rounding on the Group axis:
+`group_term_availability` rounds toward available (`blackedOutWeeks`), so a
+Wed–Fri group holiday vanishes. Same `days`-axis fix, other direction, other
+table; not touched here.
+
+---
+
 # A per-Group lecturer pin (issue #131)
 
 A real run was refused outright with `UNIMPLEMENTED`: an Offering created from

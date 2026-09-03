@@ -140,6 +140,7 @@
         "effectApproved": "Wirksam ab dem nächsten Planungslauf.",
         "effectRejected": "Nicht wirksam. Entfernen Sie den Eintrag oder sprechen Sie mit der Administration.",
         "holidayRow": "{term}: Woche {weeks}, ganztägig abwesend | {term}: Wochen {weeks}, ganztägig abwesend",
+        "holidayRowDates": "{term}: abwesend {from} – {to}",
         "holidayRowTerm": "Semester",
         "reviewerNote": "Prüfvermerk: {note}",
         "submittedAt": "Eingereicht {created}",

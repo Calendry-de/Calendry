@@ -41,18 +41,23 @@ export default defineEventHandler(async (event) => {
             data: {
                 tenantId: identity.tenantId,
                 personId,
-                // Every day, every block, of the resolved weeks. The whole-week
-                // rule is stated in `resolveHolidayWeeks`; the form shows which
-                // weeks before this is sent.
+                // Every touched week, whole, as every reader of the row lists
+                // and counts it. NOT what reaches the solver for this row: the
+                // dates below are expanded to the exact days at the read path.
                 days: [],
                 blocks: [],
                 weeks: resolution.weeks,
+                // The real dates (issue #118). `approvedBlackoutsFor` expands
+                // them into day-precise windows; `weeks` above stays the
+                // whole-week list every reader of the row already understands.
+                absentFrom: new Date(body.startDate),
+                absentTo: new Date(body.endDate),
                 termId: term.id,
                 reason: body.reason ?? null,
                 status: 'PENDING',
                 createdByPersonId: personId,
             },
-            select: { id: true, status: true, weeks: true },
+            select: { id: true, status: true, weeks: true, absentFrom: true, absentTo: true },
         }));
 
         setResponseStatus(event, 201);

@@ -33,11 +33,11 @@
 
         <!--
             THE PREVIEW IS THE POINT, not decoration. A date range does not map
-            to whole weeks in any way somebody can predict from two dates. That is
+            to term weeks in any way somebody can predict from two dates. That is
             exactly the reasoning that earned the calendar-period editor its own
-            week-reclassification preview. And because a touched week is blocked
-            in FULL, the preview is also where the over-block becomes an informed
-            choice instead of a surprise discovered in next term's timetable.
+            week-reclassification preview. Each end week names the days it
+            actually covers (issue #118): until then a touched week was blocked
+            in FULL and this preview was where that over-block was disclosed.
         -->
         <div
             v-if="preview"
@@ -75,24 +75,15 @@
                         start: week.start,
                         end: week.end,
                     }) }}
-                    <span v-if="!week.whole">{{ t('availability.holidayForm.weekPartial') }}</span>
+                    <!--
+                        `days` is EMPTY for a whole week (the wire's own
+                        convention), so only a partial week names its days.
+                    -->
+                    <span v-if="!week.whole && coveredDays(week).length">{{ t('availability.holidayForm.weekDays', {
+                        days: coveredDays(week).map((day) => weekdayName(day, locale)).join(', '),
+                    }) }}</span>
                 </li>
             </ul>
-
-            <p
-                v-if="preview.partial.length"
-                class="holiday_note holiday_note--warn"
-                role="status"
-            >
-                <!--
-                    ONE plural message carrying its own verb AND its own
-                    pronoun ("is/are", "it/them"). Built inline it interleaved
-                    three mustaches with the prose, which is unusable to a
-                    translator: German changes neither word the way English
-                    does here.
-                -->
-                {{ t('availability.holidayForm.partialWarning', { count: preview.partial.length }) }}
-            </p>
         </div>
 
         <p
@@ -117,10 +108,12 @@
 </template>
 
 <script setup lang="ts">
-import type { HolidayResolution, TermWindow } from '#shared/availability';
+import type { HolidayResolution, TermWindow, TouchedWeek } from '#shared/availability';
 import { resolveHolidayWeeks } from '#shared/availability';
 import { overlaps } from '#shared/academicCalendar';
 import { useT } from '~/composables/i18n';
+import { useViewerLocale } from '~/composables/locale';
+import { weekdayName } from '~/composables/schedule';
 
 /**
  * Pick real dates; see the weeks they block.
@@ -134,6 +127,14 @@ import { useT } from '~/composables/i18n';
  */
 const props = defineProps<{
     terms: TermWindow[];
+    /**
+     * The grid's teaching days, for DISPLAY only: a Wed–Sun absence in a
+     * Mon–Fri tenant reads "Wednesday, Thursday, Friday", not a list ending in
+     * a weekend nobody teaches. The window sent still names every covered
+     * day, which is harmless (a day with no slots blocks nothing) and keeps
+     * the stored fact independent of which grid happens to be default.
+     */
+    activeDays?: number[];
     busy?: boolean;
     error?: string;
     submitLabel?: string;
@@ -142,6 +143,9 @@ const props = defineProps<{
 const emit = defineEmits<{ submit: [payload: { startDate: string; endDate: string; reason: string | null }] }>();
 
 const { t } = useT();
+// The viewer's formatting locale, the same source every other weekday label
+// in the app reads (`ScheduleGrid`, `ScheduleInspector`).
+const locale = useViewerLocale();
 
 const startDate = ref('');
 const endDate = ref('');
@@ -234,6 +238,13 @@ const preview = computed<Preview | null>(() => {
 
     return resolution.weeks.length ? { ...resolution, term } : null;
 });
+
+/** The covered days of a partial week that the tenant actually teaches on. */
+function coveredDays(week: TouchedWeek): number[] {
+    return props.activeDays?.length
+        ? week.days.filter((day) => props.activeDays!.includes(day))
+        : week.days;
+}
 
 function submit() {
     emit('submit', {
@@ -329,8 +340,10 @@ defineExpose({ reset });
         font-variant-numeric: tabular-nums;
         color: $content7;
 
+        // No longer a warning colour: a partial end week is the person's own
+        // dates, honoured exactly, not an over-block to be disclosed (#118).
         &--partial {
-            color: $warning800;
+            color: $content3;
         }
     }
 
@@ -341,9 +354,6 @@ defineExpose({ reset });
         color: $content7;
 
         &--warn {
-            // The over-block disclosure ("the whole week is blocked") was the
-            // other 3.73:1 string in this component. An earlier edit replaced
-            // only the first of the two.
             color: $warning800;
         }
 

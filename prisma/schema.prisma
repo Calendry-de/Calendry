@@ -566,7 +566,8 @@ model PersonRole {
 
 /// One declared unavailability window for a Person (TAXONOMY.md §7).
 ///
-/// Maps 1:1 to `calendry.solver.v1.Unavailability`, INCLUDING its emptiness
+/// `days`/`blocks`/`weeks` map 1:1 to `calendry.solver.v1.Unavailability`,
+/// INCLUDING its emptiness
 /// convention: an EMPTY array means "every value on that axis", so `{days:[5]}`
 /// is every Friday and `{blocks:[0]}` is every first block. NOTE that
 /// `person_preference` below INVERTS this: there an empty array means "no
@@ -602,6 +603,23 @@ model PersonUnavailability {
   /// existed meant. Set for a date-range absence, which is anchored to real
   /// dates and therefore to one term.
   termId String? @map("term_id")
+
+  /// The real dates of a date-range absence (issue #118), both or neither.
+  ///
+  /// THE ONE PLACE THIS ROW IS NOT THE WIRE MESSAGE. One row of the
+  /// `days × blocks × weeks` product cannot spell "Wed–Fri of week 5, all of
+  /// week 6, Mon–Tue of week 7" (up to three products), and one absence must
+  /// stay ONE row because a row is the unit of approval. So a dated row keeps
+  /// `days: []`, `blocks: []`, `weeks: [every touched week]` for listing,
+  /// counting and the CHECK, and `approvedBlackoutsFor` (the single solver
+  /// read path) expands the DATES into the precise windows instead: a
+  /// Wednesday-to-Friday absence no longer blocks Monday and Tuesday.
+  ///
+  /// NULL on every recurring pattern and on every absence recorded before the
+  /// columns existed; those keep sending their whole weeks, which is what was
+  /// approved.
+  absentFrom DateTime? @map("absent_from") @db.Date
+  absentTo   DateTime? @map("absent_to") @db.Date
 
   reason String?
 

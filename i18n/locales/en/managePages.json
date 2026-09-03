@@ -130,6 +130,7 @@
         "statusRejected": "REJECTED",
         "decisionNote": "Note: {note}",
         "holidayRow": "{term}: week {weeks}, away all day | {term}: weeks {weeks}, away all day",
+        "holidayRowDates": "{term}: away {from} – {to}",
         "holidayRowTerm": "term",
         "decisionError": "Could not record that decision.",
         "deleteError": "Could not delete that."

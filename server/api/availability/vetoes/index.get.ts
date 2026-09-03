@@ -50,6 +50,8 @@ export default defineEventHandler(async (event) => {
                 days: true,
                 blocks: true,
                 weeks: true,
+            absentFrom: true,
+            absentTo: true,
                 termId: true,
                 term: { select: { name: true } },
                 reason: true,

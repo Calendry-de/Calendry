@@ -39,6 +39,8 @@ export default defineEventHandler(async (event) => withRequestTenant(event, asyn
             days: true,
             blocks: true,
             weeks: true,
+            absentFrom: true,
+            absentTo: true,
             reason: true,
             status: true,
             decisionNote: true,

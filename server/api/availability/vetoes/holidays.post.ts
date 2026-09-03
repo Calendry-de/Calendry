@@ -40,6 +40,11 @@ export default defineEventHandler(async (event) => {
                 days: [],
                 blocks: [],
                 weeks: resolution.weeks,
+                // The real dates (issue #118). `approvedBlackoutsFor` expands
+                // them into day-precise windows; `weeks` above stays the
+                // whole-week list every reader of the row already understands.
+                absentFrom: new Date(body.startDate),
+                absentTo: new Date(body.endDate),
                 termId: term.id,
                 reason: body.reason ?? null,
                 status: 'APPROVED',
@@ -47,7 +52,7 @@ export default defineEventHandler(async (event) => {
                 decidedByPersonId: identity.actorPersonId,
                 decidedAt: new Date(),
             },
-            select: { id: true, status: true, weeks: true },
+            select: { id: true, status: true, weeks: true, absentFrom: true, absentTo: true },
         }));
 
         setResponseStatus(event, 201);
