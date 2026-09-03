@@ -584,6 +584,9 @@ function wireRelationVariant(
                 precedence: {
                     minGapMinutes: Number(params.minGapMinutes) || 0,
                     maxDaysBetween: Number(params.maxDaysBetween) || 0,
+                    // proto 0.19.0: a CALENDAR-day floor on the same boundary,
+                    // the scalar form of NextDay/TwoDaysAfter (solver ADR-0024).
+                    minDaysBetween: Number(params.minDaysBetween) || 0,
                 },
             };
         default:
@@ -1235,6 +1238,14 @@ export async function assembleSolverInput(
     const persons: Person[] = personRows.map((person) => ({
         id: person.id,
         roleTags: person.personRoles.map((link) => link.role.key),
+        /*
+         * proto 0.19.0 (`LecturerRoomPin`, issue #124): the Rooms this person
+         * may teach in. The app has no Person-to-Room pin yet, and EMPTY is the
+         * proto's documented "any Room", exactly what every Person meant before
+         * the field existed. Sent empty rather than omitted so the constructed
+         * message stays checked against the proto shape (CLAUDE.md: never `as`).
+         */
+        allowedRoomIds: [],
         /**
          * Narrowed to the Groups being sent: a `group_id` the solver was never
          * given is a dangling reference. Dropping the rest loses nothing: a

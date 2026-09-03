@@ -119,9 +119,9 @@ describe('the solver-evaluated relation kinds (issues #54, #37)', () => {
     });
 
     it('sends precedence with its two parameters, members in the stated order', async () => {
-        const { relation } = await relate('precedence', { minGapMinutes: 1440, maxDaysBetween: 7 });
+        const { relation } = await relate('precedence', { minGapMinutes: 1440, maxDaysBetween: 7, minDaysBetween: 1 });
 
-        expect(relation!.precedence).toEqual({ minGapMinutes: 1440, maxDaysBetween: 7 });
+        expect(relation!.precedence).toEqual({ minGapMinutes: 1440, maxDaysBetween: 7, minDaysBetween: 1 });
         // The ONLY kind that reads member order: predecessor first.
         expect(relation!.offeringIds).toEqual(['test-offering-a', offeringB]);
     });
@@ -129,7 +129,7 @@ describe('the solver-evaluated relation kinds (issues #54, #37)', () => {
     it('sends precedence with the proto zeros when a row predates the parameters', async () => {
         const { relation } = await relate('precedence', {});
 
-        expect(relation!.precedence).toEqual({ minGapMinutes: 0, maxDaysBetween: 0 });
+        expect(relation!.precedence).toEqual({ minGapMinutes: 0, maxDaysBetween: 0, minDaysBetween: 0 });
     });
 });
 

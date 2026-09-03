@@ -732,6 +732,17 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             help: 'Calendar days from the predecessor\u2019s last session to the successor\u2019s '
                 + 'first. 0 means no ceiling; 7 means \u201Cwithin a week of the lecture\u201D. '
                 + 'Calendar days, so Friday to Monday is three.',
+        }, {
+            key: 'minDaysBetween',
+            label: 'At least this many days apart',
+            type: 'number',
+            min: 0,
+            required: true,
+            default: 0,
+            help: 'The floor on the same boundary, in the same calendar days: 1 means \u201Cnot '
+                + 'before the next day\u201D, 2 \u201Cat least two days after\u201D. 0 keeps only the '
+                + 'ordering. A day floor, not the minute gap above: minutes would stretch '
+                + 'across every weekend and closure week.',
         }],
         relation: { minMembers: 2 },
     },
