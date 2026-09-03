@@ -90,6 +90,11 @@
             "isVirtual": {
                 "label": "Virtual"
             },
+            "footprintTags": {
+                "label": "Shared footprint",
+                "help": "Rooms carrying the same tag occupy one physical space, such as three rooms behind movable walls and the hall they form when the walls are open. Booking any one blocks the others for that slot. Type one tag per shared wall, comma-separated; a tag only one room carries does nothing. A virtual room has no footprint.",
+                "placeholder": "e.g. audimax"
+            },
             "isSpecialized": {
                 "label": "Specialized",
                 "help": "A lab, computer room or workshop to keep free for teaching that needs its equipment. Only the \"Keep specialized rooms free\" constraint reads this, and it charges nothing for teaching that requires one of this room's features. Separate from ranking: a room can be premium, specialized, both or neither."

@@ -69,7 +69,14 @@ export type FieldType =
     | 'reference'
     | 'color'
     /** Structured value a bespoke component owns (Constraint.params). */
-    | 'json';
+    | 'json'
+    /**
+     * A list of short free-text tags (`string[]`), typed comma-separated and
+     * stored as an array. Open vocabulary by design: `Room.footprintTags`
+     * (issue #122) is the first, and hardcoding its values would push a
+     * tenant's building into the schema.
+     */
+    | 'tags';
 
 export interface FieldDef {
     key: string;
@@ -1306,6 +1313,13 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     label: t('manage.room.field.isSpecialized.label'),
                     type: 'boolean',
                     help: t('manage.room.field.isSpecialized.help'),
+                },
+                {
+                    key: 'footprintTags',
+                    label: t('manage.room.field.footprintTags.label'),
+                    type: 'tags',
+                    help: t('manage.room.field.footprintTags.help'),
+                    placeholder: t('manage.room.field.footprintTags.placeholder'),
                 },
                 { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
             ],

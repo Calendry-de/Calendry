@@ -81,6 +81,22 @@
         </select>
 
         <!-- One implementation, shared with the display-settings page. -->
+        <!--
+            TAGS: one text control, comma-separated, emitted as a string array
+            on CHANGE rather than on input, so typing a comma does not split
+            the value under the cursor. Trimmed and deduplicated here for the
+            display; the server does the same at the write.
+        -->
+        <input
+            v-else-if="field.type === 'tags'"
+            :id="controlId"
+            class="field_control"
+            type="text"
+            :value="tagsText"
+            :placeholder="field.placeholder"
+            @change="emitValue(parseTags(($event.target as HTMLInputElement).value))"
+        >
+
         <ManageColorField
             v-else-if="field.type === 'color'"
             :model-value="(model as string) ?? null"
@@ -209,7 +225,18 @@ function isRenderablePrimitive(value: unknown): boolean {
         || typeof value === 'boolean';
 }
 
+/** `string[]` ⇄ "a, b, c". Empty input is an empty list, never `['']`. */
+function parseTags(text: string): string[] {
+    return [...new Set(text.split(',').map((tag) => tag.trim()).filter(Boolean))];
+}
+
+const tagsText = computed(() => (Array.isArray(model.value) ? (model.value as string[]).join(', ') : ''));
+
 const staticText = computed(() => {
+    if (props.field.type === 'tags') {
+        return Array.isArray(model.value) && model.value.length ? (model.value as string[]).join(', ') : '-';
+    }
+
     if (props.field.type === 'boolean') {
         return model.value ? t('manageUi.shared.yes') : t('manageUi.shared.no');
     }

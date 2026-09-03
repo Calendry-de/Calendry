@@ -494,6 +494,60 @@ async function assertPermissionsSeeded(tx: Tx, submitted: unknown): Promise<void
     }
 }
 
+/**
+ * `Room.footprintTags` (issue #122): open-vocabulary tags naming a shared
+ * physical space. Trimmed, non-empty, deduplicated at the write so "Audimax"
+ * and "Audimax " cannot silently be two footprints. Capped: a Room sharing
+ * more than eight walls is a data-entry error, not an architecture.
+ */
+const footprintTagsSchema = z.array(z.string().trim().min(1).max(64)).max(8)
+    .transform((tags) => [...new Set(tags)])
+    .optional();
+
+/**
+ * A virtual Room has no physical footprint (issue #122). The same rule the
+ * database CHECK `room_virtual_has_no_footprint` states, refused here with a
+ * FIELD so the form can point at it rather than surfacing a constraint name.
+ * The update hook merges the patch onto the stored row, because a PATCH may
+ * carry either field without the other and the rule is about their pair.
+ */
+function refuseVirtualFootprint(isVirtual: boolean, footprintTags: readonly string[]): void {
+    if (isVirtual && footprintTags.length > 0) {
+        throw createError({
+            statusCode: 422,
+            message: 'A virtual room has no physical footprint; remove its footprint tags or make it a physical room.',
+            data: { field: 'footprintTags' },
+        });
+    }
+}
+
+async function roomBeforeCreate(ctx: { data: Record<string, unknown> }): Promise<void> {
+    refuseVirtualFootprint(
+        ctx.data.isVirtual === true,
+        Array.isArray(ctx.data.footprintTags) ? (ctx.data.footprintTags as string[]) : [],
+    );
+}
+
+async function roomBeforeUpdate(ctx: { tx: Tx; tenantId: string; id: string; patch: Record<string, unknown> }): Promise<void> {
+    if (ctx.patch.isVirtual === undefined && ctx.patch.footprintTags === undefined) {
+        return;
+    }
+
+    const current = await ctx.tx.room.findFirst({
+        where: { id: ctx.id, tenantId: ctx.tenantId },
+        select: { isVirtual: true, footprintTags: true },
+    });
+
+    if (!current) {
+        return;
+    }
+
+    refuseVirtualFootprint(
+        ctx.patch.isVirtual === undefined ? current.isVirtual : ctx.patch.isVirtual === true,
+        Array.isArray(ctx.patch.footprintTags) ? (ctx.patch.footprintTags as string[]) : current.footprintTags,
+    );
+}
+
 export const RESOURCES: Record<string, ResourceConfig> = {
     persons: {
         model: 'person',
@@ -666,6 +720,7 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             isVirtual: z.boolean().optional(),
             // Issue #121: a lab/computer room to keep free for teaching that needs it.
             isSpecialized: z.boolean().optional(),
+            footprintTags: footprintTagsSchema,
             isActive: z.boolean().optional(),
         }),
         update: z.object({
@@ -677,8 +732,11 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             isVirtual: z.boolean().optional(),
             // Issue #121: a lab/computer room to keep free for teaching that needs it.
             isSpecialized: z.boolean().optional(),
+            footprintTags: footprintTagsSchema,
             isActive: z.boolean().optional(),
         }),
+        beforeCreate: roomBeforeCreate,
+        beforeUpdate: roomBeforeUpdate,
         filters: z.object({
             isVirtual: z.coerce.boolean().optional(),
             isActive: z.coerce.boolean().optional(),

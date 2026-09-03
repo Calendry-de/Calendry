@@ -3223,6 +3223,53 @@ backfill:constraints -- --all-missing` so tenants can enable them.
 
 ---
 
+# Shared footprints: `Room.footprintTags` (issue #122)
+
+Three rooms behind movable walls are one room with the walls open. Booking
+1.0 must make 1.1, 1.2 AND the Audimax unbookable for that slot, and
+booking the Audimax must block all three. `no_double_booking_room` could not
+say it: it is a property of one Room against itself across time, never a
+relationship between Rooms. The solver half shipped as `Room.footprint_tags`
+(proto 0.17.0, solver `df7d88d`, ADR-0022's third addendum) and this app sent
+`footprintTags: []` with a comment calling it a tracked gap. Now a column.
+
+## A tag, not a reference, and expanded on the query side
+
+The proto's shape is an open-vocabulary tag shared between the parts and the
+whole, which makes the relation SYMMETRIC by construction ("A blocks B" and
+"B blocks A" cannot drift) and lets a Room carry several, one per wall it
+shares. A tag only one Room carries is inert, so a half-entered
+configuration does not fail a run. The thing not to undo lives solver-side
+and is restated here because the app's comment is where a reader lands
+first: the footprint is expanded in `is_free`, never in `mark`, so overlap
+is not transitive; with `1.0 | wall | 1.1 | wall | 1.2` booking 1.0 blocks
+1.1 and the hall, not 1.2.
+
+## The virtual-room refusal moved to the write
+
+The solver REFUSES a footprint tag on a virtual Room at conversion (a
+virtual room has no physical footprint), which would surface as a failed run
+long after the save. Two guards now refuse it at the write instead: a DB
+CHECK `room_virtual_has_no_footprint` as the backstop, and `roomBeforeCreate`
+/ `roomBeforeUpdate` hooks answering 422 with `field: 'footprintTags'` so
+the form can point at the control. The update hook merges the patch onto the
+stored row because a PATCH may carry either half of the pair alone; a zod
+`.refine()` on the create schema was tried and dropped, since
+`tests/openapi-route-meta.test.ts` introspects `.shape`, which a
+`ZodEffects` does not have. The write also trims and deduplicates, so
+"Audimax" and "Audimax " cannot silently be two footprints.
+
+## A generic `tags` field type
+
+The manage form had no list-valued control. Rather than a bespoke Room
+form, `FieldType` gains `'tags'`: one text control, comma-separated, parsed
+to `string[]` on CHANGE (not on input, so typing a comma does not split the
+value under the cursor), rendered joined in read-only mode. Open vocabulary
+by design: hardcoding a tenant's building layout would push it into the
+schema, the same reason `feature_tags` and `site` are tags.
+
+---
+
 # Specialized rooms: `Room.isSpecialized` and `minimize_specialized_room_use` (issue #121)
 
 Room eligibility is a SUPERSET filter: an Offering requiring no features is

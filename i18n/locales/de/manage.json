@@ -90,6 +90,11 @@
             "isVirtual": {
                 "label": "Virtuell"
             },
+            "footprintTags": {
+                "label": "Gemeinsame Grundfläche",
+                "help": "Räume mit demselben Kürzel belegen dieselbe Fläche, etwa drei Räume hinter Trennwänden und der Saal, den sie bei geöffneten Wänden bilden. Wird einer gebucht, sind die anderen in diesem Slot gesperrt. Ein Kürzel pro gemeinsamer Wand, durch Komma getrennt; ein Kürzel, das nur ein Raum trägt, bewirkt nichts. Ein virtueller Raum hat keine Grundfläche.",
+                "placeholder": "z. B. audimax"
+            },
             "isSpecialized": {
                 "label": "Fachraum",
                 "help": "Ein Labor, Computerraum oder eine Werkstatt, die für Unterricht frei bleiben soll, der ihre Ausstattung braucht. Nur die Regel „Fachräume freihalten“ liest dies, und sie berechnet nichts für Unterricht, der eine Ausstattung dieses Raums benötigt. Unabhängig vom Rang: Ein Raum kann hochwertig, Fachraum, beides oder keines sein."

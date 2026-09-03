@@ -930,6 +930,14 @@ model Room {
   /// `MinimizeRoomRank.invert` reads the other way round.
   isSpecialized Boolean @default(false) @map("is_specialized")
 
+  /// Shared physical footprints (issue #122): Rooms carrying the same tag
+  /// occupy one space (three rooms behind movable walls and the hall they
+  /// form), so booking one blocks the others for that slot. Open vocabulary,
+  /// symmetric by construction, a tag only one Room carries is inert. Sent
+  /// verbatim as `Room.footprint_tags`. A virtual Room may carry none: the
+  /// solver refuses it at conversion, so a CHECK refuses it at the write.
+  footprintTags String[] @default([]) @map("footprint_tags")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
