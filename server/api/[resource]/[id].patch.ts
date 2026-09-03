@@ -122,12 +122,6 @@ defineRouteMeta({
                                         type: 'boolean',
                                         description: 'A lab, computer room or workshop to keep free for teaching that needs its features; priced by the minimize_specialized_room_use constraint only. Separate from ranking.',
                                     },
-                                    footprintTags: {
-                                        type: 'array',
-                                        maxItems: 8,
-                                        items: { type: 'string' },
-                                        description: 'Rooms sharing a tag share one physical footprint (movable walls): booking one blocks the others for that slot. Open vocabulary; a tag only one room carries is inert. A virtual room may carry none.',
-                                    },
                                     isActive: {
                                         type: 'boolean',
                                     },

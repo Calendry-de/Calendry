@@ -118,12 +118,12 @@
         "myApiTokens": {
             "label": "API tokens",
             "description": "Mint a bearer token for a script, scoped to permissions you already hold.",
-            "keywords": "api, token, skript, automatisierung, schnittstelle, schlüssel"
+            "keywords": "api, token, script, automation, interface, key"
         },
         "myDataExport": {
             "label": "Export my data",
             "description": "Download everything this institution holds about you.",
-            "keywords": "export, download, dsgvo, daten, auskunftsrecht, kopie"
+            "keywords": "export, download, gdpr, data, right to access, copy"
         }
     },
     "shell": {

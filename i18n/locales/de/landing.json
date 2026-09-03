@@ -1,7 +1,7 @@
 {
     "meta": {
         "title": "Software für die Stundenplanung an Schulen und Hochschulen",
-        "description": "Calendry platziert ein ganzes Semester in etwa 350 Millisekunden und legt Ihnen den Vorschlag zur Entscheidung vor. Räume, Klassen, Personal und Kurse an einem Ort, für Schulen und Hochschulen."
+        "description": "Calendry platziert ein ganzes Semester in etwa 350 Millisekunden und legt Ihnen den Vorschlag zur Entscheidung vor. Räume, Klassen, Personal und Lehrveranstaltungen an einem Ort, für Schulen und Hochschulen."
     },
     "action": {
         "getInTouch": "Kontakt aufnehmen",
@@ -11,9 +11,9 @@
     },
     "hero": {
         "statusLabel": "In aktiver Entwicklung",
-        "lead": "Calendry verwaltet jeden Raum, jede Klasse, jede Lehrkraft und jeden Kurs, aus denen Ihr Semester besteht, und schlägt die Platzierung für alles davon in etwa 350 Millisekunden vor. Nichts erreicht den echten Stundenplan, bevor es jemand anwendet.",
+        "lead": "Calendry verwaltet jeden Raum, jede Klasse, jede Lehrkraft und jede Lehrveranstaltung, aus denen Ihr Semester besteht, und schlägt die Platzierung für alles davon in etwa 350 Millisekunden vor. Nichts erreicht den echten Stundenplan, bevor es jemand anwendet.",
         "titleLineOne": "Ein Solver baut Ihr Semester.",
-        "titleLineTwo": "Ein Mensch gibt es frei.",
+        "titleLineTwo": "Ein Mensch gibt es trotzdem frei.",
         "proof": "Der Quellcode ist öffentlich. Jede Funktion auf dieser Seite ist durch die Integrationstests dieses Repositorys abgedeckt."
     },
     "topbar": {
@@ -68,7 +68,7 @@
         },
         "faq": {
             "title": "Häufige Fragen",
-            "lead": "Die ersten zwei sind die, an denen es scheitert. Sie werden mit einem teilweisen Nein und einem Nein beantwortet."
+            "lead": "Die ersten zwei sind die, an denen ein Verkauf scheitert. Sie werden mit einem teilweisen Nein und einem Nein beantwortet."
         },
         "finalCta": {
             "title": "Bringen Sie uns Ihre schwierigste Woche",
@@ -132,7 +132,7 @@
         },
         "determinism": {
             "title": "Reproduzierbare Läufe",
-            "note": "Gleiche Eingaben und gleicher Startwert ergeben einen bytegleichen Stundenplan, solange der Lauf an seinem Zugbudget endete und nicht an einer Uhr – was der Lauf selbst mitteilt."
+            "note": "Gleiche Eingaben und gleicher Startwert ergeben einen bytegleichen Stundenplan, solange der Lauf an seinem Schritt-Budget endete und nicht an einer Uhr – was der Lauf selbst mitteilt."
         },
         "auth": {
             "title": "Anmeldung und Berechtigungsrollen je Institution",
@@ -146,7 +146,7 @@
     "next": {
         "import": {
             "title": "Import aus CSV und Excel",
-            "note": "Für Institutionen, die mit Tabellen aus vielen Jahren ankommen. Ob die Spaltenzuordnung geführt wird oder eine feste Vorlage vorgibt, ist noch nicht entschieden."
+            "note": "Für Institutionen, die mit Tabellen aus vielen Jahren ankommen. Ob die Spaltenzuordnung geführt wird oder einer festen Vorlage folgt, ist noch nicht entschieden."
         },
         "export": {
             "title": "Ein Kalender-Abo, nicht nur ein Download",
@@ -176,7 +176,7 @@
         },
         "groups": {
             "title": "Verschachtelte Gruppen kollidieren wirklich",
-            "body": "Wer einen Studiengang belegt, blockiert dessen Jahrgänge, und wer einen Jahrgang belegt, blockiert den Studiengang. Die Kollisionsprüfung geht die gesamte Verwandtschaft nach oben und nach unten durch, über eine gepflegte transitive Hülle, statt nur die zwei Namen zu vergleichen, die ihr übergeben wurden."
+            "body": "Ein Termin für einen Studiengang blockiert dessen Jahrgänge, und ein Termin für einen Jahrgang blockiert den Studiengang. Die Kollisionsprüfung geht die gesamte Verwandtschaft nach oben und nach unten durch, über eine gepflegte transitive Hülle, statt nur die zwei Namen zu vergleichen, die ihr übergeben wurden."
         },
         "isolation": {
             "title": "Trennung in der Datenbank, nicht im Code",
@@ -215,10 +215,10 @@
         "messagePlaceholder": "Wie viele Räume, wie viele Klassen, was Sie heute einsetzen …",
         "messageCount": "{used} / {max}",
         "submit": "E-Mail an uns öffnen",
-        "opened": "In Ihrem E-Mail-Programm sollte sich ein Entwurf an {email} geöffnet haben. Ist nichts passiert, ist in Ihrem Browser kein Mail-Programm hinterlegt. Schreiben Sie uns dann bitte direkt.",
-        "asideTitle": "Warum das eine E-Mail ist und kein Registrierungsformular",
-        "asideBody": "Eine Selbstregistrierung gibt es nicht, und Calendry kann noch keine E-Mails verschicken: Der Versand von Benachrichtigungen steht oben auf der Liste, er liegt nicht hinter uns. Ein Formular, das Ihnen ein Häkchen zeigt und Ihre Nachricht nirgendwo ablegt, wäre schlechter, als das offen zu sagen. Deshalb schreibt diese Schaltfläche eine Nachricht in Ihrem eigenen E-Mail-Programm, und Sie senden sie von Ihrem eigenen Konto.",
-        "asideContact": "Oder schreiben Sie an {link}. Konten für eine bestehende Institution legt deren Administration an.",
+        "opened": "In Ihrem E-Mail-Programm sollte sich ein Entwurf an {email} geöffnet haben. Ist nichts passiert, ist in Ihrem Browser kein E-Mail-Programm hinterlegt. Schreiben Sie uns dann bitte direkt.",
+        "asideTitle": "Warum das eine E-Mail ist und kein Formular",
+        "asideBody": "Eine Selbstregistrierung gibt es nicht, und Calendry kann noch keine E-Mails verschicken: Der Versand von Benachrichtigungen steht auf der Liste weiter oben, nicht hinter uns. Ein Formular, das Ihnen ein Häkchen zeigt und Ihre Nachricht nirgendwo ablegt, wäre schlechter, als das offen zu sagen. Deshalb schreibt diese Schaltfläche eine Nachricht in Ihrem eigenen E-Mail-Programm, und Sie senden sie von Ihrem eigenen Konto.",
+        "asideContact": "Oder schreiben Sie an {link}. Zugänge für eine bestehende Institution legt deren Administration an.",
         "error": {
             "name": "Sagen Sie uns, wer Sie sind – sonst hat eine Antwort kein Ziel.",
             "institution": "Um welche Schule oder Hochschule geht es?",
@@ -264,11 +264,11 @@
     "problem": {
         "before": {
             "title": "Was heute schiefgeht",
-            "body": "Das Semester liegt in einer Datei, die genau eine Person gefahrlos bearbeiten kann. Einen doppelt belegten Raum entdeckt die Lehrkraft, die hineinläuft. Die Kollision einer Klasse bleibt unsichtbar, weil die Klasse über vier Reiter verteilt ist, und eine einzige Verschiebung heißt, die anderen neunzig von Hand zu prüfen."
+            "body": "Das Semester liegt in einer Datei, die genau eine Person gefahrlos bearbeiten kann. Einen doppelt belegten Raum entdeckt die Lehrkraft, die hineinläuft. Die Kollision einer Klasse bleibt unsichtbar, weil die Klasse über vier Reiter verteilt ist, und einen Termin zu verschieben heißt, die anderen neunzig von Hand zu prüfen."
         },
         "after": {
             "title": "Was sich ändert",
-            "body": "Das Semester liegt in einem Modell, das bereits weiß, dass ein Studiengang und seine Klassen dieselben Menschen sind. Eine Kollision wird in dem Moment festgehalten, in dem Sie sie erzeugen, und ist nächste Woche noch auffindbar. Verschieben Sie eine Veranstaltung, erfahren Sie, was dadurch bricht; fragen Sie die ganze Woche neu an, kommt sie in etwa vier Sekunden zurück."
+            "body": "Das Semester liegt in einem Modell, das bereits weiß, dass ein Studiengang und seine Jahrgänge dieselben Menschen sind. Eine Kollision wird in dem Moment festgehalten, in dem Sie sie erzeugen, und ist nächste Woche noch auffindbar. Verschieben Sie einen Termin, erfahren Sie, was dadurch bricht; fragen Sie die ganze Woche neu an, kommt sie in etwa vier Sekunden zurück."
         }
     },
     "tagline": {
@@ -277,34 +277,34 @@
     },
     "benefit": {
         "solver": {
-            "title": "Ein Semester, platziert während Sie warten",
-            "body": "27.000 Veranstaltungen in etwa 350 Millisekunden auf einem synthetischen Datensatz in der Größe einer großen Hochschule; das Semester der Entwicklungsdatenbank läuft in etwa vier Sekunden bis zur Konvergenz. Zurück kommt ein Vorschlag, gezeichnet gegen den Plan, den Sie schon haben, mit allem, was er ändern würde, und allem, was er nicht erfüllen konnte. Nichts wird angewendet, bis Sie es anwenden."
+            "title": "Ein Semester, platziert, während Sie warten",
+            "body": "27.000 Termine in etwa 350 Millisekunden auf einem synthetischen Datensatz in der Größe einer großen Hochschule; das Semester der Entwicklungsdatenbank läuft in etwa vier Sekunden bis zur Konvergenz. Zurück kommt ein Vorschlag, abgeglichen mit dem Plan, den Sie schon haben, mit allem, was er ändern würde, und allem, was er nicht erfüllen konnte. Nichts wird angewendet, bis Sie es anwenden."
         },
         "editing": {
             "title": "Eine Änderung, die eine Regel bricht, ist trotzdem erlaubt",
-            "body": "Verschieben Sie eine Veranstaltung, tauschen Sie zwei, oder sperren Sie eine, damit nichts sie berührt. Kollidiert die Änderung mit etwas, lässt Calendry sie zu und hält den Verstoß als Zustand fest, den Sie später nachlesen können. Wer einen Stundenplan bearbeitet, weiß meist etwas, das die Regeln nicht wissen: deshalb blockiert es Sie nicht, und deshalb vergisst es auch nichts."
+            "body": "Verschieben Sie einen Termin, tauschen Sie zwei, oder fixieren Sie einen, damit nichts ihn berührt. Kollidiert die Änderung mit etwas, lässt Calendry sie zu und hält den Verstoß als Zustand fest, den Sie später nachlesen können. Wer einen Stundenplan bearbeitet, weiß meist etwas, das die Regeln nicht wissen: deshalb blockiert es Sie nicht, und deshalb vergisst es auch nichts."
         },
         "model": {
             "title": "Ihre Begriffe bleiben Ihre",
-            "body": "Rollennamen, Veranstaltungsarten und Raumausstattung definieren Sie selbst; es ist keine feste Liste, in die Sie übersetzen müssen. Tage pro Woche, Blöcke pro Tag, Blocklänge und die ungleichen Pausen dazwischen kommen aus Ihrem eigenen Raster. Es gibt keine unterstellte Woche von Montag bis Freitag und nirgends eine Ersatzform."
+            "body": "Rollennamen, Terminarten und Raumausstattung definieren Sie selbst; es ist keine feste Liste, in die Sie übersetzen müssen. Tage pro Woche, Blöcke pro Tag, Blocklänge und die ungleichen Pausen dazwischen kommen aus Ihrem eigenen Raster. Es gibt keine unterstellte Woche von Montag bis Freitag und nirgends eine Ersatzform."
         },
         "people": {
             "title": "Jede Person sieht ihren eigenen Teil",
-            "body": "Die Berechtigungsrollen Ihrer Institution stellen Sie selbst zusammen: wer den Plan lesen darf, wer eine Veranstaltung verschieben darf und wer den Solver starten darf, sind getrennte Fragen. Lehrkräfte geben an, wann sie nicht unterrichten können und welche Tage sie bevorzugen; die Verwaltung nimmt jede Angabe an oder lehnt sie ab."
+            "body": "Die Berechtigungsrollen Ihrer Institution stellen Sie selbst zusammen: wer den Plan lesen darf, wer einen Termin verschieben darf und wer den Solver starten darf, sind getrennte Fragen. Lehrkräfte geben an, wann sie nicht unterrichten können und welche Tage sie bevorzugen; die Verwaltung nimmt jede Angabe an oder lehnt sie ab."
         },
         "isolation": {
             "title": "Keine Institution kann eine andere lesen",
-            "body": "Die Trennung wird von row level security in Postgres selbst durchgesetzt, und die Anwendung verbindet sich mit einer Datenbankrolle, die nichts besitzt. Ein Fehler führt dazu, dass keine Zeilen erscheinen, und das fällt auf, statt dass die Zeilen einer anderen Institution erscheinen, was nicht auffällt."
+            "body": "Die Trennung wird von Row-Level-Security in Postgres selbst durchgesetzt, und die Anwendung verbindet sich mit einer Datenbankrolle, die nichts besitzt. Ein Fehler führt dazu, dass keine Zeilen erscheinen, und das fällt auf, statt dass die Zeilen einer anderen Institution erscheinen, was nicht auffällt."
         }
     },
     "step": {
         "describe": {
             "title": "Beschreiben Sie Ihre Institution einmal",
-            "body": "Räume, Klassen, Personal, Kurse, Semester und Ihre eigene Tagesstruktur, dazu die Auswahl, welche von dreißig Regelarten gelten sollen und wie schwer jede wiegt."
+            "body": "Räume, Klassen, Personal, Lehrveranstaltungen, Semester und Ihre eigene Tagesstruktur, dazu die Auswahl, welche von dreißig Regeltypen gelten sollen und wie schwer jede wiegt."
         },
         "ask": {
             "title": "Fragen Sie einen Stundenplan an",
-            "body": "Starten Sie einen Lauf, sehen Sie ihm zu, brechen Sie ihn ab, wenn Sie es sich anders überlegen. Gleiche Eingaben und gleicher Startwert ergeben denselben Stundenplan, und der Lauf selbst meldet, ob er an seinem Zugbudget endete oder an der Uhr."
+            "body": "Starten Sie einen Lauf, sehen Sie ihm zu, brechen Sie ihn ab, wenn Sie es sich anders überlegen. Gleiche Eingaben und gleicher Startwert ergeben denselben Stundenplan, und der Lauf selbst meldet, ob er an seinem Schritt-Budget endete oder an der Uhr."
         },
         "judge": {
             "title": "Beurteilen Sie den Vorschlag",
@@ -326,7 +326,7 @@
         },
         "decides": {
             "q": "Entscheidet der Solver unseren Stundenplan für uns?",
-            "a": "Nein. Er liefert einen Vorschlag, gezeichnet gegen den Plan, den Sie schon haben, und nichts erreicht den echten Stundenplan, bevor ein Mensch es anwendet. Ein Lauf, der mit noch gebrochenen Regeln endet, wird Ihnen trotzdem angeboten, mit einer Liste der Verstöße, statt als Fehlschlag verworfen zu werden."
+            "a": "Nein. Er liefert einen Vorschlag, abgeglichen mit dem Plan, den Sie schon haben, und nichts erreicht den echten Stundenplan, bevor ein Mensch es anwendet. Ein Lauf, der mit noch gebrochenen Regeln endet, wird Ihnen trotzdem angeboten, mit einer Liste der Verstöße, statt als Fehlschlag verworfen zu werden."
         },
         "breaks": {
             "q": "Was passiert, wenn ein Vorschlag eine unserer Regeln bricht?",
@@ -342,19 +342,19 @@
         },
         "permissions": {
             "q": "Wer sieht was?",
-            "a": "Das entscheiden Sie, pro Institution. Rollen werden in der Oberfläche aus einem festen Katalog von Berechtigungen zusammengestellt, sodass den Plan lesen, eine Veranstaltung verschieben und den Solver starten getrennte Rechte sind. Eine Lehrkraft erreicht ihre eigenen Veranstaltungen und ihre eigenen Angaben und nichts sonst. Ein Konto kann in mehreren Institutionen handeln und wählt bei der Anmeldung, in welcher."
+            "a": "Das entscheiden Sie, pro Institution. Rollen werden in der Oberfläche aus einem festen Katalog von Berechtigungen zusammengestellt, sodass den Plan lesen, einen Termin verschieben und den Solver starten getrennte Rechte sind. Eine Lehrkraft erreicht ihre eigenen Termine und ihre eigenen Angaben und nichts sonst. Ein Zugang kann in mehreren Institutionen handeln und wählt bei der Anmeldung, in welcher."
         },
         "reproducible": {
             "q": "Ergibt dieselbe Anfrage zweimal denselben Stundenplan?",
-            "a": "Ja, solange der Lauf an seinem Zugbudget endete und nicht an der Uhr, und der Lauf meldet, welches von beiden es war. Bei gleichen Eingaben und gleichem Startwert ist das Ergebnis Byte für Byte identisch. Ein Lauf, der wegen eines Zeitlimits abbrach, ist keine vergleichbare Messung, und Calendry stellt ihn auch nicht als eine dar."
+            "a": "Ja, solange der Lauf an seinem Schritt-Budget endete und nicht an der Uhr, und der Lauf meldet, welches von beiden es war. Bei gleichen Eingaben und gleichem Startwert ist das Ergebnis Byte für Byte identisch. Ein Lauf, der wegen eines Zeitlimits abbrach, ist keine vergleichbare Messung, und Calendry stellt ihn auch nicht als eine dar."
         },
         "cost": {
             "q": "Was kostet es?",
-            "a": "Die Grundstufe richtet sich nach Ihrer Zahl an Studierenden, Lehrkräfte werden nach Lehrlast berechnet, mit einem Faktor dafür, wie komplex Ihre Woche ist, und Verwaltungszugänge werden getrennt gezählt, für die wenigen Menschen, die wirklich bearbeiten. Studierende werden nie berechnet. Die Preisseite nennt die Sätze und hat einen Rechner, in den Sie Ihre eigenen Zahlen eintragen können."
+            "a": "Die Grundstufe richtet sich nach Ihrer Zahl an Lernenden, Lehrkräfte werden nach Lehrlast berechnet, mit einem Faktor dafür, wie komplex Ihre Woche ist, und Verwaltungszugänge werden getrennt gezählt, für die wenigen Menschen, die wirklich bearbeiten. Lernende werden nie berechnet. Die Preisseite nennt die Sätze und hat einen Rechner, in den Sie Ihre eigenen Zahlen eintragen können."
         },
         "accounts": {
             "q": "Wie bekommen wir Zugänge?",
-            "a": "Es gibt keine Selbstregistrierung. Die Zugänge einer Institution werden von ihrer Verwaltung angelegt, und deshalb ist die Handlung auf dieser Seite ein Gespräch und kein Formular. Ein Konto kann zu mehreren Institutionen gehören und wählt bei der Anmeldung, in welcher es handelt."
+            "a": "Es gibt keine Selbstregistrierung. Die Zugänge einer Institution werden von ihrer Verwaltung angelegt, und deshalb ist die Handlung auf dieser Seite ein Gespräch und kein Formular. Ein Zugang kann zu mehreren Institutionen gehören und wählt bei der Anmeldung, in welcher es handelt."
         },
         "code": {
             "q": "Können wir den Quellcode lesen, bevor wir uns binden?",

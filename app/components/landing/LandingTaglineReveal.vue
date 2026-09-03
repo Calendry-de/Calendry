@@ -218,8 +218,15 @@ onMounted(() => {
         }
     }
 
+    /*
+     * BALANCED, so a line that wraps splits evenly instead of leaving its
+     * last word alone: at 36px the first line broke as "A timetable is a
+     * hundred small / judgements.", one word on a row of its own. The words
+     * are inline blocks, which `text-wrap: balance` treats as inline content.
+     */
     &_line {
         display: block;
+        text-wrap: balance;
     }
 
     /*

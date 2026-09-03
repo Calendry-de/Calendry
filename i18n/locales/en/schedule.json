@@ -393,7 +393,7 @@
         "compare": "Separately, Calendry's own {rules} structural checks find {count} issue on the live schedule (a different rule set), so the two counts are not a like-for-like difference. | Separately, Calendry's own {rules} structural checks find {count} issues on the live schedule (a different rule set), so the two counts are not a like-for-like difference.",
         "recheckNote": "They re-run after applying.",
         "lockedLabel": "Locked",
-        "lockedValue": "{count} session left exactly as they are | {count} sessions left exactly as they are",
+        "lockedValue": "{count} session left exactly as it is | {count} sessions left exactly as they are",
         "demandShortLabel": "Incomplete answer",
         "demandShortValue": "The solver returned {returned} of the {required} placements this run asked it for, across {count} offering. | The solver returned {returned} of the {required} placements this run asked it for, across {count} offerings.",
         "withheldValue": "{count} existing session is being kept rather than removed: the run said nothing about it, which is not the same as refusing to place it. | {count} existing sessions are being kept rather than removed: the run said nothing about them, which is not the same as refusing to place them.",
@@ -469,6 +469,6 @@
         "noChanges": "no placement changes",
         "replace": "Replace this term's timetable: {changes}.",
         "hardIssues": "{count} hard-rule issue the solver could not resolve will be recorded against the schedule. | {count} hard-rule issues the solver could not resolve will be recorded against the schedule.",
-        "lockedStay": "{count} locked session stay as they are. | {count} locked sessions stay as they are."
+        "lockedStay": "{count} locked session stays as it is. | {count} locked sessions stay as they are."
     }
 }

@@ -25,7 +25,7 @@
         "talk": {
             "title": "Wie Sie zu einer echten Zahl kommen",
             "lead": "Mit den Sätzen oben kommen Sie allein schon recht nah heran. Ein echtes Angebot braucht die Zahl Ihrer Lehrkräfte, deren wöchentliche Last und einen Blick darauf, wie zerstreut der Stundenplan ist – und das ist der Teil, den von außen niemand schätzen kann.",
-            "calloutText": "Konten werden durch die Administration angelegt, hier gibt es also nichts zu registrieren. Beschreiben Sie uns die Form Ihrer Institution, und wir kommen mit einer Zahl zurück.",
+            "calloutText": "Zugänge werden durch die Administration angelegt, hier gibt es also nichts zu registrieren. Beschreiben Sie uns die Form Ihrer Institution, und wir kommen mit einer Zahl zurück.",
             "calloutAction": "Kontakt aufnehmen"
         }
     },
@@ -192,7 +192,7 @@
         },
         "b": {
             "short": "Groß, regelmäßig",
-            "title": "Große Universität, regelmäßiger Stundenplan",
+            "title": "Große Hochschule, regelmäßiger Stundenplan",
             "shape": "{students} Lernende und {lecturers} Lehrkräfte mit klaren, sich wiederholenden Wochenmustern"
         },
         "c": {

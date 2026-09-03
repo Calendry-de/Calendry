@@ -34,9 +34,9 @@
             "unavailable": "Die Sperrzeitanträge konnten nicht gelesen werden."
         },
         "exams": {
-            "label": "Klausuranträge",
-            "sentence": "Keine Klausuranträge warten auf eine Entscheidung | Ein Klausurantrag wartet auf eine Entscheidung | {count} Klausuranträge warten auf eine Entscheidung",
-            "unavailable": "Die Klausuranträge konnten nicht gelesen werden."
+            "label": "Prüfungsanträge",
+            "sentence": "Keine Prüfungsanträge warten auf eine Entscheidung | Ein Prüfungsantrag wartet auf eine Entscheidung | {count} Prüfungsanträge warten auf eine Entscheidung",
+            "unavailable": "Die Prüfungsanträge konnten nicht gelesen werden."
         }
     },
     "term": {

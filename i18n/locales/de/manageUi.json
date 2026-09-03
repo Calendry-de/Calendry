@@ -2,7 +2,7 @@
     "accessRoleForm": {
         "clearAll": "Keine",
         "emptyWarning": "Eine Berechtigungsrolle, die nichts enthält, tut nichts: Sie wird jemandem zugewiesen, der dann nicht handeln kann, ohne dass auf dem Bildschirm der Grund erkennbar wäre. Wählen Sie mindestens eine Berechtigung aus.",
-        "fixedNote": "Berechtigungen sind fest vorgegeben: Sie sind Code, eine je Aktion, die die Software umsetzt. Eine Institution stellt sie zu Berechtigungsrollen zusammen; erfinden kann sie keine.",
+        "fixedNote": "Berechtigungen sind fest vorgegeben; sie sind Code, eine je Aktion, die die Software umsetzt. Eine Institution stellt sie zu Berechtigungsrollen zusammen; erfinden kann sie keine.",
         "grantedCount": "{count} von {total} erteilt.",
         "legend": "Berechtigungen",
         "nameClash": "‚{key}‘ wird in dieser Institution bereits als „{name}“ angezeigt. Das ist nicht gesperrt, aber zwei Berechtigungsrollen, die in einer Auswahlliste identisch aussehen, führen dazu, dass die falsche zugewiesen wird.",
@@ -12,10 +12,10 @@
     "accountForm": {
         "activeSessions": "Aktive Anmeldungen",
         "actsAsLabel": "Handelt als",
-        "attachBody": "Es kann {person} zugeordnet werden, anstatt einen zweiten anzulegen. Die Anmeldung erfolgt dann mit dem bereits vorhandenen Passwort, das diese Institution nie sieht; und weil der Zugang danach gemeinsam genutzt wird, könnten Adresse, Aktivierung und Passwort hier nicht mehr geändert werden.",
+        "attachBody": "Er kann {person} zugeordnet werden, anstatt einen zweiten anzulegen. Die Anmeldung erfolgt dann mit dem bereits vorhandenen Passwort, das diese Institution nie sieht; und weil der Zugang danach gemeinsam genutzt wird, könnten Adresse, Aktivierung und Passwort hier nicht mehr geändert werden.",
         "attachConfirm": "Den vorhandenen Zugang zuordnen, statt einen neuen anzulegen",
         "attachHead": "Zu dieser Adresse gibt es bereits einen Zugang.",
-        "attachPrompt": "Klicken Sie erneut auf „Anlegen“, um es zuzuordnen.",
+        "attachPrompt": "Klicken Sie erneut auf „Anlegen“, um ihn zuzuordnen.",
         "candidateLimit": "Es werden die ersten {limit} Personen ohne Zugang angezeigt; es gibt weitere. Solange diese Auswahl nicht suchen kann, legen Sie den Zugang im Terminal an: {command}",
         "choosePerson": "Person auswählen",
         "copied": "Kopiert",
@@ -30,7 +30,7 @@
         "issuedNote": "Wird nur einmal angezeigt. Bei der nächsten Anmeldung wird die Person aufgefordert, ein eigenes Passwort zu wählen.",
         "lastSignIn": "Letzte Anmeldung",
         "lastUsed": "Zuletzt verwendet",
-        "noCandidates": "Alle in dieser Institution haben bereits einen Zugang, oder es ist noch niemand erfasst. Legen Sie zuerst unter „Personen“ eine Person an, denn einen Zugang muss als Person handeln.",
+        "noCandidates": "Alle in dieser Institution haben bereits einen Zugang, oder es ist noch niemand erfasst. Legen Sie zuerst unter „Personen“ eine Person an, denn ein Zugang muss als Person handeln.",
         "noSessionsRevoked": "Es gab keine aktiven Anmeldungen, die widerrufen werden konnten.",
         "noTokens": "Keine API-Tokens.",
         "opFailed": "Das konnte nicht ausgeführt werden.",
@@ -42,7 +42,7 @@
         "revoke": "Widerrufen",
         "revoking": "Wird widerrufen …",
         "sessionsRevoked": "{count} Anmeldung widerrufen. Der Zugang funktioniert weiter: Die Person kann sich mit ihrem eigenen Passwort erneut anmelden. | {count} Anmeldungen widerrufen. Der Zugang funktioniert weiter: Die Person kann sich mit ihrem eigenen Passwort erneut anmelden.",
-        "sharedNote": "Dieser Zugang wird außerdem in {count} weiterer Institution verwendet. Adresse, Aktivierung und Passwort gehören allen gemeinsam, daher kann diese Institution hier nur ändern, als wen es handelt. Ein Entfernen aus dieser Institution löst nur diese Zuordnung; anderswo funktioniert es weiter. | Dieser Zugang wird außerdem in {count} weiteren Institutionen verwendet. Adresse, Aktivierung und Passwort gehören allen gemeinsam, daher kann diese Institution hier nur ändern, als wen es handelt. Ein Entfernen aus dieser Institution löst nur diese Zuordnung; anderswo funktioniert es weiter.",
+        "sharedNote": "Dieser Zugang wird außerdem in {count} weiterer Institution verwendet. Adresse, Aktivierung und Passwort gehören allen gemeinsam, daher kann diese Institution hier nur ändern, als wen er handelt. Ein Entfernen aus dieser Institution löst nur diese Zuordnung; anderswo funktioniert er weiter. | Dieser Zugang wird außerdem in {count} weiteren Institutionen verwendet. Adresse, Aktivierung und Passwort gehören allen gemeinsam, daher kann diese Institution hier nur ändern, als wen er handelt. Ein Entfernen aus dieser Institution löst nur diese Zuordnung; anderswo funktioniert er weiter.",
         "signOutEverywhere": "Überall abmelden",
         "tokensTitle": "API-Tokens"
     },
@@ -89,7 +89,7 @@
     },
     "constraintBuilder": {
         "chooseRule": "Regel wählen …",
-        "derivedEmpty": "Noch keine Terminart ist als {type} eingestuft, daher hat diese Regel nichts, worauf sie zutrifft, und wird nicht an die Planung übergeben. Sobald die Art einer Terminart auf {type} gesetzt ist, greift sie.",
+        "derivedEmpty": "Noch keine Terminart ist als {type} eingestuft, daher hat diese Regel nichts, worauf sie zutrifft, und wird nicht an die Planung übergeben. Sobald der Typ einer Terminart auf {type} gesetzt ist, greift sie.",
         "derivedKinds": "Jede als {type} eingestufte Terminart: {kinds}.",
         "everyGrid": "Jedes Zeitraster",
         "gridRelativeWarning": "Diese Regel zählt Blöcke oder die Lücken zwischen ihnen, und Ihre Zeitraster sind sich nicht einig, was ein Block ist. Bleibt sie auf jedem Zeitraster, wendet sie auf beide dieselben Zahlen an.",
@@ -273,7 +273,7 @@
         "title": "Lehrveranstaltungen in diesem Lehrplan"
     },
     "personForm": {
-        "exportHint": "Alles, was Calendry über {person} speichert: Profil, Rollen, Gruppenmitgliedschaften, Termine, Sperrzeiten, Wünsche, Prüfungsanträge, API-Tokens, Kalender-Abos und die eigene Audit-Spur. Ein Auskunftsersuchen nach DSGVO.",
+        "exportHint": "Alles, was Calendry über {person} speichert: Profil, Rollen, Gruppenmitgliedschaften, Termine, Sperrzeiten, Wünsche, Prüfungsanträge, API-Tokens, Kalender-Abos und das eigene Audit-Protokoll. Ein Auskunftsersuchen nach DSGVO.",
         "exportTitle": "Datenexport",
         "thisPerson": "diese Person"
     },

@@ -51,6 +51,15 @@ import {
  */
 
 /** Everything narrowed or dropped on the way to the wire. Returned, never swallowed. */
+/**
+ * The wire tag for one footprint pair: the two Room ids in a fixed order,
+ * joined by a character neither can contain (ids are uuids). Fixed order is
+ * what makes the tag identical when derived from either Room's own row.
+ */
+export function footprintTag(roomId: string, otherRoomId: string): string {
+    return [roomId, otherRoomId].sort().join('|');
+}
+
 export interface AssemblyReport {
     /** Federation-shared Rooms now sent to the solver (Stage 7b). */
     includedFederationRooms: number;
@@ -883,7 +892,12 @@ export async function assembleSolverInput(
                 { tenantId: null, federationId: { not: null } },
             ],
         },
-        include: { roomEquipment: { include: { equipment: true } } },
+        include: {
+            roomEquipment: { include: { equipment: true } },
+            // Issue #122: the Rooms this one is the same physical space as.
+            // Mirrored by trigger, so this side alone is the complete set.
+            footprints: { select: { otherRoomId: true } },
+        },
     });
     const personRows = await tx.person.findMany({
         where: { tenantId: options.tenantId, isActive: true },
@@ -1038,14 +1052,20 @@ export async function assembleSolverInput(
         isSpecialized: room.isSpecialized,
         /*
          * SHARED PHYSICAL FOOTPRINTS (issue #122; proto 0.17.0, solver
-         * ADR-0022's third addendum). Rooms carrying the same tag occupy one
-         * space; the solver expands the footprint on the QUERY side of its
-         * occupancy check, never on mark, so overlap stays non-transitive.
-         * Sent verbatim: a tag only one Room carries is inert, and a virtual
-         * Room never carries one (the DB CHECK refuses it at the write, where
-         * the solver would otherwise refuse it at conversion).
+         * ADR-0022's third addendum). The proto speaks TAGS: Rooms carrying
+         * the same tag occupy one space, expanded on the QUERY side of the
+         * solver's occupancy check, never on mark, so overlap is not
+         * transitive. The app stores PAIRS (`room_footprint`), so each pair
+         * becomes one tag carried by exactly its two Rooms: the hall pairs
+         * with each part and the parts not with each other, and the wire says
+         * precisely that. The tag is the two ids in a fixed order, so both
+         * ends derive the same string without consulting each other. A pair
+         * whose other Room is not in this run (inactive) yields a tag only
+         * one sent Room carries, which the solver documents as inert. Virtual
+         * Rooms never appear: the write refuses them and a trigger backstops
+         * it, where the solver would otherwise refuse the run at conversion.
          */
-        footprintTags: room.footprintTags,
+        footprintTags: room.footprints.map((pair) => footprintTag(room.id, pair.otherRoomId)),
     }));
 
     /**

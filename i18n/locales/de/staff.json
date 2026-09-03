@@ -16,7 +16,7 @@
             "locale": "Standard-Gebietsschema"
         },
         "eraseAction": "Unwiderruflich löschen …",
-        "eraseWarning": "Damit werden jede Person, jeder Zugang, jede Gruppe, jeder Raum, jede Lehrveranstaltung, jeder Termin, jede Regel und jeder Eintrag der Audit-Spur von „{slug}“ gelöscht – sofort und endgültig, ohne Weg zurück. Geben Sie zur Bestätigung den Slug ein.",
+        "eraseWarning": "Damit werden jede Person, jeder Zugang, jede Gruppe, jeder Raum, jede Lehrveranstaltung, jeder Termin, jede Regel und jeder Eintrag im Prüfprotokoll von „{slug}“ gelöscht, sofort und endgültig. Geben Sie zur Bestätigung den Slug ein.",
         "confirmSlugLabel": "Slug bestätigen",
         "erasePermanently": "„{slug}“ endgültig löschen",
         "erasingBusy": "Wird gelöscht …",
@@ -32,9 +32,9 @@
         "localeSaved": "Standard-Gebietsschema für „{slug}“ auf {locale} gesetzt.",
         "localeCleared": "Standard-Gebietsschema für „{slug}“ entfernt.",
         "localeError": "Das Standard-Gebietsschema für „{slug}“ konnte nicht geändert werden.",
-        "lead": "Jede Institution dieser Installation. Verbund und Standard-Locale werden in der Zeile gespeichert; das Löschen verlangt zuerst das Kürzel zurück.",
+        "lead": "Jede Institution dieser Installation. Verbund und Standard-Gebietsschema werden in der Zeile gespeichert; das Löschen verlangt zuerst den Slug zurück.",
         "count": "{count} Institution | {count} Institutionen",
-        "federationAriaLabel": "Verbund für '{slug}'"
+        "federationAriaLabel": "Verbund für „{slug}“"
     },
     "federations": {
         "heading": "Verbünde",
@@ -69,7 +69,7 @@
     },
     "login": {
         "pageTitle": "Betreiber-Anmeldung",
-        "lead": "Interne Anmeldung. Diese Zugangsdaten sind eigene und nicht die eines Zugangs zu einer Institution.",
+        "lead": "Interne Anmeldung. Dies sind eigene Zugangsdaten, getrennt vom Zugang zu einer Institution.",
         "passwordChanged": "Passwort geändert. Melden Sie sich mit Ihrem neuen Passwort an.",
         "emailPlaceholder": "E-Mail",
         "passwordPlaceholder": "Passwort",
@@ -111,7 +111,7 @@
         "erasedTenant": "(gelöschte Institution)",
         "detailToggle": "Details anzeigen",
         "actorPersonId": "Personen-ID des Akteurs",
-        "actorAccountId": "Konto-ID des Akteurs",
+        "actorAccountId": "Zugangs-ID des Akteurs",
         "pagerLabel": "Seiten des Prüfprotokolls",
         "newer": "Neuer",
         "older": "Älter",

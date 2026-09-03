@@ -90,17 +90,17 @@
             "isVirtual": {
                 "label": "Virtuell"
             },
-            "footprintTags": {
-                "label": "Gemeinsame Grundfläche",
-                "help": "Räume mit demselben Kürzel belegen dieselbe Fläche, etwa drei Räume hinter Trennwänden und der Saal, den sie bei geöffneten Wänden bilden. Wird einer gebucht, sind die anderen in diesem Slot gesperrt. Ein Kürzel pro gemeinsamer Wand, durch Komma getrennt; ein Kürzel, das nur ein Raum trägt, bewirkt nichts. Ein virtueller Raum hat keine Grundfläche.",
-                "placeholder": "z. B. audimax"
-            },
             "isSpecialized": {
                 "label": "Fachraum",
                 "help": "Ein Labor, Computerraum oder eine Werkstatt, die für Unterricht frei bleiben soll, der ihre Ausstattung braucht. Nur die Regel „Fachräume freihalten“ liest dies, und sie berechnet nichts für Unterricht, der eine Ausstattung dieses Raums benötigt. Unabhängig vom Rang: Ein Raum kann hochwertig, Fachraum, beides oder keines sein."
             }
         },
         "relation": {
+            "footprint": {
+                "label": "Teilt sich die Grundfläche mit",
+                "help": "Räume, die dieselbe Fläche sind wie dieser, etwa der Saal, den drei Räume bei geöffneten Trennwänden bilden, oder die abtrennbare Hälfte eines Labors. Wird einer gebucht, ist der andere in diesem Zeitfenster gesperrt. Von beiden Seiten pflegbar: den Saal mit seinen drei Teilen zu speichern ist dasselbe wie jeden Teil mit dem Saal. Die Teile sperren einander nur, wenn Sie auch sie miteinander verbinden. Ein virtueller Raum hat keine Grundfläche.",
+                "emptyHint": "Es sind noch keine weiteren Räume definiert."
+            },
             "equipment": {
                 "label": "Ausstattung in diesem Raum",
                 "help": "Was dieser Raum bietet. Lehrveranstaltungen, die eine Ausstattung benötigen, können nur hier stattfinden, und eine Stückzahl ist der Wert, an dem eine Lehrveranstaltung mit Mindestanforderung gemessen wird. Ohne Stückzahl sagt dieser Raum nur aus, dass die Ausstattung vorhanden ist.",
@@ -222,7 +222,7 @@
             },
             "requiresLecturer": {
                 "label": "Braucht Lehrkraft",
-                "help": "Aus für Arten wie selbstständiges Lernen, bei denen ein Angebot ohne zugeordnete Person korrekt ist statt unbesetzt. Standardmäßig an: Ein Angebot einer Art, die eine Lehrkraft braucht und niemandem zugeordnet ist, wird beim nächsten Solver-Lauf gemeldet."
+                "help": "Aus für Arten wie selbstständiges Lernen, bei denen eine Lehrveranstaltung ohne zugeordnete Person korrekt ist statt unbesetzt. Standardmäßig an: Eine Lehrveranstaltung einer Art, die eine Lehrkraft braucht und der niemand zugeordnet ist, wird beim nächsten Planungslauf gemeldet."
             }
         }
     },
@@ -244,11 +244,11 @@
                 "label": "Titel"
             },
             "color": {
-                "help": "Färbt jeden Termin dieser Lehrveranstaltung ein. Leer lassen, um die Farbe der Terminart zu übernehmen: leer bedeutet übernehmen, nicht grau."
+                "help": "Färbt jeden Termin dieser Lehrveranstaltung ein. Leer lassen, um die Farbe der Terminart zu übernehmen: Leer bedeutet übernehmen, nicht grau."
             },
             "termId": {
                 "label": "Semester",
-                "emptyHint": "Legen Sie zuerst ein Semester an: eine Lehrveranstaltung muss zu einem gehören."
+                "emptyHint": "Legen Sie zuerst ein Semester an: Eine Lehrveranstaltung muss zu einem gehören."
             },
             "kindId": {
                 "label": "Art",
@@ -264,7 +264,7 @@
             },
             "schedulingPattern": {
                 "label": "Wie sich die Termine verteilen",
-                "help": "Ein wöchentliches Zeitfenster über das ganze Semester oder die gesamte Veranstaltung in einem kurzen Block. Beides wird festgehalten; auf den Stundenplan wirkt es erst, wenn die Administration die passende Regel aktiviert.",
+                "help": "Ein wöchentliches Zeitfenster über das ganze Semester oder die gesamte Lehrveranstaltung in einem kurzen Block. Beides wird festgehalten; auf den Stundenplan wirkt es erst, wenn die Administration die passende Regel aktiviert.",
                 "option": {
                     "notDecided": "Nicht festgelegt",
                     "distributed": "Über das Semester verteilt",
@@ -273,23 +273,23 @@
             },
             "requiredRoleId": {
                 "label": "Erforderliche Rolle",
-                "help": "Planungsrolle, die eine Lehrkraft haben muss, um diese Veranstaltung zu leiten. Ohne Angabe ist sie unerheblich.",
+                "help": "Planungsrolle, die eine Lehrkraft haben muss, um diese Lehrveranstaltung zu leiten. Ohne Angabe ist sie unerheblich.",
                 "emptyHint": "Es sind noch keine Rollen definiert."
             },
             "requiredLecturerCount": {
                 "label": "Gleichzeitig benötigte Lehrkräfte",
-                "help": "Leer lassen, um genau eine zu verlangen, die der Solver aus „Wer leitet sie“ weiter unten auswählt. Höher nur bei echtem Teamteaching: die Liste darunter ist ein Kandidatenpool, keine garantierte Besetzung."
+                "help": "Leer lassen, um genau eine zu verlangen, die der Solver aus „Wer leitet sie“ weiter unten auswählt. Höher nur bei echtem Teamteaching: Die Liste darunter ist ein Kandidatenpool, keine garantierte Besetzung."
             },
             "requiredRoomCount": {
                 "label": "Gleichzeitig benötigte Räume",
-                "help": "Für fast alles genau einer. Über eins belegt ein Termin entsprechend viele Räume gleichzeitig und ihre Kapazitäten werden ADDIERT: 120 Studierende passen in zwei Säle mit je 60 Plätzen. Nutzen Sie das für einen Jahrgang, der in keinen einzelnen Raum passt, nicht für ein Praktikum, bei dem jeder Raum alle aufnehmen muss. Höchstens {max}."
+                "help": "Für fast alles genau einer. Über eins belegt ein Termin entsprechend viele Räume gleichzeitig und ihre Kapazitäten werden ADDIERT: 120 Lernende passen in zwei Säle mit je 60 Plätzen. Nutzen Sie das für einen Jahrgang, der in keinen einzelnen Raum passt, nicht für ein Praktikum, bei dem jeder Raum alle aufnehmen muss. Höchstens {max}."
             },
             "requiredCapacity": {
                 "label": "Erforderliche Raumkapazität",
                 "help": "Ohne Angabe wird sie aus den zugeordneten Gruppen abgeleitet. Verglichen wird mit der SUMME der Kapazitäten, wenn mehr als ein Raum gleichzeitig benötigt wird.",
                 "derived": {
-                    "noGroups": "Keine Gruppen zugeordnet, daher lässt sich nichts ableiten: jeder Raum käme infrage.",
-                    "noSize": "Die zugeordneten Gruppen haben weder Mitglieder noch eine erwartete Größe, daher lässt sich nichts ableiten: jeder Raum käme infrage.",
+                    "noGroups": "Keine Gruppen zugeordnet, daher lässt sich nichts ableiten: Jeder Raum käme infrage.",
+                    "noSize": "Die zugeordneten Gruppen haben weder Mitglieder noch eine erwartete Größe, daher lässt sich nichts ableiten: Jeder Raum käme infrage.",
                     "basisMembership": "{count} eingeschriebene Person | {count} eingeschriebene Personen",
                     "basisExpected": "erwartete Größen",
                     "line": "Wenn leer gelassen: {capacity}, aus {count} zugeordneter Gruppe ({source}). | Wenn leer gelassen: {capacity}, aus {count} zugeordneten Gruppen ({source}).",
@@ -298,7 +298,7 @@
             },
             "onlineMode": {
                 "label": "Online-Durchführung",
-                "help": "Online-Lehre ist ein virtueller Raum, kein Merkmal am Termin. „Nur online“ beschränkt die Platzierung auf die virtuellen Räume und wird mit der Raumliste unten geschnitten, falls eine gesetzt ist; außerdem werden die Online-Regeln (Online/Präsenz am selben Tag, maximaler Online-Anteil, gleichzeitige Online-Termine) dadurch deutlich schwerer erfüllbar.",
+                "help": "Online-Durchführung ist ein virtueller Raum, kein Merkmal am Termin. „Nur online“ beschränkt die Platzierung auf die virtuellen Räume und wird mit der Raumliste unten geschnitten, falls eine gesetzt ist; außerdem werden die Online-Regeln (Online/Präsenz am selben Tag, maximaler Online-Anteil, gleichzeitige Online-Termine) dadurch deutlich schwerer erfüllbar.",
                 "option": {
                     "forbidden": "Nur in Präsenz",
                     "allowed": "Darf online stattfinden",
@@ -334,7 +334,7 @@
             },
             "rooms": {
                 "label": "Nur diese Räume",
-                "help": "Beschränkt die Platzierung auf genau diese Räume; leer lassen für jeden geeigneten Raum. Das ist keine Präferenz: die Liste wird mit den Anforderungen an Kapazität, Ausstattung und Online-Durchführung kombiniert, eine zu enge Auswahl lässt der Lehrveranstaltung also keinen Platz mehr.",
+                "help": "Beschränkt die Platzierung auf genau diese Räume; leer lassen für jeden geeigneten Raum. Das ist keine Präferenz: Die Liste wird mit den Anforderungen an Kapazität, Ausstattung und Online-Durchführung kombiniert, eine zu enge Auswahl lässt der Lehrveranstaltung also keinen Platz mehr.",
                 "emptyHint": "Es sind noch keine Räume definiert."
             }
         }
@@ -406,8 +406,8 @@
         "relation": {
             "lecturers": {
                 "label": "Wer leitet sie",
-                "help": "Namentlich benannte Personen, die diese Vorlage auf jedes daraus erstellte Angebot überträgt, in der Größe von „Gleichzeitig benötigte Lehrkräfte“ weiter oben. Optional können Sie angeben, welche Planungsrolle jede Person ausfüllt. Wird nur beim Anwenden einmalig kopiert — eine spätere Änderung dieser Liste besetzt bereits erstellte Angebote nicht nachträglich neu.",
-                "emptyHint": "Es sind noch keine Personen definiert. Ein aus dieser Vorlage erstelltes Angebot hätte einen leeren Lehrkräfte-Pool.",
+                "help": "Namentlich benannte Personen, die diese Vorlage auf jede daraus erstellte Lehrveranstaltung überträgt, in der Größe von „Gleichzeitig benötigte Lehrkräfte“ weiter oben. Optional können Sie angeben, welche Planungsrolle jede Person ausfüllt. Wird nur beim Anwenden einmalig kopiert: Eine spätere Änderung dieser Liste besetzt bereits erstellte Lehrveranstaltungen nicht nachträglich neu.",
+                "emptyHint": "Es sind noch keine Personen definiert. Eine aus dieser Vorlage erstellte Lehrveranstaltung hat einen leeren Lehrkräfte-Pool.",
                 "rolePlaceholder": "Beliebige Rolle"
             }
         }
@@ -415,12 +415,12 @@
     "offeringPlan": {
         "label": "Lehrplan",
         "plural": "Lehrpläne",
-        "description": "Das gesamte Lehrangebot eines Jahrgangs, gebündelt: auf eine Gruppe angewendet, entstehen alle Lehrveranstaltungen auf einmal.",
+        "description": "Das gesamte Lehrangebot eines Jahrgangs, gebündelt: Auf eine Gruppe angewendet, entstehen alle Lehrveranstaltungen auf einmal.",
         "keywords": "Lehrplan, Lehrpläne, Curriculum, Jahrgang, Kohorte, Bündel, Vorlage, Stundenumfang",
         "field": {
             "nextPlanId": {
                 "label": "Nachfolgender Lehrplan",
-                "help": "Wohin eine Gruppe mit diesem Lehrplan als Nächstes wechselt: „Semester 3“ benennt „Semester 4“. Damit rückt eine Gruppe ohne Auswahlfeld vor: als Semester gilt standardmäßig das nächste beginnende.",
+                "help": "Wohin eine Gruppe mit diesem Lehrplan als Nächstes wechselt: „Semester 3“ benennt „Semester 4“. Damit rückt eine Gruppe ohne Auswahlfeld vor: Als Semester gilt standardmäßig das nächste beginnende.",
                 "emptyHint": "Es gibt noch keinen anderen Lehrplan, auf den verwiesen werden könnte."
             }
         }
@@ -492,7 +492,7 @@
             },
             "groupIds": {
                 "label": "Angezeigte Gruppen",
-                "emptyHint": "Noch keine Gruppen festgelegt."
+                "emptyHint": "Es sind noch keine Gruppen definiert."
             },
             "planStartMinute": {
                 "label": "Plan beginnt um"
@@ -538,12 +538,12 @@
         "field": {
             "termId": {
                 "label": "Semester",
-                "help": "In welches Semester dieser Zeitraum fällt. Nachträglich nicht änderbar: einen Zeitraum in ein anderes Semester zu verschieben heißt, einen anderen Zeitraum anzulegen.",
+                "help": "In welches Semester dieser Zeitraum fällt. Nachträglich nicht änderbar: Einen Zeitraum in ein anderes Semester zu verschieben heißt, einen anderen Zeitraum anzulegen.",
                 "emptyHint": "Es sind noch keine Semester eingerichtet."
             },
             "kind": {
                 "label": "Art",
-                "help": "Ein Zeitraum vom Typ EXAM beansprucht jede Woche, die er berührt. BREAK oder HOLIDAY beanspruchen eine Woche nur, wenn sie sie vollständig abdecken.",
+                "help": "Ein Prüfungszeitraum beansprucht jede Woche, die er berührt. Unterrichtsfreie Zeit oder ein Feiertag beanspruchen eine Woche nur, wenn sie sie vollständig abdecken.",
                 "option": {
                     "exam": "Prüfungszeitraum",
                     "break": "Unterrichtsfreie Zeit",
@@ -575,7 +575,7 @@
         "field": {
             "email": {
                 "label": "E-Mail",
-                "help": "Die Adresse für die Anmeldung, eindeutig über die gesamte Installation: ein Zugang kann in mehreren Institutionen handeln."
+                "help": "Die Adresse für die Anmeldung, eindeutig über die gesamte Installation: Ein Zugang kann in mehreren Institutionen handeln."
             },
             "personId": {
                 "label": "Handelt als"
@@ -588,7 +588,7 @@
             },
             "mustChangePassword": {
                 "label": "Muss bei der ersten Anmeldung ein neues Passwort wählen",
-                "help": "Ein Passwort, das die Administration kennt, ist ein geteiltes Geheimnis. Genau das macht es vorübergehend: die Anmeldung gelingt, erzeugt aber erst dann eine Sitzung, wenn das Passwort geändert wurde."
+                "help": "Ein Passwort, das die Administration kennt, ist ein geteiltes Geheimnis. Genau das macht es vorübergehend: Die Anmeldung gelingt, erzeugt aber erst dann eine Sitzung, wenn das Passwort geändert wurde."
             },
             "isActive": {
                 "help": "Eine Deaktivierung sperrt die Anmeldung sofort, und zwar in jeder Institution, in der dieser Zugang genutzt wird. Die Person bleibt in beiden Fällen im Stundenplan."
@@ -606,7 +606,7 @@
         "field": {
             "key": {
                 "label": "Schlüssel",
-                "help": "Stabile Kennung. `create:account --role <key>` und jeder Import sprechen die Rolle darüber an, sie kann daher später nicht geändert werden."
+                "help": "Stabile Kennung. `create:account --role ‹key›` und jeder Import sprechen die Rolle darüber an, sie kann daher später nicht geändert werden."
             },
             "permissions": {
                 "label": "Berechtigungen"

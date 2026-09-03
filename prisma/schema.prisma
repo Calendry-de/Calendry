@@ -401,6 +401,7 @@ model Tenant {
   rooms                        Room[]
   equipment                    Equipment[]
   roomEquipment                RoomEquipment[]
+  roomFootprints               RoomFootprint[]
   timeGrids                    TimeGrid[]
   displaySettings              TenantDisplaySettings?
   timeGridBreaks               TimeGridBreak[]
@@ -930,14 +931,6 @@ model Room {
   /// `MinimizeRoomRank.invert` reads the other way round.
   isSpecialized Boolean @default(false) @map("is_specialized")
 
-  /// Shared physical footprints (issue #122): Rooms carrying the same tag
-  /// occupy one space (three rooms behind movable walls and the hall they
-  /// form), so booking one blocks the others for that slot. Open vocabulary,
-  /// symmetric by construction, a tag only one Room carries is inert. Sent
-  /// verbatim as `Room.footprint_tags`. A virtual Room may carry none: the
-  /// solver refuses it at conversion, so a CHECK refuses it at the write.
-  footprintTags String[] @default([]) @map("footprint_tags")
-
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -948,6 +941,14 @@ model Room {
   sessionRooms  SessionRoom[]
   screenRooms   ScreenRoom[]
   offeringPins  OfferingRoom[]
+
+  /// Shared physical footprint (issue #122): the OTHER Rooms this one is the
+  /// same space as. Both directions are always present (a trigger mirrors
+  /// every row), so this list is complete from either side; `footprintOf` is
+  /// the same edges read from the other end and exists only because Prisma
+  /// needs a back-relation per foreign key.
+  footprints  RoomFootprint[] @relation("FootprintRoom")
+  footprintOf RoomFootprint[] @relation("FootprintOtherRoom")
 
   @@index([tenantId])
   @@index([federationId])
@@ -1002,6 +1003,43 @@ model RoomEquipment {
   @@index([equipmentId])
   @@index([tenantId])
   @@map("room_equipment")
+}
+
+/// Two Rooms that are ONE PHYSICAL SPACE (issue #122): three rooms behind
+/// movable walls and the hall they form with the walls open, or a lab and the
+/// half of it that can be partitioned off. Booking either blocks the other for
+/// that slot.
+///
+/// A PAIR, NOT A TAG. The first version stored free-text `footprint_tags` on
+/// each Room and asked the operator to invent a tag per shared wall and type
+/// it on every Room involved, which raised the question this model answers by
+/// construction: "which room carries it, the hall or the parts?" — BOTH, and
+/// now you pick the other rooms from either side and the trigger writes the
+/// other direction (`room_footprint_mirror`). The wire still speaks tags:
+/// `toWireRoom` derives one tag per pair, carried by exactly its two Rooms, so
+/// the solver's semantics are unchanged and, in particular, overlap stays
+/// NON-TRANSITIVE: with 1.0 | wall | 1.1 | wall | 1.2, the hall pairs with each
+/// part, 1.0 pairs with nothing but the hall, and booking 1.0 blocks the hall
+/// and not 1.2.
+///
+/// SELF-PAIRS ARE REFUSED by a CHECK, VIRTUAL ROOMS by a trigger on both
+/// tables (a virtual room has no physical footprint; the solver refuses one at
+/// conversion, which would fail the whole run long after the save). Tenant id
+/// nullable for the same reason `room_equipment`'s is: a federation-owned Room
+/// has no owning tenant.
+model RoomFootprint {
+  roomId      String  @map("room_id")
+  otherRoomId String  @map("other_room_id")
+  tenantId    String? @map("tenant_id")
+
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  room      Room    @relation("FootprintRoom", fields: [roomId], references: [id], onDelete: Cascade)
+  otherRoom Room    @relation("FootprintOtherRoom", fields: [otherRoomId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, otherRoomId])
+  @@index([otherRoomId])
+  @@index([tenantId])
+  @@map("room_footprint")
 }
 
 // ---------------------------------------------------------------------------

@@ -6,8 +6,14 @@
         <div class="final_measure">
             <h2 class="final_title">{{ t('landing.section.finalCta.title') }}</h2>
 
-            <p class="final_lead">{{ t('landing.section.finalCta.lead') }}</p>
-
+            <!--
+                No lead. It said "the useful conversation is about your
+                institution: how many rooms and cohorts, what your week looks
+                like, and what breaks today", and the contact section directly
+                underneath opens with the same sentence. Said once, where the
+                form is; here the title, the action and the risk line are the
+                whole band, which is what a final CTA is for.
+            -->
             <div class="final_action">
                 <LandingCta/>
             </div>
@@ -104,23 +110,6 @@ const { t } = useT();
         }
     }
 
-    &_lead {
-        @include landingReveal($shift: 16px, $order: 1);
-
-        margin: 0;
-
-        font-size: $fontSizeLg;
-        line-height: $lineHeightLg;
-        color: $surface3;
-        text-align: center;
-        text-wrap: pretty;
-
-        @include mobileOnly {
-            font-size: $fontSizeMd;
-            line-height: $lineHeightMd;
-        }
-    }
-
     /*
      * Less blur than everything above it, deliberately. This is the one element
      * on the page a reader is trying to hit, and a 12px blur on a button label
@@ -128,7 +117,7 @@ const { t } = useT();
      * in the sequence.
      */
     &_action {
-        @include landingReveal($shift: 12px, $blur: 4px, $order: 2);
+        @include landingReveal($shift: 12px, $blur: 4px, $order: 1);
     }
 
     // The risk line's default ink is set for the page ground; on this band it
@@ -136,7 +125,7 @@ const { t } = useT();
     // the property the component exposes, so the override does not depend on
     // stylesheet order. See `LandingRiskReversal`.
     &_risk {
-        @include landingReveal($shift: 12px, $blur: 4px, $order: 3);
+        @include landingReveal($shift: 12px, $blur: 4px, $order: 2);
 
         --risk-ink: #{$surface5};
     }

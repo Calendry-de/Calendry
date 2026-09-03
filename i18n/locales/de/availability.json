@@ -27,7 +27,7 @@
         "clearOverride": "Standard verwenden",
         "overrideSummary": "Zählt {value} × den Standardwert",
         "unparseable": "Geben Sie eine Zahl zwischen {min} und {max} ein, oder verwenden Sie den Standardwert.",
-        "outOfRange": "Ein Faktor muss zwischen {min} und {max} liegen. Alles darüber hinaus würde den Wunsch einer einzelnen Person schwerer wiegen lassen als die Regeln, mit denen er konkurriert."
+        "outOfRange": "Ein Faktor muss zwischen {min} und {max} liegen. Alles außerhalb dieses Bereichs würde den Wunsch einer einzelnen Person schwerer wiegen lassen als die Regeln, mit denen er konkurriert."
     },
     "holidayForm": {
         "firstDay": "Erster Abwesenheitstag",

@@ -17,7 +17,7 @@
         "modeUniversity": "Hochschule: Lehrveranstaltungen, geforderte Terminzahlen, ein Pool von Lehrkräften",
         "modeSchool": "Schule: ein Fach, eine Wochenstundenzahl, eine benannte Lehrkraft",
         "onlineHead": "Online-Termine",
-        "onlineHint": "Online-Lehre ist ein {room} und kein Schalter am Termin. Diese Einstellung entscheidet also, wie diese Tatsache gezeichnet wird, nie ob sie zutrifft. Ein Termin gilt als online, wenn jeder Raum, den er nutzt, virtuell ist.",
+        "onlineHint": "Online-Durchführung ist ein {room} und kein Schalter am Termin. Diese Einstellung entscheidet also, wie diese Tatsache gezeichnet wird, nie ob sie zutrifft. Ein Termin gilt als online, wenn jeder Raum, den er nutzt, virtuell ist.",
         "onlineHintRoom": "virtueller Raum",
         "onlineToggle": "Online-Termine im Stundenplan markieren",
         "onlineColourLabel": "Online-Farbe",
@@ -100,7 +100,7 @@
     "availabilityReviews": {
         "pageTitle": "Sperrzeitfreigabe",
         "description": "Sperrzeiten, die Personen für sich selbst erklärt haben und die auf eine Entscheidung warten.",
-        "intro": "Eine erklärte Sperrzeit ist für die Planung eine {hard} Regel, deshalb bleibt eine selbst erklärte wirkungslos, bis sie hier freigegeben wird. Sperrzeiten, die die Administration direkt eingetragen hat, sind bereits freigegeben: eine ohnehin befugte eigene Handlung freizugeben wäre Zeremonie, keine Kontrolle.",
+        "intro": "Eine erklärte Sperrzeit ist für die Planung eine {hard} Regel, deshalb bleibt eine selbst erklärte wirkungslos, bis sie hier freigegeben wird. Sperrzeiten, die die Administration direkt eingetragen hat, sind bereits freigegeben: Eine ohnehin befugte eigene Handlung freizugeben wäre Zeremonie, keine Kontrolle.",
         "introHard": "harte",
         "entryHead": "Sperrzeit für eine andere Person erfassen",
         "entryHint": "Hier eingetragen, ist sie sofort freigegeben.",

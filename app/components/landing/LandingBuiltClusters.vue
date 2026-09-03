@@ -82,10 +82,10 @@ const groups = computed(() => BUILT_CLUSTERS
 .built {
     display: flex;
     flex-direction: column;
-    gap: $space10;
+    gap: $space9;
 
     @include mobileOnly {
-        gap: $space9;
+        gap: $space8;
     }
 
     &_group {
@@ -109,12 +109,23 @@ const groups = computed(() => BUILT_CLUSTERS
     &_items {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: $space8 $space9;
+        gap: $space7 $space8;
 
         margin: 0;
         padding: 0;
 
         list-style: none;
+
+        /*
+         * THREE COLUMNS at desktop, two on a tablet. Fourteen items in two
+         * columns of 28px-leaded prose ran to ~1,900px, the tallest stretch of
+         * the page and the point where a reader who had followed the argument
+         * this far stopped scrolling. Three columns and body leading bring the
+         * same fourteen claims, unshortened, into about two thirds of that.
+         */
+        @include pc {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
 
         // One column only where a column genuinely cannot hold a sentence. The
         // two-column measure is ~62ch at the page's widest, which is inside the
@@ -163,7 +174,7 @@ const groups = computed(() => BUILT_CLUSTERS
         margin: 0;
 
         font-size: $fontSizeMd;
-        line-height: 1.75;
+        line-height: $lineHeightMd;
         color: $content6;
     }
 }

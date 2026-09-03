@@ -77,7 +77,7 @@
         },
         "manageDataExport": {
             "label": "Datenexport",
-            "description": "Laden Sie alle Personen, Konten, Gruppen, Räume, Lehrveranstaltungen, Termine und Regeln dieser Institution herunter.",
+            "description": "Laden Sie alle Personen, Zugänge, Gruppen, Räume, Lehrveranstaltungen, Termine und Regeln dieser Institution herunter.",
             "keywords": "export, download, herunterladen, dsgvo, daten, sicherung, auskunftsrecht, datenübertragbarkeit"
         },
         "manageCurriculumProgression": {
@@ -136,7 +136,7 @@
         "jumpToSection": "Zu einem Bereich springen",
         "switchInstitution": "Institution wechseln",
         "switchFailed": "Die Institution konnte nicht gewechselt werden.",
-        "expandSidebar": "ausklappen",
-        "collapseSidebar": "einklappen"
+        "expandSidebar": "Seitenleiste ausklappen",
+        "collapseSidebar": "Seitenleiste einklappen"
     }
 }

@@ -53,10 +53,15 @@ const { t } = useT();
 
 <style scoped lang="scss">
 .audience {
-    padding: $space10 $space7;
+    /*
+     * `$space8`, not `$space10`: one sentence between the hero and the first
+     * section, and at 48px above and below it floated in its own band of air,
+     * a stranded paragraph rather than the hero's last line.
+     */
+    padding: $space8 $space7;
 
     @include mobileOnly {
-        padding: $space9 $space5;
+        padding: $space7 $space5;
     }
 
     // The same 1040px column every other section uses, so this block starts on
@@ -71,14 +76,16 @@ const { t } = useT();
         // Wider than the 68ch prose measure would suggest because the type is
         // larger: at 24px this is about three lines, which is the length a
         // single statement can be before it stops being one.
-        max-width: 34ch;
+        // 48ch: three balanced lines at this size, not four narrow ones
+        // beside an empty half of the measure.
+        max-width: 48ch;
         margin: 0;
 
         // One step under the hero's display size and one over a section title,
         // which is the whole hierarchy claim: louder than a heading, quieter
         // than the headline it qualifies.
         font-size: $fontSizeXl;
-        line-height: 1.4;
+        line-height: $lineHeightXl;
         color: $content2;
         text-wrap: balance;
 

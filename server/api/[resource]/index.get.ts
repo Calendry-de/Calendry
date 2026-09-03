@@ -64,6 +64,7 @@ defineRouteMeta({
             { name: 'termId', in: 'query', schema: { type: 'string' }, description: 'groups (SCOPED-OR-UNIVERSAL: returns the groups scoped to this term AND every group carrying no scope at all, because no group_term row means every term), offerings and calendar-periods (equality).' },
             { name: 'isVirtual', in: 'query', schema: { type: 'boolean' }, description: 'rooms.' },
             { name: 'minCapacity', in: 'query', schema: { type: 'integer' }, description: 'rooms; capacity >= this value, not equality.' },
+            { name: 'excludeId', in: 'query', schema: { type: 'string' }, description: 'rooms; every room but this one. The footprint picker sends the room being edited.' },
             { name: 'kindId', in: 'query', schema: { type: 'string' }, description: 'offerings, offering-templates.' },
             { name: 'isDefault', in: 'query', schema: { type: 'boolean' }, description: 'time-grids.' },
             { name: 'kind', in: 'query', schema: { type: 'string', enum: ['HOLIDAY', 'BREAK', 'EXAM'] }, description: 'calendar-periods.' },

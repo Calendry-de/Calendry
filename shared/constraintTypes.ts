@@ -591,7 +591,7 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             'An offering can restrict which rooms may host it: a room PIN ("only these '
             + 'two lecture halls") and an online mode (forbidden, allowed, or online '
             + 'only). The solver honours both; a person dragging a session on the grid '
-            + 'can break either. This reports it — warn, never block — so the breach is '
+            + 'can break either. This reports it (warn, never block) so the breach is '
             + 'listed and counted rather than living only in whoever happened to be '
             + 'looking.',
         evaluator: 'app',

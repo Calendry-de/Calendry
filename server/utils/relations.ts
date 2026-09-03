@@ -210,6 +210,53 @@ async function lecturerPinWarnings(ctx: { tx: Tx; tenantId: string; id: string }
     ));
 }
 
+/**
+ * What a footprint set may not contain, checked on the state the write leaves
+ * behind (issue #122): the Room itself, and any virtual Room on either end.
+ *
+ * REFUSED WITH A FIELD, before the database would. Both rules also exist as a
+ * CHECK (`room_footprint_not_self`) and a trigger
+ * (`room_footprint_refuse_virtual`), which are the backstop for a write that
+ * bypasses this route; here they answer 422 naming `otherRoomId` so the form can
+ * point at the control instead of surfacing a constraint name. A virtual Room
+ * has no physical footprint, and the solver refuses one at conversion, which
+ * would fail the whole tenant's run long after the save.
+ */
+async function roomFootprintInvariants(ctx: { tx: Tx; tenantId: string; id: string }): Promise<void> {
+    const rows = await ctx.tx.roomFootprint.findMany({
+        where: { roomId: ctx.id },
+        select: { otherRoomId: true, otherRoom: { select: { isVirtual: true, name: true } } },
+    });
+
+    if (rows.some((row) => row.otherRoomId === ctx.id)) {
+        throw createError({
+            statusCode: 422,
+            message: 'A room cannot share a footprint with itself.',
+            data: { field: 'otherRoomId' },
+        });
+    }
+
+    const virtual = rows.filter((row) => row.otherRoom.isVirtual).map((row) => row.otherRoom.name);
+
+    if (virtual.length) {
+        throw createError({
+            statusCode: 422,
+            message: `A virtual room has no physical footprint: ${virtual.join(', ')}.`,
+            data: { field: 'otherRoomId' },
+        });
+    }
+
+    const self = await ctx.tx.room.findFirst({ where: { id: ctx.id }, select: { isVirtual: true } });
+
+    if (rows.length && self?.isVirtual) {
+        throw createError({
+            statusCode: 422,
+            message: 'A virtual room has no physical footprint; make it a physical room first.',
+            data: { field: 'otherRoomId' },
+        });
+    }
+}
+
 const id = z.string().min(1);
 
 export const RELATIONS: Record<string, RelationConfig> = {
@@ -412,6 +459,27 @@ export const RELATIONS: Record<string, RelationConfig> = {
         parentKey: 'offeringId',
         item: z.object({ roomId: id }),
         select: { roomId: true },
+    },
+
+    /**
+     * The OTHER Rooms this one is the same physical space as (issue #122,
+     * reworked from free-text tags; see the `RoomFootprint` schema comment).
+     *
+     * Edited from EITHER side: the table is mirrored by trigger, so replacing
+     * this Room's set also rewrites the other direction on every Room it names,
+     * and the generic delete-then-insert below needs no knowledge of that.
+     * The wire derives one footprint tag per pair (`toWireRoom`), so the
+     * solver's non-transitive expansion is exactly what the pairs say.
+     */
+    'rooms/footprint': {
+        parent: 'rooms',
+        parentModel: 'room',
+        model: 'roomFootprint',
+        parentKey: 'roomId',
+        item: z.object({ otherRoomId: id }),
+        select: { otherRoomId: true },
+        tenantColumnNullable: true,
+        afterWrite: roomFootprintInvariants,
     },
 
     'rooms/equipment': {

@@ -11,7 +11,7 @@ defineRouteMeta({
     openAPI: {
         tags: ['Resources'],
         summary: 'Replace a relation membership set',
-        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. The RESPONSE is a bare array too, except for groups/terms, offerings/groups and offerings/lecturers, which answer { rows, warnings }. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, offering-templates/lecturers, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
+        description: 'Replaces the ENTIRE membership set in one idempotent write; there is no per-row add or remove. THE BODY IS A BARE ARRAY of relation items (max 500), not an envelope. The RESPONSE is a bare array too, except for groups/terms, offerings/groups and offerings/lecturers, which answer { rows, warnings }. Requires the parent resource update permission unless the relation declares its own (persons/access-roles requires person_access_role.assign). Valid pairs: time-grids/breaks, groups/terms, groups/sources, groups/availability, offerings/groups, offerings/lecturers, offerings/equipment, offerings/rooms, offering-templates/lecturers, rooms/footprint, rooms/equipment, persons/roles, persons/access-roles, persons/groups, constraints/scopes.',
         parameters: [
             { name: 'resource', in: 'path', required: true, schema: { type: 'string', enum: ['persons', 'roles', 'groups', 'rooms', 'equipment', 'offerings', 'offering-templates', 'offering-plans', 'time-grids', 'terms', 'constraints', 'session-kinds', 'calendar-periods', 'access-roles'] } },
             { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
@@ -167,6 +167,17 @@ defineRouteMeta({
                                         roomId: {
                                             type: 'string',
                                             description: 'May name a federation-owned room the offering’s tenant can read.',
+                                        },
+                                    },
+                                },
+                                {
+                                    title: 'rooms/footprint',
+                                    type: 'object',
+                                    required: ['otherRoomId'],
+                                    properties: {
+                                        otherRoomId: {
+                                            type: 'string',
+                                            description: 'A room this one is the same physical space as (movable walls). Symmetric: saving it here also writes the other direction. Never the room itself, never a virtual room (422).',
                                         },
                                     },
                                 },

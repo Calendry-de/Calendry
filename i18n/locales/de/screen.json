@@ -2,12 +2,12 @@
     "board": {
         "noTerm": "Heute läuft kein Semester.",
         "noRooms": "Für diese Anzeigetafel sind keine Räume hinterlegt.",
-        "missingKey": "Dieser Anzeige fehlt der Schlüssel. Öffnen Sie die Adresse, mit der die Anzeigetafel eingerichtet wurde.",
+        "missingKey": "Dieser Anzeigetafel fehlt der Schlüssel. Öffnen Sie sie über die Adresse, mit der sie eingerichtet wurde.",
         "unreachable": "Der Stundenplan ist nicht erreichbar.",
         "timeColumn": "Zeit",
         "pagerLabel": "Raumseiten",
         "pageLabel": "Räume {from} bis {to} von {total}",
-        "outsideWindow": "{count} Veranstaltung außerhalb von {from}–{to} | {count} Veranstaltungen außerhalb von {from}–{to}"
+        "outsideWindow": "{count} Termin außerhalb von {from}–{to} | {count} Termine außerhalb von {from}–{to}"
     },
     "room": {
         "nowLabel": "Jetzt",
@@ -26,8 +26,8 @@
         "change": {
             "covered": "Vertretung",
             "cancelled": "Entfällt",
-            "movedIn": "Verlegt",
-            "movedAway": "Verlegt weg"
+            "movedIn": "Hierher verlegt",
+            "movedAway": "Verlegt"
         },
         "coveredBy": "Vertreten durch {name}",
         "insteadOf": "statt {names}",

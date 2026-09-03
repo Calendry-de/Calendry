@@ -817,10 +817,10 @@ export function offeringEntity(t: Translate): ManageEntity {
                 resource: 'rooms',
                 valueKey: 'roomId',
                 searchable: true,
-                // `code — name`, the way a timetabler names a room out loud:
+                // `code · name`, the way a timetabler names a room out loud:
                 // "A101" identifies it and "Lecture Hall" says which one that
                 // is. Same order the solver's own room label uses.
-                optionLabel: (row) => [row.code, row.name].filter(Boolean).join(' — '),
+                optionLabel: (row) => [row.code, row.name].filter(Boolean).join(' · '),
                 emptyHint: t('manage.offering.relation.rooms.emptyHint'),
             },
         ],
@@ -1314,16 +1314,34 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     type: 'boolean',
                     help: t('manage.room.field.isSpecialized.help'),
                 },
-                {
-                    key: 'footprintTags',
-                    label: t('manage.room.field.footprintTags.label'),
-                    type: 'tags',
-                    help: t('manage.room.field.footprintTags.help'),
-                    placeholder: t('manage.room.field.footprintTags.placeholder'),
-                },
                 { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
             ],
             relations: [
+                /*
+                 * SHARED FOOTPRINT (issue #122): the OTHER rooms this one is
+                 * the same physical space as, picked from a room search rather
+                 * than typed as tags. Symmetric on the server (a trigger
+                 * mirrors every pair), so it does not matter whether somebody
+                 * edits the hall and adds its parts or edits a part and adds
+                 * the hall: the answer to "which room carries it?" is that the
+                 * pair does, and either side shows it.
+                 *
+                 * `searchable` for the reason the Offering's room pin is: a
+                 * room inventory plausibly runs to thousands. `scopeBy`
+                 * excludes the room being edited from its own candidates,
+                 * since the write refuses a self-pair.
+                 */
+                {
+                    key: 'footprint',
+                    label: t('manage.room.relation.footprint.label'),
+                    help: t('manage.room.relation.footprint.help'),
+                    resource: 'rooms',
+                    valueKey: 'otherRoomId',
+                    searchable: true,
+                    scopeBy: { filter: 'excludeId', from: 'id' },
+                    optionLabel: (row) => [row.code, row.name].filter(Boolean).join(' · '),
+                    emptyHint: t('manage.room.relation.footprint.emptyHint'),
+                },
                 {
                     key: 'equipment',
                     label: t('manage.room.relation.equipment.label'),

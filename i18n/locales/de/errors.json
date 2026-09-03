@@ -35,7 +35,7 @@
     "page": {
         "notFound": {
             "title": "Diese Seite gibt es hier nicht",
-            "detail": "Der Link ist vielleicht veraltet, oder die Seite hat nie existiert. Auf Ihrer Seite ist nichts kaputt."
+            "detail": "Der Link ist vielleicht veraltet, oder die Seite hat nie existiert. Bei Ihnen ist nichts kaputt."
         },
         "unexpected": {
             "title": "Bei uns ist etwas schiefgegangen",

@@ -278,7 +278,17 @@ const version = computed(() => config.public.version);
         text-wrap: pretty;
     }
 
-    &_figure {
+    /*
+     * `.hero_measure > .hero_figure`, NOT `.hero_figure`. The class sits on
+     * `LandingHeroGrid`'s root, whose own scoped `.grid { width: 100% }` has
+     * the same specificity, so whichever stylesheet the browser met LAST won:
+     * the server inlines this component's CSS before the child's (325px, no
+     * bleed), the client bundle injects them the other way round (421px). The
+     * figure therefore drew at column width and jumped a third wider about a
+     * second in, when the client CSS arrived, which read as a broken entrance
+     * animation. The extra compound makes this rule win in both orders.
+     */
+    &_measure > &_figure {
         /*
          * BLEEDS RIGHT, past the measure and off the edge of the section. The
          * figure gave up two columns of grid width above and takes the presence

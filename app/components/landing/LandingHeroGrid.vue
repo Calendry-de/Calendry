@@ -340,7 +340,6 @@ const TARGETS = [
         transform: translate(0, 0);
     }
 }
-</style>
 
 @keyframes grid-target-consumed {
     0% {
@@ -359,3 +358,4 @@ const TARGETS = [
         opacity: 0;
     }
 }
+</style>

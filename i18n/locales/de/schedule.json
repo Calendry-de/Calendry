@@ -57,7 +57,7 @@
         "includeNested": "Untergruppen einbeziehen",
         "room": "Raum",
         "person": "Person",
-        "search": "Suchen…",
+        "search": "Suchen …",
         "searchIn": "{label} durchsuchen",
         "noMatches": "Keine Treffer",
         "clear": "Zurücksetzen",
@@ -97,8 +97,8 @@
         "locked": "Fixiert",
         "violationCountHard": "{count} harter Regelverstoß | {count} harte Regelverstöße",
         "violationCountSoft": "{count} weicher Regelverstoß | {count} weiche Regelverstöße",
-        "interruptedNamed": "Unterbrochen von {names}, {count} Minute wird nicht unterrichtet | Unterbrochen von {names}, {count} Minuten werden nicht unterrichtet",
-        "interruptedUnnamed": "Unterbrochen von {count} Minute Pause | Unterbrochen von {count} Minuten Pause"
+        "interruptedNamed": "Unterbrochen durch {names}, {count} Minute wird nicht unterrichtet | Unterbrochen durch {names}, {count} Minuten werden nicht unterrichtet",
+        "interruptedUnnamed": "Unterbrochen durch {count} Minute Pause | Unterbrochen durch {count} Minuten Pause"
     },
     "offGrid": {
         "heading": "{count} Termin lässt sich in diesem Raster nicht platzieren | {count} Termine lassen sich in diesem Raster nicht platzieren",
@@ -133,7 +133,7 @@
     },
     "relation": {
         "groupsLabel": "Gruppen",
-        "groupsHelp": "Verschachtelung wirkt weiter: Wählen Sie eine Kohorte aus, sind deren Seminare mit erfasst.",
+        "groupsHelp": "Verschachtelung wirkt weiter: Wählen Sie einen Jahrgang aus, sind dessen Seminare mit erfasst.",
         "groupsEmptyHint": "In diesem Semester sind keine Gruppen verfügbar.",
         "lecturerLabel": "Lehrkraft",
         "lecturerHelp": "Wer diesen Termin leitet. Eine Änderung hier überschreibt dauerhaft, was die Lehrveranstaltung oder der Solver zugeordnet hat. Genau deshalb muss der Termin vorher fixiert werden.",
@@ -142,7 +142,7 @@
         "peopleEmptyHint": "In dieser Institution gibt es noch keine Personen.",
         "substituteLabel": "Vertreten durch",
         "substituteHelp": "Eine andere Person unterrichtet nur diesen einen Termin. Die ursprüngliche Lehrkraft behält die Lehrveranstaltung, und nächste Woche gilt wieder die Regelbesetzung; nichts davon ist dauerhaft.",
-        "substituteEmptyHint": "Derzeit ist niemand frei, um dieses Zeitfenster zu vertreten."
+        "substituteEmptyHint": "Derzeit ist niemand frei, der in diesem Zeitfenster vertreten könnte."
     },
     "eventForm": {
         "dialogLabel": "Neuer Einzeltermin am {day}",
@@ -152,7 +152,7 @@
         "noteCalendar": "Wenn Sie stattdessen einen DATUMSBEREICH markieren möchten (Ferien, eine Unterrichtspause, eine Prüfungsphase), ist das {link} und kein Einzeltermin.",
         "noteCalendarLink": "ein Zeitraum im akademischen Kalender",
         "name": "Name",
-        "namePlaceholder": "Tag der offenen Tür, Klausurtermin, Teamsitzung …",
+        "namePlaceholder": "Tag der offenen Tür, Prüfungstermin, Teamsitzung …",
         "kind": "Art",
         "choose": "Auswählen …",
         "noKinds": "Diese Institution hat noch keine Terminarten. Eine ist erforderlich; verwaltet werden sie unter „Terminarten“.",
@@ -196,10 +196,10 @@
         "swap": "Tauschen",
         "cancelSwap": "Tausch abbrechen",
         "swapHint": "Wählen Sie jetzt den Termin, mit dem getauscht werden soll.",
-        "unlock": "Lösen",
+        "unlock": "Fixierung aufheben",
         "lockInPlace": "Fixieren",
         "moving": "Wird verschoben …",
-        "bank": "Reservepool",
+        "bank": "In den Reservepool",
         "unlockBeforeBank": "Heben Sie die Fixierung auf, bevor Sie diesen Termin in den Reservepool verschieben.",
         "deleteEvent": "Einzeltermin löschen",
         "deleteConfirm": "Diesen Einzeltermin löschen? Es steht keine Lehrveranstaltung dahinter, also legt ihn nichts neu an.",
@@ -291,7 +291,7 @@
         "hardViolations": "Harte Regelverstöße",
         "penalty": "Strafwert",
         "penaltyHint": "niedriger ist besser",
-        "bestOf": "bester von {count} auf derselben Eingabe",
+        "bestOf": "bester von {count} mit derselben Eingabe",
         "review": "Prüfen",
         "inspect": "Ansehen",
         "truncated": "Es werden die {limit} neuesten Planvorschläge angezeigt. Ältere sind nicht aufgeführt.",
@@ -376,7 +376,7 @@
         "terminalCurrentDetail": "{version} wurde übernommen und ist die Grundlage dieses Semesters. Hier wartet nichts auf eine Entscheidung.",
         "terminalReplacedTitle": "Übernommen und inzwischen ersetzt",
         "terminalReplacedDetail": "{version} wurde übernommen, danach hat ein späterer Planvorschlag seinen Platz eingenommen. Er ist jetzt nur noch Dokumentation.",
-        "terminalSupersededTitle": "Nicht mehr anwendbar",
+        "terminalSupersededTitle": "Kann nicht mehr übernommen werden",
         "terminalSupersededDetail": "Dieser Planvorschlag wurde verworfen oder ersetzt. Er bleibt dokumentiert und kann nicht mehr übernommen werden.",
         "terminalOtherTitle": "Dieser Planvorschlag ist {status}",
         "terminalOtherDetail": "Er wartet nicht auf eine Entscheidung."
@@ -437,7 +437,7 @@
         "movedFromWeek": "verschoben von {slot} in Woche {week}"
     },
     "termination": {
-        "unknown": "Unbekannt. Dieser Lauf ist älter als die Erfassung des Abbruchgrunds.",
+        "unknown": "Unbekannt. Dieser Lauf ist älter als die Erfassung des Beendigungsgrunds.",
         "converged": "Hat eine optimale Lösung gefunden und angehalten.",
         "moveBudget": "Das Schritt-Budget war aufgebraucht. Ein längerer Lauf kann ein besseres Ergebnis bringen.",
         "timeBudget": "Die Zeit war aufgebraucht. Nicht reproduzierbar. Ein erneuter Lauf kann abweichen.",
@@ -456,8 +456,8 @@
         "failedDetail": "Die Vorschau kam nicht zurück. Es wurde nichts geändert. Versuchen Sie es erneut."
     },
     "reviewAction": {
-        "applyLostContact": "Beim Übernehmen dieses Planvorschlags ist die Verbindung abgebrochen; es ist deshalb nicht bekannt, ob er durchgelaufen ist. Aktualisieren Sie, bevor Sie es erneut versuchen.",
-        "discardLostContact": "Beim Verwerfen dieses Planvorschlags ist die Verbindung abgebrochen; es ist deshalb nicht bekannt, ob es durchgelaufen ist. Aktualisieren Sie, bevor Sie es erneut versuchen.",
+        "applyLostContact": "Beim Übernehmen dieses Planvorschlags ist die Verbindung abgebrochen; es ist deshalb nicht bekannt, ob die Übernahme durchgelaufen ist. Aktualisieren Sie, bevor Sie es erneut versuchen.",
+        "discardLostContact": "Beim Verwerfen dieses Planvorschlags ist die Verbindung abgebrochen; es ist deshalb nicht bekannt, ob das Verwerfen durchgelaufen ist. Aktualisieren Sie, bevor Sie es erneut versuchen.",
         "appliedNoRefresh": "Übernommen. Die Ansicht konnte nicht aktualisiert werden. Laden Sie die Seite neu, um sie zu sehen.",
         "discardedNoRefresh": "Verworfen. Die Ansicht konnte nicht aktualisiert werden. Laden Sie die Seite neu, um sie zu sehen."
     },
