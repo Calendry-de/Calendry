@@ -45,7 +45,7 @@
     "repair:unsendable-constraints": "bun run scripts/repair-unsendable-constraints.ts"
   },
   "dependencies": {
-    "@calendry-de/calendry-proto": "^0.17.0",
+    "@calendry-de/calendry-proto": "^0.18.0",
     "@grpc/grpc-js": "^1.14.4",
     "@nuxt/fonts": "^0.14.0",
     "@nuxt/icon": "^2.5.1",
@@ -67,6 +67,7 @@
     "socket.io-client": "^4.8.3",
     "uuid": "^14.0.2",
     "vue": "^3.5.42",
+    "vue-i18n": "^11.4.10",
     "vue-router": "^5.3.0",
     "zod": "^4.5.2"
   },

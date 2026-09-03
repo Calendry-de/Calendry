@@ -1,4 +1,4 @@
-import type { AcademicCalendar, SlotRef, TimeGrid as WireTimeGrid } from '@calendry-de/calendry-proto';
+import type { AcademicCalendar, SlotRef, Week, TimeGrid as WireTimeGrid } from '@calendry-de/calendry-proto';
 import type { BlockGrid } from '../../shared/timeGrid';
 import { blockAtMinute } from '../../shared/timeGrid';
 import {
@@ -156,7 +156,34 @@ export function buildAcademicCalendar(
         }
     }
 
-    return { termId, weeks, holidays: holidayDates };
+    /**
+     * `ClassifiedWeek` -> the wire's `Week`, field by field.
+     *
+     * NOT A CAST, and that is the point. `classifyWeeks` answers a question
+     * about DATES and knows nothing about the wire, so the two shapes are
+     * related by a mapping rather than by an assertion — which is exactly why
+     * proto v0.18.0's new `exam_group_ids` arrived as a compile error NAMING
+     * the field instead of a message silently missing it. CLAUDE.md: never
+     * assert a proto message's shape with `as`; construct checked and let
+     * typecheck name the new field.
+     *
+     * EMPTY IS THE ANSWER, not a gap. The proto reads an empty
+     * `exam_group_ids` as EVERY Group — a term-global exam period, which is
+     * what every peer on an earlier schema sends and what this app's data
+     * actually says: `calendar_period` carries no Group scoping at all, no
+     * column and no join table, so there is no narrower set to send. Deriving
+     * one would scope an institution's exam fortnight to an audience nobody
+     * chose, the same class of mistake as sending an empty `allowed_room_ids`
+     * for "must be online".
+     */
+    const wireWeeks: Week[] = weeks.map((week) => ({
+        index: week.index,
+        startDate: week.startDate,
+        kind: week.kind,
+        examGroupIds: [],
+    }));
+
+    return { termId, weeks: wireWeeks, holidays: holidayDates };
 }
 
 // ---------------------------------------------------------------------------

@@ -2998,6 +2998,66 @@ decides what applying a plan to a second building should do. The template's
 `allowOnline → onlineMode` move was NOT optional and shipped here: a template
 holding a boolean the Offering no longer has is a shape that cannot be copied.
 
+# `Week.exam_group_ids` is sent EMPTY, and empty is the answer
+
+Proto v0.18.0 added `Week.exam_group_ids`: which Groups a week is an EXAM week
+FOR, an audience narrowing on top of `WeekKind`. `buildAcademicCalendar` sends
+it as `[]` for every week, and that is a decision rather than a stub.
+
+The proto defines empty as EVERY Group — a term-global exam period, exactly
+what every peer on an earlier schema sends. That is precisely what this app's
+data says: `calendar_period` carries no Group scoping at all, no column and no
+join table, so a period is a property of the TERM and applies to everybody in
+it. There is no narrower set to derive, and deriving one — from the Groups that
+happen to have Sessions that week, say — would scope an institution's exam
+fortnight to an audience nobody chose. Same class of mistake as sending an
+empty `allowed_room_ids` for "must be online": a value invented at the boundary
+that reads as a decision downstream.
+
+Per-Group exam periods are therefore a CAPABILITY THE WIRE NOW HAS AND THE APP
+CANNOT YET EXPRESS. Landing it is a schema change (a `calendar_period_group`
+join, or a nullable scope column) plus the editor, not a mapping tweak here.
+
+## The compile error was protecting a runtime crash
+
+`buildAcademicCalendar` returns a constructed object, not a cast, so the new
+required field arrived as `TS2322: Property 'examGroupIds' is missing`. That is
+the rule in CLAUDE.md working exactly as written — and the third time it has
+mattered, after `Room.feature_quantities` and `Session.room_ids` in v0.10.0.
+
+Had the return been `as AcademicCalendar`, it would have compiled clean and
+then thrown: ts-proto iterates a repeated field with no presence check, so
+`Week.encode` on a week with no `examGroupIds` raises
+`message.examGroupIds is not iterable`. Verified directly against the installed
+package. That throw happens inside `hashInput`, BEFORE any request is made, so
+every solve would have failed at assembly with an error naming neither the
+calendar nor the proto bump.
+
+## How it was found, which was not by CI
+
+Worth stating plainly, because the obvious reading is wrong. The CI build that
+prompted this change failed on `vue-i18n` and on nothing else: `main` was
+internally consistent at proto `0.17.0`, manifest and lockfile agreeing, and
+`0.17.0` has no `exam_group_ids` at all.
+
+It surfaced because a working copy had `0.18.0` installed in `node_modules`,
+ahead of the lockfile, so the local build compiled the app against a contract
+the repository had not adopted yet. That is an accident, but a useful one: it
+is the exact error the upgrade produces, found before the upgrade landed rather
+than after. This change therefore does two things at once — it declares
+`vue-i18n`, which is what CI was actually failing on, and it takes the
+`0.17.0 → 0.18.0` bump together with the adaptation the bump requires.
+
+`vue-i18n` is the mirror-image failure: a real runtime dependency (`createI18n`
+in the plugin, `useI18n` in the composable) that had never been added to
+`package.json`, resolving locally only as an orphan in `node_modules` left
+behind when `@nuxtjs/i18n` was removed. Declared now, so the lockfile carries it.
+
+**The shared lesson is about `node_modules`, in both directions.** One package
+was present but undeclared; another was installed ahead of the lockfile. Either
+way a green local build says nothing about the dependency tree unless the
+install is clean, and neither fault was visible in the working tree.
+
 # The online-share cap against teaching that must be online
 
 `max_online_ratio_per_group` is HARD. A tenant marks a lecture
