@@ -3184,6 +3184,41 @@ backfill:constraints -- --all-missing` so tenants can enable them.
 
 ---
 
+# Specialized rooms: `Room.isSpecialized` and `minimize_specialized_room_use` (issue #121)
+
+Room eligibility is a SUPERSET filter: an Offering requiring no features is
+eligible for every Room, the computer lab included, so an ordinary lecture
+can land in the lab while the programming class that needs it is pushed
+elsewhere, with every existing rule satisfied. The proto's
+`Room.is_specialized` and the solver's `MinimizeSpecializedRoomUse` had
+shipped; `toWireRoom` sent `isSpecialized: false` with a comment saying the
+app had no model for it. The board's audit listed four missing pieces and
+all four were confirmed missing before building: the column, the form flag,
+the catalogue entry, the wire read.
+
+## A flag, not a rank
+
+The proto's own comment settles the shape and it is worth restating here:
+`ranking` is ordinal desirability and `MinimizeRoomRank.invert` reads it the
+OTHER way round ("prefer the premium rooms"), so spelling a lab as a high
+rank would make that policy pull Sessions INTO the lab and would make "spare
+the lab but prefer the auditorium" unrepresentable. A Room can be premium,
+specialized, both or neither. Hence a boolean column of its own,
+`room.is_specialized`, default false, and a form checkbox whose help text
+names the one constraint that reads it and says it is separate from ranking.
+
+## Soft, and inert until marked
+
+`minimize_specialized_room_use` is SOFT (default weight 5): an ordinary
+lecture in the lab is a bad use of a scarce room, not an invalid timetable,
+and on a tight week it may be the only placement left. The solver prices it
+only for Offerings that require NONE of the Room's features, so the teaching
+the lab exists for pays nothing. A tenant that marks no Room pays nothing
+either. Not `defaultEnabled`, same deploy step as the other new types
+(`backfill:constraints -- --all-missing`).
+
+---
+
 # Overnight rest: `daybreak` (issue #57)
 
 Solver half `calendry-solver` `3516493`, wire type `Daybreak` with

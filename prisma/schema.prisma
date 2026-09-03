@@ -922,6 +922,14 @@ model Room {
   isVirtual Boolean @default(false) @map("is_virtual")
   isActive  Boolean @default(true) @map("is_active")
 
+  /// Scarce by FUNCTION (issue #121): a lab, a computer room, a workshop that
+  /// should stay free for the teaching that actually needs it. Sent as
+  /// `Room.is_specialized`; priced only by the `minimize_specialized_room_use`
+  /// constraint, and only for Offerings requiring none of this Room's
+  /// features. A separate axis from `ranking` (desirability), which
+  /// `MinimizeRoomRank.invert` reads the other way round.
+  isSpecialized Boolean @default(false) @map("is_specialized")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

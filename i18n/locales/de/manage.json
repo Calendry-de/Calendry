@@ -89,6 +89,10 @@
             },
             "isVirtual": {
                 "label": "Virtuell"
+            },
+            "isSpecialized": {
+                "label": "Fachraum",
+                "help": "Ein Labor, Computerraum oder eine Werkstatt, die für Unterricht frei bleiben soll, der ihre Ausstattung braucht. Nur die Regel „Fachräume freihalten“ liest dies, und sie berechnet nichts für Unterricht, der eine Ausstattung dieses Raums benötigt. Unabhängig vom Rang: Ein Raum kann hochwertig, Fachraum, beides oder keines sein."
             }
         },
         "relation": {

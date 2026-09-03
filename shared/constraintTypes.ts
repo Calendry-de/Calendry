@@ -108,6 +108,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'max_days',
     'max_consecutive_days',
     'daybreak',
+    'minimize_specialized_room_use',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -207,7 +208,8 @@ export type WireConstraintField =
     | 'maxDailySessionCount'
     | 'maxDays'
     | 'maxConsecutiveDays'
-    | 'daybreak';
+    | 'daybreak'
+    | 'minimizeSpecializedRoomUse';
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
@@ -1069,6 +1071,29 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * at all. This is the cross-check for when that derivation was wrong.
          */
         severity: 'HARD',
+        params: [],
+    },
+
+    {
+        key: 'minimize_specialized_room_use',
+        category: 'rooms',
+        wireField: 'minimizeSpecializedRoomUse',
+        label: 'Keep specialized rooms free',
+        description:
+            'Discourages placing a session in a room marked \u201Cspecialized\u201D (a lab, '
+            + 'a computer room, a workshop) when the offering requires none of that '
+            + 'room\u2019s equipment, so the room stays free for the teaching that needs '
+            + 'it. Room eligibility is a superset filter, so without this an ordinary '
+            + 'lecture can take the lab.',
+        evaluator: 'solver',
+        /*
+         * SOFT: an ordinary lecture in the lab is a bad use of a scarce room,
+         * not an invalid timetable, and on a tight week it may be the only
+         * placement left. Reads `Room.isSpecialized` (issue #121); a tenant
+         * that marks no room pays nothing.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
         params: [],
     },
 

@@ -1,0 +1,21 @@
+-- ---------------------------------------------------------------------------
+-- room.is_specialized: a Room that should stay free for teaching that needs it
+-- (issue #121)
+-- ---------------------------------------------------------------------------
+--
+-- Room eligibility is a SUPERSET filter: an Offering requiring no features is
+-- eligible for every Room, the computer lab included, so an ordinary lecture
+-- can land in the lab while the programming class that needs it is pushed
+-- elsewhere and every rule is satisfied. The proto's Room.is_specialized and
+-- the MinimizeSpecializedRoomUse soft constraint (solver-side, already in the
+-- pinned proto 0.18.0) price occupying such a Room with teaching that does not
+-- require any of its features. This column is the app's half.
+--
+-- A SEPARATE axis from `ranking`: rank is ordinal desirability and
+-- MinimizeRoomRank.invert reads it the other way round ("prefer premium
+-- rooms"), so encoding a lab as high-rank would pull Sessions INTO it. A Room
+-- can be premium and specialized, or either alone.
+--
+-- Inert on its own: costs nothing until the constraint is enabled.
+
+ALTER TABLE "room" ADD COLUMN "is_specialized" BOOLEAN NOT NULL DEFAULT false;

@@ -118,6 +118,10 @@ defineRouteMeta({
                                     isVirtual: {
                                         type: 'boolean',
                                     },
+                                    isSpecialized: {
+                                        type: 'boolean',
+                                        description: 'A lab, computer room or workshop to keep free for teaching that needs its features; priced by the minimize_specialized_room_use constraint only. Separate from ranking.',
+                                    },
                                     isActive: {
                                         type: 'boolean',
                                     },

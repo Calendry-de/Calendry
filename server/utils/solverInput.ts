@@ -1001,13 +1001,10 @@ export async function assembleSolverInput(
         featureQuantities: room.roomEquipment
             .filter((link) => link.quantity !== null)
             .map((link) => ({ feature: link.equipment.key, quantity: link.quantity! })),
-        /*
-         * The app models no specialized-room flag yet, the same "not modeled"
-         * treatment as `site` above. `false` is the proto's own documented
-         * no-op: the field is "inert on its own", costing nothing until a
-         * `MinimizeSpecializedRoomUse` constraint exists to read it.
-         */
-        isSpecialized: false,
+        // Issue #121. Inert until a `minimize_specialized_room_use` row is
+        // enabled, and even then only priced for Offerings needing none of
+        // this Room's features: the proto's documented semantics.
+        isSpecialized: room.isSpecialized,
         /*
          * SHARED PHYSICAL FOOTPRINTS, which this app cannot express yet.
          *

@@ -1301,6 +1301,12 @@ export function manageEntities(t: Translate): ManageEntity[] {
                     help: t('manage.room.field.ranking.help'),
                 },
                 { key: 'isVirtual', label: t('manage.room.field.isVirtual.label'), type: 'boolean' },
+                {
+                    key: 'isSpecialized',
+                    label: t('manage.room.field.isSpecialized.label'),
+                    type: 'boolean',
+                    help: t('manage.room.field.isSpecialized.help'),
+                },
                 { key: 'isActive', label: t('common.field.active'), type: 'boolean' },
             ],
             relations: [

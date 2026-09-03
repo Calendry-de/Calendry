@@ -89,6 +89,10 @@
             },
             "isVirtual": {
                 "label": "Virtual"
+            },
+            "isSpecialized": {
+                "label": "Specialized",
+                "help": "A lab, computer room or workshop to keep free for teaching that needs its equipment. Only the \"Keep specialized rooms free\" constraint reads this, and it charges nothing for teaching that requires one of this room's features. Separate from ranking: a room can be premium, specialized, both or neither."
             }
         },
         "relation": {

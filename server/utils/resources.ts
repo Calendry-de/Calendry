@@ -664,6 +664,8 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             location: z.string().nullish(),
             ranking: z.number().int().optional(),
             isVirtual: z.boolean().optional(),
+            // Issue #121: a lab/computer room to keep free for teaching that needs it.
+            isSpecialized: z.boolean().optional(),
             isActive: z.boolean().optional(),
         }),
         update: z.object({
@@ -673,6 +675,8 @@ export const RESOURCES: Record<string, ResourceConfig> = {
             location: z.string().nullish(),
             ranking: z.number().int().optional(),
             isVirtual: z.boolean().optional(),
+            // Issue #121: a lab/computer room to keep free for teaching that needs it.
+            isSpecialized: z.boolean().optional(),
             isActive: z.boolean().optional(),
         }),
         filters: z.object({
