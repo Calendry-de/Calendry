@@ -3158,6 +3158,32 @@ needed their `include: { template: true }` (or bare `upsert`) changed to load
 `lecturers` explicitly; the type change is what caught all three at compile
 time rather than at the first tenant to hit the untested path.
 
+# Hard day caps: `max_days` and `max_consecutive_days` (issue #56)
+
+The solver half (`calendry-solver` `fcd1c48`, wire types `MaxDays` /
+`MaxConsecutiveDays`) had shipped and the board said "Remaining, app-side:
+two catalogue entries, backfill, grep." Confirmed against the code first:
+neither key was in `shared/constraintTypes.ts`, the proto pinned here
+(0.18.0) carries both messages, and the vendored solver contains the commit.
+
+Both are HARD in the catalogue and priced at the solver's hard penalty
+rather than used as construction filters, the stance `MaxOnlineShare`
+takes: a run can `SUCCEED` while reporting the breach, so a cap that makes an
+otherwise-feasible term infeasible warns rather than dead-ends. The UI copy
+says "cap" and names the soft rule it is the counterpart of, because the
+whole point of the card is that "prefer fewer days" cannot express "never
+more than two" and the two must not read as interchangeable settings.
+`MaxHalfDays` stays excluded: it needs a morning/afternoon split the
+TimeGrid does not model.
+
+Not `defaultEnabled`. A new hard rule switched on for every tenant by
+`backfill:constraints --all-missing` would be a silent change to every
+timetable, which is exactly what CLAUDE.md's "a new constraint type is
+itself a migration" entry exists to prevent. Deploy note: `bun run
+backfill:constraints -- --all-missing` so tenants can enable them.
+
+---
+
 # The fourth append-only cascade: `session_event.actor_person_id` (issue #127)
 
 A Person who had ever moved, swapped, locked, banked or substituted a Session

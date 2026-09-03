@@ -12,6 +12,7 @@ import {
 } from '../shared/constraintTypes';
 import type { ConstraintParamDef } from '../shared/constraintTypes';
 import { toWireConstraint } from '../server/utils/solverInput';
+import { CompactnessScope } from '@calendry-de/calendry-proto';
 
 /**
  * Guards the one invariant `shared/constraintTypes.ts` exists to hold.
@@ -590,6 +591,39 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         const result = toWireConstraint(row({ type: 'invented_by_hand' }), noKinds);
 
         expect('skip' in result).toBe(true);
+    });
+});
+
+describe('the hard day caps (issue #56)', () => {
+    const scopeless: { offeringId: string | null; kindId: string | null }[] = [];
+    const noKinds = new Map<string, string>();
+    const row = (type: string, params: Record<string, unknown>) => ({
+        id: 'c', type, severity: 'HARD', weight: null, params, scopes: scopeless,
+    });
+
+    it('sends max_days with its scope and cap, HARD so the weight is zero', () => {
+        const result = toWireConstraint(row('max_days', { scope: 'PERSON', maxDays: 2 }), noKinds);
+        const config = (result as { config: Record<string, unknown> }).config;
+
+        expect(config.maxDays).toEqual({ scope: [CompactnessScope.COMPACTNESS_SCOPE_PERSON], maxDays: 2 });
+        expect(config.weight).toBe(0);
+    });
+
+    it('sends max_consecutive_days with BOTH scopes as an empty list, the wire\'s own convention', () => {
+        const result = toWireConstraint(
+            row('max_consecutive_days', { scope: 'BOTH', maxConsecutiveDays: 4 }),
+            noKinds,
+        );
+        const config = (result as { config: Record<string, unknown> }).config;
+
+        expect(config.maxConsecutiveDays).toEqual({ scope: [], maxConsecutiveDays: 4 });
+    });
+
+    it('are HARD in the catalogue: a cap a weight could outvote would be the soft rule again', () => {
+        for (const key of ['max_days', 'max_consecutive_days']) {
+            expect(findConstraintType(key)?.severity, key).toBe('HARD');
+            expect(findConstraintType(key)?.defaultEnabled, key).toBeUndefined();
+        }
     });
 });
 

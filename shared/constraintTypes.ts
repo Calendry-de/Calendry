@@ -105,6 +105,8 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'max_offering_sessions_per_day',
     'max_consecutive_offering_blocks',
     'max_daily_session_count',
+    'max_days',
+    'max_consecutive_days',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -201,7 +203,9 @@ export type WireConstraintField =
     | 'minimizeOfferingDaySplit'
     | 'maxOfferingSessionsPerDay'
     | 'maxConsecutiveOfferingBlocks'
-    | 'maxDailySessionCount';
+    | 'maxDailySessionCount'
+    | 'maxDays'
+    | 'maxConsecutiveDays';
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
@@ -1396,6 +1400,93 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 8,
             help: 'Counts every block between the first and last session, teaching or not. '
                 + 'Each block past this is charged.',
+        }],
+    },
+
+    {
+        key: 'max_days',
+        category: 'days',
+        wireField: 'maxDays',
+        label: 'Cap the days used per week',
+        description:
+            'Never more than this many different weekdays carry teaching for a group or '
+            + 'a person in one week. The HARD counterpart of “Prefer fewer teaching '
+            + 'days”: a weight can be outvoted, a cap cannot. Built for the part-time '
+            + 'lecturer contracted for two days a week.',
+        evaluator: 'solver',
+        /*
+         * HARD, priced at the solver's hard penalty rather than used as a
+         * construction filter (calendry-solver fcd1c48, the same stance as
+         * MaxOnlineShare): a run can SUCCEED while reporting the breach, so a
+         * cap that makes an otherwise-feasible term infeasible warns rather
+         * than dead-ends. The UI copy above must keep saying "cap", not
+         * "prefer": the whole point of the type (issue #56) is that it is not
+         * interchangeable with the soft rule next to it.
+         */
+        severity: 'HARD',
+        params: [{
+            key: 'scope',
+            label: 'Whose week',
+            type: 'select',
+            required: true,
+            default: 'PERSON',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s week and a person\u2019s week are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a week none of those cohorts can see.',
+        }, {
+            key: 'maxDays',
+            label: 'Weekdays at most',
+            type: 'number',
+            min: 1,
+            max: 7,
+            required: true,
+            default: 2,
+            help: 'Distinct weekdays with at least one session, counted per week. Each week '
+                + 'over the cap is a hard breach.',
+        }],
+    },
+
+    {
+        key: 'max_consecutive_days',
+        category: 'days',
+        wireField: 'maxConsecutiveDays',
+        label: 'Cap consecutive teaching days',
+        description:
+            'Never more than this many teaching days in a row for a group or a person in '
+            + 'one week: a stretch of four days followed by one off, never five straight. '
+            + 'A cap, not a preference.',
+        evaluator: 'solver',
+        // Same HARD-but-priced stance as max_days above; both share the
+        // solver's distinct-days accumulator, one counting days, the other
+        // the longest run.
+        severity: 'HARD',
+        params: [{
+            key: 'scope',
+            label: 'Whose week',
+            type: 'select',
+            required: true,
+            default: 'PERSON',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s week and a person\u2019s week are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a week none of those cohorts can see.',
+        }, {
+            key: 'maxConsecutiveDays',
+            label: 'Teaching days in a row at most',
+            type: 'number',
+            min: 1,
+            max: 7,
+            required: true,
+            default: 4,
+            help: 'The longest run of consecutive weekdays with teaching, counted per week. '
+                + 'Only the grid\u2019s active days count as consecutive.',
         }],
     },
 
