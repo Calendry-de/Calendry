@@ -79,8 +79,8 @@ async function fixture(): Promise<void> {
          VALUES ('probe-sess', $1, 'probe-term', 'probe-kind', 'probe-gen', 1, 2, 0, now())`, T,
     );
     await ownerDb.$executeRawUnsafe(
-        `INSERT INTO session_event (id, tenant_id, generation_id, session_id, type, seq, payload, created_at)
-         VALUES ('probe-ev', $1, 'probe-gen', 'probe-sess', 'CREATE', 1, '{}'::jsonb, now())`, T,
+        `INSERT INTO session_event (id, tenant_id, generation_id, session_id, type, seq, payload, actor_person_id, created_at)
+         VALUES ('probe-ev', $1, 'probe-gen', 'probe-sess', 'CREATE', 1, '{}'::jsonb, 'probe-author', now())`, T,
     );
 }
 
@@ -101,6 +101,27 @@ describe('what the cascade exemption permits', () => {
         );
 
         expect(Number(left[0]!.n)).toBe(0);
+    });
+
+    it('lets a Person who ACTED on a Session be deleted, detaching the actor (issue #127)', async () => {
+        // The fourth instance of the shape: `session_event.actor_person_id` is
+        // ON DELETE SET NULL, and the append-only trigger refused that UPDATE
+        // until 20260903190000. The fixture's event names the author as its
+        // actor precisely so this cascade FIRES; with the column NULL the
+        // test below would pass against the unfixed trigger and assert nothing.
+        await fixture();
+
+        await ownerDb.$executeRawUnsafe(`DELETE FROM person WHERE id = 'probe-author'`);
+
+        const row = await ownerDb.$queryRawUnsafe<{ actor_person_id: string | null; type: string }[]>(
+            `SELECT actor_person_id, type::text FROM session_event WHERE id = 'probe-ev'`,
+        );
+
+        // The event SURVIVES: deleting a person must not delete history. Who
+        // acted degrades to unknown rather than to a lie.
+        expect(row).toHaveLength(1);
+        expect(row[0]!.actor_person_id).toBeNull();
+        expect(row[0]!.type).toBe('CREATE');
     });
 
     it('lets a Person who created a Generation be deleted, detaching authorship', async () => {
@@ -178,6 +199,22 @@ describe('what it still refuses: the boundaries', () => {
         );
 
         expect(row[0]!.status).toBe('READY');
+    });
+
+    it('refuses REPOINTING actor_person_id at a different Person', async () => {
+        await fixture();
+
+        await expect(ownerDb.$executeRawUnsafe(
+            `UPDATE session_event SET actor_person_id = 'probe-other' WHERE id = 'probe-ev'`,
+        )).rejects.toThrow(/append-only/);
+    });
+
+    it('refuses nulling actor_person_id ALONGSIDE another change', async () => {
+        await fixture();
+
+        await expect(ownerDb.$executeRawUnsafe(
+            `UPDATE session_event SET actor_person_id = NULL, reason = 'edited' WHERE id = 'probe-ev'`,
+        )).rejects.toThrow(/append-only/);
     });
 
     it('still allows the session_event detach from 20260816180000', async () => {

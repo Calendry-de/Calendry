@@ -3158,6 +3158,48 @@ needed their `include: { template: true }` (or bare `upsert`) changed to load
 `lecturers` explicitly; the type change is what caught all three at compile
 time rather than at the first tenant to hit the untested path.
 
+# The fourth append-only cascade: `session_event.actor_person_id` (issue #127)
+
+A Person who had ever moved, swapped, locked, banked or substituted a Session
+could not be deleted. `/manage/persons` offers delete behind `person.delete`
+and answered 409 with the raw trigger text. Verified against the migration
+SQL before fixing, as the issue did: `session_event.actor_person_id` is `ON
+DELETE SET NULL`, and `deny_mutation()` permitted exactly one UPDATE shape on
+`session_event`: `session_id`/`counterpart_session_id` cleared, nothing else
+changed. The cascade's `SET actor_person_id = NULL` matched no branch and hit
+the `RAISE`, aborting the parent DELETE.
+
+## The same shape, a fourth time, one column across from the third
+
+`tests/append-only-cascades.test.ts` names the other three in its header:
+the `session_event.session_id` detach, the Tenant cascade, and
+`generation.created_by_id` against `generation_content_immutable`. The third
+was fixed as user-facing and this column, declared identically, was never
+touched; the test that read like coverage inserted its event WITHOUT an
+actor, so the cascade never fired and the case could not be exercised.
+Both are fixed together: the fixture names an actor, and a test asserts the
+event survives with `actor_person_id` nulled and `type` intact.
+
+## Widened on the same terms, not loosened
+
+Migration `20260903190000` adds `actor_person_id` to the ONE legal `NEW`
+the trigger constructs from `OLD`: cleared only, never repointed, nothing
+else changed, and at least one of the three columns actually detached so a
+no-op UPDATE is still refused. Two new refusal tests pin the boundary
+(repointing at another Person; nulling alongside a `reason` edit). The
+DELETE-cascade branch is copied verbatim; the function is replaced whole,
+so the old text cannot linger beside the new.
+
+The CLAUDE.md rule now says the general thing rather than the two-column
+instance: every `ON DELETE SET NULL` column on an append-only table needs
+its own clause in the trigger, or the schema promises a cascade the trigger
+refuses. Issue #96's anonymiser will need a larger exemption still, and it
+is a different problem: that one is a direct UPDATE by the app role, which
+`REVOKE UPDATE ON session_event FROM calendry_app` also blocks, where a
+cascade runs with the constraint's privileges.
+
+---
+
 # A mid-week absence blocks the days away, not the week (issue #118)
 
 `resolveHolidayWeeks` rounded every touched week UP to a whole one, on

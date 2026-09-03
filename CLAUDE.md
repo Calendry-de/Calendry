@@ -128,8 +128,11 @@ values. **Never hardcode an open value into logic**: never assume a Role called
   rather than the enum handles `create`/`move`/`swap`/`delete`/`lock` and
   silently drops the other six, which is why the list is gone rather than
   corrected. The trigger permits one exception: an UPDATE nulling
-  `session_id`/`counterpart_session_id` and nothing else, so a Session can be
-  deleted without destroying its audit trail.
+  `session_id`/`counterpart_session_id`/`actor_person_id` and nothing else,
+  so a Session (or, since issue #127, a Person who acted on one) can be
+  deleted without destroying the audit trail. Every column the schema
+  declares `ON DELETE SET NULL` on an append-only table needs its own clause
+  there: this shape has now bitten FOUR times (`tests/append-only-cascades.test.ts`).
 - **Nested Groups propagate conflicts both directions** (ancestor ↔ descendant).
   Read TAXONOMY.md §6 before touching conflict-check code, and never walk the
   tree live in a hot path: use the precomputed closure.
