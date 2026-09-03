@@ -3223,6 +3223,52 @@ backfill:constraints -- --all-missing` so tenants can enable them.
 
 ---
 
+# Solver-evaluated relation kinds: SameTime, SameDays, SameStart, Precedence (issues #54, #37)
+
+Both cards were "Blocked on `OfferingRelation`", then "Partial done: solver
+half landed" (`calendry-solver` `037502c` and `7919b15`, `calendry-proto`
+`1fc95f0`), with the app half open. Confirmed against the code: the pinned
+proto carries all four `OfferingRelation` variants and `wireRelationVariant`
+knew only `differentTime`. Four catalogue entries now share `different_time`'s
+`relation: { minMembers: 2 }` shape, its `ConstraintRelationMember` storage,
+its builder (the ordered Offering picker) and its wire carve-out.
+
+## A fifth evaluator list, because the fourth means something specific
+
+`RELATION_CONSTRAINT_TYPES` is not "types with members"; it is "relation
+types `violations.ts` evaluates on a manual edit", and that evaluator has
+exactly one semantics: pairwise overlap, `different_time`'s. Adding
+`same_time` to it would have warned that two parallel sections overlap,
+which is the rule working. So `SOLVER_RELATION_CONSTRAINT_TYPES` exists:
+same storage and wire, `evaluator: 'solver'`, never loaded by the app-side
+evaluator. Until an app evaluator exists for a kind, a manual edit that
+breaks it warns about nothing, exactly as every solver-owned type behaves.
+The catalogue tests now recognise a relation by `type.relation`, not by
+list membership, and assert no relation type carries a `wireField` (it
+would be sent twice).
+
+## Decisions carried from the solver, restated where a tenant reads them
+
+- **Per week, best effort** for the three "same" kinds: in each week where
+  two or more members have a placed Session their sets must be equal; a week
+  where one member meets imposes nothing, and none requires equal
+  `required_session_count`. The accepted cost, that a week one-sided by
+  construction is never flagged, follows from placing Sessions per week
+  independently with no UniTime-style meeting pattern.
+- **HARD but priced**, not filtered: a full week set cannot be checked
+  against a half-built week mid-search, so a run can `SUCCEED` while
+  reporting a mismatch. Same warn-and-allow stance as every built relation.
+- **Precedence is a chain in member order, term-wide, all pairs.** The only
+  relation kind that reads `offering_ids` order; the picker's insertion
+  order is that order, and the catalogue copy says so in capitals since
+  nothing else in the builder can. "Same week" and "within N days" are both
+  reachable through `minGapMinutes` (wall-clock through the grid, 1440 =
+  a day later) and `maxDaysBetween` (calendar days, 0 = no ceiling). A row
+  predating the parameters sends the proto zeros rather than `NaN`, which
+  would refuse the run.
+
+---
+
 # Shared footprints: `Room.footprintTags` (issue #122)
 
 Three rooms behind movable walls are one room with the walls open. Booking

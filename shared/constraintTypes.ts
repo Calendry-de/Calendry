@@ -62,6 +62,25 @@ export const RELATION_CONSTRAINT_TYPES = [
 export type RelationConstraintType = (typeof RELATION_CONSTRAINT_TYPES)[number];
 
 /**
+ * Relation kinds the SOLVER evaluates and this app does not (issues #37, #54).
+ *
+ * Same storage and same wire carve-out as `RELATION_CONSTRAINT_TYPES`
+ * (`ConstraintRelationMember`, `OfferingRelation`), but NOT in that list on
+ * purpose: `violations.ts` evaluates every type in it as `different_time`
+ * (pairwise overlap), which is the opposite of what `same_time` means. Until
+ * an app-side evaluator exists for a kind, a manual edit that breaks it warns
+ * about nothing, exactly as every solver-owned type behaves today.
+ */
+export const SOLVER_RELATION_CONSTRAINT_TYPES = [
+    'same_time',
+    'same_days',
+    'same_start',
+    'precedence',
+] as const;
+
+export type SolverRelationConstraintType = (typeof SOLVER_RELATION_CONSTRAINT_TYPES)[number];
+
+/**
  * Types owned by the solver service (TAXONOMY.md §7), evaluated at generation
  * time rather than by this app on every manual edit.
  *
@@ -613,6 +632,105 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
          * `ConstraintConfig`: see `assembleSolverInput`'s relation carve-out.
          */
         params: [],
+        relation: { minMembers: 2 },
+    },
+
+    /*
+     * SOLVER-EVALUATED RELATIONS (issues #54, #37): the same `relation` shape
+     * as `different_time`, sent through the same `OfferingRelation` carve-out,
+     * evaluated only at generation time. All HARD but PRICED at the solver's
+     * hard penalty rather than filtered (solver 037502c, 7919b15): a full
+     * week's set cannot be compared against a half-built week mid-search, so
+     * a run can SUCCEED while reporting a mismatch, the warn-and-allow stance.
+     *
+     * PER WEEK, BEST EFFORT, for the three "same" kinds: in each week where
+     * two or more members have a placed Session their sets must match; a week
+     * where only one member meets imposes nothing. None requires equal
+     * frequency. That sidesteps "one meets twice a week, the other three
+     * times" without a shared meeting-pattern object.
+     */
+    {
+        key: 'same_time',
+        category: 'structure',
+        label: 'Same time',
+        description:
+            'Named offerings meet at the same weekday-and-block slots in every week where '
+            + 'two or more of them meet: two sections of one course taught in parallel. '
+            + 'A week where only one of them meets is not compared.',
+        evaluator: 'solver',
+        severity: 'HARD',
+        params: [],
+        relation: { minMembers: 2 },
+    },
+
+    {
+        key: 'same_days',
+        category: 'structure',
+        label: 'Same days',
+        description:
+            'Named offerings meet on the same weekdays in every week where two or more '
+            + 'of them meet, whatever the time of day: a lecture and its lab on the same '
+            + 'days so a commuting cohort travels once.',
+        evaluator: 'solver',
+        severity: 'HARD',
+        params: [],
+        relation: { minMembers: 2 },
+    },
+
+    {
+        key: 'same_start',
+        category: 'structure',
+        label: 'Same start time',
+        description:
+            'Named offerings start in the same block of the day in every week where two '
+            + 'or more of them meet, whatever the weekday: a course whose two weekly '
+            + 'sessions always begin at 10:00.',
+        evaluator: 'solver',
+        severity: 'HARD',
+        params: [],
+        relation: { minMembers: 2 },
+    },
+
+    {
+        key: 'precedence',
+        category: 'structure',
+        gridRelative: true,
+        label: 'One offering before the next',
+        description:
+            'The named offerings form a chain IN THE ORDER LISTED: every session of an '
+            + 'earlier one ends before any session of the next begins, across the whole '
+            + 'term. A lab that follows its lecture, a tutorial after the material it '
+            + 'reviews. The only relation whose member order matters.',
+        evaluator: 'solver',
+        /*
+         * TERM-WIDE, ALL PAIRS, not "same week": a per-week pairing says
+         * nothing about a lab in week 2 preceding a lecture in week 3. Both
+         * narrower readings are reachable through the two parameters. A member
+         * with no Session imposes nothing on its boundaries. HARD but priced,
+         * like the three above (solver ADR-0028, "Precedence landed").
+         */
+        severity: 'HARD',
+        params: [{
+            key: 'minGapMinutes',
+            label: 'Minimum gap, in minutes',
+            type: 'number',
+            min: 0,
+            required: true,
+            default: 0,
+            help: 'Wall-clock time between the predecessor\u2019s last session ending and '
+                + 'the successor\u2019s first beginning, through the time grid. 0 keeps the '
+                + 'order but allows back-to-back; 1440 is \u201Cat least a day later\u201D.',
+        }, {
+            key: 'maxDaysBetween',
+            label: 'At most this many days apart',
+            type: 'number',
+            min: 0,
+            required: true,
+            default: 0,
+            help: 'Calendar days from the predecessor\u2019s last session to the successor\u2019s '
+                + 'first. 0 means no ceiling; 7 means \u201Cwithin a week of the lecture\u201D. '
+                + 'Calendar days, so Friday to Monday is three.',
+        }],
         relation: { minMembers: 2 },
     },
 
@@ -2057,7 +2175,8 @@ export function constraintCatalogueDrift(): { missingFromCatalogue: string[]; mi
     const declared = new Set(CONSTRAINT_TYPE_KEYS);
     const evaluated = [
         ...STRUCTURAL_CONSTRAINT_TYPES, ...PER_SESSION_CONSTRAINT_TYPES,
-        ...RELATION_CONSTRAINT_TYPES, ...SOLVER_OWNED_CONSTRAINT_TYPES,
+        ...RELATION_CONSTRAINT_TYPES, ...SOLVER_RELATION_CONSTRAINT_TYPES,
+        ...SOLVER_OWNED_CONSTRAINT_TYPES,
     ];
 
     return {

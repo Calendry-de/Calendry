@@ -84,6 +84,55 @@ describe('an enabled different_time relation', () => {
     });
 });
 
+describe('the solver-evaluated relation kinds (issues #54, #37)', () => {
+    const relate = async (type: string, params: Record<string, unknown> = {}) => {
+        const constraint = await ownerDb.constraint.create({
+            data: { tenantId: f.tenantA, type, name: type, severity: 'HARD', weight: null, isEnabled: true, params },
+        });
+
+        await ownerDb.constraintRelationMember.createMany({
+            data: [
+                { tenantId: f.tenantA, constraintId: constraint.id, offeringId: 'test-offering-a', position: 0 },
+                { tenantId: f.tenantA, constraintId: constraint.id, offeringId: offeringB, position: 1 },
+            ],
+        });
+
+        const { input, report } = await assemble();
+        const relation = input.offeringRelations.find((r) => r.id === constraint.id);
+
+        await ownerDb.constraint.delete({ where: { id: constraint.id } });
+
+        return { relation, report, id: constraint.id };
+    };
+
+    it.each([
+        ['same_time', 'sameTime'],
+        ['same_days', 'sameDays'],
+        ['same_start', 'sameStart'],
+    ] as const)('sends %s as an empty %s variant with the ordered members', async (type, field) => {
+        const { relation, report, id } = await relate(type);
+
+        expect(relation, type).toBeDefined();
+        expect(relation![field]).toEqual({});
+        expect(relation!.offeringIds).toEqual(['test-offering-a', offeringB]);
+        expect(report.skippedConstraints.find((s) => s.id === id)).toBeUndefined();
+    });
+
+    it('sends precedence with its two parameters, members in the stated order', async () => {
+        const { relation } = await relate('precedence', { minGapMinutes: 1440, maxDaysBetween: 7 });
+
+        expect(relation!.precedence).toEqual({ minGapMinutes: 1440, maxDaysBetween: 7 });
+        // The ONLY kind that reads member order: predecessor first.
+        expect(relation!.offeringIds).toEqual(['test-offering-a', offeringB]);
+    });
+
+    it('sends precedence with the proto zeros when a row predates the parameters', async () => {
+        const { relation } = await relate('precedence', {});
+
+        expect(relation!.precedence).toEqual({ minGapMinutes: 0, maxDaysBetween: 0 });
+    });
+});
+
 describe('a disabled different_time relation', () => {
     it('is not sent at all', async () => {
         const constraint = await ownerDb.constraint.create({

@@ -3,6 +3,7 @@ import {
     CONSTRAINT_TYPES,
     PER_SESSION_CONSTRAINT_TYPES,
     RELATION_CONSTRAINT_TYPES,
+    SOLVER_RELATION_CONSTRAINT_TYPES,
     SOLVER_OWNED_CONSTRAINT_TYPES,
     STRUCTURAL_CONSTRAINT_TYPES,
     constraintCatalogueDrift,
@@ -52,6 +53,14 @@ describe('constraint catalogue', () => {
             ...RELATION_CONSTRAINT_TYPES,
         ]);
 
+        // FIVE LISTS since issues #37/#54: `SOLVER_RELATION_CONSTRAINT_TYPES`
+        // share `different_time`'s storage and wire carve-out but are
+        // evaluated by the solver only, so they are 'solver' AND `relation`.
+        for (const key of SOLVER_RELATION_CONSTRAINT_TYPES) {
+            expect(findConstraintType(key)?.relation, `${key} is a relation`).toBeDefined();
+            expect(appEvaluated.has(key), `${key} must not be app-evaluated as different_time`).toBe(false);
+        }
+
         for (const type of CONSTRAINT_TYPES) {
             const expected = appEvaluated.has(type.key) ? 'app' : 'solver';
 
@@ -59,11 +68,12 @@ describe('constraint catalogue', () => {
         }
     });
 
-    it('covers exactly the four evaluator lists', () => {
+    it('covers exactly the five evaluator lists', () => {
         expect(CONSTRAINT_TYPES).toHaveLength(
             STRUCTURAL_CONSTRAINT_TYPES.length
             + PER_SESSION_CONSTRAINT_TYPES.length
             + RELATION_CONSTRAINT_TYPES.length
+            + SOLVER_RELATION_CONSTRAINT_TYPES.length
             + SOLVER_OWNED_CONSTRAINT_TYPES.length,
         );
     });
@@ -218,6 +228,10 @@ describe('constraint → wire mapping (Stage 3d)', () => {
 
         const unmapped = CONSTRAINT_TYPES
             .filter((type) => type.params.length > 0)
+            // A RELATION's parameters travel on `OfferingRelation`, built by
+            // `wireRelationVariant`, never through `toWireConstraint`; pinned
+            // in tests/offering-relation-wire.test.ts instead (`precedence`).
+            .filter((type) => !type.relation)
             .filter((type) => {
                 const params = Object.fromEntries(type.params.map((p) => [p.key, sample(p)]));
                 const result = toWireConstraint(
@@ -277,8 +291,13 @@ describe('constraint → wire mapping (Stage 3d)', () => {
         const unmapped = CONSTRAINT_TYPES
             .filter((type) => !type.wireField)
             .filter((type) => !(PER_SESSION_CONSTRAINT_TYPES as readonly string[]).includes(type.key))
-            .filter((type) => !(RELATION_CONSTRAINT_TYPES as readonly string[]).includes(type.key))
+            // Every relation kind, app- or solver-evaluated: the carve-out is
+            // the shape, not the list. A relation type WITH a wireField would be
+            // the bug here, sent twice.
+            .filter((type) => !type.relation)
             .map((type) => type.key);
+
+        expect(CONSTRAINT_TYPES.filter((type) => type.relation && type.wireField)).toEqual([]);
 
         expect(unmapped).toEqual([]);
     });

@@ -563,10 +563,29 @@ export function toWireConstraint(row: {
  * `ConstraintTypeDef.wireField` documents; reported by the caller rather
  * than guessed at here.
  */
-function wireRelationVariant(typeKey: string): Pick<OfferingRelation, 'differentTime'> | null {
+function wireRelationVariant(
+    typeKey: string,
+    params: Record<string, unknown>,
+): Pick<OfferingRelation, 'differentTime' | 'sameTime' | 'sameDays' | 'sameStart' | 'precedence'> | null {
     switch (typeKey) {
         case 'different_time':
             return { differentTime: {} };
+        case 'same_time':
+            return { sameTime: {} };
+        case 'same_days':
+            return { sameDays: {} };
+        case 'same_start':
+            return { sameStart: {} };
+        case 'precedence':
+            // `Number(undefined)` is NaN, and a NaN on the wire is a refused
+            // run, so both fall back to the proto's own zero ("back-to-back
+            // allowed", "no ceiling"), which is what the catalogue defaults to.
+            return {
+                precedence: {
+                    minGapMinutes: Number(params.minGapMinutes) || 0,
+                    maxDaysBetween: Number(params.maxDaysBetween) || 0,
+                },
+            };
         default:
             return null;
     }
@@ -1917,7 +1936,10 @@ export async function assembleSolverInput(
                 continue;
             }
 
-            const variant = wireRelationVariant(row.type);
+            const variant = wireRelationVariant(
+                row.type,
+                (row.params && typeof row.params === 'object' ? row.params : {}) as Record<string, unknown>,
+            );
 
             if (!variant) {
                 skippedConstraints.push({
