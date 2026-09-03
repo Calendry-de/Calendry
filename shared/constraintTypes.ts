@@ -129,6 +129,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'daybreak',
     'minimize_specialized_room_use',
     'minimize_break_spanning',
+    'travel_time_between_rooms',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -230,7 +231,8 @@ export type WireConstraintField =
     | 'maxConsecutiveDays'
     | 'daybreak'
     | 'minimizeSpecializedRoomUse'
-    | 'minimizeBreakSpanning';
+    | 'minimizeBreakSpanning'
+    | 'travelTimeBetweenRooms';
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
@@ -1713,6 +1715,56 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
         severity: 'SOFT',
         defaultWeight: 3,
         params: [],
+    },
+
+    {
+        key: 'travel_time_between_rooms',
+        category: 'rooms',
+        gridRelative: true,
+        wireField: 'travelTimeBetweenRooms',
+        label: 'Travel time between locations',
+        description:
+            'Requires a gap when a group\u2019s or a person\u2019s consecutive sessions on one '
+            + 'day are in rooms at different locations: another building, another campus. '
+            + 'Without it two rooms ten minutes apart can be booked back to back and the '
+            + 'timetable is valid and physically impossible.',
+        evaluator: 'solver',
+        /*
+         * READS `Room.location`, the free-text building/campus field the Room
+         * form already has, NOT a new column: the solver chose to reuse the
+         * field `MinimizeLocationChange` reads rather than introduce a second
+         * one for the identical concept (calendry-solver, `TravelTimeInstance`).
+         * An EMPTY location is "unconfigured" and counts as the SAME location as
+         * every other empty one, so a single-building tenant that never filled
+         * the field pays nothing. SOFT and priced like `room_turnaround_buffer`:
+         * a minimum-gap requirement, wall-clock through the grid.
+         */
+        severity: 'SOFT',
+        defaultWeight: 5,
+        params: [{
+            key: 'scope',
+            label: 'Whose day',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s day and a person\u2019s day are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has a day none of those cohorts can see.',
+        }, {
+            key: 'minMinutesBetweenSites',
+            label: 'Minimum gap between locations, in minutes',
+            type: 'number',
+            min: 1,
+            required: true,
+            default: 15,
+            help: 'Wall-clock time from the end of one session to the start of the next when '
+                + 'their rooms\u2019 locations differ, through the time grid. Locations are the '
+                + 'room\u2019s \u201CLocation\u201D field; rooms with no location count as one place.',
+        }],
     },
 
     {

@@ -3223,6 +3223,30 @@ backfill:constraints -- --all-missing` so tenants can enable them.
 
 ---
 
+# Travel time between rooms reads `Room.location`, not a new column (issue #38)
+
+The card said the distinguishing feature was "a new Room attribute" that
+"does not exist yet in any form", and was marked Blocked on the proto and
+solver. Both had landed (`TravelTimeBetweenRooms`, `Room.site`, solver
+`TravelTimeInstance`), and the solver made a decision the card did not
+anticipate: it reads `Room.location`, the free-text building/campus field
+the Room form has always had and `MinimizeLocationChange` already reads,
+and documents `Room.site` as an unused duplicate kept only because removing
+it would rewrite a made commit. So this repo's half is a catalogue entry and
+nothing else. `toWireRoom` keeps sending `site: ''`, with the comment
+rewritten from "not modeled yet" to "deliberately empty": sending `location`
+there too would be the second field for one concept the solver declined.
+
+An EMPTY location counts as the same location as every other empty one, so
+a single-building tenant that never filled the field pays nothing; that is
+in the help text because it is the difference between "inert until
+configured" and "penalises every room pair", and nothing else on the page
+can say it. SOFT, default weight 5, priced like `room_turnaround_buffer`
+(a minimum wall-clock gap through the grid). Not `defaultEnabled`; same
+deploy step as the other new types.
+
+---
+
 # Solver-evaluated relation kinds: SameTime, SameDays, SameStart, Precedence (issues #54, #37)
 
 Both cards were "Blocked on `OfferingRelation`", then "Partial done: solver

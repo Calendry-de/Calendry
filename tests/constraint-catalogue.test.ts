@@ -646,6 +646,33 @@ describe('the hard day caps (issue #56)', () => {
     });
 });
 
+describe('travel_time_between_rooms (issue #38)', () => {
+    it('sends the scope and the wall-clock gap, SOFT so the weight travels', () => {
+        const result = toWireConstraint(
+            {
+                id: 'c', type: 'travel_time_between_rooms', severity: 'SOFT', weight: 4,
+                params: { scope: 'PERSON', minMinutesBetweenSites: 20 }, scopes: [],
+            },
+            new Map<string, string>(),
+        );
+        const config = (result as { config: Record<string, unknown> }).config;
+
+        expect(config.travelTimeBetweenRooms).toEqual({
+            scope: [CompactnessScope.COMPACTNESS_SCOPE_PERSON],
+            minMinutesBetweenSites: 20,
+        });
+        expect(config.weight).toBe(4);
+    });
+
+    it('names the Room field it reads, since there is no new column to find', () => {
+        // The solver reads `Room.location`, which `toWireRoom` already sends;
+        // `site` stays empty on purpose. A tenant has to know which field to
+        // fill, and the help text is the only place that can say so.
+        expect(findConstraintType('travel_time_between_rooms')!.params
+            .find((param) => param.key === 'minMinutesBetweenSites')!.help).toContain('Location');
+    });
+});
+
 describe('daybreak (issue #57)', () => {
     it('sends the scope and the wall-clock rest, HARD so the weight is zero', () => {
         const result = toWireConstraint(

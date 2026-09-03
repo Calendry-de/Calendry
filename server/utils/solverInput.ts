@@ -755,6 +755,12 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 minRestMinutes: Number(params.minRestMinutes),
             };
 
+        case 'travel_time_between_rooms':
+            return {
+                scope: compactnessScope(params.scope),
+                minMinutesBetweenSites: Number(params.minMinutesBetweenSites),
+            };
+
         case 'minimize_exam_week_sessions':
             /*
              * SENT EXPLICITLY, though `{}` happens to reach the solver as false
@@ -1005,10 +1011,12 @@ export async function assembleSolverInput(
         featureTags: room.roomEquipment.map((link) => link.equipment.key),
         location: room.location ?? '',
         /*
-         * The app models no site; empty is the proto's documented "no site
-         * set" (co-located with every other Room), read only by
-         * `TravelTimeBetweenRooms` (a constraint type not yet in this repo's
-         * catalogue). Wiring a real value is part of landing that type.
+         * DELIBERATELY EMPTY, and not a gap (issue #38). The solver's
+         * `TravelTimeBetweenRooms` reads `location` above, the same field
+         * `MinimizeLocationChange` reads, and documents `site` as an unused
+         * duplicate kept only because removing it would rewrite a made
+         * commit. Sending `location` here as well would be the second field
+         * for the identical concept the solver declined to introduce.
          */
         site: '',
         /*
