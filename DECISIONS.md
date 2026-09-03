@@ -3338,6 +3338,58 @@ value under the cursor), rendered joined in read-only mode. Open vocabulary
 by design: hardcoding a tenant's building layout would push it into the
 schema, the same reason `feature_tags` and `site` are tags.
 
+## Reworked the same day: a PAIR of Rooms, picked, not a tag, typed
+
+The tag model shipped and immediately raised the question it could only
+answer in prose: "which room needs the tag, the hall or the three parts?"
+The honest answer was BOTH, one tag per shared wall, typed identically onto
+every Room involved, and a tag typed onto one Room only was inert rather than
+wrong, so a half-entered configuration looked configured and blocked nothing.
+That is the silent-failure shape this codebase keeps naming, and it was
+built into the data entry.
+
+`room_footprint` (migration `20260903220000_room_footprint_pairs`) stores
+the relationship itself: `(room_id, other_room_id)` means the two are one
+physical space. Four properties, each replacing a way the tags could be
+wrong:
+
+- **Symmetric by trigger, not by convention.** `room_footprint_mirror`
+  writes every row's mirror and removes it on delete, so the set reads
+  complete from either Room and the form edits it from either side: saving
+  the hall with its three parts IS saving each part with the hall. The
+  generic PUT-set route (delete this Room's rows, insert the new set) needs
+  no knowledge of this, and `ON CONFLICT DO NOTHING` on the mirror insert is
+  what lets it stay ignorant.
+- **The wire is unchanged, and derived.** `toWireRoom` emits one
+  `footprint_tags` entry per pair, the two ids in fixed order
+  (`footprintTag()`), carried by exactly those two Rooms. The solver's
+  non-transitive expansion therefore sees precisely what the pairs say: the
+  hall pairs with each part, the parts do not pair with each other unless
+  somebody pairs them, and `1.0 | wall | 1.1 | wall | 1.2` behaves as before.
+  Tags are never stored; two representations "kept in agreement by hand" is
+  the failure CLAUDE.md forbids.
+- **The virtual-room rule spans two tables now**, so it is two triggers
+  (`room_footprint_refuse_virtual`, `room_refuse_virtual_with_footprint`)
+  raising `check_violation` under the old constraint's name, and two route
+  guards answering 422 with a field first (`roomFootprintInvariants` in
+  relations.ts names `otherRoomId`; `roomBeforeUpdate` names `isVirtual`).
+  A self-pair is a CHECK.
+- **The picker cannot offer the room itself.** `rooms` gained an
+  `excludeId` filter and the relation declares `scopeBy: { filter:
+  'excludeId', from: 'id' }`, the first use of `scopeBy` on a SEARCHABLE
+  relation, which `searchParamsFor` was written for and had never exercised.
+
+The backfill turns every tag-clique into pairs (`a.footprint_tags &&
+b.footprint_tags`, both directions from the self-join) before the triggers
+and RLS exist, then drops the column and its CHECK. The generic `tags` field
+type stays: it is generic, and nothing about it was the problem.
+
+**Still a gap, now tracked here:** `violations.ts` warns about a manual move
+only for a Room's own double booking (`no_double_booking_room` reads shared
+`roomIds`), never through a footprint sibling. The solver enforces it; the
+UI does not yet warn about it. The pairs make that a straightforward
+expansion of `roomIds` through `room_footprint` when it is done.
+
 ---
 
 # Specialized rooms: `Room.isSpecialized` and `minimize_specialized_room_use` (issue #121)
@@ -3396,6 +3448,65 @@ an absent value as missing and `0` as present.
 The optional distance parameter the card mentioned is not built; `Room.site`
 and `TravelTimeBetweenRooms` (issue #38) are the place it would inherit
 from if a tenant ever asks for rest plus travel.
+
+---
+
+# The audit log gets its first reader, and the staff plane gets a frame (issue #78)
+
+`audit_log` had been written since issue #78 and read by nobody: no route,
+no page, so every login failure, denied cross-tenant attempt, permission
+change, export and erasure was recorded into a table only `psql` could open.
+
+## Why the reader is the staff principal, and only that
+
+The table is the fifth tenant-isolation exception: no `tenant_id` FK, no
+RLS, because a denied cross-tenant attempt is about more than one tenant and
+a bare login failure predates any tenant. A tenant-scoped reader would have
+to answer "which rows are yours?", and for this table that question has no
+honest answer: the row naming the tenant that was DENIED is exactly the one
+that tenant must not see as its own. The staff principal is never IN a
+tenant, so "every row" is the only complete answer and not a leak.
+`GET /api/staff/audit-log` therefore follows `GET /api/staff/tenants`: gated
+by `requireStaffIdentity`, read through the OWNER connection, never
+`withRequestTenant`. A tenant-facing view (an institution's own admin
+reading its own login failures) is a separate question with a separate
+filter design, and it is not answered here.
+
+## Plain ids, labelled by lookup, never dropped
+
+`tenantId` on a row is a plain id by design, so a tenant erased after the
+events it caused leaves rows behind. The route labels live tenants with a
+lookup and returns `tenant: null` for an erased one WITH the id kept, and
+the page prints "(erased institution)" rather than a blank: "an erased tenant
+did this" is precisely the kind of fact an audit log exists to keep. The
+filter, page and search all live in the URL (`?tab=audit&a=…&o=…&t=…&q=…
+&offset=…`), so a view can be pasted to a colleague, and any filter change
+returns to the first page since an offset into a different result set means
+nothing. "No rows" and "fetch failed" are two states with two renderings.
+
+## The redesign: a shell of its own, not `CommonAppShell`
+
+The staff page was three stacked `<section>`s with two tables and two
+forms, in the app's plainest styling. `CommonAppShell` was considered and
+rejected for the same reason the old page's comment gave: its rail is
+`useAppSections()`'s permission-filtered TENANT navigation, and a staff
+session has no tenant to render it around. `StaffShell` is the plane's own
+frame: the Calendry mark and an "Operator plane" kicker, a tab strip over
+the three cross-tenant surfaces (Tenants, Federations, Audit log), the tab
+in the URL. Signal Teal appears once, on the active tab's underline: an
+active toggle, which is what DESIGN.md spends the accent on. Panels are
+`surface0` on the `surface1` ground with a 1px `surface4` edge and the
+panel radius, no shadow (Floats-Or-Flat); table headers and field labels
+use the one uppercase register; counts and times are tabular. Outcome
+badges are word plus icon plus tint, never colour alone, the same rule
+violations follow.
+
+The three existing surfaces moved into `StaffTenantsPanel`,
+`StaffFederationsPanel` and `StaffCreateTenantPanel` with their logic
+unchanged (the slug-typed erasure confirmation included); the page keeps the
+two shared fetches and refreshes both after any write, because a tenant's
+federation change alters a federation's member list on the other tab.
+`utils/staff.ts` holds the two row shapes once.
 
 ---
 

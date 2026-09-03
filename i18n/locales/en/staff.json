@@ -31,7 +31,10 @@
         "localeSave": "Save locale",
         "localeSaved": "Set the default locale for '{slug}' to {locale}.",
         "localeCleared": "Cleared the default locale for '{slug}'.",
-        "localeError": "Could not update the default locale for '{slug}'."
+        "localeError": "Could not update the default locale for '{slug}'.",
+        "lead": "Every institution on this deployment. Federation and default locale save from the row; erasure asks for the slug back first.",
+        "count": "{count} tenant | {count} tenants",
+        "federationAriaLabel": "Federation for '{slug}'"
     },
     "federations": {
         "heading": "Federations",
@@ -46,7 +49,9 @@
         "submit": "Create federation",
         "created": "Created federation '{slug}'.",
         "alreadyExisted": "Federation '{slug}' already existed; nothing created.",
-        "error": "Could not create the federation."
+        "error": "Could not create the federation.",
+        "count": "{count} federation | {count} federations",
+        "createHeading": "New federation"
     },
     "createTenant": {
         "heading": "Create a tenant",
@@ -84,5 +89,58 @@
         "backToSignIn": "Back to sign in",
         "invalidPassword": "That password cannot be used.",
         "error": "Invalid credentials."
+    },
+    "shell": {
+        "kicker": "Operator plane",
+        "tabsLabel": "Staff sections",
+        "tab": {
+            "tenants": "Tenants",
+            "federations": "Federations",
+            "audit": "Audit log"
+        }
+    },
+    "audit": {
+        "heading": "Audit log",
+        "lead": "Every security-relevant event across every institution: sign-ins, permission changes, denied requests, exports and erasures. Newest first. Rows about an erased institution keep its id.",
+        "loading": "Loading…",
+        "total": "{count} entry | {count} entries",
+        "loadError": "Could not load the audit log.",
+        "empty": "Nothing has been recorded yet.",
+        "emptyFiltered": "Nothing matches these filters.",
+        "noActor": "(no actor)",
+        "erasedTenant": "(erased institution)",
+        "detailToggle": "Show details",
+        "actorPersonId": "actor person id",
+        "actorAccountId": "actor account id",
+        "pagerLabel": "Audit log pages",
+        "newer": "Newer",
+        "older": "Older",
+        "range": "{from}–{to} of {total}",
+        "filter": {
+            "action": "Event",
+            "anyAction": "Any event",
+            "outcome": "Outcome",
+            "anyOutcome": "Any outcome",
+            "tenant": "Institution",
+            "anyTenant": "Any institution",
+            "search": "Actor or target",
+            "searchPlaceholder": "Name, email, role, route…",
+            "apply": "Search",
+            "clear": "Clear filters"
+        },
+        "outcome": {
+            "SUCCESS": "Success",
+            "FAILURE": "Failure",
+            "DENIED": "Denied"
+        },
+        "column": {
+            "when": "When",
+            "outcome": "Outcome",
+            "action": "Event",
+            "actor": "Actor",
+            "target": "Target",
+            "tenant": "Institution",
+            "detail": "Details"
+        }
     }
 }

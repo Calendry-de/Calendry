@@ -31,7 +31,10 @@
         "localeSave": "Gebietsschema speichern",
         "localeSaved": "Standard-Gebietsschema für „{slug}“ auf {locale} gesetzt.",
         "localeCleared": "Standard-Gebietsschema für „{slug}“ entfernt.",
-        "localeError": "Das Standard-Gebietsschema für „{slug}“ konnte nicht geändert werden."
+        "localeError": "Das Standard-Gebietsschema für „{slug}“ konnte nicht geändert werden.",
+        "lead": "Jede Institution dieser Installation. Verbund und Standard-Locale werden in der Zeile gespeichert; das Löschen verlangt zuerst das Kürzel zurück.",
+        "count": "{count} Institution | {count} Institutionen",
+        "federationAriaLabel": "Verbund für '{slug}'"
     },
     "federations": {
         "heading": "Verbünde",
@@ -46,7 +49,9 @@
         "submit": "Verbund anlegen",
         "created": "Verbund „{slug}“ angelegt.",
         "alreadyExisted": "Verbund „{slug}“ gab es bereits; nichts angelegt.",
-        "error": "Der Verbund konnte nicht angelegt werden."
+        "error": "Der Verbund konnte nicht angelegt werden.",
+        "count": "{count} Verbund | {count} Verbünde",
+        "createHeading": "Neuer Verbund"
     },
     "createTenant": {
         "heading": "Institution anlegen",
@@ -84,5 +89,58 @@
         "backToSignIn": "Zurück zur Anmeldung",
         "invalidPassword": "Dieses Passwort kann nicht verwendet werden.",
         "error": "Ungültige Zugangsdaten."
+    },
+    "shell": {
+        "kicker": "Betreiberebene",
+        "tabsLabel": "Betreiberbereiche",
+        "tab": {
+            "tenants": "Institutionen",
+            "federations": "Verbünde",
+            "audit": "Prüfprotokoll"
+        }
+    },
+    "audit": {
+        "heading": "Prüfprotokoll",
+        "lead": "Jedes sicherheitsrelevante Ereignis über alle Institutionen: Anmeldungen, Berechtigungsänderungen, abgewiesene Anfragen, Exporte und Löschungen. Neueste zuerst. Einträge zu einer gelöschten Institution behalten deren Kennung.",
+        "loading": "Wird geladen …",
+        "total": "{count} Eintrag | {count} Einträge",
+        "loadError": "Das Prüfprotokoll konnte nicht geladen werden.",
+        "empty": "Es wurde noch nichts aufgezeichnet.",
+        "emptyFiltered": "Nichts entspricht diesen Filtern.",
+        "noActor": "(kein Akteur)",
+        "erasedTenant": "(gelöschte Institution)",
+        "detailToggle": "Details anzeigen",
+        "actorPersonId": "Personen-ID des Akteurs",
+        "actorAccountId": "Konto-ID des Akteurs",
+        "pagerLabel": "Seiten des Prüfprotokolls",
+        "newer": "Neuer",
+        "older": "Älter",
+        "range": "{from}–{to} von {total}",
+        "filter": {
+            "action": "Ereignis",
+            "anyAction": "Jedes Ereignis",
+            "outcome": "Ergebnis",
+            "anyOutcome": "Jedes Ergebnis",
+            "tenant": "Institution",
+            "anyTenant": "Jede Institution",
+            "search": "Akteur oder Ziel",
+            "searchPlaceholder": "Name, E-Mail, Rolle, Route …",
+            "apply": "Suchen",
+            "clear": "Filter zurücksetzen"
+        },
+        "outcome": {
+            "SUCCESS": "Erfolg",
+            "FAILURE": "Fehlgeschlagen",
+            "DENIED": "Abgewiesen"
+        },
+        "column": {
+            "when": "Zeitpunkt",
+            "outcome": "Ergebnis",
+            "action": "Ereignis",
+            "actor": "Akteur",
+            "target": "Ziel",
+            "tenant": "Institution",
+            "detail": "Details"
+        }
     }
 }
