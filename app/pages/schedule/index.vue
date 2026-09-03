@@ -1176,6 +1176,11 @@ function reconcileFilters() {
         && data.terms.value.length
         && !data.terms.value.some((term) => term.id === filters.termId.value)) {
         filters.termId.value = '';
+        // The cookie remembered the id that just proved stale (a deleted
+        // term, or another tenant's, since the cookie is not tenant-scoped).
+        // Left alone it would re-seed the same id on the next load; the
+        // `watch(filters.termId)` above only ever writes a truthy one.
+        patchScheduleSettings({ termId: '' });
         filterNotice.value = t('schedule.page.termGone');
 
         return;

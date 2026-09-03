@@ -136,8 +136,22 @@ export default defineEventHandler(async (event) => {
          * how the names below would come to belong to a week nobody is looking
          * at. `startDate: 'desc'` matches `RESOURCES['terms']`, so the default
          * is the same term the old five-fetch wave picked.
+         *
+         * "RESOLVED" MEANS A TERM THIS TENANT HAS. A requested id that is not in
+         * `terms` (a deleted term, or the remembered-term cookie carried over
+         * from ANOTHER tenant, since that cookie is not tenant-scoped) used to
+         * be echoed back as `resolvedTermId` verbatim. The page then cleared it
+         * (not in its list) and its watchEffect re-seeded it from this same
+         * response, a synchronous reactive cycle that Vue's dev build aborts
+         * with "Maximum recursive updates exceeded" and the PRODUCTION build,
+         * which compiles that guard out, spins forever: one fetch and one
+         * `router.replace` per turn until the tab dies. Reproduced at 1,781
+         * context requests in four seconds. Falling back here is what breaks
+         * the loop at its source; the client guards the same edge twice more.
          */
-        const termId = query.termId || terms[0]?.id || '';
+        const termId = terms.some((term) => term.id === query.termId)
+            ? query.termId!
+            : (terms[0]?.id ?? '');
 
         /**
          * Cache freshness (issue #66): the query above (terms/timeGrids,

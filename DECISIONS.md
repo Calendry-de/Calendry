@@ -3399,6 +3399,57 @@ from if a tenant ever asks for rest plus travel.
 
 ---
 
+# The schedule page froze in production only: a reactive cycle Vue guards in dev
+
+A production-only report: the schedule page freezes, then the browser dies.
+Reproduced in the dev stack by loading `/schedule?term=does-not-exist`:
+1,781 requests to `/api/schedule/context` in four seconds, and "Maximum
+recursive updates exceeded in component <index>" repeated in the console.
+Dev survives because Vue's scheduler aborts a synchronous update cycle
+after 100 turns; that guard is compiled out of production builds, where the
+same cycle spins forever with one fetch and one `router.replace` per turn.
+
+## Three pieces, each correct alone
+
+1. `server/api/schedule/context.get.ts` resolved the term as
+   `query.termId || terms[0]?.id` and echoed the requested id back as
+   `resolvedTermId` without checking it was one of the tenant's terms.
+2. `reconcileFilters` on the page clears a `termId` that is not in the
+   client's `terms` list, and shows the "term gone" notice.
+3. `useScheduleData`'s watchEffect re-seeds an empty `termId` from
+   `resolvedTermId` on the SAME stale response, which is the bad id again.
+   Back to 2, in the same flush.
+
+The trigger is any term id the current tenant does not have. The
+remembered-term cookie (`calendry-schedule-settings`) is not tenant-scoped,
+so anyone who used the schedule in one tenant and opened it in another
+carried the id across; a deleted term does the same. The dev tenant rarely
+meets either state, production does. None of the recent schedule commits
+introduced it; the pieces met when the term picker moved to the toolbar.
+
+## Fixed at the source and guarded twice more
+
+- **Server**: `resolvedTermId` is a term in `terms`, falling back to the
+  first when the request names one the tenant lacks. This alone breaks the
+  loop; a route test pins both the fallback and the honoured case.
+- **Composable**: the watchEffect seeds only an id the response's own
+  `terms` contain, so a stale response, a cache, or a future server
+  regression cannot reopen the cycle from the client side.
+- **Page**: when `reconcileFilters` clears the filter it also clears the
+  cookie. The `watch(filters.termId)` beside it writes only a truthy value,
+  so without this the stale id returned on the next load.
+
+## The general lesson, since this shape will recur
+
+Two effects that each "correct" the other's output form a loop the moment
+their notions of valid disagree. Here "valid" meant "in the list" on one
+side and "what the server said" on the other, and the server said something
+not in the list. When a watcher seeds state from a response, seed only what
+the same response also lists as legal; and never trust the dev build to
+surface an update cycle in production, because it will not.
+
+---
+
 # The fourth append-only cascade: `session_event.actor_person_id` (issue #127)
 
 A Person who had ever moved, swapped, locked, banked or substituted a Session

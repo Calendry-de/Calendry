@@ -343,6 +343,30 @@ describe('GET /api/sessions under session.read_own', () => {
 });
 
 describe('GET /api/schedule/context', () => {
+    it('resolves a termId this tenant does not have to the first real term, never echoing it back', async () => {
+        /*
+         * THE PRODUCTION FREEZE. A stale id (a deleted term, or the
+         * remembered-term cookie carried over from another tenant) used to come
+         * back as `resolvedTermId` verbatim; the page cleared it and its
+         * watchEffect re-seeded it from the same response, a reactive cycle
+         * Vue's dev build aborts ("Maximum recursive updates exceeded") and
+         * the production build runs forever. Reproduced at 1,781 context
+         * requests in four seconds. "Resolved" now means a term in `terms`.
+         */
+        const res = await api<Context>('/api/schedule/context?termId=does-not-exist', { cookie: cookies.admin });
+
+        expect(res.status).toBe(200);
+        expect(res.body.resolvedTermId).not.toBe('does-not-exist');
+        expect(res.body.terms.map((term) => term.id)).toContain(res.body.resolvedTermId);
+        expect(res.body.resolvedTermId).toBe(res.body.terms[0]!.id);
+    });
+
+    it('still honours a termId the tenant has', async () => {
+        const res = await api<Context>('/api/schedule/context?termId=test-term-a', { cookie: cookies.admin });
+
+        expect(res.body.resolvedTermId).toBe('test-term-a');
+    });
+
     it('names the room and the lecturer of a session, with no directory permission', async () => {
         const res = await api<Context>('/api/schedule/context?termId=test-term-a', { cookie: cookies.own });
 

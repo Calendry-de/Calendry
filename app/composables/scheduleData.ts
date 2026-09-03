@@ -218,11 +218,22 @@ export function useScheduleData(filters: {
 
     const reference = asyncData.data;
 
-    // Reflect the term the fetch actually used, so the toolbar shows it.
+    /*
+     * Reflect the term the fetch actually used, so the toolbar shows it.
+     *
+     * ONLY AN ID THE RESPONSE'S OWN `terms` CONTAINS. The page's
+     * `reconcileFilters` clears a term that is not in that list; seeding one
+     * back from the same response would re-trigger the clear in the same
+     * flush, a cycle Vue aborts in dev and runs forever in production (the
+     * schedule freeze). The server no longer returns such an id, and this
+     * guard is what keeps a stale response, a cache, or a future regression
+     * from reopening the loop from the client side.
+     */
     watchEffect(() => {
-        const resolved = reference.value?.resolvedTermId;
+        const context = reference.value;
+        const resolved = context?.resolvedTermId;
 
-        if (resolved && !filters.termId.value) {
+        if (resolved && !filters.termId.value && context.terms.some((term) => term.id === resolved)) {
             filters.termId.value = resolved;
         }
     });
