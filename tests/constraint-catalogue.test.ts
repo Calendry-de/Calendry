@@ -627,6 +627,29 @@ describe('the hard day caps (issue #56)', () => {
     });
 });
 
+describe('daybreak (issue #57)', () => {
+    it('sends the scope and the wall-clock rest, HARD so the weight is zero', () => {
+        const result = toWireConstraint(
+            { id: 'c', type: 'daybreak', severity: 'HARD', weight: null, params: { scope: 'GROUP', minRestMinutes: 660 }, scopes: [] },
+            new Map<string, string>(),
+        );
+        const config = (result as { config: Record<string, unknown> }).config;
+
+        expect(config.daybreak).toEqual({ scope: [CompactnessScope.COMPACTNESS_SCOPE_GROUP], minRestMinutes: 660 });
+        expect(config.weight).toBe(0);
+    });
+
+    it('accepts 0 minutes as a real value (ordering only), not as unset', () => {
+        const result = toWireConstraint(
+            { id: 'c', type: 'daybreak', severity: 'HARD', weight: null, params: { scope: 'BOTH', minRestMinutes: 0 }, scopes: [] },
+            new Map<string, string>(),
+        );
+
+        expect('config' in result).toBe(true);
+        expect((result as { config: Record<string, unknown> }).config.daybreak).toEqual({ scope: [], minRestMinutes: 0 });
+    });
+});
+
 describe('severityMismatch', () => {
     it('reports a stored severity that contradicts the catalogue', () => {
         const type = findConstraintType('no_double_booking_room')!;

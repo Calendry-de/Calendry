@@ -3184,6 +3184,30 @@ backfill:constraints -- --all-missing` so tenants can enable them.
 
 ---
 
+# Overnight rest: `daybreak` (issue #57)
+
+Solver half `calendry-solver` `3516493`, wire type `Daybreak` with
+`min_rest_minutes`, scoped per Group and/or Person; confirmed absent from
+the catalogue and present in the pinned proto before adding. The two
+decisions the card asked to settle first were settled solver-side and the
+catalogue copy carries them so a tenant is not surprised: the gap is
+WALL-CLOCK through the TimeGrid (blocks would give a different answer per
+grid), and it compares consecutive TEACHING days only, so Friday evening to
+Monday morning is never a pair. Charged once per violated pair, flat.
+
+HARD, priced at the hard penalty, not `defaultEnabled`: same reasoning as
+§ "Hard day caps" above, and the same deploy step
+(`backfill:constraints -- --all-missing`). Default 660 minutes, the common
+eleven-hour working-time floor; `0` is accepted as a real value meaning
+"ordering only", checked by test, because `missingConstraintParams` treats
+an absent value as missing and `0` as present.
+
+The optional distance parameter the card mentioned is not built; `Room.site`
+and `TravelTimeBetweenRooms` (issue #38) are the place it would inherit
+from if a tenant ever asks for rest plus travel.
+
+---
+
 # The fourth append-only cascade: `session_event.actor_person_id` (issue #127)
 
 A Person who had ever moved, swapped, locked, banked or substituted a Session

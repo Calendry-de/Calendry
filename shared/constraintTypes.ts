@@ -107,6 +107,7 @@ export const SOLVER_OWNED_CONSTRAINT_TYPES = [
     'max_daily_session_count',
     'max_days',
     'max_consecutive_days',
+    'daybreak',
 ] as const;
 
 export type SolverOwnedConstraintType = (typeof SOLVER_OWNED_CONSTRAINT_TYPES)[number];
@@ -205,7 +206,8 @@ export type WireConstraintField =
     | 'maxConsecutiveOfferingBlocks'
     | 'maxDailySessionCount'
     | 'maxDays'
-    | 'maxConsecutiveDays';
+    | 'maxConsecutiveDays'
+    | 'daybreak';
 
 /**
  * What a rule is ABOUT, for grouping the manage UI into filterable, collapsible
@@ -1487,6 +1489,54 @@ export const CONSTRAINT_TYPES: ConstraintTypeDef[] = [
             default: 4,
             help: 'The longest run of consecutive weekdays with teaching, counted per week. '
                 + 'Only the grid\u2019s active days count as consecutive.',
+        }],
+    },
+
+    {
+        key: 'daybreak',
+        category: 'days',
+        gridRelative: true,
+        wireField: 'daybreak',
+        label: 'Overnight rest between teaching days',
+        description:
+            'A minimum gap between the last session of one teaching day and the first '
+            + 'of the next, for a group or a person. Every other day rule stops at '
+            + 'midnight: without this, finishing at 21:00 and starting at 08:00 is a '
+            + 'valid timetable.',
+        evaluator: 'solver',
+        /*
+         * HARD, priced at the hard penalty (calendry-solver 3516493), the same
+         * stance as the day caps above. WALL-CLOCK, not blocks: the gap is
+         * resolved through the TimeGrid (last block's end, next day's first
+         * block's start), so a grid's breaks shift the boundary and a block
+         * count would give a different answer per grid. Consecutive TEACHING
+         * days only, as the grid's active days define them: Friday evening to
+         * Monday morning is never compared. Charged once per violated pair.
+         */
+        severity: 'HARD',
+        params: [{
+            key: 'scope',
+            label: 'Whose night',
+            type: 'select',
+            required: true,
+            default: 'BOTH',
+            options: [
+                { value: 'BOTH', label: 'Groups and people' },
+                { value: 'GROUP', label: 'Groups only' },
+                { value: 'PERSON', label: 'People only' },
+            ],
+            help: 'A group\u2019s day and a person\u2019s day are different sets \u2014 a lecturer '
+                + 'teaching three cohorts has evenings none of those cohorts can see.',
+        }, {
+            key: 'minRestMinutes',
+            label: 'Minimum rest, in minutes',
+            type: 'number',
+            min: 0,
+            required: true,
+            default: 660,
+            help: 'From the end of the last block of one teaching day to the start of the '
+                + 'first block of the next, by the clock. 660 is eleven hours, the common '
+                + 'working-time floor.',
         }],
     },
 

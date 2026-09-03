@@ -730,6 +730,12 @@ function buildVariant(typeKey: string, params: Record<string, unknown>): Record<
                 maxConsecutiveDays: Number(params.maxConsecutiveDays),
             };
 
+        case 'daybreak':
+            return {
+                scope: compactnessScope(params.scope),
+                minRestMinutes: Number(params.minRestMinutes),
+            };
+
         case 'minimize_exam_week_sessions':
             /*
              * SENT EXPLICITLY, though `{}` happens to reach the solver as false
