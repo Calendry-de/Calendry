@@ -5,7 +5,7 @@
     "": {
       "name": "calendry",
       "dependencies": {
-        "@calendry-de/calendry-proto": "^0.18.0",
+        "@calendry-de/calendry-proto": "^0.19.0",
         "@grpc/grpc-js": "^1.14.4",
         "@nuxt/fonts": "^0.14.0",
         "@nuxt/icon": "^2.5.1",
@@ -127,7 +127,7 @@
 
     "@cacheable/utils": ["@cacheable/utils@2.5.0", "", { "dependencies": { "hashery": "^1.5.1", "keyv": "^5.6.0" } }, "sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA=="],
 
-    "@calendry-de/calendry-proto": ["@calendry-de/calendry-proto@0.18.0", "https://npm.pkg.github.com/download/@calendry-de/calendry-proto/0.18.0/8ef06135e6422ec1a6299c2cf2fb90b484f9ca7f", { "dependencies": { "protobufjs": "^7.4.0" }, "peerDependencies": { "@grpc/grpc-js": "^1.12.0" } }, "sha512-4WbqNGC1Eu3TdcalNSCTJuBK2Q9XqNiyNYDLrc61xlPfVeAHczaDUot/DzUPz3OhhqyK25J36WfmSmVM324lpA=="],
+    "@calendry-de/calendry-proto": ["@calendry-de/calendry-proto@0.19.0", "https://npm.pkg.github.com/download/@calendry-de/calendry-proto/0.19.0/e787538538fba7fe16bfeea2c388df1f404dc5bb", { "dependencies": { "protobufjs": "^7.4.0" }, "peerDependencies": { "@grpc/grpc-js": "^1.12.0" } }, "sha512-IrrwxYZlhwsCAT3Siou0SiiCHwgAOoasu6NFygV+AfQI+qbgqJlathZbBI3Omi6zPAvEsjc4FuMYpBtLTGtVIA=="],
 
     "@capsizecss/unpack": ["@capsizecss/unpack@4.0.1", "", { "dependencies": { "fontkitten": "^1.0.3" } }, "sha512-CuNiSqg7+e1cO/GjffyMOm5Tt2jUF9CWHHnvQ/UkqvtkGfHdgwEC0wpmq7fkN3gxwpRnrAN0WzO3vREKmNolMQ=="],
 
